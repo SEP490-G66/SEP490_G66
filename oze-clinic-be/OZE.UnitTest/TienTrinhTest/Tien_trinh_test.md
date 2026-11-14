@@ -28,14 +28,14 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 1 | OZ-AUTH | 4–14 | 11 | 11 | 0 | 0 | 0 | 0 |
 | 2 | OZ-ME | 15–19 | 5 | 5 | 0 | 0 | 0 | 0 |
 | 3 | OZ-PAT | 20–26 | 7 | 7 | 0 | 0 | 0 | 0 |
-| 4 | OZ-SVC | 27–35 | 9 | 4 | 4 | 0 | 1 | 0 |
+| 4 | OZ-SVC | 27–35 | 9 | 5 | 3 | 0 | 1 | 0 |
 | 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 2 | 0 | 23 | 0 | 0 |
 | 6 | OZ-APPT, OZ-Q | 61–84 | 24 | 0 | 6 | 17 | 1 | 0 |
 | 7 | OZ-EXAM, OZ-IMG, OZ-MR | 85–113 | 29 | 0 | 5 | 22 | 2 | 0 |
 | 8 | OZ-TP, OZ-INV | 114–125 | 12 | 0 | 1 | 7 | 4 | 0 |
 | 9 | OZ-HOME, OZ-CFG, OZ-LEAVE, OZ-NOTIF, OZ-WH | 126–133 | 8 | 0 | 2 | 2 | 4 | 0 |
 | 10 | OZ-SIM | 134–142 | 9 | 0 | 0 | 0 | 0 | 9 |
-| | **Tổng tab hàm** | 4–142 | **139** | **29** | **18** | **71** | **12** | **9** |
+| | **Tổng tab hàm** | 4–142 | **139** | **30** | **17** | **71** | **12** | **9** |
 
 **Thứ tự đề xuất:** đợt 3 → 4 → 7 (phần chụp phim) → 6 (phần có test) → 0, rồi viết test cho các tab ✍️ theo đợt 2 → 5 → 6 → 7 → 8 → 9.
 
@@ -95,7 +95,7 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 28 | GetActiveServices | OZ-SVC-02 | ClinicServices/GetActiveServicesTests: 1 | ✅ | DuongDH | 15/11/2026 | 1 UTCID, sheet đã điền |
 | 29 | GetServiceById | OZ-SVC-03 | ClinicServices/GetServiceByIdTests: 2 | ✅ | DuongDH | 15/11/2026 | 2 UTCID, sheet đã điền |
 | 30 | GetServiceByCode | OZ-SVC-04 | ClinicServices/GetServiceByCodeTests: 2 | ✅ | DuongDH | 15/11/2026 | 2 UTCID, sheet đã điền |
-| 31 | CreateService | OZ-SVC-05 | ClinicServices/CreateServiceTests: 5 (1) | 📝 | | | |
+| 31 | CreateService | OZ-SVC-05 | ClinicServices/CreateServiceTests: 5 (1) | ✅ | DuongDH | 15/11/2026 | 5 UTCID, sheet đã điền |
 | 32 | UpdateService | OZ-SVC-06 | ClinicServices/UpdateServiceTests: 2 (1) | 📝 | | | |
 | 33 | ToggleServiceStatus | OZ-SVC-07 | ClinicServices/ToggleServiceStatusTests: 2 (1) | 📝 | | | |
 | 34 | DeleteService | OZ-SVC-08 | ClinicServices/DeleteServiceTests: 2 (1) | 📝 | | | |
@@ -285,6 +285,7 @@ Cần thêm tab (copy một tab mẫu, thêm dòng vào MethodList và Statistic
 | 15/11/2026 | DuongDH | OZ-SVC-02 GetActiveServices: 🔄→✅. Dùng test sẵn (1 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-02` → 1 Passed. Sheet đã điền và được xác nhận. |
 | 15/11/2026 | DuongDH | OZ-SVC-03 GetServiceById: 🔄→✅. Dùng test sẵn (2 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-03` → 2 Passed. Sheet đã điền và được xác nhận. |
 | 15/11/2026 | DuongDH | OZ-SVC-04 GetServiceByCode: 🔄→✅. Dùng test sẵn (2 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-04` → 4 Passed (Theory×3). Sheet đã điền và được xác nhận. |
+| 15/11/2026 | DuongDH | OZ-SVC-05 CreateService: 🔄→✅. Dùng test sẵn (5 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-05` → 5 Passed. Sheet đã điền và được xác nhận. |
 | 13/11/2026 | HungPVA | OZ-WS-01 CreateWorkShift: ✍️→✅. Viết 13 unit test service (3N, 3B, 7A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-01` → 13 Passed. Điền sheet CreateWorkShift. |
 | 14/11/2026 | HungPVA | OZ-WS-02 GetWorkShifts: ✍️→✅. Viết 12 unit test service (7N, 3B, 2A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-02` → 12 Passed. Điền sheet GetWorkShifts. |
 
