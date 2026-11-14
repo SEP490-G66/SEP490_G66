@@ -131,3 +131,21 @@ export const getMedicalRecordDetailRoute = (examinationId) => generatePath(ROUTE
 export const getErrorRoute = (code) => generatePath(ROUTES.ERROR, { code: String(code) });
 
 export const getPostLoginRoute = (role) => (role === USER_ROLES.PATIENT ? ROUTES.HOME : ROUTES.DASHBOARD);
+
+export const RECEPTION_PATIENT_CREATE_ROUTE = `${ROUTES.RECEPTION_PATIENTS}/new`;
+
+const RECEPTION_PATIENT_DETAIL = `${ROUTES.RECEPTION_PATIENTS}/:patientId`;
+
+const RECEPTION_PATIENT_EDIT = `${ROUTES.RECEPTION_PATIENTS}/:patientId/edit`;
+
+export const RECEPTION_PATIENT_QUERY = { SEARCH: "q", GENDER: "f_gender", SORT: "sort", PAGE: "page", TAB: "tab" };
+
+export const RECEPTION_PATIENT_TABS = { INFO: "info", APPOINTMENTS: "appointments", PLANS: "plans", INVOICES: "invoices" };
+
+export const getReceptionPatientRoute = (patientId, tab) => {
+    const path = generatePath(RECEPTION_PATIENT_DETAIL, { patientId: String(patientId) });
+    if (!tab || tab === RECEPTION_PATIENT_TABS.INFO) return path;
+    return `${path}?${new URLSearchParams({ [RECEPTION_PATIENT_QUERY.TAB]: tab })}`;
+};
+
+export const getReceptionPatientEditRoute = (patientId) => generatePath(RECEPTION_PATIENT_EDIT, { patientId: String(patientId) });

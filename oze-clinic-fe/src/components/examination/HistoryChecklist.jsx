@@ -14,20 +14,29 @@ const allOptions = (options, value) => [...options, ...value.filter((item) => !o
 
 // One collapsible group of the medical history (Dị ứng, Bệnh nền…): tick items, or type one that is not listed.
 // Collapsed, the head shows the ticked items.
-const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "neutral", placeholder, note, defaultOpen = true }) => {
+const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "neutral", placeholder, note, defaultOpen = true, locked, itemNotes, maxLength, emptyError }) => {
     const panelId = useId();
     const inputId = useId();
+    const errorId = useId();
     const [open, setOpen] = useState(defaultOpen);
     const [draft, setDraft] = useState("");
+    const [draftError, setDraftError] = useState(false);
+    const isLocked = (item) => Boolean(locked?.includes(item));
     const colors = TONES[tone] ?? TONES.neutral;
     const items = allOptions(options, value);
     const isChecked = (item) => value.includes(item);
 
-    const toggle = (item) => onChange?.(isChecked(item) ? value.filter((entry) => entry !== item) : [...value, item]);
+    const toggle = (item) => {
+        if (isLocked(item)) return;
+        onChange?.(isChecked(item) ? value.filter((entry) => entry !== item) : [...value, item]);
+    };
 
     const addDraft = () => {
         const text = draft.trim();
-        if (!text) return;
+        if (!text) {
+            if (emptyError) setDraftError(true);
+            return;
+        }
         const existing = items.find((item) => normalizeText(item) === normalizeText(text));
         if (!existing) onChange?.([...value, text]);
         else if (!isChecked(existing)) onChange?.([...value, existing]);
@@ -58,6 +67,8 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                             {items.map((item) => {
                                 const checked = isChecked(item);
+                                const itemLocked = isLocked(item);
+                                const itemNote = itemNotes?.[item];
                                 return (
                                     <label
                                         key={item}
@@ -71,9 +82,13 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
                                             type="checkbox"
                                             className={cx("size-4 shrink-0", colors.accent)}
                                             checked={checked}
+                                            disabled={itemLocked || undefined}
                                             onChange={() => toggle(item)}
                                         />
-                                        <span className="min-w-0 break-words">{item}</span>
+                                        <span className="min-w-0 break-words">
+                                            {item}
+                                            {itemNote && <span className="block text-caption font-normal text-muted">{itemNote}</span>}
+                                        </span>
                                     </label>
                                 );
                             })}
@@ -89,17 +104,28 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
                             className="input min-w-0 flex-1"
                             placeholder={placeholder}
                             value={draft}
-                            onChange={(event) => setDraft(event.target.value)}
+                            maxLength={maxLength}
+                            aria-invalid={draftError ? "true" : undefined}
+                            aria-describedby={draftError ? errorId : undefined}
+                            onChange={(event) => {
+                                setDraft(event.target.value);
+                                if (draftError) setDraftError(false);
+                            }}
                             onKeyDown={(event) => {
                                 if (event.key !== "Enter") return;
                                 event.preventDefault();
                                 addDraft();
                             }}
                         />
-                        <button type="button" className="btn btn-secondary shrink-0" disabled={!draft.trim()} onClick={addDraft}>
+                        <button type="button" className="btn btn-secondary shrink-0" disabled={emptyError ? undefined : !draft.trim()} onClick={addDraft}>
                             + Thêm
                         </button>
                     </div>
+                    {draftError && (
+                        <p id={errorId} className="error-text">
+                            {emptyError}
+                        </p>
+                    )}
                 </div>
             )}
         </div>

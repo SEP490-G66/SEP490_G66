@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Modal from "@/components/ui/Modal";
 import { PRIORITY, clinicToday, findPatientsByKeyword, getAvailableSlots } from "@/services/receptionService";
 import { PRIORITY_LABEL, ddmm, dmy, hhmm, servicesOf, slotText, useSubmit } from "./receptionUtils";
 import { cx } from "@/utils/cx";
+import { PATIENT_RECORD_TEXT } from "@/utils/messages";
+import { genderOf, phoneDisplay, walkInName } from "@/utils/patientRecord";
 
 // Shared pieces of the receptionist pages: formatting, status labels, page and card frames, and the dialogs.
 
@@ -133,10 +135,10 @@ export const RescheduleDialog = ({ appointment, onClose, onSubmit }) => {
     );
 };
 
-export const DialogActions = ({ onClose, submitLabel, disabled, danger, busy }) => (
+export const DialogActions = ({ onClose, submitLabel, disabled, danger, busy, closeDisabled, closeLabel }) => (
     <div className="mt-6 flex justify-end gap-2">
-        <button type="button" className="btn btn-secondary" onClick={onClose}>
-            Đóng
+        <button type="button" className="btn btn-secondary" onClick={onClose} disabled={closeDisabled}>
+            {closeLabel ?? "Đóng"}
         </button>
         <button type="submit" className={cx("btn", danger ? "btn-danger" : "btn-primary")} disabled={disabled || busy}>
             {busy && <span className="btn-spinner" aria-hidden />}
@@ -147,14 +149,20 @@ export const DialogActions = ({ onClose, submitLabel, disabled, danger, busy }) 
 
 const PRIORITY_REASONS = ["Đau cấp, sưng", "Chảy máu sau nhổ răng", "Trẻ nhỏ", "Người cao tuổi", "Phụ nữ mang thai", "Người khuyết tật"];
 
-export const PriorityFields = ({ priority, setPriority, reason, setReason, idPrefix }) => (
+export const PriorityFields = ({ priority, setPriority, reason, setReason, idPrefix, checkedRef }) => (
     <>
         <fieldset className="field">
             <legend className="label">Mức ưu tiên</legend>
             <div className="flex flex-wrap gap-4 pt-1">
                 {Object.entries(PRIORITY_LABEL).map(([value, label]) => (
                     <label key={value} className="flex items-center gap-2 text-body-sm">
-                        <input type="radio" name={`${idPrefix}-priority`} checked={priority === Number(value)} onChange={() => setPriority(Number(value))} />
+                        <input
+                            ref={priority === Number(value) ? checkedRef : undefined}
+                            type="radio"
+                            name={`${idPrefix}-priority`}
+                            checked={priority === Number(value)}
+                            onChange={() => setPriority(Number(value))}
+                        />
                         {label}
                     </label>
                 ))}
@@ -308,16 +316,31 @@ export const NoShowDialog = ({ appointment, onClose, onSubmit }) => {
     );
 };
 
-export const WalkInDialog = ({ doctors, onClose, onSubmit }) => {
+export const WalkInDialog = ({ doctors, onClose, onSubmit, patient, doctorsStatus, onRetryDoctors }) => {
     const [phone, setPhone] = useState("");
     const [fullName, setFullName] = useState("");
     const [dateOfBirth, setDateOfBirth] = useState("");
     const [gender, setGender] = useState("");
-    const [doctorId, setDoctorId] = useState(doctors[0]?.id ?? "");
+    const [doctorId, setDoctorId] = useState(patient ? "" : (doctors[0]?.id ?? ""));
     const [priority, setPriorityValue] = useState(PRIORITY.NORMAL);
     const [reason, setReason] = useState("");
     const [found, setFound] = useState(null);
     const [busy, submit] = useSubmit(onSubmit);
+    const [sending, setSending] = useState(false);
+    const [alert, setAlert] = useState(null);
+    const [doctorError, setDoctorError] = useState(false);
+    const priorityRef = useRef(null);
+    const doctorRef = useRef(null);
+    const alertRef = useRef(null);
+    const formRef = useRef(null);
+
+    useEffect(() => {
+        if (patient) onRetryDoctors?.();
+    }, [patient, onRetryDoctors]);
+
+    useEffect(() => {
+        if (alert) alertRef.current?.focus();
+    }, [alert]);
 
     // Look the phone number up so an existing patient is not created twice
     const lookUp = async () => {
@@ -334,6 +357,129 @@ export const WalkInDialog = ({ doctors, onClose, onSubmit }) => {
     };
 
     const needsReason = priority > PRIORITY.NORMAL && !reason.trim();
+    const chosenDoctor = patient && !doctors.some((d) => String(d.id) === String(doctorId)) ? "" : doctorId;
+    const doctorsReady = doctorsStatus === "ready";
+
+    const sendForPatient = async () => {
+        if (!chosenDoctor) {
+            setDoctorError(true);
+            doctorRef.current?.focus();
+            return;
+        }
+        setSending(true);
+        setAlert(null);
+        formRef.current?.closest(".modal")?.focus();
+        try {
+            const outcome = await onSubmit({
+                fullName: walkInName(patient.fullName),
+                phoneNumber: patient.phoneNumber,
+                dateOfBirth: null,
+                gender: null,
+                email: null,
+                doctorId: Number(chosenDoctor),
+                serviceId: [],
+                variantId: [],
+                priority,
+                reason: reason.trim() || null,
+            });
+            if (outcome?.alert) setAlert(outcome.alert);
+        } finally {
+            setSending(false);
+        }
+    };
+
+    if (patient) {
+        const genderLabel = genderOf(patient.gender).label;
+        return (
+            <Modal
+                title={PATIENT_RECORD_TEXT.WALK_IN_TITLE}
+                description={PATIENT_RECORD_TEXT.WALK_IN_DESCRIPTION}
+                onClose={onClose}
+                initialFocusRef={priorityRef}
+                closeDisabled={sending}
+            >
+                <form
+                    ref={formRef}
+                    noValidate
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!sending) sendForPatient();
+                    }}
+                    className="space-y-4"
+                >
+                    <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-lg bg-surface-muted px-3 py-2 text-body-sm">
+                        {[
+                            [PATIENT_RECORD_TEXT.FIELDS.FULL_NAME, patient.fullName],
+                            [PATIENT_RECORD_TEXT.FIELDS.PHONE, phoneDisplay(patient.phoneNumber)],
+                            [PATIENT_RECORD_TEXT.FIELDS.DOB, patient.dateOfBirth ? dmy(String(patient.dateOfBirth).slice(0, 10)) : PATIENT_RECORD_TEXT.DASH],
+                            [PATIENT_RECORD_TEXT.FIELDS.GENDER, genderLabel],
+                        ].map(([label, value]) => (
+                            <div key={label} className="contents">
+                                <dt className="text-muted">{label}</dt>
+                                <dd className="m-0 text-ink">{value}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <div className="field">
+                        <label className="label label-required" htmlFor="wi-doctor">
+                            {PATIENT_RECORD_TEXT.DOCTOR_LABEL}
+                        </label>
+                        <select
+                            ref={doctorRef}
+                            id="wi-doctor"
+                            className="input"
+                            value={chosenDoctor}
+                            disabled={!doctorsReady || sending}
+                            aria-invalid={doctorError ? "true" : undefined}
+                            aria-describedby={doctorError ? "wi-doctor-error" : undefined}
+                            onChange={(e) => {
+                                setDoctorId(e.target.value);
+                                setDoctorError(false);
+                            }}
+                        >
+                            <option value="">{PATIENT_RECORD_TEXT.CHOOSE_DOCTOR}</option>
+                            {doctors.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                    {d.name}
+                                    {d.room ? ` · ${d.room}` : ""}
+                                </option>
+                            ))}
+                        </select>
+                        {doctorsStatus === "loading" && <p className="help-text">{PATIENT_RECORD_TEXT.REASON_DOCTORS_LOADING}</p>}
+                        {doctorsReady && doctors.length === 0 && <p className="help-text">{PATIENT_RECORD_TEXT.REASON_NO_DOCTORS}</p>}
+                        {doctorError && (
+                            <p id="wi-doctor-error" className="error-text">
+                                {PATIENT_RECORD_TEXT.DOCTOR_REQUIRED}
+                            </p>
+                        )}
+                    </div>
+                    {doctorsStatus === "error" && (
+                        <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
+                            <span className="flex-1">{PATIENT_RECORD_TEXT.REASON_DOCTORS_ERROR}</span>
+                            <button type="button" className="btn btn-secondary h-9" onClick={() => onRetryDoctors?.()}>
+                                {PATIENT_RECORD_TEXT.RETRY}
+                            </button>
+                        </div>
+                    )}
+                    <PriorityFields priority={priority} setPriority={setPriorityValue} reason={reason} setReason={setReason} idPrefix="wi" checkedRef={priorityRef} />
+                    {alert && (
+                        <p ref={alertRef} role="alert" tabIndex={-1} className="alert alert-danger">
+                            {alert}
+                        </p>
+                    )}
+                    <DialogActions
+                        onClose={onClose}
+                        submitLabel={PATIENT_RECORD_TEXT.WALK_IN_SUBMIT}
+                        busy={sending}
+                        disabled={!doctorsReady || doctors.length === 0 || needsReason}
+                        closeDisabled={sending}
+                        closeLabel={PATIENT_RECORD_TEXT.CANCEL}
+                    />
+                </form>
+            </Modal>
+        );
+    }
+
     return (
         <Modal title="Tiếp nhận khách vãng lai" description="Khách đến không hẹn trước được check-in ngay và vào nhóm vãng lai của hàng chờ." onClose={onClose}>
             <form
