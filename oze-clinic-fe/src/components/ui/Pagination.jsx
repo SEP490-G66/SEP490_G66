@@ -13,50 +13,59 @@ const visiblePages = (page, totalPages) => {
 };
 
 // Previous / page numbers / next. label names the list for screen readers, e.g. "Phân trang danh sách phòng".
-const Pagination = ({ page, totalPages, onChange, label = "Phân trang" }) => (
-    <nav aria-label={label} className="flex items-center gap-2">
-        <button
-            type="button"
-            className={ICON_BUTTON_CLASS}
-            aria-label="Trang trước"
-            title="Trang trước"
-            disabled={page <= 1}
-            onClick={() => onChange(page - 1)}
-        >
-            <ChevronLeft className="size-4" aria-hidden="true" />
-        </button>
-        {visiblePages(page, totalPages).map((pageNumber, index, pages) => (
-            <Fragment key={pageNumber}>
-                {index > 0 && pageNumber - pages[index - 1] > 1 && (
-                    <span className="num text-caption text-muted" aria-hidden="true">
-                        …
-                    </span>
-                )}
-                <button
-                    type="button"
-                    className={cx(
-                        "btn btn-icon num size-8",
-                        pageNumber === page ? "bg-primary-soft text-primary" : "hover:bg-surface-tint",
+const Pagination = ({ page, totalPages, onChange, label = "Phân trang", busy }) => {
+    const soft = busy !== undefined;
+    const blocked = (off) => (soft ? { "aria-disabled": busy || off ? "true" : undefined } : { disabled: off });
+    const go = (target, off) => () => {
+        if (soft && (busy || off)) return;
+        onChange(target);
+    };
+    return (
+        <nav aria-label={label} className="flex items-center gap-2">
+            <button
+                type="button"
+                className={ICON_BUTTON_CLASS}
+                aria-label="Trang trước"
+                title="Trang trước"
+                {...blocked(page <= 1)}
+                onClick={go(page - 1, page <= 1)}
+            >
+                <ChevronLeft className="size-4" aria-hidden="true" />
+            </button>
+            {visiblePages(page, totalPages).map((pageNumber, index, pages) => (
+                <Fragment key={pageNumber}>
+                    {index > 0 && pageNumber - pages[index - 1] > 1 && (
+                        <span className="num text-caption text-muted" aria-hidden="true">
+                            …
+                        </span>
                     )}
-                    aria-current={pageNumber === page ? "page" : undefined}
-                    aria-label={`Trang ${pageNumber}`}
-                    onClick={() => onChange(pageNumber)}
-                >
-                    {pageNumber}
-                </button>
-            </Fragment>
-        ))}
-        <button
-            type="button"
-            className={ICON_BUTTON_CLASS}
-            aria-label="Trang sau"
-            title="Trang sau"
-            disabled={page >= totalPages}
-            onClick={() => onChange(page + 1)}
-        >
-            <ChevronRight className="size-4" aria-hidden="true" />
-        </button>
-    </nav>
-);
+                    <button
+                        type="button"
+                        className={cx(
+                            "btn btn-icon num size-8",
+                            pageNumber === page ? "bg-primary-soft text-primary" : "hover:bg-surface-tint",
+                        )}
+                        aria-current={pageNumber === page ? "page" : undefined}
+                        aria-label={`Trang ${pageNumber}`}
+                        {...(soft ? blocked(false) : {})}
+                        onClick={go(pageNumber, false)}
+                    >
+                        {pageNumber}
+                    </button>
+                </Fragment>
+            ))}
+            <button
+                type="button"
+                className={ICON_BUTTON_CLASS}
+                aria-label="Trang sau"
+                title="Trang sau"
+                {...blocked(page >= totalPages)}
+                onClick={go(page + 1, page >= totalPages)}
+            >
+                <ChevronRight className="size-4" aria-hidden="true" />
+            </button>
+        </nav>
+    );
+};
 
 export default Pagination;
