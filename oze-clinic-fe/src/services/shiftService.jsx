@@ -3,7 +3,8 @@ import { USER_ROLES } from "../utils/messages";
 import { MOCK_ROOMS, ROOM_STATUSES, ROOM_TYPES } from "../utils/data/mockRooms";
 import { MOCK_ABSENCES, MOCK_LEAVES, MOCK_SHIFT_TEMPLATE, MOCK_UNASSIGNED, SHIFT_STATUSES } from "../utils/data/mockShifts";
 import { LEAVE_REQUEST_STATUSES, SHIFT_SLOT_OPTIONS } from "../utils/shift";
-import { ACCOUNT_STATUSES, MOCK_STAFF } from "../utils/data/mockStaff";
+import { MOCK_STAFF } from "../utils/data/mockStaff";
+import { ACCOUNT_STATUSES } from "../utils/staff";
 
 // TODO(api): mock only. Shifts live in memory, so changes last until the page is reloaded.
 const MOCK_DELAY_MS = 300;

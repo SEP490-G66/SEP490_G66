@@ -17,41 +17,10 @@ import trung4 from "@/assets/mock/certificates/trung/trung-4.webp";
 import van1 from "@/assets/mock/certificates/van/van-1.webp";
 import van2 from "@/assets/mock/certificates/van/van-2.webp";
 import { USER_ROLES } from "../messages";
+import { ACCOUNT_STATUSES } from "../staff";
 
-// Mock staff accounts for the clinic manager's "Tài khoản & nhân sự" page.
-// TODO(api): the backend has no staff account endpoints yet.
-
-export const ACCOUNT_STATUSES = {
-    ACTIVE: "active",
-    LOCKED: "locked",
-};
-
-// Short role names used in the staff table (ROLE_LABELS in messages has the long ones).
-export const STAFF_ROLE_OPTIONS = [
-    { value: USER_ROLES.CLINIC_MANAGER, label: "Quản lý" },
-    { value: USER_ROLES.DOCTOR, label: "Bác sĩ" },
-    { value: USER_ROLES.DENTAL_IMAGING_TECHNICIAN, label: "KTV hình ảnh" },
-    { value: USER_ROLES.RECEPTIONIST, label: "Lễ tân" },
-];
-
-export const ACCOUNT_STATUS_OPTIONS = [
-    { value: ACCOUNT_STATUSES.ACTIVE, label: "Hoạt động" },
-    { value: ACCOUNT_STATUSES.LOCKED, label: "Đã khoá" },
-];
-
-// For StatusBadge.
-export const ACCOUNT_STATUS_LABELS = {
-    [ACCOUNT_STATUSES.ACTIVE]: { label: "Hoạt động", badge: "badge-success" },
-    [ACCOUNT_STATUSES.LOCKED]: { label: "Đã khoá", badge: "badge-danger" },
-};
-
-// TODO(spec): lock reasons are not in the SRS yet.
-export const LOCK_REASON_OPTIONS = [
-    { value: "resigned", label: "Nghỉ việc" },
-    { value: "long_leave", label: "Tạm nghỉ dài hạn" },
-    { value: "violation", label: "Vi phạm quy định" },
-    { value: "other", label: "Khác" },
-];
+// Mock staff for the pages not wired to the API yet (shifts, debts). The "Tài khoản & nhân sự" page uses the Staff API.
+// TODO(api): swap once those pages read staff from the backend.
 
 // Same keys as GENDER_LABELS in messages.
 export const GENDERS = {
@@ -128,8 +97,3 @@ export const MOCK_STAFF = [
     { id: 75, code: "NV0075", fullName: "Lương Thị Kim", email: "kim.lt@oze.vn", role: RECEPTIONIST, gender: FEMALE, phone: "0935666999", birthDate: null, status: ACTIVE },
 ];
 
-// What locking an account touches: upcoming shifts to reassign and, for doctors, appointments to move.
-// NV0012 matches the mockup; the others are made up from the id.
-export const MOCK_LOCK_IMPACT = {
-    12: { upcomingShifts: 4, upcomingAppointments: 9 },
-};
