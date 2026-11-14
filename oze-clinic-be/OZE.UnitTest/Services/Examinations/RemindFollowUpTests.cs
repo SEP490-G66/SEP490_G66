@@ -27,21 +27,16 @@ namespace OZE.UnitTest.Services.Examinations
                 .Setup(r => r.GetByIdWithFollowUpAsync(ExaminationId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(exam);
 
-            Notification? savedNotification = null;
-            _examinationRepoMock
-                .Setup(r => r.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
-                .Callback<Notification, CancellationToken>((n, _) => savedNotification = n)
-                .Returns(Task.CompletedTask);
-
             var result = await _service.RemindFollowUpAsync("staff-1", ExaminationId);
 
             result.Should().NotBeNull();
             result.ReminderCount.Should().Be(1);
             result.LastRemindedAt.Should().NotBeNull();
             exam.FollowUpReminderCount.Should().Be(1);
-            savedNotification.Should().NotBeNull();
-            savedNotification!.UserId.Should().Be("patient-user-1");
-            savedNotification.Message.Should().Contain("Tái khám cắt chỉ");
+            _notificationsMock.Verify(n => n.NotifyUsersAsync(
+                It.Is<IEnumerable<string?>>(ids => ids.Contains("patient-user-1")),
+                It.Is<NotificationContent>(c => c.Message.Contains("Tái khám cắt chỉ")),
+                It.IsAny<CancellationToken>()), Times.Once);
             _examinationRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
 

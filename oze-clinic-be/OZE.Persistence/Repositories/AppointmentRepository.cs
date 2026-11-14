@@ -129,6 +129,16 @@ namespace OZE.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<Appointment>> GetPendingFromAsync(DateOnly fromDate, CancellationToken cancellationToken = default)
+        {
+            return await _context.Appointments
+                .AsNoTracking()
+                .Include(x => x.Patient)
+                .Include(x => x.Doctor)
+                .Where(x => x.Status == AppointmentConstants.PendingStatus && x.AppointmentDate >= fromDate)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<List<Appointment>> GetAppointmentsOfDoctorsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds, IReadOnlyCollection<string> statuses)
         {
             return await _context.Appointments
@@ -203,8 +213,10 @@ namespace OZE.Persistence.Repositories
 
         public async Task<List<Service>> GetServicesByIdsAsync(IReadOnlyCollection<int> serviceIds)
         {
+            // Active variants are loaded so booking can tell a service that needs a variant chosen
             return await _context.Services
                 .AsNoTracking()
+                .Include(s => s.Variants.Where(v => v.IsActive))
                 .Where(s => serviceIds.Contains(s.Id))
                 .ToListAsync();
         }
@@ -446,11 +458,6 @@ namespace OZE.Persistence.Repositories
                 _context.Entry(examination).State = EntityState.Detached;
                 throw new BadRequestException(ErrorConstants.AppointmentMessage.ExaminationAlreadyStarted);
             }
-        }
-
-        public async Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default)
-        {
-            await _context.Notifications.AddAsync(notification, cancellationToken);
         }
 
         private static bool IsDuplicateExamination(DbUpdateException exception)

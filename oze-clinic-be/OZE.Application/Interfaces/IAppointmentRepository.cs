@@ -38,6 +38,8 @@ namespace OZE.Application.Interfaces
         Task<List<StaffSchedule>> GetEndedShiftsAsync(DateOnly date);
         // Appointments of these doctors on one day in these statuses, with the patient, the doctor, the examination and the queue entries
         Task<List<Appointment>> GetAppointmentsOfDoctorsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds, IReadOnlyCollection<string> statuses);
+        // PENDING appointments from that day on, with the patient and the doctor (read only)
+        Task<List<Appointment>> GetPendingFromAsync(DateOnly fromDate, CancellationToken cancellationToken = default);
         // Pending, confirmed, checked-in and in-service appointments of the doctor on one day, with the patient and the examination (tracked, so they can be updated)
         Task<List<Appointment>> GetDoctorOpenAppointmentsAsync(int doctorId, DateOnly date, CancellationToken cancellationToken = default);
         // True when the doctor already has a patient being examined (IN_SERVICE) on that date
@@ -53,6 +55,5 @@ namespace OZE.Application.Interfaces
         // A draft prescription with no medication is only a leftover
         Task RemoveEmptyDraftPrescriptionsAsync(long examinationId, CancellationToken cancellationToken = default);
         Task SaveStartedExaminationAsync(Appointment appointment, Examination examination, CancellationToken cancellationToken = default);
-        Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default);
     }
 }

@@ -45,6 +45,7 @@ namespace OZE.Common.Constants
         public const string InstallmentPeriodPaid = "INSTALLMENT_PERIOD_PAID";
 
         public const string ExaminationFollowUpSet = "EXAMINATION_FOLLOW_UP_SET";
+        public const string ExaminationAddendumAdded = "EXAMINATION_ADDENDUM_ADDED";
         public const string AppointmentFollowUpScheduled = "APPOINTMENT_FOLLOW_UP_SCHEDULED";
         public const string FollowUpReminded = "FOLLOW_UP_REMINDED";
 
@@ -66,5 +67,7 @@ namespace OZE.Common.Constants
         public const string ReconciliationEntity = "DailyReconciliation";
         public const string ConsultationHandled = "CONSULTATION_HANDLED";
         public const string ConsultationEntity = "ConsultationRequest";
+        public const string SystemConfigUpdated = "SYSTEM_CONFIG_UPDATED";
+        public const string SystemConfigEntity = "SystemConfiguration";
     }
 }

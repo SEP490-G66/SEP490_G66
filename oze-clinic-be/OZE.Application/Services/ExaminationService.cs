@@ -19,6 +19,7 @@ namespace OZE.Application.Services
         private readonly ISmsSender? _smsSender;
         private readonly IEmailSender? _emailSender;
         private readonly ILogger<ExaminationService>? _logger;
+        private readonly INotificationService? _notifications;
 
         public ExaminationService(
             IExaminationRepository examinationRepository,
@@ -27,7 +28,8 @@ namespace OZE.Application.Services
             IAuditLogService auditLogService,
             ISmsSender? smsSender = null,
             IEmailSender? emailSender = null,
-            ILogger<ExaminationService>? logger = null)
+            ILogger<ExaminationService>? logger = null,
+            INotificationService? notifications = null)
         {
             _examinationRepository = examinationRepository;
             _staffRepository = staffRepository;
@@ -36,12 +38,69 @@ namespace OZE.Application.Services
             _smsSender = smsSender;
             _emailSender = emailSender;
             _logger = logger;
+            _notifications = notifications;
         }
 
         public async Task<ExaminationWorkResponse> GetAsync(string userId, long examinationId, CancellationToken cancellationToken = default)
         {
             var (_, examination) = await LoadAsync(userId, examinationId, cancellationToken);
             return await BuildWorkResponseAsync(examination, cancellationToken);
+        }
+
+        public async Task<List<AddendumResponse>> GetAddendaAsync(string userId, long examinationId, CancellationToken cancellationToken = default)
+        {
+            await LoadAsync(userId, examinationId, cancellationToken);
+            return await BuildAddendaAsync(examinationId, cancellationToken);
+        }
+
+        // BR-EXM-04: once locked, the record is changed only by adding an addendum; the original stays as it was
+        public async Task<List<AddendumResponse>> AddAddendumAsync(string userId, long examinationId, CreateAddendumRequest request, CancellationToken cancellationToken = default)
+        {
+            var (doctor, examination) = await LoadAsync(userId, examinationId, cancellationToken);
+            ConditionGuard.Ensure(examination.ExaminationStatus == ExaminationConstants.Locked, ErrorConstants.ExaminationMessage.AddendumOnlyLocked);
+
+            var type = ExaminationConstants.AddendumTypes.FirstOrDefault(t => string.Equals(t, request.AddendumType?.Trim(), StringComparison.OrdinalIgnoreCase));
+            ConditionGuard.Ensure(type != null, ErrorConstants.ExaminationMessage.AddendumTypeInvalid);
+
+            var content = Clean(request.Content);
+            ConditionGuard.Ensure(content != null, ErrorConstants.ExaminationMessage.AddendumContentRequired);
+            ConditionGuard.Ensure(content!.Length <= ExaminationConstants.AddendumContentMaxLength, ErrorConstants.ExaminationMessage.AddendumContentTooLong);
+
+            var original = Clean(request.OriginalContent);
+            ConditionGuard.ThrowIf(type == ExaminationConstants.AddendumCorrection && original == null, ErrorConstants.ExaminationMessage.AddendumOriginalRequired);
+            ConditionGuard.ThrowIf(original != null && original.Length > ExaminationConstants.AddendumContentMaxLength, ErrorConstants.ExaminationMessage.AddendumOriginalTooLong);
+
+            var addendum = new ClinicalRecordAddendum
+            {
+                ExaminationId = examination.Id,
+                AddendumType = type!,
+                Content = content,
+                OriginalContent = original,
+                CreatedByDoctorId = doctor.Id,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            await _examinationRepository.AddAddendumAsync(addendum, cancellationToken);
+            await _examinationRepository.SaveChangesAsync(cancellationToken);
+
+            await _auditLogService.LogAsync(AuditConstants.ExaminationAddendumAdded, AuditConstants.ExaminationEntity, examination.Id.ToString(),
+                newValues: new { AddendumId = addendum.Id, addendum.AddendumType, addendum.Content, addendum.OriginalContent });
+
+            return await BuildAddendaAsync(examination.Id, cancellationToken);
+        }
+
+        private async Task<List<AddendumResponse>> BuildAddendaAsync(long examinationId, CancellationToken cancellationToken)
+        {
+            var addenda = await _examinationRepository.GetAddendaAsync(examinationId, cancellationToken);
+            return addenda.Select(x => new AddendumResponse
+            {
+                Id = x.Id,
+                AddendumType = x.AddendumType,
+                Content = x.Content,
+                OriginalContent = x.OriginalContent,
+                CreatedByDoctorId = x.CreatedByDoctorId,
+                CreatedByDoctorName = x.CreatedByDoctor?.FullName ?? string.Empty,
+                CreatedAt = x.CreatedAt
+            }).ToList();
         }
 
         public async Task<ExaminationWorkResponse> UpdateContentAsync(string userId, long examinationId, UpdateExaminationContentRequest request, CancellationToken cancellationToken = default)
@@ -510,9 +569,10 @@ namespace OZE.Application.Services
             examination.FollowUpReminderCount += 1;
             examination.UpdatedAt = now;
 
-            await SendFollowUpNotificationsAsync(examination, followUpDate!.Value, now, cancellationToken);
+            var reminderText = await SendFollowUpNotificationsAsync(examination, followUpDate!.Value);
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
+            await NotifyFollowUpReminderAsync(examination, reminderText, cancellationToken);
 
             await _auditLogService.LogAsync(
                 AuditConstants.FollowUpReminded,
@@ -551,7 +611,7 @@ namespace OZE.Application.Services
 
             var now = DateTimeOffset.UtcNow;
             var successfulExams = new List<(Examination Exam, DateOnly FollowUpDate)>();
-            var inAppNotifications = new List<Notification>();
+            var reminderTexts = new Dictionary<long, string>();
             var syncLock = new object();
 
             // Tối ưu 1: Gửi SMS/Email song song có kiểm soát (MaxDegreeOfParallelism = 5)
@@ -572,17 +632,10 @@ namespace OZE.Application.Services
                     // Gửi đồng thời SMS và Email cho bệnh nhân (non-blocking, parallel)
                     await SendExternalRemindersAsync(exam.Patient, msg, exam.Id);
 
-                    Notification? inAppNotification = !string.IsNullOrEmpty(exam.Patient?.UserId)
-                        ? CreateFollowUpInAppNotification(exam.Patient.UserId, msg, exam.Id, now)
-                        : null;
-
                     lock (syncLock)
                     {
                         successfulExams.Add((exam, followUpDate));
-                        if (inAppNotification != null)
-                        {
-                            inAppNotifications.Add(inAppNotification);
-                        }
+                        reminderTexts[exam.Id] = msg;
                     }
                 }
                 catch (Exception ex)
@@ -603,11 +656,6 @@ namespace OZE.Application.Services
                 exam.UpdatedAt = now;
             }
 
-            foreach (var notification in inAppNotifications)
-            {
-                await _examinationRepository.AddNotificationAsync(notification, cancellationToken);
-            }
-
             // Tối ưu 3: Commit toàn bộ batch trong 1 round-trip duy nhất xuống Database (thay vì N lần SaveChanges)
             if (successfulExams.Count > 0)
             {
@@ -620,6 +668,12 @@ namespace OZE.Application.Services
                     _logger?.LogError(ex, "Failed to batch save examination follow-up reminders to database.");
                     throw;
                 }
+            }
+
+            // In-app notifications once the reminders are saved, one at a time (the DbContext is not thread-safe)
+            foreach (var (exam, _) in successfulExams)
+            {
+                await NotifyFollowUpReminderAsync(exam, reminderTexts[exam.Id], cancellationToken);
             }
 
             // Tối ưu 4: Ghi Audit Log và lập danh sách kết quả phản hồi
@@ -711,35 +765,21 @@ namespace OZE.Application.Services
             }
         }
 
-        private async Task SendFollowUpNotificationsAsync(
-            Examination examination, DateOnly followUpDate, DateTimeOffset now, CancellationToken cancellationToken)
+        // SMS and email at once; returns the text so the same words go to the in-app notification after the save
+        private async Task<string> SendFollowUpNotificationsAsync(Examination examination, DateOnly followUpDate)
         {
             var msg = BuildFollowUpMessage(examination, followUpDate);
-
-            // 1. In-App Notification (cho bệnh nhân có tài khoản)
-            if (!string.IsNullOrEmpty(examination.Patient?.UserId))
-            {
-                var notification = CreateFollowUpInAppNotification(examination.Patient.UserId, msg, examination.Id, now);
-                await _examinationRepository.AddNotificationAsync(notification, cancellationToken);
-            }
-
-            // 2 & 3. SMS & Email chạy đồng thời (non-blocking song song)
             await SendExternalRemindersAsync(examination.Patient, msg, examination.Id);
+            return msg;
         }
 
-        private static Notification CreateFollowUpInAppNotification(string userId, string message, long examinationId, DateTimeOffset createdAt) =>
-            new()
-            {
-                UserId = userId,
-                Title = "Nhắc lịch tái khám",
-                Message = message,
-                NotificationType = "InApp",
-                Channel = "InApp",
-                ReferenceType = "Examination",
-                ReferenceId = examinationId.ToString(),
-                DeliveryStatus = "Sent",
-                CreatedAt = createdAt
-            };
+        // In-app, for a patient with an account
+        private Task NotifyFollowUpReminderAsync(Examination examination, string message, CancellationToken cancellationToken) =>
+            NotifyAsync(n => n.NotifyUsersAsync(new[] { examination.Patient?.UserId },
+                new NotificationContent(NotificationConstants.Text.FollowUpReminderTitle, message, NotificationConstants.Reference.Examination, examination.Id.ToString()), cancellationToken));
+
+        // In-app notifications are optional so unit tests can build the service without them
+        private Task NotifyAsync(Func<INotificationService, Task> send) => _notifications == null ? Task.CompletedTask : send(_notifications);
 
         // The service and the variant the request names: both must exist and be active, the variant must belong to the service
         private async Task<(Service Service, ServiceVariant? Variant)> ResolveServiceAsync(SaveExaminationServiceRequest request, CancellationToken cancellationToken)
@@ -747,6 +787,10 @@ namespace OZE.Application.Services
             var service = await _examinationRepository.GetServiceAsync(request.ServiceId!.Value, cancellationToken);
             ConditionGuard.Ensure<NotFoundException>(service != null, ErrorConstants.AppointmentMessage.ServiceNotFound);
             ConditionGuard.Ensure(service!.IsActive, ErrorConstants.AppointmentMessage.ServiceInactive);
+
+            // A service that has active variants is added through one of them, never on its own
+            ConditionGuard.Ensure(request.VariantId.HasValue || !service.Variants.Any(v => v.IsActive),
+                string.Format(ErrorConstants.AppointmentMessage.VariantRequired, service.ServiceName));
 
             ServiceVariant? variant = null;
             if (request.VariantId.HasValue)

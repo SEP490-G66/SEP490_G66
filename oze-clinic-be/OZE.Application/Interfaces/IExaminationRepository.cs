@@ -24,7 +24,9 @@ namespace OZE.Application.Interfaces
         Task<List<Examination>> GetDueFollowUpsAsync(DateOnly targetDate, CancellationToken cancellationToken = default);
         Task<Patient?> GetPatientByUserIdAsync(string userId, CancellationToken cancellationToken = default);
         Task<List<Examination>> GetPatientFollowUpsAsync(int patientId, CancellationToken cancellationToken = default);
-        Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default);
+        // Addenda of a locked examination, oldest first, with the doctor who wrote each
+        Task<List<ClinicalRecordAddendum>> GetAddendaAsync(long examinationId, CancellationToken cancellationToken = default);
+        Task AddAddendumAsync(ClinicalRecordAddendum addendum, CancellationToken cancellationToken = default);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 }
