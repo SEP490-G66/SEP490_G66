@@ -161,20 +161,38 @@ export const remindPayment = (invoiceId, force = false) => call(() => api.post(`
 export const getPaymentReminders = (invoiceId) => call(() => api.get(`/api/debts/${invoiceId}/reminders`));
 
 // ----- follow-up care -----
-export const getFollowUpList = ({ fromDate, toDate, hasAppointment, keyword, pageSize = 100 }) =>
+export const getFollowUpList = ({ fromDate, toDate, hasAppointment, keyword, doctorId, contactStatus, page, pageSize = 100 }, config = {}) =>
     call(() =>
         api.get("/api/examinations/follow-ups", {
-            params: { fromDate, toDate, hasAppointment, searchKeyword: keyword || undefined, pageSize },
+            ...config,
+            params: {
+                fromDate,
+                toDate,
+                hasAppointment,
+                searchKeyword: keyword || undefined,
+                doctorId: doctorId || undefined,
+                contactStatus: contactStatus || undefined,
+                pageNumber: page,
+                pageSize,
+            },
         }),
     );
 
-export const recordFollowUpContact = (examinationId, { outcome, note, callBackDate }) =>
-    call(() => api.post(`/api/examinations/${examinationId}/follow-up/contacts`, { outcome, note: note || null, callBackDate: callBackDate || null }));
+export const recordFollowUpContact = (examinationId, { outcome, note, callBackDate, callBackTime }, config = {}) =>
+    call(() =>
+        api.post(
+            `/api/examinations/${examinationId}/follow-up/contacts`,
+            { outcome, note: note || null, callBackDate: callBackDate || null, callBackTime: callBackTime || undefined },
+            config,
+        ),
+    );
 
 export const getFollowUpContacts = (examinationId) => call(() => api.get(`/api/examinations/${examinationId}/follow-up/contacts`));
 
-export const scheduleFollowUpAppointment = (examinationId, { date, slotStart, doctorId }) =>
-    call(() => api.post(`/api/examinations/${examinationId}/follow-up/schedule`, { date, slotStart, doctorId: doctorId || null }));
+export const scheduleFollowUpAppointment = (examinationId, { date, slotStart, doctorId }, config = {}) =>
+    call(() => api.post(`/api/examinations/${examinationId}/follow-up/schedule`, { date, slotStart, doctorId: doctorId || null }, config));
+
+export const getDoctorOptions = (config = {}) => call(() => api.get("/api/doctors", { ...config, params: { pageSize: 100 } }));
 
 // ----- booking on behalf (F-APT-09) -----
 export const getBookableServices = () => call(() => api.get("/api/appointments/bookable-services"));
