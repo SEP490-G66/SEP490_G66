@@ -17,6 +17,8 @@ namespace OZE.Common.Constants
         public const string GeneralExamServiceCode = "Booking.GeneralExamServiceCode";
         // A booked patient who checks in more than this many minutes after the slot start is "late" in the waiting list
         public const string CheckInLateMinutes = "CheckIn.LateMinutes";
+        public const string ClinicWorkStartTime = "Clinic.WorkStartTime";
+        public const string ClinicWorkEndTime = "Clinic.WorkEndTime";
         // A PENDING appointment not confirmed within this many hours of being booked (or rescheduled) is overdue
         public const string BookingPendingConfirmHours = "Booking.PendingConfirmHours";
         // A PENDING appointment whose visit starts within this many hours is overdue, however recently it was booked

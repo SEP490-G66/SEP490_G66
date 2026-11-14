@@ -66,5 +66,7 @@ namespace OZE.Common.Constants
         public const string ReconciliationEntity = "DailyReconciliation";
         public const string ConsultationHandled = "CONSULTATION_HANDLED";
         public const string ConsultationEntity = "ConsultationRequest";
+        public const string SystemConfigUpdated = "SYSTEM_CONFIG_UPDATED";
+        public const string SystemConfigEntity = "SystemConfiguration";
     }
 }
