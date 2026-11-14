@@ -1543,24 +1543,9 @@ namespace OZE.Application.Services
             // Send instant confirmation notification via SMS/Email to patient
             await SendConfirmationNotificationAsync(appointment);
 
-            if (!string.IsNullOrEmpty(originalAppointment.Patient.UserId))
-            {
-                var notification = new Notification
-                {
-                    UserId = originalAppointment.Patient.UserId,
-                    Title = "Lịch hẹn tái khám",
-                    Message = $"Bạn có lịch hẹn tái khám vào ngày {appointment.AppointmentDate:dd/MM/yyyy} lúc {appointment.TimeSlotStart:HH\\:mm}.",
-                    NotificationType = "InApp",
-                    Channel = "InApp",
-                    ReferenceType = "Appointment",
-                    ReferenceId = appointment.Id.ToString(),
-                    DeliveryStatus = "Sent",
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-                await _appointmentRepository.AddNotificationAsync(notification, cancellationToken);
-            }
-
             await _appointmentRepository.SaveChangesAsync();
+            await NotifyAsync(n => n.NotifyPatientAsync(originalAppointment.PatientId,
+                Content(NotificationConstants.Text.FollowUpScheduledTitle, NotificationConstants.Text.FollowUpScheduledMessage, appointment), cancellationToken));
 
             await _auditLogService.LogAsync(
                 AuditConstants.AppointmentFollowUpScheduled,

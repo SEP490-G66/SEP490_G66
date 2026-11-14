@@ -8,6 +8,10 @@ namespace OZE.Application.Interfaces
     {
         Task<ExaminationWorkResponse> GetAsync(string userId, long examinationId, CancellationToken cancellationToken = default);
 
+        // Addenda to a locked examination (F-EXM-08): only added, never edited or deleted
+        Task<List<AddendumResponse>> GetAddendaAsync(string userId, long examinationId, CancellationToken cancellationToken = default);
+        Task<List<AddendumResponse>> AddAddendumAsync(string userId, long examinationId, CreateAddendumRequest request, CancellationToken cancellationToken = default);
+
         // Reason for the visit (the patient's booking note) and the doctor's clinical notes
         Task<ExaminationWorkResponse> UpdateContentAsync(string userId, long examinationId, UpdateExaminationContentRequest request, CancellationToken cancellationToken = default);
 

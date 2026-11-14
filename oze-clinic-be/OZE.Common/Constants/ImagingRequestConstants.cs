@@ -36,9 +36,5 @@ namespace OZE.Common.Constants
         // Only used on a development machine that has no secret configured; any other environment must configure its own
         public const string DevelopmentWebhookSecret = "oze-xray-shared-secret-key-2026";
 
-        public const string NotificationTypeInApp = "InApp";
-        public const string NotificationChannelInApp = "InApp";
-        public const string NotificationDeliverySent = "Sent";
-        public const string NotificationReferenceType = "ImagingRequest";
     }
 }

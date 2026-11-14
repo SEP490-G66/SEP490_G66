@@ -55,6 +55,5 @@ namespace OZE.Application.Interfaces
         // A draft prescription with no medication is only a leftover
         Task RemoveEmptyDraftPrescriptionsAsync(long examinationId, CancellationToken cancellationToken = default);
         Task SaveStartedExaminationAsync(Appointment appointment, Examination examination, CancellationToken cancellationToken = default);
-        Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default);
     }
 }

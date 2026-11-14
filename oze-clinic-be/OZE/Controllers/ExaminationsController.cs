@@ -32,6 +32,27 @@ namespace OZE.Controllers
             return Ok(ApiResponse<ExaminationWorkResponse>.SuccessResult(result));
         }
 
+        /// <summary>
+        /// Addenda of a locked examination, oldest first (F-EXM-08).
+        /// </summary>
+        [HttpGet("examinations/{id:long}/addenda")]
+        public async Task<ActionResult<ApiResponse<List<AddendumResponse>>>> GetAddendaAsync(long id, CancellationToken cancellationToken)
+        {
+            var result = await _examinationService.GetAddendaAsync(DoctorUserId, id, cancellationToken);
+            return Ok(ApiResponse<List<AddendumResponse>>.SuccessResult(result));
+        }
+
+        /// <summary>
+        /// Adds a correction, addition or clarification to a locked examination. The record itself is not changed.
+        /// </summary>
+        [HttpPost("examinations/{id:long}/addenda")]
+        public async Task<ActionResult<ApiResponse<List<AddendumResponse>>>> AddAddendumAsync(
+            long id, [FromBody] CreateAddendumRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _examinationService.AddAddendumAsync(DoctorUserId, id, request, cancellationToken);
+            return Ok(ApiResponse<List<AddendumResponse>>.SuccessResult(result, "Addendum added"));
+        }
+
         [HttpPut("examinations/{id:long}/content")]
         public async Task<ActionResult<ApiResponse<ExaminationWorkResponse>>> UpdateContentAsync(
             long id, [FromBody] UpdateExaminationContentRequest request, CancellationToken cancellationToken)
