@@ -1,4 +1,5 @@
 import { FOLLOW_UP_TEXT as TEXT } from "./messages";
+import { addDays, ddmm, weekdayIndex } from "./calendar";
 
 export const FOLLOW_UP_PAGE_SIZE = 10;
 
@@ -15,37 +16,9 @@ export const STATUS_CHIPS = {
     booked: [TEXT.STATUS_OPTIONS.booked, "badge-success"],
 };
 
-const pad = (n) => String(n).padStart(2, "0");
-
-const toKey = (date) => `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
-
-const fromKey = (key) => new Date(`${key}T00:00:00Z`);
-
-export const addDays = (key, n) => {
-    const date = fromKey(key);
-    date.setUTCDate(date.getUTCDate() + n);
-    return toKey(date);
-};
-
-export const weekdayIndex = (key) => (fromKey(key).getUTCDay() + 6) % 7;
-
-export const mondayOf = (key) => addDays(key, -weekdayIndex(key));
-
-export const ddmm = (key) => (key ? `${key.slice(8, 10)}/${key.slice(5, 7)}` : "");
-
-export const dmy = (key) => (key ? `${ddmm(key)}/${key.slice(0, 4)}` : "");
-
 export const shortDay = (key) => `${TEXT.WEEKDAYS_SHORT[weekdayIndex(key)]} ${ddmm(key)}`;
 
 export const isSunday = (key) => weekdayIndex(key) === 6;
-
-export const hhmm = (time) => (time ? String(time).slice(0, 5) : "");
-
-export const slotEnd = (start, minutes = 30) => {
-    const [h, m] = hhmm(start).split(":").map(Number);
-    const total = h * 60 + m + minutes;
-    return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
-};
 
 export const followUpQuery = (filters, today) => {
     const query = { keyword: filters.keyword.trim(), doctorId: filters.doctorId, page: filters.page, pageSize: FOLLOW_UP_PAGE_SIZE };

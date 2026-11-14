@@ -10,7 +10,8 @@ import { phoneText } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import { clinicToday, getDoctorOptions, getFollowUpList } from "@/services/receptionService";
 import { FOLLOW_UP_TEXT as TEXT } from "@/utils/messages";
-import { EMPTY_FILTERS, FOLLOW_UP_PAGE_SIZE, STATUS_CHIPS, contactStatusOf, dmy, followUpQuery, isFiltered } from "@/utils/followUp";
+import { dmy } from "@/utils/calendar";
+import { EMPTY_FILTERS, FOLLOW_UP_PAGE_SIZE, STATUS_CHIPS, contactStatusOf, followUpQuery, isFiltered } from "@/utils/followUp";
 import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
