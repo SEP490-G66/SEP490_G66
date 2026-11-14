@@ -27,7 +27,7 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 0 | Cover, MethodList, Statistics | 1–3 | 3 | 0 | – | – | – | – |
 | 1 | OZ-AUTH | 4–14 | 11 | 11 | 0 | 0 | 0 | 0 |
 | 2 | OZ-ME | 15–19 | 5 | 5 | 0 | 0 | 0 | 0 |
-| 3 | OZ-PAT | 20–26 | 7 | 6 | 1 | 0 | 0 | 0 |
+| 3 | OZ-PAT | 20–26 | 7 | 7 | 0 | 0 | 0 | 0 |
 | 4 | OZ-SVC | 27–35 | 9 | 0 | 8 | 0 | 1 | 0 |
 | 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 2 | 0 | 23 | 0 | 0 |
 | 6 | OZ-APPT, OZ-Q | 61–84 | 24 | 0 | 6 | 17 | 1 | 0 |
@@ -35,7 +35,7 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 8 | OZ-TP, OZ-INV | 114–125 | 12 | 0 | 1 | 7 | 4 | 0 |
 | 9 | OZ-HOME, OZ-CFG, OZ-LEAVE, OZ-NOTIF, OZ-WH | 126–133 | 8 | 0 | 2 | 2 | 4 | 0 |
 | 10 | OZ-SIM | 134–142 | 9 | 0 | 0 | 0 | 0 | 9 |
-| | **Tổng tab hàm** | 4–142 | **139** | **24** | **23** | **71** | **12** | **9** |
+| | **Tổng tab hàm** | 4–142 | **139** | **25** | **22** | **71** | **12** | **9** |
 
 **Thứ tự đề xuất:** đợt 3 → 4 → 7 (phần chụp phim) → 6 (phần có test) → 0, rồi viết test cho các tab ✍️ theo đợt 2 → 5 → 6 → 7 → 8 → 9.
 
@@ -85,7 +85,7 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 23 | CreatePatient | OZ-PAT-04 | Patients/CreatePatientTests: 4 (2) | ✅ | DuongDH | 15/11/2026 | 4 UTCID, sheet đã điền |
 | 24 | DeletePatient | OZ-PAT-05 | Patients/DeletePatientTests: 4 (1) | ✅ | DuongDH | 15/11/2026 | 4 UTCID, sheet đã điền |
 | 25 | AddMedicalProfile | OZ-PAT-06 | Patients/AddMedicalProfileTests: 7 (1) | ✅ | DuongDH | 15/11/2026 | 7 UTCID, sheet đã điền |
-| 26 | UpdatePatient | OZ-PAT-07 | Patients/UpdatePatientTests: 14 (3) | 📝 | HiepNX | 11/11/2026 | Thêm lại API `PUT api/patients/{id}` (lễ tân, quản lý); chờ điền sheet |
+| 26 | UpdatePatient | OZ-PAT-07 | Patients/UpdatePatientTests: 14 (3) | ✅ | DuongDH | 15/11/2026 | 14 UTCID, sheet đã điền |
 
 ## Đợt 4 – OZ-SVC (Dịch vụ)
 
@@ -280,6 +280,7 @@ Cần thêm tab (copy một tab mẫu, thêm dòng vào MethodList và Statistic
 | 15/11/2026 | DuongDH | OZ-PAT-04 CreatePatient: 🔄→✅. Dùng test sẵn (4 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-PAT-04` → 4 Passed. Sheet đã điền và được xác nhận. |
 | 15/11/2026 | DuongDH | OZ-PAT-05 DeletePatient: 🔄→✅. Dùng test sẵn (4 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-PAT-05` → 4 Passed. Sheet đã điền và được xác nhận. |
 | 15/11/2026 | DuongDH | OZ-PAT-06 AddMedicalProfile: 🔄→✅. Dùng test sẵn (7 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-PAT-06` → 7 Passed. Sheet đã điền và được xác nhận. |
+| 15/11/2026 | DuongDH | OZ-PAT-07 UpdatePatient: 🔄→✅. Dùng test sẵn (14 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-PAT-07` → 14 Passed. Sheet đã điền và được xác nhận. |
 | 13/11/2026 | HungPVA | OZ-WS-01 CreateWorkShift: ✍️→✅. Viết 13 unit test service (3N, 3B, 7A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-01` → 13 Passed. Điền sheet CreateWorkShift. |
 | 14/11/2026 | HungPVA | OZ-WS-02 GetWorkShifts: ✍️→✅. Viết 12 unit test service (7N, 3B, 2A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-02` → 12 Passed. Điền sheet GetWorkShifts. |
 
