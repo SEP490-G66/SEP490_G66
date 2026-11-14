@@ -74,17 +74,13 @@ namespace OZE.Application.Services
                 CreatedAt = now
             };
 
-            var patientName = string.IsNullOrWhiteSpace(examination.Patient?.FullName)
-                ? "the patient"
-                : examination.Patient!.FullName.Trim();
-            var technicianUserIds = await _imagingRequestRepository.GetActiveTechnicianUserIdsAsync(cancellationToken);
+            await _imagingRequestRepository.AddAsync(imagingRequest, cancellationToken);
 
-            await _imagingRequestRepository.AddAsync(
-                imagingRequest,
-                technicianUserIds,
-                ErrorConstants.ImagingRequestMessage.TechnicianNotificationTitle,
-                string.Format(ErrorConstants.ImagingRequestMessage.TechnicianNotificationMessage, canonicalType, patientName),
-                cancellationToken);
+            // BR-IMG-02: every active technician is told there is a film to take
+            await NotifyAsync(n => n.NotifyRolesAsync(new[] { RoleConstants.DentalImagingTechnicianRole },
+                new NotificationContent(NotificationConstants.Text.NewImagingRequestTitle,
+                    string.Format(NotificationConstants.Text.NewImagingRequestMessage, canonicalType, examination.Patient?.FullName?.Trim() ?? string.Empty),
+                    NotificationConstants.Reference.ImagingRequest, imagingRequest.Id.ToString()), cancellationToken: cancellationToken));
 
             // Unblock doctor so doctor can examine other waiting patients while this patient goes to the imaging room
             if (examination.Appointment != null)

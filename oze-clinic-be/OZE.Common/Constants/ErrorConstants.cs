@@ -371,6 +371,13 @@ namespace OZE.Common.Constants
         // Writing the content of an examination: services, notes and diagnoses
         public static class ExaminationMessage
         {
+            // Addenda (F-EXM-08)
+            public const string AddendumOnlyLocked = "Addenda can only be added to a locked examination. Edit the examination directly";
+            public const string AddendumTypeInvalid = "The addendum type must be one of: Correction, Addition, Clarification";
+            public const string AddendumContentRequired = "Please enter the addendum content";
+            public const string AddendumContentTooLong = "Addendum content cannot exceed 2000 characters";
+            public const string AddendumOriginalRequired = "Please enter the original content being corrected";
+            public const string AddendumOriginalTooLong = "Original content cannot exceed 2000 characters";
             public const string NothingRecorded = "Please record at least a diagnosis or clinical notes before completing the examination";
             public const string PrescriptionNotFinalized = "Please finalize the prescription, or delete it, before completing the examination";
             public const string NotExaminingDoctor = "You can only work on the examinations you are performing";
@@ -453,8 +460,6 @@ namespace OZE.Common.Constants
             public const string WebhookPayloadInvalid = "Invalid payload";
             // MSG02
             public const string QueueEmpty = "No Data.";
-            public const string TechnicianNotificationTitle = "New imaging request";
-            public const string TechnicianNotificationMessage = "Imaging request ({0}) for {1} has been submitted.";
         }
 
         public static class InvoiceMessage

@@ -10,12 +10,6 @@ namespace OZE.Application.Interfaces
         Task<ImagingRequest?> GetTrackedByIdAsync(long id, CancellationToken cancellationToken = default);
         Task<List<ImagingRequest>> GetQueueAsync(CancellationToken cancellationToken = default);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
-        Task<List<string>> GetActiveTechnicianUserIdsAsync(CancellationToken cancellationToken = default);
-        Task AddAsync(
-            ImagingRequest request,
-            IReadOnlyCollection<string> technicianUserIds,
-            string notificationTitle,
-            string notificationMessage,
-            CancellationToken cancellationToken = default);
+        Task AddAsync(ImagingRequest request, CancellationToken cancellationToken = default);
     }
 }

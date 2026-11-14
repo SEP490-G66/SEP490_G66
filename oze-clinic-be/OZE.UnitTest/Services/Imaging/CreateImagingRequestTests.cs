@@ -19,31 +19,18 @@ namespace OZE.UnitTest.Services.Imaging
             var doctor = new StaffProfile { Id = 5, UserId = DoctorUserId, FullName = "Dr An" };
             var examination = ExaminationInProgress();
             ImagingRequest? saved = null;
-            IReadOnlyCollection<string>? notifiedUsers = null;
-            string? notificationMessage = null;
 
             _staffRepository.Setup(r => r.GetByUserIdAsync(DoctorUserId)).ReturnsAsync(doctor);
             _imagingRequestRepository
                 .Setup(r => r.GetExaminationAsync(ExaminationId, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(examination);
             _imagingRequestRepository
-                .Setup(r => r.GetActiveTechnicianUserIdsAsync(It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new List<string> { "tech-1", "tech-2" });
-            _imagingRequestRepository
-                .Setup(r => r.AddAsync(
-                    It.IsAny<ImagingRequest>(),
-                    It.IsAny<IReadOnlyCollection<string>>(),
-                    It.IsAny<string>(),
-                    It.IsAny<string>(),
-                    It.IsAny<CancellationToken>()))
-                .Callback<ImagingRequest, IReadOnlyCollection<string>, string, string, CancellationToken>(
-                    (request, users, _, message, _) =>
-                    {
-                        request.Id = 99;
-                        saved = request;
-                        notifiedUsers = users;
-                        notificationMessage = message;
-                    })
+                .Setup(r => r.AddAsync(It.IsAny<ImagingRequest>(), It.IsAny<CancellationToken>()))
+                .Callback<ImagingRequest, CancellationToken>((request, _) =>
+                {
+                    request.Id = 99;
+                    saved = request;
+                })
                 .Returns(Task.CompletedTask);
 
             var result = await _service.CreateAsync(DoctorUserId, ExaminationId, new CreateImagingRequest
@@ -64,8 +51,10 @@ namespace OZE.UnitTest.Services.Imaging
             saved.Should().NotBeNull();
             saved!.RequestedByDoctorId.Should().Be(doctor.Id);
             saved.RequestStatus.Should().Be(ImagingRequestConstants.Pending);
-            notifiedUsers.Should().BeEquivalentTo(new[] { "tech-1", "tech-2" });
-            notificationMessage.Should().Be("Imaging request (Panoramic) for Lan Nguyen has been submitted.");
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(
+                It.Is<IReadOnlyCollection<string>>(r => r.Contains(RoleConstants.DentalImagingTechnicianRole)),
+                It.Is<NotificationContent>(c => c.Message == "Chỉ định chụp Panoramic cho Lan Nguyen vừa được gửi." && c.ReferenceId == "99"),
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Theory]
@@ -89,12 +78,7 @@ namespace OZE.UnitTest.Services.Imaging
             var error = await act.Should().ThrowAsync<BadRequestException>();
             error.Which.Message.Should().Be(expectedMessage);
             _imagingRequestRepository.Verify(
-                r => r.AddAsync(
-                    It.IsAny<ImagingRequest>(),
-                    It.IsAny<IReadOnlyCollection<string>>(),
-                    It.IsAny<string>(),
-                    It.IsAny<string>(),
-                    It.IsAny<CancellationToken>()),
+                r => r.AddAsync(It.IsAny<ImagingRequest>(), It.IsAny<CancellationToken>()),
                 Times.Never);
         }
 

@@ -14,5 +14,12 @@ namespace OZE.Common.Constants
         public const int DiagnosisCodeMaxLength = 20;
         public const int DiagnosisNameMaxLength = 300;
         public const int DiagnosisDescriptionMaxLength = 1000;
+
+        // Addenda to a locked examination (F-EXM-08). Types must match CK_ClinicalRecordAddenda_Type
+        public const string AddendumCorrection = "Correction";
+        public const string AddendumAddition = "Addition";
+        public const string AddendumClarification = "Clarification";
+        public static readonly string[] AddendumTypes = { AddendumCorrection, AddendumAddition, AddendumClarification };
+        public const int AddendumContentMaxLength = 2000;
     }
 }

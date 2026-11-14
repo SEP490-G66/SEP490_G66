@@ -460,11 +460,6 @@ namespace OZE.Persistence.Repositories
             }
         }
 
-        public async Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default)
-        {
-            await _context.Notifications.AddAsync(notification, cancellationToken);
-        }
-
         private static bool IsDuplicateExamination(DbUpdateException exception)
         {
             return exception.InnerException is SqlException sql

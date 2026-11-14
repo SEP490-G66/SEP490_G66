@@ -23,6 +23,7 @@ namespace OZE.UnitTest.Services.Examinations
         protected readonly Mock<IStaffRepository> _staffRepoMock = new();
         protected readonly Mock<IAppointmentService> _appointmentServiceMock = new();
         protected readonly Mock<IAuditLogService> _auditLogMock = new();
+        protected readonly Mock<INotificationService> _notificationsMock = new();
         protected readonly ExaminationService _service;
 
         protected ExaminationFollowUpTestBase()
@@ -31,7 +32,8 @@ namespace OZE.UnitTest.Services.Examinations
                 _examinationRepoMock.Object,
                 _staffRepoMock.Object,
                 _appointmentServiceMock.Object,
-                _auditLogMock.Object);
+                _auditLogMock.Object,
+                notifications: _notificationsMock.Object);
 
             _staffRepoMock
                 .Setup(r => r.GetByUserIdAsync(DoctorUserId))

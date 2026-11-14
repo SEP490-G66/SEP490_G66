@@ -46,6 +46,9 @@ namespace OZE.Common.Constants
             public const string PaymentConfirmedTitle = "Đã nhận thanh toán";
             public const string PaymentConfirmedMessage = "Phòng khám đã nhận {0} cho hóa đơn {1}.";
             public const string PaymentReminderTitle = "Nhắc thanh toán";
+            public const string FollowUpScheduledTitle = "Lịch hẹn tái khám";
+            public const string FollowUpScheduledMessage = "Bạn có lịch hẹn tái khám lúc {0} ngày {1}.";
+            public const string FollowUpReminderTitle = "Nhắc lịch tái khám";
             public const string RefundApprovedTitle = "Yêu cầu hoàn tiền đã được duyệt";
             public const string RefundApprovedMessage = "Yêu cầu hoàn {0} cho hóa đơn {1} đã được duyệt.";
             public const string RefundRejectedTitle = "Yêu cầu hoàn tiền bị từ chối";

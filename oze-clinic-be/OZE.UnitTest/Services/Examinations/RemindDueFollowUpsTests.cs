@@ -37,12 +37,6 @@ namespace OZE.UnitTest.Services.Examinations
                 .Setup(r => r.GetDueFollowUpsAsync(targetDate, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(dueExams);
 
-            var savedNotifications = new List<Notification>();
-            _examinationRepoMock
-                .Setup(r => r.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
-                .Callback<Notification, CancellationToken>((n, _) => savedNotifications.Add(n))
-                .Returns(Task.CompletedTask);
-
             var result = await _service.RemindDueFollowUpsAsync(targetDate, "System_AutoWorker");
 
             result.Should().NotBeNull();
@@ -56,7 +50,9 @@ namespace OZE.UnitTest.Services.Examinations
             exam2.FollowUpReminderCount.Should().Be(1);
             exam2.FollowUpRemindedAt.Should().NotBeNull();
 
-            savedNotifications.Should().HaveCount(2);
+            _notificationsMock.Verify(n => n.NotifyUsersAsync(It.IsAny<IEnumerable<string?>>(),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.FollowUpReminderTitle),
+                It.IsAny<CancellationToken>()), Times.Exactly(2));
             // Verify single batch save to avoid N+1 database roundtrips
             _examinationRepoMock.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         }
