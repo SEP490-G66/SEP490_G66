@@ -24,3 +24,9 @@ export const getErrorStatus = (error) => {
     if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") return 408;
     return 503;
 };
+
+export const NAVIGATE_EVENT = "app:navigate";
+
+export const requestNavigate = (url, state) => {
+    window.dispatchEvent(new CustomEvent(NAVIGATE_EVENT, { detail: { url, state } }));
+};
