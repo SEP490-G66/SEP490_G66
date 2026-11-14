@@ -194,6 +194,22 @@ namespace OZE.Common.Constants
             public const string InvalidEstimatedMinutes = "Estimated minutes must be greater than 0";
         }
 
+        // System configuration (clinic manager)
+        public static class SystemConfigMessage
+        {
+            public const string NotFound = "Configuration not found.";
+            public const string ValueRequired = "Please enter a value.";
+            public const string ValueTooLong = "Value cannot exceed 500 characters.";
+            public const string InvalidInt = "Value must be a whole number greater than or equal to 0.";
+            public const string MustBePositive = "Value must be greater than 0.";
+            public const string InvalidBool = "Value must be true or false.";
+            public const string InvalidDecimal = "Value must be a number.";
+            public const string InvalidJson = "Value must be valid JSON.";
+            public const string InvalidTime = "Value must be a time in HH:mm format.";
+            public const string WorkTimeOrder = "Opening time must be earlier than closing time.";
+            public const string ServiceCodeNotFound = "No active service has this code.";
+        }
+
         // Audit log, read only (clinic manager)
         public static class AuditLogMessage
         {

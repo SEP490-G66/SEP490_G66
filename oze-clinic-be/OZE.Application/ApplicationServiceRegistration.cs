@@ -81,6 +81,7 @@ namespace OZE.Application
             services.AddHttpContextAccessor();
             services.AddScoped<IAuditLogService, AuditLogService>();
             services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
+            services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
             services.AddHostedService<OZE.Application.BackgroundServices.FollowUpReminderBackgroundService>();
             services.AddHostedService<OZE.Application.BackgroundServices.PaymentReminderBackgroundService>();
             return services;
