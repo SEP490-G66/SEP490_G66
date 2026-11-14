@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { DialogActions } from "./shared";
-import { hhmm, money, useSubmit } from "./receptionUtils";
+import { hhmm, money, phoneText, useSubmit } from "./receptionUtils";
 import { bookForPatient, clinicToday, findPatientsByKeyword, getAvailableSlots, getBookableServices } from "@/services/receptionService";
 import { cx } from "@/utils/cx";
+
+const PATIENT_GONE_MESSAGE = "No patient profile is linked to this account";
 
 // "Đặt lịch hộ" (F-APT-09): the receptionist books for a patient on the phone or at the counter.
 // 1) find the patient by phone (or type a new one), 2) pick services, 3) pick a day and a free slot.
 // The booking is CONFIRMED at once and the patient gets a message. Same rules as online booking (BR-APT-01..04).
 
 // patient: an existing record to book for; initial: { fullName, phoneNumber, date } to start from
-const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, onBooked }) => {
+const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, onBooked, formatError, onPatientGone, readConfig, writeConfig }) => {
     const [phone, setPhone] = useState(initial.phoneNumber ?? givenPatient?.phoneNumber ?? "");
     const [patient, setPatient] = useState(givenPatient);
     const [lookedUp, setLookedUp] = useState(Boolean(givenPatient));
@@ -23,6 +25,12 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
     const [slot, setSlot] = useState(null);
     const [note, setNote] = useState("");
     const [error, setError] = useState(null);
+    const hasReadConfig = Boolean(readConfig);
+    const readSkipErrorPage = readConfig?.skipErrorPage;
+    const formatErrorRef = useRef(formatError);
+    useEffect(() => {
+        formatErrorRef.current = formatError;
+    });
     const [busy, submit] = useSubmit(async () => {
         const result = await bookForPatient({
             patientId: patient?.id ?? null,
@@ -35,9 +43,10 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
             slotStart: slot.slotStart,
             doctorId: slot.doctorId,
             note: note.trim() || null,
-        });
+        }, writeConfig ? { skipErrorPage: writeConfig.skipErrorPage } : undefined);
         if (result.success) onBooked(result.data);
-        else setError(result.message);
+        else if (onPatientGone && result.message === PATIENT_GONE_MESSAGE) onPatientGone();
+        else setError(formatError ? formatError(result) : result.message);
     });
 
     useEffect(() => {
@@ -51,13 +60,21 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
     // Free slots for the chosen services, all doctors; re-asked whenever the day or the services change
     useEffect(() => {
         let active = true;
-        getAvailableSlots({ date, serviceIds: picked.serviceIds, variantIds: picked.variantIds }).then(
-            (result) => active && setSlots({ loading: false, items: result.success ? result.data : [], error: result.success ? null : result.message }),
-        );
+        const controller = hasReadConfig ? new AbortController() : null;
+        const config = controller ? { skipErrorPage: readSkipErrorPage, signal: controller.signal } : undefined;
+        getAvailableSlots({ date, serviceIds: picked.serviceIds, variantIds: picked.variantIds }, config).then((result) => {
+            if (!active || result.aborted) return;
+            setSlots({
+                loading: false,
+                items: result.success ? result.data : [],
+                error: result.success ? null : formatErrorRef.current ? formatErrorRef.current(result) : result.message,
+            });
+        });
         return () => {
             active = false;
+            controller?.abort();
         };
-    }, [date, picked]);
+    }, [date, picked, hasReadConfig, readSkipErrorPage]);
 
     const lookUp = async () => {
         const digits = phone.replace(/\s/g, "");
@@ -113,7 +130,8 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
                     <legend className="label">1. Bệnh nhân</legend>
                     {givenPatient ? (
                         <p className="rounded-lg bg-surface-muted px-3 py-2 text-body-sm text-ink">
-                            {givenPatient.fullName} · {givenPatient.patientCode} · {givenPatient.phoneNumber}
+                            {givenPatient.fullName} · {givenPatient.patientCode}
+                            {givenPatient.phoneNumber ? ` · ${phoneText(givenPatient.phoneNumber)}` : ""}
                         </p>
                     ) : (
                         <>
