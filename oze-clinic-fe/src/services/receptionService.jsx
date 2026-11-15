@@ -312,3 +312,7 @@ export const setQueuePriority = (id, priority) => call(() => api.post(`/api/queu
 export const moveQueueEntry = (id, roomId) => call(() => api.post(`/api/queues/${id}/move`, { roomId }));
 
 export const removeQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/remove`));
+
+export const callAppointment = (id) => call(() => api.post(`/api/appointments/${id}/call`));
+
+export const callQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/call`));

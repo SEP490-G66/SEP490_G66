@@ -14,7 +14,20 @@ const isCalled = (w) => w.status === "CALLED" || w.queueStatus === "Called" || B
 
 export const examRooms = (doctors, waiting, serving) => {
     const map = new Map();
-    doctors.forEach((d) => map.set(String(d.id), { key: String(d.id), tab: "kham", doctorId: d.id, name: d.room, staff: d.name, ended: ENDED.includes(d.status), endAt: d.end, active: !ENDED.includes(d.status) }));
+    doctors.forEach((d) =>
+        map.set(String(d.id), {
+            key: String(d.id),
+            tab: "kham",
+            doctorId: d.id,
+            name: d.room,
+            staff: d.name,
+            ended: ENDED.includes(d.status),
+            endAt: d.end,
+            off: d.status === "NotStarted",
+            startAt: d.start,
+            active: !ENDED.includes(d.status),
+        }),
+    );
     [...waiting, ...serving].forEach((x) => {
         if (!x.doctorId || map.has(String(x.doctorId))) return;
         map.set(String(x.doctorId), { key: String(x.doctorId), tab: "kham", doctorId: x.doctorId, name: x.roomName, staff: x.doctorName, ended: false, active: true });

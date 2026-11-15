@@ -9,6 +9,7 @@ import { clinicClock, money, report } from "@/components/reception/receptionUtil
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import { getCashSessions, getCurrentCashSession, getHandoverCandidates, getNextCashShift, openCashSession } from "@/services/cashSessionService";
 import { clinicToday } from "@/services/receptionService";
+import { getMyShifts } from "@/services/myScheduleService";
 import { getSessionUserName } from "@/services/sessionStore";
 import { addDays } from "@/utils/calendar";
 import { dateKey, dateTimeOf, isOpen, openingPlan, shiftTypeOf, signedMoney } from "@/utils/cashShift";
@@ -82,13 +83,17 @@ const CashHandover = () => {
     };
 
     const startOpen = async () => {
-        const next = await getNextCashShift(READ);
+        const [next, mine] = await Promise.all([getNextCashShift(READ), getMyShifts({ fromDate: today, toDate: today })]);
+        const now = clinicClock();
+        const shifts = mine.success && Array.isArray(mine.data) ? mine.data : [];
+        const myShift = shifts.find((x) => x.shiftEnd?.slice(0, 5) > now) ?? shifts.at(-1);
         const lastClosed = (result?.items ?? []).find((s) => !isOpen(s) && dateKey(s.openedAt) === today);
         setPlan(
             openingPlan({
                 next: next.success ? next.data : null,
                 lastClosed,
-                now: clinicClock(),
+                myShift,
+                now,
                 staff: getSessionUserName(),
                 labels: TEXT.SHIFT,
                 sourceDay: TEXT.SOURCE_DAY,

@@ -77,34 +77,39 @@ const vnd = (value) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
 
 export const signedMoney = (value) => (!value ? vnd(0) : value < 0 ? <span className="text-danger">−{vnd(-value)}</span> : vnd(value));
 
-const SHIFT_HOURS = { Morning: ["07:30", "12:00"], Afternoon: ["13:00", "17:30"] };
+const typeOfStart = (start) => (start && start < "12:00" ? "Morning" : "Afternoon");
 
-export const shiftHours = (type) => SHIFT_HOURS[type] ?? [];
-
-export const openingPlan = ({ next, lastClosed, now, staff, labels, sourceDay, sourcePrev }) => {
+// myShift: today's work shift of the signed-in user (api/schedules/my), used when the server has no plan
+export const openingPlan = ({ next, lastClosed, myShift, now, staff, labels, sourceDay, sourcePrev }) => {
+    const myFrom = myShift?.shiftStart?.slice(0, 5);
+    const myTo = myShift?.shiftEnd?.slice(0, 5);
     if (next) {
-        const type = next.shiftType ?? (now >= "12:00" ? "Afternoon" : "Morning");
-        const [from, to] = [next.shiftStart?.slice(0, 5) ?? shiftHours(type)[0], next.shiftEnd?.slice(0, 5) ?? shiftHours(type)[1]];
-        const fromPrev = next.previousClosedAt != null;
+        const from = next.shiftStart?.slice(0, 5) ?? myFrom;
         return {
-            label: labels[type],
+            label: labels[next.shiftType ?? typeOfStart(from ?? now)],
             staff: next.staffName ?? staff,
             from,
-            to,
+            to: next.shiftEnd?.slice(0, 5) ?? myTo,
             now,
             amount: Number(next.expectedOpeningCash ?? 0),
-            source: fromPrev ? sourcePrev(next.previousClosedByName, timeOf(next.previousClosedAt)) : sourceDay,
+            source: next.previousClosedAt != null ? sourcePrev(next.previousClosedByName, timeOf(next.previousClosedAt)) : sourceDay,
         };
     }
-    const type = lastClosed ? "Afternoon" : "Morning";
-    const [from, to] = shiftHours(type);
     return {
-        label: labels[type],
+        label: labels[typeOfStart(myFrom ?? now)],
         staff,
-        from,
-        to,
+        from: myFrom,
+        to: myTo,
         now,
         amount: Number(lastClosed?.countedCash ?? 0),
         source: lastClosed ? sourcePrev(lastClosed.closedByName ?? lastClosed.openedByName, timeOf(lastClosed.closedAt)) : sourceDay,
     };
+};
+
+// End of the shift a session belongs to: the session's own value, else the user's work shift that was running when it opened
+export const shiftEndOf = (session, myShifts) => {
+    if (session.shiftEnd) return String(session.shiftEnd).slice(0, 5);
+    const opened = timeOf(session.openedAt);
+    const match = myShifts.find((x) => x.shiftStart?.slice(0, 5) <= opened && x.shiftEnd?.slice(0, 5) > opened) ?? myShifts.find((x) => x.shiftEnd?.slice(0, 5) > opened);
+    return match?.shiftEnd?.slice(0, 5) ?? null;
 };

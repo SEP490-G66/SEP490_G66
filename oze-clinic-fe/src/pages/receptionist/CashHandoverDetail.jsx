@@ -11,8 +11,9 @@ import { Card } from "@/components/reception/shared";
 import { clinicClock, report } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import { closeCashSession, getCashSession } from "@/services/cashSessionService";
+import { getMyShifts } from "@/services/myScheduleService";
 import { weekdayIndex } from "@/utils/calendar";
-import { dateKey, isOpen, shiftHours, shiftTypeOf, summarize, systemTotals, timeOf, transactionsOf } from "@/utils/cashShift";
+import { dateKey, isOpen, shiftEndOf, shiftTypeOf, summarize, systemTotals, timeOf, transactionsOf } from "@/utils/cashShift";
 import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
@@ -32,6 +33,7 @@ const CashHandoverDetail = () => {
     const [reload, setReload] = useState(0);
     const [result, setResult] = useState(null);
     const [closing, setClosing] = useState(null);
+    const [myShifts, setMyShifts] = useState([]);
 
     const key = `${sessionId}|${reload}`;
 
@@ -45,6 +47,16 @@ const CashHandoverDetail = () => {
     }, [sessionId, key]);
 
     const session = result?.session;
+    const sessionDay = session ? dateKey(session.openedAt) : null;
+
+    useEffect(() => {
+        if (!sessionDay) return undefined;
+        let active = true;
+        getMyShifts({ fromDate: sessionDay, toDate: sessionDay }).then((r) => active && r.success && Array.isArray(r.data) && setMyShifts(r.data));
+        return () => {
+            active = false;
+        };
+    }, [sessionDay]);
     usePageTitle(session?.code ? `${session.code} – ${TEXT.DOC_TITLE}` : TEXT.DOC_TITLE);
 
     const back = (
@@ -130,7 +142,7 @@ const CashHandoverDetail = () => {
                     subtitle={[code, session.openedByName, clinicClock()].filter(Boolean).join(" · ")}
                     values={closing.values}
                     system={system}
-                    shiftEnd={dateKey(new Date()) === day ? shiftHours(type)[1] : null}
+                    shiftEnd={day === dateKey(new Date()) ? shiftEndOf(session, myShifts) : null}
                     now={clinicClock()}
                     print={closing.print}
                     onClose={() => setClosing(null)}

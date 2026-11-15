@@ -1,9 +1,5 @@
 import { fromMinutes, hhmm, slotEnd, toMinutes } from "./calendar";
 
-export const SCHEDULE_SLOTS = ["08:00", "08:30", "09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"];
-
-export const NOON = "12:00";
-
 export const CELL_KEYS = ["done", "noshow", "cancelled", "serving", "checkedin", "notyet", "pending", "confirmed", "callback", "noanswer"];
 
 export const CELL_DOT = {
@@ -25,7 +21,15 @@ const TODAY_KEYS = { COMPLETED: "done", NO_SHOW: "noshow", CANCELLED: "cancelled
 
 const CALL_KEYS = { CallBack: "callback", Unreachable: "noanswer" };
 
-export const rowOf = (time) => fromMinutes(Math.floor(toMinutes(time) / 30) * 30);
+const DEFAULT_STEP = 30;
+
+export const slotStep = (times) => {
+    const sorted = [...new Set(times)].sort().map(toMinutes);
+    const gaps = sorted.slice(1).map((m, i) => m - sorted[i]).filter((g) => g > 0);
+    return gaps.length ? Math.min(...gaps) : DEFAULT_STEP;
+};
+
+export const rowOf = (time, step = DEFAULT_STEP) => fromMinutes(Math.floor(toMinutes(time) / step) * step);
 
 export const cellKeyOf = (appointment, today) => {
     if (appointment.appointmentDate <= today) return TODAY_KEYS[appointment.status] ?? "notyet";
@@ -34,15 +38,33 @@ export const cellKeyOf = (appointment, today) => {
     return "confirmed";
 };
 
-export const scheduleRows = (appointments) => {
-    const extra = appointments.filter((a) => a.timeSlotStart).map((a) => rowOf(a.timeSlotStart));
-    return [...new Set([...SCHEDULE_SLOTS, ...extra])].sort();
+// Rows come from the clinic's real slots (free slots of the week) plus every booked time
+const MIN_BREAK = 60;
+
+export const scheduleRows = (appointments, freeTimes, step) => {
+    const booked = appointments.filter((a) => a.timeSlotStart).map((a) => rowOf(a.timeSlotStart, step));
+    const known = [...new Set([...freeTimes.map((t) => rowOf(t, step)), ...booked])].sort().map(toMinutes);
+    const rows = [];
+    known.forEach((m, i) => {
+        const prev = known[i - 1];
+        if (prev != null && m - prev - step < MIN_BREAK) for (let t = prev + step; t < m; t += step) rows.push(t);
+        rows.push(m);
+    });
+    return rows.map(fromMinutes);
 };
 
-export const slotPhase = (day, time, today, now) => {
+// A break sits between two rows further apart than one slot
+export const breakBefore = (rows, index, step) => {
+    if (index === 0) return null;
+    const from = toMinutes(rows[index - 1]) + step;
+    const to = toMinutes(rows[index]);
+    return to - from >= MIN_BREAK ? { from: fromMinutes(from), to: rows[index], lunch: from <= 12 * 60 && to >= 12 * 60 } : null;
+};
+
+export const slotPhase = (day, time, today, now, step = DEFAULT_STEP) => {
     if (day < today) return "past";
     if (day > today) return "future";
-    if (slotEnd(time) <= now) return "past";
+    if (slotEnd(time, step) <= now) return "past";
     return time <= now ? "now" : "future";
 };
 
