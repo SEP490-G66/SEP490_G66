@@ -139,5 +139,32 @@ namespace OZE.UnitTest.Services.ClinicServices
             result.Success.Should().BeFalse();
             result.Message.Should().Be(ErrorConstants.ServiceMessage.InvalidEstimatedMinutes);
         }
+
+        [Fact]
+        public async Task CreateServiceAsync_ShouldFail_WhenNameAlreadyExists()
+        {
+            // Arrange
+            var request = new CreateServiceRequest
+            {
+                ServiceCode = "DV-NEW-NAME",
+                ServiceName = "Tram rang trung ten",
+                ReferencePrice = 100000m
+            };
+
+            _serviceRepositoryMock
+                .Setup(r => r.ExistsByCodeAsync("DV-NEW-NAME", null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            _serviceRepositoryMock
+                .Setup(r => r.ExistsByNameAsync("Tram rang trung ten", null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            // Act
+            var result = await _service.CreateServiceAsync(request);
+
+            // Assert
+            result.Success.Should().BeFalse();
+            result.Message.Should().Be(ErrorConstants.ServiceMessage.ServiceNameExist);
+        }
     }
 }

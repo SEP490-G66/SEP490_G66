@@ -98,9 +98,6 @@ namespace OZE.UnitTest.Services.WorkShifts
             };
         }
 
- feat/unittest-get-work-shift-by-id
-
- main
         protected CreateWorkShiftRequest CreateValidRequest()
         {
             return new CreateWorkShiftRequest
