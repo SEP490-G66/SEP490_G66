@@ -1,4 +1,4 @@
-import { LEAVE_REQUEST_STATUSES } from "../utils/shift";
+import { LEAVE_REQUEST_STATUSES, leaveMessage } from "../utils/shift";
 import { BACKEND_ROLE_NAMES } from "../utils/messages";
 import api from "./api";
 import { call } from "./receptionService";
@@ -21,6 +21,7 @@ const STATUS_TO_API = {
     [LEAVE_REQUEST_STATUSES.PENDING]: "Pending",
     [LEAVE_REQUEST_STATUSES.APPROVED]: "Approved",
     [LEAVE_REQUEST_STATUSES.REJECTED]: "Rejected",
+    [LEAVE_REQUEST_STATUSES.CANCELLED]: "Cancelled",
 };
 const STATUS_FROM_API = Object.fromEntries(Object.entries(STATUS_TO_API).map(([page, backend]) => [backend, page]));
 
@@ -35,14 +36,13 @@ const toRequest = (item) => {
         date: item.leaveDate,
         slot: SLOT_FROM_API[item.slot] ?? null,
         reason: item.reason,
-        // A withdrawn request has no page status of its own; it never needs a decision any more
-        status: STATUS_FROM_API[item.status] ?? LEAVE_REQUEST_STATUSES.REJECTED,
+        status: STATUS_FROM_API[item.status] ?? LEAVE_REQUEST_STATUSES.PENDING,
         role,
         senderName: item.staffName,
         senderRole: roleLabel(role),
         substituteId: item.substituteStaffUserId,
         substituteName: item.substituteName,
-        rejectReason: item.status === "Cancelled" ? "Nhân viên đã rút đơn." : item.rejectionReason,
+        rejectReason: item.rejectionReason,
         submittedAt: item.createdAt,
         affectedAppointments: (item.affectedAppointments ?? []).map((appointment) => ({
             id: appointment.id,
@@ -50,12 +50,33 @@ const toRequest = (item) => {
             patientName: appointment.patientName,
             serviceName: appointment.serviceName,
         })),
+        // Shifts of the person in the leave time, with the room (none = reception desk)
+        affectedShifts: (item.affectedShifts ?? []).map((shift) => ({
+            id: shift.shiftId,
+            start: shift.shiftStart?.slice(0, 5) ?? "",
+            end: shift.shiftEnd?.slice(0, 5) ?? "",
+            roomName: shift.roomName ?? "Quầy lễ tân",
+        })),
     };
 };
 
-const mapResult = (result, mapData) => (result.success ? { ...result, data: mapData(result.data) } : result);
+// Backend messages (success and failure) are shown in Vietnamese.
+const mapResult = (result, mapData) => {
+    const message = leaveMessage(result.message);
+    return result.success ? { ...result, message, data: mapData(result.data) } : { ...result, message };
+};
 
-export const getLeaveRequests = async ({ page = 1, pageSize = LEAVE_REQUEST_PAGE_SIZE, keyword = "", status = "", role = "", slot = "" } = {}) => {
+// from / to: "YYYY-MM-DD" leave days, both included ("" = no limit).
+export const getLeaveRequests = async ({
+    page = 1,
+    pageSize = LEAVE_REQUEST_PAGE_SIZE,
+    keyword = "",
+    status = "",
+    role = "",
+    slot = "",
+    from = "",
+    to = "",
+} = {}) => {
     const result = await call(() =>
         api.get("/api/leave-requests", {
             params: {
@@ -65,6 +86,8 @@ export const getLeaveRequests = async ({ page = 1, pageSize = LEAVE_REQUEST_PAGE
                 status: STATUS_TO_API[status],
                 role: BACKEND_ROLE_NAMES[role],
                 slot: SLOT_TO_API[slot],
+                fromDate: from || undefined,
+                toDate: to || undefined,
             },
         }),
     );
