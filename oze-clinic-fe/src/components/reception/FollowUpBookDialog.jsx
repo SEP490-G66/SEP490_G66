@@ -3,7 +3,8 @@ import Modal from "@/components/ui/Modal";
 import { DialogActions } from "./shared";
 import { clinicToday, getAvailableSlots, recordFollowUpContact, scheduleFollowUpAppointment } from "@/services/receptionService";
 import { FOLLOW_UP_TEXT as TEXT } from "@/utils/messages";
-import { addDays, ddmm, hhmm, isSunday, mondayOf, shortDay, slotEnd, weekdayIndex } from "@/utils/followUp";
+import { addDays, ddmm, hhmm, isSunday, mondayOf, slotEnd, weekdayIndex } from "@/utils/calendar";
+import { shortDay } from "@/utils/followUp";
 import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
