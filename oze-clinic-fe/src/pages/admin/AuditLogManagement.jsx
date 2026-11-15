@@ -3,21 +3,20 @@ import { ChevronRight, History } from "lucide-react";
 import { toast } from "react-toastify";
 import AuditLogDetailPopup from "@/components/popup/auditLog/AuditLogDetailPopup";
 import Badge from "@/components/ui/Badge";
+import FilterBar, { FILTER_SEARCH_CLASS, FILTER_SELECT_CLASS } from "@/components/ui/FilterBar";
 import FilterSelect from "@/components/ui/FilterSelect";
 import Pagination from "@/components/ui/Pagination";
 import PersonCell from "@/components/ui/PersonCell";
 import SearchInput from "@/components/ui/SearchInput";
 import useAsync from "@/hooks/useAsync";
 import { getAllAuditLogs, getAuditLogs } from "@/services/auditLogService";
-import { AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS, AUDIT_ENTITY_OPTIONS } from "@/utils/data/mockAuditLogs";
+import { AUDIT_ACTION_OPTIONS, AUDIT_ENTITY_OPTIONS, auditActionLook, auditEntityLabel } from "@/utils/auditLog";
 import { getClinicDateTimeParts, getClinicToday } from "@/utils/format";
 import { downloadExcel } from "@/utils/reportExport";
 
 const SEARCH_DELAY_MS = 300;
 const SKELETON_ROW_COUNT = 5;
 const COLUMN_COUNT = 8;
-
-const entityLabel = (entityType) => AUDIT_ENTITY_OPTIONS.find((option) => option.value === entityType)?.label ?? entityType;
 
 const EXPORT_HEADER = ["Mã", "Người dùng", "Vai trò", "Hành động", "Đối tượng", "Mã đối tượng", "Địa chỉ IP", "Trình duyệt / thiết bị", "Thời gian"];
 
@@ -27,8 +26,8 @@ const toExportRow = (log) => {
         log.id,
         log.userName,
         log.userRole,
-        AUDIT_ACTION_LABELS[log.action].label,
-        entityLabel(log.entityType),
+        auditActionLook(log.action).label,
+        auditEntityLabel(log.entityType),
         log.entityId,
         log.ipAddress,
         log.userAgent,
@@ -37,7 +36,7 @@ const toExportRow = (log) => {
 };
 
 const AuditLogRow = ({ log, onView }) => {
-    const { label, variant } = AUDIT_ACTION_LABELS[log.action];
+    const { label, variant } = auditActionLook(log.action);
     const { date, time } = getClinicDateTimeParts(log.createdAt);
 
     return (
@@ -49,9 +48,9 @@ const AuditLogRow = ({ log, onView }) => {
             <td data-label="Hành động">
                 <Badge variant={variant}>{label}</Badge>
             </td>
-            <td data-label="Đối tượng" className="whitespace-nowrap">{entityLabel(log.entityType)}</td>
-            <td data-label="Địa chỉ IP" className="num whitespace-nowrap">{log.ipAddress}</td>
-            <td data-label="Trình duyệt / thiết bị" data-block className="whitespace-nowrap text-muted">{log.userAgent}</td>
+            <td data-label="Đối tượng" className="whitespace-nowrap">{auditEntityLabel(log.entityType)}</td>
+            <td data-label="Địa chỉ IP" className="num whitespace-nowrap">{log.ipAddress || "—"}</td>
+            <td data-label="Trình duyệt / thiết bị" data-block className="max-w-64 truncate text-muted" title={log.userAgent}>{log.userAgent || "—"}</td>
             <td data-label="Thời gian" className="num whitespace-nowrap">
                 <span className="block text-caption text-muted">{date}</span>
                 <span className="font-medium text-ink">{time}</span>
@@ -108,6 +107,16 @@ const AuditLogManagement = () => {
         setPage(1);
     };
 
+    const clearFilters = () => {
+        setSearchInput("");
+        setKeyword("");
+        setFrom("");
+        setTo("");
+        setAction("");
+        setEntityType("");
+        setPage(1);
+    };
+
     const handleExport = async () => {
         setExporting(true);
         const response = await getAllAuditLogs({ keyword, from, to, action, entityType });
@@ -124,21 +133,21 @@ const AuditLogManagement = () => {
             <div className="page-header mb-0 items-center">
                 <div>
                     <h1 className="page-title">Nhật ký hệ thống</h1>
-                    <p className="page-description">Lịch sử tạo, sửa, xoá dữ liệu trong hệ thống · chỉ đọc</p>
+                    <p className="page-description">Lịch sử thao tác của người dùng trong hệ thống · chỉ đọc</p>
                 </div>
                 <button type="button" className="btn btn-secondary" disabled={exporting || !data?.totalItems} onClick={handleExport}>
                     {exporting ? "Đang xuất..." : "Xuất Excel"}
                 </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <FilterBar canClear={Boolean(filtered || searchInput)} onClear={clearFilters}>
                 <SearchInput
                     id="audit-log-search"
                     label="Tìm nhật ký"
-                    placeholder="Tìm theo người dùng hoặc IP"
+                    placeholder="Tìm theo người dùng, IP, mã đối tượng"
                     value={searchInput}
                     onChange={setSearchInput}
-                    className="w-full sm:w-72 lg:flex-1"
+                    className={FILTER_SEARCH_CLASS}
                 />
                 <div className="flex w-full items-center gap-2 sm:w-auto">
                     <input
@@ -161,16 +170,22 @@ const AuditLogManagement = () => {
                         onChange={(event) => changeFilter(setTo)(event.target.value)}
                     />
                 </div>
-                <FilterSelect className="w-full sm:w-auto sm:min-w-40" id="audit-log-action" label="Hành động" options={AUDIT_ACTION_OPTIONS} value={action} onChange={changeFilter(setAction)} />
+                <FilterSelect className={FILTER_SELECT_CLASS} id="audit-log-action" label="Hành động" options={AUDIT_ACTION_OPTIONS} value={action} onChange={changeFilter(setAction)} />
                 <FilterSelect
-                    className="w-full sm:w-auto sm:min-w-40"
+                    className={FILTER_SELECT_CLASS}
                     id="audit-log-entity"
                     label="Đối tượng"
                     options={AUDIT_ENTITY_OPTIONS}
                     value={entityType}
                     onChange={changeFilter(setEntityType)}
                 />
-            </div>
+            </FilterBar>
+
+            {!loading && result && !result.success && (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được nhật ký hệ thống. Vui lòng thử lại sau."}
+                </p>
+            )}
 
             <div>
                 <div className="table-wrap">
