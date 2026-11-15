@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarCheck,Inbox, Stethoscope, UserPlus, Wallet } from "lucide-react";
+import { CalendarCheck, FileText, Inbox, Receipt, Wallet } from "lucide-react";
 import BarChart from "@/components/chart/BarChart";
 import DonutChart from "@/components/chart/DonutChart";
 import ExportReportPopup from "@/components/popup/report/ExportReportPopup";
@@ -22,7 +22,7 @@ const PERIOD_OPTIONS = [
 
 // Revenue chart title (followed by the period) and the hint next to it.
 const CHART_TEXTS = {
-    [REPORT_PERIODS.DAY]: { title: "Thực thu theo khung giờ", hint: "Bấm vào một cột để xem hoá đơn trong ngày" },
+    [REPORT_PERIODS.DAY]: { title: "Thực thu 7 ngày gần nhất", hint: "Bấm vào một cột để xem báo cáo ngày đó" },
     [REPORT_PERIODS.WEEK]: { title: "Thực thu theo ngày", hint: "Bấm vào một cột để xem báo cáo ngày đó" },
     [REPORT_PERIODS.MONTH]: { title: "Thực thu theo ngày", hint: "Bấm vào một cột để xem báo cáo ngày đó" },
     [REPORT_PERIODS.YEAR]: { title: "Thực thu theo tháng", hint: "Bấm vào một cột để xem tháng đó" },
@@ -144,12 +144,8 @@ const AdminDashboard = () => {
     // TODO: open the "Danh sách công nợ" drawer once it is built.
     const openDebts = () => {};
 
-    // TODO: open the invoices of the clicked hour once the invoice list exists.
-    const openInvoices = () => {};
-
     // A day bar opens that day's report, a month bar that month's; days not reached yet have nothing to show.
     const openBar = (bar) => {
-        if (period === REPORT_PERIODS.DAY) return openInvoices(bar);
         if (bar.value === null) return;
         const next = period === REPORT_PERIODS.YEAR ? REPORT_PERIODS.MONTH : REPORT_PERIODS.DAY;
         setPeriod(next);
@@ -162,7 +158,7 @@ const AdminDashboard = () => {
                 <div>
                     <h1 className="page-title">Báo cáo</h1>
                     <p className="num mt-1 text-caption text-muted">
-                        {report ? `Cập nhật lúc ${formatDateTime(report.updatedAt)}` : "Đang tải…"}
+                        {report ? `Cập nhật lúc ${formatDateTime(report.updatedAt)}` : loading ? "Đang tải…" : " "}
                     </p>
                 </div>
                 {/* Phone: period buttons share the full width, the navigator stretches next to "Xuất báo cáo". */}
@@ -187,6 +183,12 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
+            {reportResult && !reportResult.success && (
+                <p role="alert" className="alert alert-danger">
+                    {reportResult.message || "Không tải được báo cáo. Vui lòng thử lại sau."}
+                </p>
+            )}
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                     icon={Wallet}
@@ -197,20 +199,19 @@ const AdminDashboard = () => {
                     tone={report ? toneOf(report.revenue.change) : undefined}
                 />
                 <MetricCard
-                    icon={Stethoscope}
-                    label="Lượt khám"
+                    icon={Receipt}
+                    label="Công nợ hiện tại"
                     loading={loading}
-                    value={report?.visits.value}
-                    caption={report && changeCaption(report.visits.change, report, "%")}
-                    tone={report ? toneOf(report.visits.change) : undefined}
+                    value={report && formatCurrency(report.debts.total)}
+                    caption={report && `${report.debts.invoiceCount} hoá đơn chưa thanh toán đủ`}
                 />
                 <MetricCard
-                    icon={UserPlus}
-                    label="Bệnh nhân mới"
+                    icon={FileText}
+                    label="Hoá đơn mới"
                     loading={loading}
-                    value={report?.newPatients.value}
-                    caption={report && changeCaption(report.newPatients.change, report)}
-                    tone={report ? toneOf(report.newPatients.change) : undefined}
+                    value={report?.newInvoices.value}
+                    caption={report && changeCaption(report.newInvoices.change, report)}
+                    tone={report ? toneOf(report.newInvoices.change) : undefined}
                 />
                 <MetricCard
                     icon={CalendarCheck}
@@ -260,14 +261,19 @@ const AdminDashboard = () => {
             </ReportCard>
 
             <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-                <ReportCard title="Tỷ trọng doanh thu theo dịch vụ">
+                <ReportCard title="Thực thu theo phương thức thanh toán">
                     {loading ? (
                         <div className="skeleton h-44 w-full" aria-hidden="true" />
+                    ) : report && report.revenueByMethod.length === 0 ? (
+                        <div className="empty-state">
+                            <Wallet className="empty-state-icon" aria-hidden="true" />
+                            <p className="empty-state-title">Chưa có khoản thu nào trong kỳ</p>
+                        </div>
                     ) : (
                         report && (
                             <DonutChart
-                                data={report.revenueByService}
-                                title="Tỷ trọng doanh thu theo dịch vụ (triệu ₫)"
+                                data={report.revenueByMethod}
+                                title="Thực thu theo phương thức thanh toán (triệu ₫)"
                                 formatValue={(value) => `${formatMillion(value)} tr`}
                                 centerValue={`${formatMillion(report.revenue.value)} tr`}
                                 centerLabel="Tổng"
