@@ -11,6 +11,8 @@ import { cx } from "@/utils/cx";
 
 const PAGE_SIZE = 10;
 const STATUS_OPTIONS = [["", TEXT.ALL], ...Object.entries(TEXT.REFUND_STATUS).map(([k, [label]]) => [k, label])];
+// The backend writes statuses as Pending / Approved / Processed / Rejected; any casing is read the same.
+const statusOf = (value) => Object.keys(TEXT.REFUND_STATUS).find((k) => k.toLowerCase() === String(value ?? "").toLowerCase()) ?? value;
 
 const RefundsTab = () => {
     const [status, setStatus] = useState("");
@@ -25,6 +27,11 @@ const RefundsTab = () => {
         const controller = new AbortController();
         getCashierRefunds({ status, page, pageSize: PAGE_SIZE }, { skipErrorPage: true, signal: controller.signal }).then((response) => {
             if (controller.signal.aborted || response.aborted) return;
+            const lastPage = Math.max(1, Number(response.data?.totalPages ?? 1));
+            if (response.success && page > lastPage) {
+                setPage(lastPage);
+                return;
+            }
             const items = response.success ? (response.data?.items ?? []) : [];
             setResult({ key, ok: response.success, items, total: Number(response.data?.totalCount ?? items.length), totalPages: Math.max(1, Number(response.data?.totalPages ?? 1)) });
         });
@@ -33,8 +40,8 @@ const RefundsTab = () => {
 
     const items = result?.items ?? [];
     const fresh = result?.key === key;
-    const done = (ok) => {
-        if (!ok) return;
+    // Failed or not, the dialog closes and the list reloads: another cashier or the manager may have acted on it.
+    const done = () => {
         setDialog(null);
         setReload((n) => n + 1);
     };
@@ -68,7 +75,7 @@ const RefundsTab = () => {
                     <div className="space-y-2 p-4">
                         <div className="skeleton h-10 rounded" />
                     </div>
-                ) : !items.length ? (
+                ) : !result.ok && !items.length ? null : !items.length ? (
                     <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.REFUND_EMPTY}</p>
                 ) : (
                     <div className={cx("table-wrap rounded-none border-x-0", !fresh && "opacity-60")}>
@@ -84,7 +91,8 @@ const RefundsTab = () => {
                             </thead>
                             <tbody>
                                 {items.map((r) => {
-                                    const [label, tone] = TEXT.REFUND_STATUS[r.status] ?? [r.status, "badge-neutral"];
+                                    const status = statusOf(r.status);
+                                    const [label, tone] = TEXT.REFUND_STATUS[status] ?? [r.status ?? "—", "badge-neutral"];
                                     return (
                                         <tr key={r.id}>
                                             <td data-primary>
@@ -104,18 +112,28 @@ const RefundsTab = () => {
                                                 {r.requestedByName}
                                             </td>
                                             <td data-label={TEXT.REFUND_COLUMNS[6]} className="num whitespace-nowrap">
-                                                {dateTimeOf(r.requestedAt ?? r.createdAt)}
+                                                {r.requestedAt || r.createdAt ? dateTimeOf(r.requestedAt ?? r.createdAt) : "—"}
                                             </td>
                                             <td data-label={TEXT.REFUND_COLUMNS[7]}>
                                                 <span className={cx("badge", tone)}>{label}</span>
                                             </td>
                                             <td data-actions>
-                                                {r.status === "Pending" && (
+                                                {status === "Approved" && (
                                                     <div className="ml-auto grid w-max grid-cols-2 gap-2">
-                                                        <button type="button" className="btn btn-primary h-8 px-2.5" onClick={() => setDialog({ type: "payout", item: r })}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-primary h-8 px-2.5"
+                                                            disabled={!fresh}
+                                                            onClick={() => setDialog({ type: "payout", item: r })}
+                                                        >
                                                             {TEXT.REFUND}
                                                         </button>
-                                                        <button type="button" className="btn btn-secondary h-8 px-2.5" onClick={() => setDialog({ type: "reject", item: r })}>
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-secondary h-8 px-2.5"
+                                                            disabled={!fresh}
+                                                            onClick={() => setDialog({ type: "reject", item: r })}
+                                                        >
                                                             {TEXT.CK_REJECT}
                                                         </button>
                                                     </div>
@@ -141,11 +159,24 @@ const RefundsTab = () => {
                 <ConfirmActionDialog
                     title={TEXT.REFUND_TITLE}
                     description={`${dialog.item.patientName} · ${dialog.item.invoiceNumber}`}
-                    body={TEXT.REFUND_BODY(money(dialog.item.amount))}
+                    body={TEXT.REFUND_BODY(
+                        money(dialog.item.amount),
+                        TEXT.METHODS[dialog.item.refundMethod ?? dialog.item.paymentMethod] ?? TEXT.METHODS.CASH,
+                        dialog.item.paidAmount != null ? money(dialog.item.paidAmount) : null,
+                    )}
                     closeLabel={TEXT.CANCEL}
                     submitLabel={TEXT.REFUND}
                     onClose={() => setDialog(null)}
-                    onSubmit={async () => done(report(await payoutRefund(dialog.item.id), TEXT.REFUNDED(money(dialog.item.amount), dialog.item.patientName)))}
+                    onSubmit={async () => {
+                        const amount = Number(dialog.item.amount);
+                        // Never hand back more than the invoice took in, nor nothing at all.
+                        if (!(amount > 0) || (dialog.item.paidAmount != null && amount > Number(dialog.item.paidAmount))) {
+                            report({ success: false, message: TEXT.REFUND_TOO_MUCH });
+                            return done();
+                        }
+                        report(await payoutRefund(dialog.item.id), TEXT.REFUNDED(money(amount), dialog.item.patientName));
+                        done();
+                    }}
                 />
             )}
             {dialog?.type === "reject" && (
@@ -156,8 +187,13 @@ const RefundsTab = () => {
                     closeLabel={TEXT.CANCEL}
                     submitLabel={TEXT.CK_REJECT}
                     danger
+                    reasonLabel={TEXT.REFUND_REASON}
+                    reasonPlaceholder={TEXT.REFUND_REASON_PLACEHOLDER}
                     onClose={() => setDialog(null)}
-                    onSubmit={async () => done(report(await rejectRefund(dialog.item.id), TEXT.REFUND_REJECTED))}
+                    onSubmit={async (reason) => {
+                        report(await rejectRefund(dialog.item.id, reason), TEXT.REFUND_REJECTED);
+                        done();
+                    }}
                 />
             )}
         </div>

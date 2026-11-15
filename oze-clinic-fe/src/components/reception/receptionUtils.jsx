@@ -44,7 +44,11 @@ export const isPendingSoon = (a, today, now) => {
 
 export const DUTY_LABEL = { Working: "Đang làm", NotStarted: "Chưa vào ca", Ended: "Đã kết thúc ca", OnLeave: "Nghỉ phép" };
 
-export const money = (value) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
+// VND has no fractions; anything that is not a number shows as "—" instead of "NaN ₫".
+export const money = (value) => {
+    const amount = Number(value ?? 0);
+    return Number.isFinite(amount) ? `${Math.round(amount).toLocaleString("vi-VN")} ₫` : "—";
+};
 export const hhmm = (time) => (time ? time.slice(0, 5) : null);
 export const slotText = (a) => (a.timeSlotStart ? `${hhmm(a.timeSlotStart)} – ${hhmm(a.timeSlotEnd)}` : "Vãng lai");
 export const clockOf = (dateTime) =>
@@ -71,14 +75,6 @@ export const clinicClock = () =>
 
 // Whole minutes since a moment (0 when missing or in the future)
 export const minutesSince = (moment, now = Date.now()) => (moment ? Math.max(0, Math.floor((now - new Date(moment).getTime()) / 60_000)) : 0);
-
-// How long someone has waited, as a colour: calm under 15 minutes, watch 15–30, act over 30
-export const waitTone = (minutes) => (minutes >= 30 ? "danger" : minutes >= 15 ? "warning" : "success");
-export const WAIT_TONE_CLASS = {
-    success: "bg-success-soft text-success",
-    warning: "bg-warning-soft text-warning",
-    danger: "bg-danger-soft text-danger",
-};
 
 // "0912 345 678" → "…5678" with the patient code, to tell apart two people with the same name
 export const phoneTail = (phone) => (phone ? `…${phone.replace(/\D/g, "").slice(-4)}` : "");

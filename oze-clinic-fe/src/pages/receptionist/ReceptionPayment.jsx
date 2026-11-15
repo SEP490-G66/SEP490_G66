@@ -16,16 +16,21 @@ import { cx } from "@/utils/cx";
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.PAY_TITLE }];
 const METHOD_OPTIONS = Object.entries(TEXT.METHODS).map(([value, label]) => ({ value, label }));
 
+const STAY = { skipErrorPage: true };
+
 const loadQueue = async () => {
+    const fromDate = clinicToday(-7);
     const [visits, invoices, open] = await Promise.all([
-        getAppointments({ fromDate: clinicToday(-7), toDate: clinicToday(), status: "COMPLETED" }),
-        getRecentInvoices(),
-        getOpenInvoices(),
+        getAppointments({ fromDate, toDate: clinicToday(), status: "COMPLETED" }, STAY),
+        getRecentInvoices({ fromDate }, STAY),
+        getOpenInvoices(STAY),
     ]);
     const ok = visits.success && invoices.success && open.success;
+    // Errors stay on this page (alert + retry) instead of opening the app's error page.
+// Without the invoice list a billed visit looks unbilled, so no visit is offered: billing it again would make a second invoice.
     const invoiced = new Set((invoices.data?.items ?? []).filter((i) => i.paymentStatus !== "CANCELLED" && i.appointmentId).map((i) => i.appointmentId));
-    const pending = (visits.data?.items ?? []).filter((a) => !invoiced.has(a.id));
-    return { ok, visits: pending, queue: queueOf(pending, open.data?.items ?? []) };
+    const pending = invoices.success ? (visits.data?.items ?? []).filter((a) => !invoiced.has(a.id)) : [];
+    return { ok, visitsHidden: !invoices.success, visits: pending, open: open.data?.items ?? [] };
 };
 
 const printReceipt = () => {
@@ -42,6 +47,10 @@ const ReceptionPayment = () => {
     const [version, setVersion] = useState(0);
     const [collapsed, setCollapsed] = useState(false);
     const [chosen, setChosen] = useState(() => (searchParams.get("invoice") ? `i${searchParams.get("invoice")}` : null));
+    // The first patient is picked for the cashier only when the page opens; after a payment the cashier picks the next one.
+    const [autoPick, setAutoPick] = useState(true);
+    // Visits billed from this page: never billed twice, even when the list has not caught up yet.
+    const [billed, setBilled] = useState({});
     const [invoice, setInvoice] = useState(null);
     const [method, setMethod] = useState("CASH");
     const [confirming, setConfirming] = useState(false);
@@ -56,14 +65,17 @@ const ReceptionPayment = () => {
         };
     }, [version]);
 
-    const queue = data?.queue ?? [];
-    const selected = queue.find((q) => q.key === chosen) ?? queue[0] ?? null;
+    const visits = (data?.visits ?? []).filter((a) => !billed[a.id]);
+    const queue = data ? queueOf(visits, data.open) : [];
+    const selected = chosen ? (queue.find((q) => q.key === chosen) ?? null) : autoPick ? (queue[0] ?? null) : null;
+    const missing = Boolean(data && chosen && !selected);
 
     useEffect(() => {
         if (selected?.kind !== "invoice") return undefined;
         const controller = new AbortController();
         getInvoice(selected.id, { skipErrorPage: true, signal: controller.signal }).then((response) => {
-            if (!controller.signal.aborted && response.success) setInvoice(response.data);
+            if (controller.signal.aborted || response.aborted) return;
+            setInvoice(response.success ? response.data : { id: selected.id, failed: true });
         });
         return () => controller.abort();
     }, [selected?.kind, selected?.id, version]);
@@ -75,8 +87,9 @@ const ReceptionPayment = () => {
         if (searchParams.get("invoice")) setSearchParams({}, { replace: true });
     };
 
-    const visit = selected?.kind === "visit" ? data.visits.find((a) => a.id === selected.id) : null;
-    const loadedInvoice = selected?.kind === "invoice" && invoice?.id === selected.id ? invoice : null;
+    const visit = selected?.kind === "visit" ? visits.find((a) => a.id === selected.id) : null;
+    const invoiceFailed = selected?.kind === "invoice" && invoice?.id === selected.id && invoice.failed;
+    const loadedInvoice = selected?.kind === "invoice" && invoice?.id === selected.id && !invoice.failed ? invoice : null;
     const items = visit ? visitItems(visit) : loadedInvoice ? invoiceItems(loadedInvoice) : [];
     const total = visit ? items.reduce((sum, item) => sum + lineTotal(item), 0) : Number(loadedInvoice?.totalAmount ?? 0);
     const discount = Number(loadedInvoice?.discountAmount ?? 0);
@@ -84,32 +97,50 @@ const ReceptionPayment = () => {
     const due = visit ? total : Number(loadedInvoice?.remainingAmount ?? 0);
     const patient = visit ?? loadedInvoice;
 
+    // Whatever happens the dialog closes and the list reloads, so the cashier never retries on numbers that are out of date.
+    const finish = (nextChosen) => {
+        setConfirming(false);
+        setChosen(nextChosen);
+        if (!nextChosen) setAutoPick(false);
+        reload();
+    };
+
     const pay = async () => {
         let invoiceId = loadedInvoice?.id;
         if (visit) {
-            const created = await createInvoice({
-                patientId: visit.patientId,
-                appointmentId: visit.id,
-                discountAmount: 0,
-                notes: null,
-                items: items.map(({ serviceId, name, unitPrice, quantity, sortOrder }) => ({ serviceId, serviceName: name, unitPrice, quantity, sortOrder })),
-            });
-            if (!created.success) {
-                report(created);
-                return;
-            }
+            const created = await createInvoice(
+                {
+                    patientId: visit.patientId,
+                    appointmentId: visit.id,
+                    discountAmount: 0,
+                    notes: null,
+                    items: items.map(({ serviceId, name, unitPrice, quantity, sortOrder }) => ({ serviceId, serviceName: name, unitPrice, quantity, sortOrder })),
+                },
+                STAY,
+            );
+            if (!report(created)) return finish(chosen);
             invoiceId = created.data?.id;
+            if (!invoiceId) {
+                toast.error(TEXT.NO_INVOICE_ID);
+                return finish(null);
+            }
+            setBilled((map) => ({ ...map, [visit.id]: invoiceId }));
+        } else {
+            // Another cashier may have collected part of it since it was opened here.
+            const latest = await getInvoice(invoiceId, STAY);
+            if (!report(latest)) return finish(chosen);
+            if (Number(latest.data?.remainingAmount ?? 0) !== due) {
+                toast.warning(TEXT.AMOUNT_CHANGED(money(latest.data?.remainingAmount)));
+                return finish(chosen);
+            }
         }
         const name = patient.patientName;
-        const ok = report(
-            await recordPayment(invoiceId, { amount: due, paymentMethod: method, purpose: "Regular", transactionReference: null }),
+        const paid = report(
+            await recordPayment(invoiceId, { amount: due, paymentMethod: method, purpose: "Regular", transactionReference: null }, STAY),
             method === "CASH" ? TEXT.PAID_CASH(money(due), name) : TEXT.PAID_TRANSFER(money(due), name),
         );
-        if (ok) {
-            setConfirming(false);
-            setChosen(null);
-            reload();
-        }
+        if (!paid && visit) toast.info(TEXT.INVOICE_CREATED_UNPAID);
+        finish(paid ? null : `i${invoiceId}`);
     };
 
     const list = collapsed ? (
@@ -133,6 +164,8 @@ const ReceptionPayment = () => {
                     <div className="skeleton h-14 rounded-lg" />
                     <div className="skeleton h-14 rounded-lg" />
                 </div>
+            ) : !queue.length && !data.ok ? (
+                <p className="px-5 py-8 text-center text-body-sm text-danger">{TEXT.QUEUE_LOAD_ERROR}</p>
             ) : queue.length ? (
                 <ul className="divide-y divide-border">
                     {queue.map((q) => {
@@ -173,8 +206,17 @@ const ReceptionPayment = () => {
 
     const main = !selected ? (
         <Card>
-            <p className="px-6 py-12 text-center text-body text-muted">{data ? TEXT.NONE_SELECTED : ""}</p>
+            <p className="px-6 py-12 text-center text-body text-muted">
+                {!data ? "" : missing ? TEXT.NOT_IN_QUEUE : queue.length ? TEXT.PICK_NEXT : data.ok ? TEXT.NONE_SELECTED : ""}
+            </p>
         </Card>
+    ) : invoiceFailed ? (
+        <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3 self-start">
+            <span className="flex-1">{TEXT.INVOICE_LOAD_ERROR}</span>
+            <button type="button" className="btn btn-secondary h-9" onClick={reload}>
+                {TEXT.RETRY}
+            </button>
+        </div>
     ) : !patient ? (
         <div className="skeleton h-64 rounded-xl" />
     ) : (
@@ -225,7 +267,7 @@ const ReceptionPayment = () => {
                     <button type="button" className="btn btn-secondary" onClick={printReceipt}>
                         {TEXT.PRINT_RECEIPT}
                     </button>
-                    <button type="button" className="btn btn-primary" disabled={due <= 0 || !items.length} onClick={() => setConfirming(true)}>
+                    <button type="button" className="btn btn-primary" disabled={!Number.isFinite(due) || due <= 0 || !items.length} onClick={() => setConfirming(true)}>
                         {TEXT.CONFIRM_PAY}
                     </button>
                 </div>
@@ -241,7 +283,7 @@ const ReceptionPayment = () => {
             </div>
             {data && !data.ok && (
                 <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
-                    <span className="flex-1">{TEXT.LOAD_ERROR}</span>
+                    <span className="flex-1">{data.visitsHidden ? TEXT.VISITS_HIDDEN : TEXT.LOAD_ERROR}</span>
                     <button type="button" className="btn btn-secondary h-9" onClick={reload}>
                         {TEXT.RETRY}
                     </button>
