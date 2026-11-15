@@ -300,6 +300,16 @@
   .table .cell-primary { @apply text-title text-ink; }
   .table-footer { @apply flex items-center justify-between border-t border-border px-4 py-3 text-caption text-muted; }
 
+  /* .table-fixed-acts: column widths from <colgroup>, long text wraps, and the last (actions) column stays pinned on the
+     right while the rest scrolls sideways. Only as a real table; .table-stack cards drop it below 56rem. */
+  @container (width >= 56rem) {
+    .table-fixed-acts { table-layout: fixed; min-width: 860px; }
+    .table-fixed-acts td, .table-fixed-acts th { overflow-wrap: anywhere; }
+    .table-fixed-acts th:last-child, .table-fixed-acts td[data-actions] { @apply sticky right-0 bg-canvas; box-shadow: -8px 0 8px -8px rgb(15 23 42 / 0.18); }
+    .table-fixed-acts th:last-child { @apply bg-surface-tint; }
+    .table-fixed-acts tbody tr:hover td[data-actions] { @apply bg-primary-softer; }
+  }
+
   /* Table -> cards when its .table-wrap is narrower than 56rem (phone, tablet, narrow column). Mark the cells:
      data-primary  = the card title (no label), data-label="…" = a "Label ··· value" line,
      data-block    = label above a long value, data-actions = the buttons row at the bottom,
@@ -316,6 +326,7 @@
     .table-stack td[data-actions] { @apply justify-end pt-2; }
     .table-stack td[colspan] { @apply block px-0 text-center; }
     .table-stack td[data-hide-stack] { display: none; }
+    .table-stack colgroup { display: none; }
   }
 
   /* .table-stack-sm: same cards, for tables with few columns that fit a narrower box: only below 36rem. */
