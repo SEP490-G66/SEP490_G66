@@ -11,8 +11,8 @@ import { getCashSessions, getCurrentCashSession, getHandoverCandidates, getNextC
 import { clinicToday } from "@/services/receptionService";
 import { getMyShifts } from "@/services/myScheduleService";
 import { getSessionUserName } from "@/services/sessionStore";
-import { addDays } from "@/utils/calendar";
-import { dateKey, dateTimeOf, isOpen, openingPlan, shiftTypeOf, signedMoney } from "@/utils/cashShift";
+import { addDays, dmy } from "@/utils/calendar";
+import { dateKey, dateTimeOf, isOpen, openingPlan, shiftNotOver, shiftTypeOf, signedMoney } from "@/utils/cashShift";
 import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
 import { getCashHandoverRoute } from "@/utils/routes";
 import { cx } from "@/utils/cx";
@@ -21,12 +21,15 @@ const READ = { skipErrorPage: true };
 const PAGE_SIZE = 10;
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
 const STATUS_OPTIONS = [["", TEXT.ALL], ...Object.entries(TEXT.STATUS_LABEL)];
+// How far back to look for a shift someone forgot to close before a new one is opened.
+const OPEN_LOOKBACK_DAYS = 30;
 
 const defaults = (today) => ({ from: addDays(today, -6), to: today, status: "", staff: "" });
 
 const CashHandover = () => {
     const navigate = useNavigate();
-    const [today] = useState(clinicToday);
+    // Read on every render so a page left open overnight moves to the new day.
+    const today = clinicToday();
     const [filters, setFilters] = useState(() => defaults(today));
     const [page, setPage] = useState(1);
     const [reload, setReload] = useState(0);
@@ -34,6 +37,8 @@ const CashHandover = () => {
     const [current, setCurrent] = useState(undefined);
     const [staff, setStaff] = useState([]);
     const [plan, setPlan] = useState(null);
+    const [preparing, setPreparing] = useState(false);
+    const [blocked, setBlocked] = useState(null);
 
     usePageTitle(TEXT.DOC_TITLE);
 
@@ -46,6 +51,11 @@ const CashHandover = () => {
             { ...READ, signal: controller.signal },
         ).then((response) => {
             if (controller.signal.aborted || response.aborted) return;
+            const lastPage = Math.max(1, Number(response.data?.totalPages ?? 1));
+            if (response.success && page > lastPage) {
+                setPage(lastPage);
+                return;
+            }
             setResult({
                 key: requestKey,
                 ok: response.success,
@@ -59,7 +69,11 @@ const CashHandover = () => {
 
     useEffect(() => {
         const controller = new AbortController();
-        getCurrentCashSession().then((response) => !controller.signal.aborted && setCurrent(response.success ? response.data : null));
+        // A failed check is not "no open shift": showing "Mở ca" then could start a second drawer.
+        getCurrentCashSession({ ...READ, signal: controller.signal }).then((response) => {
+            if (controller.signal.aborted || response.aborted) return;
+            setCurrent(response.success ? (response.data ?? null) : { failed: true });
+        });
         return () => controller.abort();
     }, [reload]);
 
@@ -82,16 +96,40 @@ const CashHandover = () => {
         setPage(1);
     };
 
+    // Opening rules (decided with the clinic): the receptionist must be on today's schedule with a shift not yet over,
+    // and every earlier shift must be closed by the person who opened it. Anything that cannot be checked blocks the opening.
     const startOpen = async () => {
-        const [next, mine] = await Promise.all([getNextCashShift(READ), getMyShifts({ fromDate: today, toDate: today })]);
+        if (preparing) return;
+        setPreparing(true);
+        setBlocked(null);
+        const day = clinicToday();
+        const [next, mine, openOnes] = await Promise.all([
+            getNextCashShift(READ),
+            getMyShifts({ fromDate: day, toDate: day }, READ),
+            getCashSessions({ fromDate: addDays(day, -OPEN_LOOKBACK_DAYS), toDate: day, status: "Open", page: 1, pageSize: 5 }, READ),
+        ]);
+        setPreparing(false);
         const now = clinicClock();
-        const shifts = mine.success && Array.isArray(mine.data) ? mine.data : [];
-        const myShift = shifts.find((x) => x.shiftEnd?.slice(0, 5) > now) ?? shifts.at(-1);
-        const lastClosed = (result?.items ?? []).find((s) => !isOpen(s) && dateKey(s.openedAt) === today);
+        if (!mine.success) return setBlocked(TEXT.SCHEDULE_ERROR);
+        const shifts = Array.isArray(mine.data) ? mine.data : [];
+        if (!shifts.length) return setBlocked(TEXT.NO_SCHEDULE);
+        const myShift = shifts.find((x) => shiftNotOver(x, now));
+        if (!myShift) return setBlocked(TEXT.SHIFT_OVER);
+        if (!openOnes.success) return setBlocked(TEXT.PREV_CHECK_ERROR);
+        const others = (openOnes.data?.items ?? []).filter((x) => isOpen(x));
+        if (others.length) return setBlocked(TEXT.PREV_OPEN(others[0].openedByName, dateTimeOf(others[0].openedAt)));
+        // No plan from the server (404 = no earlier shift to hand over): fall back to the latest closed shift, not to the filtered list.
+        let lastClosed = null;
+        if (!next.success && next.status !== 404) return setBlocked(TEXT.PLAN_ERROR);
+        if (!next.success || !next.data) {
+            const closed = await getCashSessions({ fromDate: addDays(day, -OPEN_LOOKBACK_DAYS), toDate: day, status: "Closed", page: 1, pageSize: 1 }, READ);
+            if (!closed.success) return setBlocked(TEXT.PLAN_ERROR);
+            lastClosed = closed.data?.items?.[0] ?? null;
+        }
         setPlan(
             openingPlan({
                 next: next.success ? next.data : null,
-                lastClosed,
+                lastClosed: lastClosed && dateKey(lastClosed.closedAt ?? lastClosed.openedAt) === day ? lastClosed : null,
                 myShift,
                 now,
                 staff: getSessionUserName(),
@@ -108,7 +146,7 @@ const CashHandover = () => {
 
     const table = () => {
         if (!result) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.LOADING}</p>;
-        if (!items.length) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.EMPTY}</p>;
+        if (!items.length) return result.ok ? <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.EMPTY}</p> : null;
         return (
             <div className={cx("table-wrap rounded-none border-x-0", !fresh && "opacity-60")} aria-busy={!fresh ? "true" : undefined}>
                 <table className="table table-stack [&_td]:px-3 [&_th]:px-3 [&_th]:whitespace-nowrap">
@@ -125,6 +163,8 @@ const CashHandover = () => {
                         {items.map((s) => {
                             const open = isOpen(s);
                             const diff = s.difference ?? (s.countedCash != null && s.expectedCash != null ? s.countedCash - s.expectedCash : null);
+                            const diffTransfer =
+                                s.transferDifference ?? (s.countedTransfer != null && s.expectedTransfer != null ? s.countedTransfer - s.expectedTransfer : null);
                             return (
                                 <tr key={s.id}>
                                     <td data-primary>
@@ -150,9 +190,10 @@ const CashHandover = () => {
                                     </td>
                                     <td data-label={TEXT.COLUMNS[6]} className="num text-right">
                                         {open || diff == null ? dash : signedMoney(diff)}
+                                        {!open && Boolean(diffTransfer) && <small className="block text-caption text-muted">{TEXT.TRANSFER_DIFF(signedMoney(diffTransfer))}</small>}
                                     </td>
                                     <td data-label={TEXT.COLUMNS[7]}>
-                                        <span className={cx("badge", open ? "badge-success" : "badge-neutral")}>{TEXT.STATUS_LABEL[open ? "Open" : "Closed"]}</span>
+                                        <span className={cx("badge", open ? "badge-success" : "badge-neutral")}>{open ? TEXT.STATUS_LABEL.Open : (TEXT.STATUS_LABEL[s.status] ?? s.status)}</span>
                                     </td>
                                 </tr>
                             );
@@ -171,16 +212,38 @@ const CashHandover = () => {
                     <h1 className="page-title">{TEXT.TITLE}</h1>
                 </div>
                 {current !== undefined &&
+                    !current?.failed &&
                     (current ? (
                         <button type="button" className="btn btn-primary" onClick={() => navigate(getCashHandoverRoute(current.id))}>
                             {TEXT.CLOSE_SHIFT(TEXT.SHIFT[shiftTypeOf(current)])}
                         </button>
                     ) : (
-                        <button type="button" className="btn btn-primary" onClick={startOpen}>
-                            {TEXT.OPEN_SHIFT}
+                        <button type="button" className="btn btn-primary" onClick={startOpen} disabled={preparing} aria-busy={preparing || undefined}>
+                            {preparing ? TEXT.CHECKING : TEXT.OPEN_SHIFT}
                         </button>
                     ))}
             </div>
+            {current?.failed && (
+                <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
+                    <span className="flex-1">{TEXT.CURRENT_ERROR}</span>
+                    <button type="button" className="btn btn-secondary h-9" onClick={() => setReload((n) => n + 1)}>
+                        {TEXT.RETRY}
+                    </button>
+                </div>
+            )}
+            {current && !current.failed && dateKey(current.openedAt) && dateKey(current.openedAt) < today && (
+                <p role="alert" className="alert alert-warning">
+                    {TEXT.STALE_OPEN(dmy(dateKey(current.openedAt)))}
+                </p>
+            )}
+            {blocked && (
+                <div role="alert" className="alert alert-warning flex flex-wrap items-center gap-3">
+                    <span className="flex-1">{blocked}</span>
+                    <button type="button" className="btn btn-secondary h-9" onClick={() => setBlocked(null)}>
+                        {TEXT.CLOSE}
+                    </button>
+                </div>
+            )}
             <Card>
                 <div className="flex flex-wrap items-end gap-3 px-4 py-3">
                     {[
@@ -197,7 +260,7 @@ const CashHandover = () => {
                                 className="input w-auto"
                                 max={today}
                                 value={filters[key]}
-                                onChange={(e) => e.target.value && setFilter(key)(e.target.value)}
+                                onChange={(e) => e.target.value && e.target.value <= today && setFilter(key)(e.target.value)}
                             />
                         </div>
                     ))}
@@ -229,7 +292,8 @@ const CashHandover = () => {
                     plan={plan}
                     onClose={() => setPlan(null)}
                     onSubmit={async (values) => {
-                        if (!report(await openCashSession(values), TEXT.OPENED_TOAST(plan.label, plan.now))) return;
+                        // Failed or not, the dialog closes and the page reloads: someone may have opened a shift meanwhile.
+                        report(await openCashSession(values), TEXT.OPENED_TOAST(plan.label, clinicClock()));
                         setPlan(null);
                         setReload((n) => n + 1);
                     }}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import Pagination from "@/components/ui/Pagination";
 import { PRIORITY, getDoctorsOnDuty } from "@/services/receptionService";
@@ -172,13 +172,18 @@ export const dutyText = (doctor, now = clinicClock()) => {
 };
 
 // Wraps a submit so the button shows progress and cannot be pressed twice
+// The ref stops a second submit (double click, Enter twice) before the busy state has re-rendered the button.
 export const useSubmit = (onSubmit) => {
     const [busy, setBusy] = useState(false);
+    const inFlight = useRef(false);
     const submit = async (...args) => {
+        if (inFlight.current) return;
+        inFlight.current = true;
         setBusy(true);
         try {
             await onSubmit(...args);
         } finally {
+            inFlight.current = false;
             setBusy(false);
         }
     };

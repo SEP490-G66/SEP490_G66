@@ -5,11 +5,12 @@ import DiffChip from "./DiffChip";
 import MoneyLine from "./MoneyLine";
 import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
 
-const ShiftCloseDialog = ({ label, subtitle, values, system, shiftEnd, now, print, onClose, onSubmit }) => {
+// warning: shown above the lock note, e.g. when the session was opened on an earlier day
+const ShiftCloseDialog = ({ label, subtitle, values, system, shiftEnd, now, print, warning, onClose, onSubmit }) => {
     const [busy, submit] = useSubmit(onSubmit);
     const { countedCash: cash, countedTransfer: transfer } = values;
     return (
-        <Modal title={TEXT.CONFIRM_CLOSE(label)} description={subtitle} onClose={onClose}>
+        <Modal title={TEXT.CONFIRM_CLOSE(label)} description={subtitle} onClose={onClose} closeDisabled={busy}>
             <form
                 className="space-y-3"
                 onSubmit={(event) => {
@@ -32,9 +33,10 @@ const ShiftCloseDialog = ({ label, subtitle, values, system, shiftEnd, now, prin
                         {money(cash + transfer)}
                     </MoneyLine>
                 </dl>
+                {warning && <p className="alert alert-warning">{warning}</p>}
                 {shiftEnd && now < shiftEnd && <p className="alert alert-warning">{TEXT.NOT_ENDED(shiftEnd)}</p>}
                 <p className="help-text">{TEXT.LOCKED_NOTE}</p>
-                <DialogActions onClose={onClose} closeLabel={TEXT.BACK_BUTTON} submitLabel={print ? TEXT.CLOSE_AND_PRINT : TEXT.CLOSE_PANEL} busy={busy} />
+                <DialogActions onClose={onClose} closeDisabled={busy} closeLabel={TEXT.BACK_BUTTON} submitLabel={print ? TEXT.CLOSE_AND_PRINT : TEXT.CLOSE_PANEL} busy={busy} />
             </form>
         </Modal>
     );

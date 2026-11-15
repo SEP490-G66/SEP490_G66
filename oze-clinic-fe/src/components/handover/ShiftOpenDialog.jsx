@@ -24,6 +24,8 @@ const ShiftOpenDialog = ({ plan, onClose, onSubmit }) => {
             document.getElementById("os-amount")?.focus();
             return;
         }
+        // Typing the same amount as expected is simply "received it all": no reason needed.
+        if (got === plan.amount) return submit({ openingCash: got, expectedOpeningCash: plan.amount, notes: "" });
         if (!reason.trim()) {
             setError(["os-reason", TEXT.ERR_REASON]);
             document.getElementById("os-reason")?.focus();
@@ -34,7 +36,7 @@ const ShiftOpenDialog = ({ plan, onClose, onSubmit }) => {
     };
 
     return (
-        <Modal title={TEXT.OPEN_TITLE(plan.label)} description={TEXT.OPEN_SUB} onClose={onClose}>
+        <Modal title={TEXT.OPEN_TITLE(plan.label)} description={TEXT.OPEN_SUB} onClose={onClose} closeDisabled={busy}>
             <form className="space-y-4" onSubmit={send}>
                 <dl>
                     <MoneyLine label={TEXT.OPEN_STAFF}>{plan.staff}</MoneyLine>
@@ -108,7 +110,7 @@ const ShiftOpenDialog = ({ plan, onClose, onSubmit }) => {
                         )}
                     </div>
                 )}
-                <DialogActions onClose={onClose} closeLabel={TEXT.CANCEL} submitLabel={TEXT.OPEN_SHIFT} busy={busy} />
+                <DialogActions onClose={onClose} closeDisabled={busy} closeLabel={TEXT.CANCEL} submitLabel={TEXT.OPEN_SHIFT} busy={busy} />
             </form>
         </Modal>
     );

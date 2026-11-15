@@ -57,11 +57,11 @@ const ShiftTransactions = ({ transactions }) => {
                                             {timeOf(t.occurredAt)}
                                         </td>
                                         <td data-label={TEXT.TX_COLUMNS[1]}>{t.code}</td>
-                                        <td data-label={TEXT.TX_COLUMNS[2]}>{TEXT.KIND[t.kind]}</td>
+                                        <td data-label={TEXT.TX_COLUMNS[2]}>{TEXT.KIND[t.kind] ?? t.kind}</td>
                                         <td data-primary className="text-ink">
                                             {t.description}
                                         </td>
-                                        <td data-label={TEXT.TX_COLUMNS[4]}>{TEXT.METHOD[methodOf(t)]}</td>
+                                        <td data-label={TEXT.TX_COLUMNS[4]}>{TEXT.METHOD[methodOf(t)] ?? "—"}</td>
                                         <td data-label={TEXT.TX_COLUMNS[5]} className="num text-right">
                                             {t.cashAmount ? signedMoney(sign * t.cashAmount) : dash}
                                         </td>

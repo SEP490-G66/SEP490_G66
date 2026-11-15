@@ -28,7 +28,7 @@ export const SHIFT_SESSIONS = [
     { value: "Afternoon", label: "Ca chiều", start: "13:00", end: "17:00" },
 ];
 
-export const getMyShifts = ({ fromDate, toDate }) => call(() => api.get("/api/schedules/my", { params: { fromDate, toDate } }));
+export const getMyShifts = ({ fromDate, toDate }, config = {}) => call(() => api.get("/api/schedules/my", { ...config, params: { fromDate, toDate } }));
 
 export const getMyLeaveRequests = ({ page = 1, pageSize = 20 } = {}) =>
     call(() => api.get("/api/leave-requests/my", { params: { pageNumber: page, pageSize } }));

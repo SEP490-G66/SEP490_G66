@@ -9,10 +9,10 @@ const ResultBlock = ({ title, system, actual, className }) => (
         <dl>
             <MoneyLine label={TEXT.SYSTEM}>{money(system)}</MoneyLine>
             <MoneyLine label={TEXT.ACTUAL} strong>
-                {money(actual)}
+                {actual == null ? "—" : money(actual)}
             </MoneyLine>
             <MoneyLine label={TEXT.DIFF}>
-                <DiffChip value={actual - system} />
+                <DiffChip value={actual == null ? null : actual - system} />
             </MoneyLine>
         </dl>
     </div>

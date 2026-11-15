@@ -118,7 +118,10 @@ const ReceptionPayment = () => {
                 },
                 STAY,
             );
-            if (!report(created)) return finish(chosen);
+            if (!created.success) {
+                report(created);
+                return finish(chosen);
+            }
             invoiceId = created.data?.id;
             if (!invoiceId) {
                 toast.error(TEXT.NO_INVOICE_ID);
@@ -128,7 +131,10 @@ const ReceptionPayment = () => {
         } else {
             // Another cashier may have collected part of it since it was opened here.
             const latest = await getInvoice(invoiceId, STAY);
-            if (!report(latest)) return finish(chosen);
+            if (!latest.success) {
+                report(latest);
+                return finish(chosen);
+            }
             if (Number(latest.data?.remainingAmount ?? 0) !== due) {
                 toast.warning(TEXT.AMOUNT_CHANGED(money(latest.data?.remainingAmount)));
                 return finish(chosen);
