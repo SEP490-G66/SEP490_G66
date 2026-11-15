@@ -88,7 +88,8 @@ const RefundRequestManagement = () => {
         setVersion((current) => current + 1);
     };
 
-    const handleConfirm = async () => handleDecision(await confirmRefundRequest(viewing.id));
+    const handleConfirm = async (workDoneAmount) =>
+        handleDecision(await confirmRefundRequest({ id: viewing.id, workDoneAmount, savedWorkDoneAmount: viewing.workDoneAmount }));
 
     const handleReject = async (reason) => handleDecision(await rejectRefundRequest({ id: viewing.id, reason }));
 
@@ -122,6 +123,12 @@ const RefundRequestManagement = () => {
                     onChange={changeFilter(setStatus)}
                 />
             </FilterBar>
+
+            {!loading && result && !result.success && (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được danh sách yêu cầu hoàn tiền. Vui lòng thử lại sau."}
+                </p>
+            )}
 
             <div>
                 <RefundRequestTable

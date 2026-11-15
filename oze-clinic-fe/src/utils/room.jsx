@@ -1,5 +1,5 @@
-// Room types and statuses of the Rooms API (RoomConstants / RoomTypeConstants on the backend).
-// The shift and service pages still use the mock values in utils/data/mockRooms until they are wired to the API.
+// Room types and statuses of the Rooms API (RoomConstants / RoomTypeConstants on the backend), used by the room,
+// shift and service pages.
 
 export const ROOM_TYPES = {
     GENERAL_TREATMENT: "GeneralTreatment",
@@ -26,3 +26,7 @@ export const ROOM_STATUS_OPTIONS = [
 ];
 
 export const roomTypeLabel = (type) => ROOM_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
+
+// The reception desk is not a room on the backend: a receptionist's shift has no room (roomId null).
+// The shift schedule shows it as one more row, with this id and type.
+export const RECEPTION_DESK = { id: "reception", name: "Quầy lễ tân", type: "Reception", floor: "" };

@@ -2,29 +2,24 @@ import { useState } from "react";
 import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
 import { createStaffAccount, updateStaffAccount } from "@/services/staffService";
-import { STAFF_ROLE_OPTIONS } from "@/utils/data/mockStaff";
-import { GENDER_LABELS, PROFILE_LIMITS, USER_ROLES, VALIDATION_MESSAGES } from "@/utils/messages";
+import { PROFILE_LIMITS, USER_ROLES, VALIDATION_MESSAGES } from "@/utils/messages";
+import { STAFF_ROLE_OPTIONS, staffRoleLabel } from "@/utils/staff";
 import { isRequiredEmpty, requiredMessage, validateEmail, validatePhone } from "@/utils/validation";
 
+// Same limits as UpdateStaffRequest on the backend.
 const LICENSE_MAX = 50;
+const SPECIALIZATION_MAX = 100;
 
-const EMPTY_FORM = { fullName: "", role: "", gender: "", email: "", phone: "", birthDate: "", licenseNumber: "" };
-
-// Local date as YYYY-MM-DD, the format of <input type="date">.
-const today = () => new Date().toLocaleDateString("en-CA");
-
-const roleLabel = (role) => STAFF_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? "";
+const EMPTY_FORM = { fullName: "", role: "", email: "", phone: "", specialization: "", licenseNumber: "" };
 
 const validateStaff = (form) => {
     const errors = {};
     if (isRequiredEmpty(form.fullName)) errors.fullName = requiredMessage("họ và tên");
     else if (form.fullName.trim().length > PROFILE_LIMITS.FULL_NAME_MAX) errors.fullName = VALIDATION_MESSAGES.FULL_NAME_TOO_LONG;
     if (!form.role) errors.role = "Vui lòng chọn vai trò.";
-    if (!form.gender) errors.gender = "Vui lòng chọn giới tính.";
     if (isRequiredEmpty(form.email)) errors.email = requiredMessage("email");
     else errors.email = validateEmail(form.email.trim());
     errors.phone = validatePhone(form.phone);
-    if (form.birthDate && form.birthDate > today()) errors.birthDate = VALIDATION_MESSAGES.BIRTHDATE_IN_FUTURE;
     if (form.role === USER_ROLES.DOCTOR && isRequiredEmpty(form.licenseNumber))
         errors.licenseNumber = requiredMessage("số chứng chỉ hành nghề");
     return Object.fromEntries(Object.entries(errors).filter(([, message]) => message));
@@ -38,10 +33,9 @@ const StaffFormPopup = ({ member, onClose, onSaved }) => {
             ? {
                   fullName: member.fullName,
                   role: member.role,
-                  gender: member.gender ?? "",
                   email: member.email,
                   phone: member.phone,
-                  birthDate: member.birthDate ?? "",
+                  specialization: member.specialization ?? "",
                   licenseNumber: member.licenseNumber ?? "",
               }
             : EMPTY_FORM,
@@ -57,7 +51,7 @@ const StaffFormPopup = ({ member, onClose, onSaved }) => {
         "aria-describedby": errors[name] ? `staff-${name}-error` : undefined,
         onChange: (event) => {
             setForm((current) => ({ ...current, [name]: event.target.value }));
-            setErrors((current) => ({ ...current, [name]: undefined }));
+            setErrors((current) => ({ ...current, [name]: undefined, form: undefined }));
         },
     });
 
@@ -84,7 +78,7 @@ const StaffFormPopup = ({ member, onClose, onSaved }) => {
         <Modal
             title={editing ? "Cập nhật tài khoản nhân viên" : "Tạo tài khoản nhân viên"}
             description={
-                editing ? `${member.fullName} · ${member.code}` : "Mật khẩu tạm sẽ được gửi qua SMS đến số điện thoại của nhân viên."
+                editing ? `${member.fullName} · ${member.email}` : "Thông tin đăng nhập và mật khẩu tạm sẽ được gửi qua email của nhân viên."
             }
             onClose={onClose}
             closeDisabled={saving}
@@ -120,49 +114,29 @@ const StaffFormPopup = ({ member, onClose, onSaved }) => {
                     <FormField id="staff-phone" label="Số điện thoại" required error={errors.phone}>
                         <input {...fieldProps("phone")} type="tel" inputMode="numeric" className="input" placeholder="VD: 0922 333 555" />
                     </FormField>
-                    <FormField id="staff-birthDate" label="Ngày sinh" error={errors.birthDate}>
-                        <input {...fieldProps("birthDate")} type="date" className="input" max={today()} />
-                    </FormField>
-                    <fieldset className="field" aria-describedby={errors.gender ? "staff-gender-error" : undefined}>
-                        <legend className="label label-required">Giới tính</legend>
-                        <div className="flex h-control items-center gap-6">
-                            {Object.entries(GENDER_LABELS).map(([value, label]) => (
-                                <label key={value} className="flex cursor-pointer items-center gap-2 text-body-sm text-ink">
-                                    <input
-                                        type="radio"
-                                        name="gender"
-                                        value={value}
-                                        className="size-4"
-                                        checked={form.gender === value}
-                                        aria-invalid={Boolean(errors.gender)}
-                                        onChange={(event) => {
-                                            setForm((current) => ({ ...current, gender: event.target.value }));
-                                            setErrors((current) => ({ ...current, gender: undefined }));
-                                        }}
-                                    />
-                                    {label}
-                                </label>
-                            ))}
-                        </div>
-                        {errors.gender && (
-                            <p id="staff-gender-error" className="error-text">
-                                {errors.gender}
-                            </p>
-                        )}
-                    </fieldset>
                 </div>
 
                 {form.role === USER_ROLES.DOCTOR && (
                     <div className="flex flex-col gap-3 rounded-lg bg-surface-muted p-4">
-                        <p className="text-label font-semibold text-ink">Thông tin chuyên môn ({roleLabel(form.role)})</p>
-                        <FormField id="staff-licenseNumber" label="Số chứng chỉ hành nghề" required error={errors.licenseNumber}>
-                            <input
-                                {...fieldProps("licenseNumber")}
-                                className="input"
-                                placeholder="Nhập số CCHN"
-                                maxLength={LICENSE_MAX}
-                            />
-                        </FormField>
+                        <p className="text-label font-semibold text-ink">Thông tin chuyên môn ({staffRoleLabel(form.role)})</p>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <FormField id="staff-licenseNumber" label="Số chứng chỉ hành nghề" required error={errors.licenseNumber}>
+                                <input
+                                    {...fieldProps("licenseNumber")}
+                                    className="input"
+                                    placeholder="Nhập số CCHN"
+                                    maxLength={LICENSE_MAX}
+                                />
+                            </FormField>
+                            <FormField id="staff-specialization" label="Chuyên khoa" error={errors.specialization}>
+                                <input
+                                    {...fieldProps("specialization")}
+                                    className="input"
+                                    placeholder="VD: Chỉnh nha, Implant"
+                                    maxLength={SPECIALIZATION_MAX}
+                                />
+                            </FormField>
+                        </div>
                     </div>
                 )}
 

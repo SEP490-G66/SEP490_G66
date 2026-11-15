@@ -17,7 +17,7 @@ const UNAVAILABLE_NOTES = {
 // onSaved(message) runs after a save or a delete.
 const ShiftEditPopup = ({ cell, onClose, onSaved }) => {
     const { loading, value: result } = useAsync(
-        () => getShiftCandidates({ date: cell.date, slot: cell.slot, roomId: cell.room.id }),
+        () => getShiftCandidates({ cell }),
         [cell.key],
     );
     const [staffId, setStaffId] = useState(cell.staff.id);
@@ -39,12 +39,12 @@ const ShiftEditPopup = ({ cell, onClose, onSaved }) => {
     const handleSubmit = async (event) => {
         event.preventDefault();
         setBusy(true);
-        finish(await saveShift({ date: cell.date, slot: cell.slot, roomId: cell.room.id, staffId }));
+        finish(await saveShift({ cell, staffId }));
     };
 
     const handleDelete = async () => {
         setBusy(true);
-        finish(await deleteShift({ date: cell.date, slot: cell.slot, roomId: cell.room.id }));
+        finish(await deleteShift({ cell }));
     };
 
     return (
@@ -61,7 +61,7 @@ const ShiftEditPopup = ({ cell, onClose, onSaved }) => {
                         aria-describedby={error ? `${STAFF_ID}-error` : undefined}
                         value={staffId}
                         onChange={(event) => {
-                            setStaffId(Number(event.target.value));
+                            setStaffId(event.target.value);
                             setError(null);
                         }}
                     >

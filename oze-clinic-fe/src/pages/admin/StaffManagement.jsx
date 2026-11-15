@@ -14,49 +14,42 @@ import useAsync from "@/hooks/useAsync";
 import { getStaffAccounts, unlockStaffAccount } from "@/services/staffService";
 import { cx } from "@/utils/cx";
 import { formatPhone } from "@/utils/format";
-import { ACCOUNT_STATUSES, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_OPTIONS, STAFF_ROLE_OPTIONS } from "@/utils/data/mockStaff";
+import { ACCOUNT_STATUSES, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_OPTIONS, STAFF_ROLE_OPTIONS, staffRoleLabel } from "@/utils/staff";
 
 const SEARCH_DELAY_MS = 300;
 const SKELETON_ROW_COUNT = 5;
-const COLUMN_COUNT = 6;
+const COLUMN_COUNT = 5;
 const ACTION_CLASS = "btn btn-secondary btn-icon size-8";
-
-const roleLabel = (role) => STAFF_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
 
 const StaffRow = ({ member, onView, onEdit, onLock, onUnlock }) => {
     const locked = member.status === ACCOUNT_STATUSES.LOCKED;
 
     return (
         <tr>
-            <td data-label="Mã NV" className="cell-primary whitespace-nowrap">
-                {member.code}
-            </td>
             <td data-primary className="min-w-56">
                 <PersonCell name={member.fullName} detail={member.email} />
             </td>
             <td data-label="Vai trò">
-                <span className="chip-queue whitespace-nowrap">{roleLabel(member.role)}</span>
+                <span className="chip-queue whitespace-nowrap">{staffRoleLabel(member.role)}</span>
             </td>
             <td data-label="Số điện thoại" className="num whitespace-nowrap">
                 {formatPhone(member.phone)}
             </td>
             <td data-label="Trạng thái">
-                <span title={locked ? member.lock?.note : undefined}>
-                    <StatusBadge status={member.status} labels={ACCOUNT_STATUS_LABELS} />
-                </span>
+                <StatusBadge status={member.status} labels={ACCOUNT_STATUS_LABELS} />
             </td>
             <td data-actions>
                 <div className="flex items-center justify-end gap-2">
-                    <button type="button" className={ACTION_CLASS} aria-label={`Xem ${member.code}`} title="Xem chi tiết" onClick={() => onView(member)}>
+                    <button type="button" className={ACTION_CLASS} aria-label={`Xem ${member.fullName}`} title="Xem chi tiết" onClick={() => onView(member)}>
                         <Eye className="size-4" aria-hidden="true" />
                     </button>
-                    <button type="button" className={ACTION_CLASS} aria-label={`Chỉnh sửa ${member.code}`} title="Chỉnh sửa" onClick={() => onEdit(member)}>
+                    <button type="button" className={ACTION_CLASS} aria-label={`Chỉnh sửa ${member.fullName}`} title="Chỉnh sửa" onClick={() => onEdit(member)}>
                         <Pencil className="size-4" aria-hidden="true" />
                     </button>
                     <button
                         type="button"
                         className={cx(ACTION_CLASS, locked ? "text-success" : "text-danger")}
-                        aria-label={`${locked ? "Mở khoá" : "Khoá"} tài khoản ${member.code}`}
+                        aria-label={`${locked ? "Mở khoá" : "Khoá"} tài khoản ${member.fullName}`}
                         title={locked ? "Mở khoá tài khoản" : "Khoá tài khoản"}
                         onClick={() => (locked ? onUnlock(member) : onLock(member))}
                     >
@@ -185,7 +178,6 @@ const StaffManagement = () => {
                     <table className="table table-stack" aria-busy={loading}>
                         <thead>
                             <tr>
-                                <th scope="col">Mã NV</th>
                                 <th scope="col">Nhân viên</th>
                                 <th scope="col">Vai trò</th>
                                 <th scope="col">Số điện thoại</th>

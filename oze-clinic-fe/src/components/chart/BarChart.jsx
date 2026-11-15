@@ -15,7 +15,8 @@ const niceStep = (max) => {
     return step * magnitude;
 };
 
-// Column chart. data: [{ label, sublabel?, value, previous? }]; value null = no data yet (no bar).
+// Column chart. data: [{ label, sublabel?, value, previous?, muted? }]; value null = no data yet (no bar).
+// muted draws the bar faded, to set the other bars apart from the one the chart is about.
 // previous draws a dashed line for the period compared with (named by previousLabel in the tooltip).
 // formatValue formats the numbers on bars and in the tooltip. onSelect(item, index) makes each column a button.
 // title names what is measured (used for screen readers; the card around the chart shows it on screen).
@@ -71,7 +72,7 @@ const BarChart = ({ data, title, formatValue = String, previousLabel, onSelect, 
                             <span
                                 className={cx(
                                     "w-3/5 max-w-16 rounded-t bg-chart-1 transition-opacity duration-150",
-                                    active !== null && active !== index && "opacity-50",
+                                    (active !== null ? active !== index : item.muted) && "opacity-50",
                                 )}
                                 style={{ height: `${percent(item.value)}%` }}
                                 aria-hidden="true"

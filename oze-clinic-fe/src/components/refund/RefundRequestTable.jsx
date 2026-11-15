@@ -4,9 +4,10 @@ import { REFUND_REQUEST_STATUS_LABELS } from "@/utils/refundRequest";
 import { formatCurrency } from "@/utils/format";
 
 const SKELETON_ROW_COUNT = 5;
-const COLUMN_COUNT = 6;
+const COLUMN_COUNT = 7;
 
-// "Duyệt hoàn tiền" table. requests: [{ id, patientName, patientCode, invoiceNumber, paidAmount, status }].
+// "Duyệt hoàn tiền" table. requests: [{ id, patientName, patientCode, invoiceNumber, paidAmount, refundAmount, status }].
+// refundAmount: what was paid back, or the amount to pay back once the work-done value is entered; null = not known yet.
 // firstNumber: the STT of the first row on this page. filtered: a search or filter is on, which changes the empty message.
 const RefundRequestTable = ({ requests = [], firstNumber = 1, loading = false, filtered = false, onView }) => (
     <div className="table-wrap">
@@ -18,6 +19,9 @@ const RefundRequestTable = ({ requests = [], firstNumber = 1, loading = false, f
                     <th scope="col">Hoá đơn</th>
                     <th scope="col" className="text-right">
                         Số tiền đã thanh toán
+                    </th>
+                    <th scope="col" className="text-right">
+                        Số tiền hoàn
                     </th>
                     <th scope="col">Trạng thái</th>
                     <th scope="col">
@@ -57,6 +61,9 @@ const RefundRequestTable = ({ requests = [], firstNumber = 1, loading = false, f
                             </td>
                             <td data-label="Hoá đơn" className="num whitespace-nowrap">{request.invoiceNumber}</td>
                             <td data-label="Đã thanh toán" className="num whitespace-nowrap text-right font-semibold text-ink">{formatCurrency(request.paidAmount)}</td>
+                            <td data-label="Số tiền hoàn" className="num whitespace-nowrap text-right">
+                                {request.refundAmount == null ? <span className="text-muted">Chưa xác định</span> : formatCurrency(request.refundAmount)}
+                            </td>
                             <td data-label="Trạng thái">
                                 <StatusBadge status={request.status} labels={REFUND_REQUEST_STATUS_LABELS} />
                             </td>
