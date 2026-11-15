@@ -212,8 +212,8 @@ const COMING_SOON_TITLES = {
     [ROUTES.DOCTOR_PATIENTS]: "Bệnh nhân",
     [ROUTES.DOCTOR_TREATMENT_PLANS]: "Kế hoạch điều trị",
     [ROUTES.DOCTOR_IMAGING_REQUESTS]: "Yêu cầu chụp phim",
-    [ROUTES.TECHNICIAN_IMAGING_REQUESTS]: "Yêu cầu chụp phim",
-    [ROUTES.TECHNICIAN_IMAGING_RESULTS]: "Kết quả hình ảnh",
+    [ROUTES.TECHNICIAN_IMAGING_REQUESTS]: "Chụp chiếu",
+    [ROUTES.TECHNICIAN_IMAGING_RESULTS]: "Lịch sử chụp chiếu",
     [ROUTES.ADMIN_ROLES]: "Vai trò",
 }
 

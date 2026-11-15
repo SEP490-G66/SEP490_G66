@@ -4,6 +4,7 @@ import {
     CalendarDays,
     ChartColumn,
     ClipboardList,
+    History,
     Image,
     LayoutDashboard,
     Receipt,
@@ -90,17 +91,10 @@ const SIDEBAR_MENU = {
         { key: "imaging-reviews", label: "Duyệt kết quả chụp", icon: Image, to: ROUTES.DOCTOR_IMAGING_REVIEWS, badge: SIDEBAR_BADGES.PENDING_IMAGING_REVIEWS },
         { ...ACCOUNT_GROUP, children: [...WORK_GROUP.children, ...ACCOUNT_GROUP.children] },
     ],
+    // No overview page: the technician works from the imaging queue (also where /dashboard leads, see DashboardPage)
     [USER_ROLES.DENTAL_IMAGING_TECHNICIAN]: [
-        DASHBOARD_LINK,
-        {
-            key: "imaging",
-            label: "Chẩn đoán hình ảnh",
-            icon: ScanLine,
-            children: [
-                { key: "imaging-requests", label: "Yêu cầu chụp phim", to: ROUTES.TECHNICIAN_IMAGING_REQUESTS },
-                { key: "imaging-results", label: "Kết quả hình ảnh", to: ROUTES.TECHNICIAN_IMAGING_RESULTS },
-            ],
-        },
+        { key: "imaging", label: "Chụp chiếu", icon: ScanLine, to: ROUTES.TECHNICIAN_IMAGING_REQUESTS },
+        { key: "imaging-history", label: "Lịch sử chụp chiếu", icon: History, to: ROUTES.TECHNICIAN_IMAGING_RESULTS },
         WORK_GROUP,
         ACCOUNT_GROUP,
     ],
