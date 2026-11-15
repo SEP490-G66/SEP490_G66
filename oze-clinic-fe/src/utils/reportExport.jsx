@@ -1,19 +1,21 @@
-// Excel file for "Xuất báo cáo". TODO(api): let the backend build the file once it has report endpoints.
+// Excel file for "Xuất báo cáo", built in the browser from the report of adminReportService.getReport.
 const MILLION = 1_000_000;
 
-// Report in rows of cells: summary, revenue per bar (this period and the compared one), revenue per service.
+// Report in rows of cells: summary, revenue per bar (this period and the compared one), revenue per payment method.
 const reportRows = (report) => [
     ["Báo cáo", report.label],
     [],
-    ["Doanh thu (₫)", report.revenue.value * MILLION],
+    ["Doanh thu thực thu (₫)", report.revenue.value * MILLION],
     ["Lượt khám", report.visits.value],
-    ["Bệnh nhân mới", report.newPatients.value],
+    ["Hoá đơn mới", report.newInvoices.value],
+    ["Lịch hẹn trong kỳ", report.appointments.total],
+    ["Còn phải thu (₫)", report.debts.total],
     [],
     ["Doanh thu theo thời gian (triệu ₫)", report.comparison.current, report.comparison.previous],
     ...report.revenueBars.map((bar) => [[bar.label, bar.sublabel].filter(Boolean).join(" "), bar.value ?? "", bar.previous ?? ""]),
     [],
-    ["Doanh thu theo dịch vụ", "Triệu ₫"],
-    ...report.revenueByService.map((item) => [item.label, item.value]),
+    ["Thực thu theo phương thức", "Triệu ₫"],
+    ...report.revenueByMethod.map((item) => [item.label, item.value]),
 ];
 
 const escapeXml = (value) =>

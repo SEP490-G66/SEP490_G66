@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import StatusTabs from "@/components/ui/StatusTabs";
 import { useSearchParams } from "react-router-dom";
 import { CalendarOff } from "lucide-react";
 import { toast } from "react-toastify";
 import LeaveRequestDetailPopup from "@/components/popup/leaveRequest/LeaveRequestDetailPopup";
+import FilterBar, { FILTER_SEARCH_CLASS, FILTER_SELECT_CLASS } from "@/components/ui/FilterBar";
 import FilterSelect from "@/components/ui/FilterSelect";
 import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
@@ -11,7 +11,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import useAsync from "@/hooks/useAsync";
 import { WHOLE_DAY_FILTER, approveLeaveRequest, getLeaveRequest, getLeaveRequests, rejectLeaveRequest } from "@/services/leaveRequestService";
 import { SHIFT_ROLE_OPTIONS } from "@/services/shiftService";
-import { LEAVE_REQUEST_STATUSES, LEAVE_REQUEST_STATUS_LABELS, LEAVE_SLOT_OPTIONS, leaveSlotLabel } from "@/utils/data/mockShifts";
+import { LEAVE_REQUEST_STATUSES, LEAVE_REQUEST_STATUS_LABELS, LEAVE_SLOT_OPTIONS, leaveSlotLabel } from "@/utils/shift";
 import { formatDate } from "@/utils/format";
 
 const SEARCH_DELAY_MS = 300;
@@ -59,6 +59,8 @@ const LeaveRequestManagement = () => {
     const [status, setStatus] = useState("");
     const [role, setRole] = useState("");
     const [slot, setSlot] = useState("");
+    const [from, setFrom] = useState("");
+    const [to, setTo] = useState("");
     const [page, setPage] = useState(1);
     const [version, setVersion] = useState(0);
     const [viewing, setViewing] = useState(null);
@@ -66,7 +68,10 @@ const LeaveRequestManagement = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const openId = searchParams.get("id");
 
-    const { loading, value: result } = useAsync(() => getLeaveRequests({ keyword, status, role, slot, page }), [keyword, status, role, slot, page, version]);
+    const { loading, value: result } = useAsync(
+        () => getLeaveRequests({ keyword, status, role, slot, from, to, page }),
+        [keyword, status, role, slot, from, to, page, version],
+    );
 
     useEffect(() => {
         const nextKeyword = searchInput.trim();
@@ -97,11 +102,22 @@ const LeaveRequestManagement = () => {
 
     const data = result?.success ? result.data : null;
     const requests = data?.items ?? [];
-    const filtered = Boolean(keyword || status || role || slot);
+    const filtered = Boolean(keyword || status || role || slot || from || to);
     const firstNumber = data ? (data.page - 1) * data.pageSize + 1 : 0;
 
     const changeFilter = (setter) => (value) => {
         setter(value);
+        setPage(1);
+    };
+
+    const clearFilters = () => {
+        setSearchInput("");
+        setKeyword("");
+        setStatus("");
+        setRole("");
+        setSlot("");
+        setFrom("");
+        setTo("");
         setPage(1);
     };
 
@@ -133,18 +149,41 @@ const LeaveRequestManagement = () => {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <FilterBar
+                canClear={Boolean(filtered || searchInput)}
+                onClear={clearFilters}
+            >
                 <SearchInput
                     id="leave-request-search"
                     label="Tìm đơn xin nghỉ"
                     placeholder="Tìm theo tên nhân viên, lý do"
                     value={searchInput}
                     onChange={setSearchInput}
-                    className="w-full sm:w-72"
+                    className={FILTER_SEARCH_CLASS}
                 />
-                <StatusTabs className="w-full" label="Trạng thái" options={STATUS_OPTIONS} value={status} onChange={changeFilter(setStatus)} />
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                    <input
+                        type="date"
+                        className="input min-w-0 flex-1 sm:w-auto sm:flex-none"
+                        aria-label="Nghỉ từ ngày"
+                        max={to || undefined}
+                        value={from}
+                        onChange={(event) => changeFilter(setFrom)(event.target.value)}
+                    />
+                    <span className="text-muted" aria-hidden="true">
+                        –
+                    </span>
+                    <input
+                        type="date"
+                        className="input min-w-0 flex-1 sm:w-auto sm:flex-none"
+                        aria-label="Nghỉ đến ngày"
+                        min={from || undefined}
+                        value={to}
+                        onChange={(event) => changeFilter(setTo)(event.target.value)}
+                    />
+                </div>
                 <FilterSelect
-                    className="w-full sm:w-auto sm:min-w-40"
+                    className={FILTER_SELECT_CLASS}
                     id="leave-request-role"
                     label="Vai trò"
                     options={SHIFT_ROLE_OPTIONS}
@@ -152,14 +191,28 @@ const LeaveRequestManagement = () => {
                     onChange={changeFilter(setRole)}
                 />
                 <FilterSelect
-                    className="w-full sm:w-auto sm:min-w-40"
+                    className={FILTER_SELECT_CLASS}
                     id="leave-request-slot"
                     label="Buổi"
                     options={SLOT_OPTIONS}
                     value={slot}
                     onChange={changeFilter(setSlot)}
                 />
-            </div>
+                <FilterSelect
+                    className={FILTER_SELECT_CLASS}
+                    id="leave-request-status"
+                    label="Trạng thái"
+                    options={STATUS_OPTIONS}
+                    value={status}
+                    onChange={changeFilter(setStatus)}
+                />
+            </FilterBar>
+
+            {!loading && result && !result.success && (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được danh sách đơn xin nghỉ. Vui lòng thử lại sau."}
+                </p>
+            )}
 
             <div>
                 <div className="table-wrap">

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { LEAVE_REQUEST_STATUSES, LEAVE_REQUEST_STATUS_LABELS, LEAVE_SLOT_OPTIONS } from "@/utils/data/mockShifts";
+import { LEAVE_REQUEST_STATUSES, LEAVE_REQUEST_STATUS_LABELS, LEAVE_SLOT_OPTIONS } from "@/utils/shift";
 import { formatDateTime } from "@/utils/format";
 import RejectLeaveRequestPopup from "./RejectLeaveRequestPopup";
 
@@ -40,6 +40,23 @@ const AffectedAppointments = ({ request, pending }) => (
     </section>
 );
 
+// Shifts of the person in the leave time: what the leave takes them off (or what the substitute takes over).
+const AffectedShifts = ({ shifts }) => (
+    <section aria-labelledby="leave-shifts-title" className="field">
+        <h3 id="leave-shifts-title" className="label">
+            Ca làm bị ảnh hưởng
+        </h3>
+        <ul className="mt-1 flex flex-wrap gap-2">
+            {shifts.map((shift) => (
+                <li key={shift.id} className="rounded-md border border-border bg-surface-tint px-3 py-1.5 text-body-sm">
+                    <span className="num font-semibold text-ink">{`${shift.start} – ${shift.end}`}</span>
+                    <span className="text-muted"> · {shift.roomName}</span>
+                </li>
+            ))}
+        </ul>
+    </section>
+);
+
 // "Đơn xin nghỉ" popup: what was requested is read only. A pending request needs a substitute to approve, or a reason to reject.
 // request: { senderName, senderRole, submittedAt, date, slot, reason, status, substituteName, rejectReason,
 // affectedAppointments: [{ id, time, patientName, serviceName }] }. substituteOptions: [{ value, label }].
@@ -54,6 +71,9 @@ const LeaveRequestDetailPopup = ({ request, substituteOptions, onClose, onApprov
 
     const pending = request.status === LEAVE_REQUEST_STATUSES.PENDING;
     const rejected = request.status === LEAVE_REQUEST_STATUSES.REJECTED;
+    const cancelled = request.status === LEAVE_REQUEST_STATUSES.CANCELLED;
+    // A rejected or withdrawn request takes nobody off a shift, so its shifts and appointments are not listed
+    const showsImpact = !rejected && !cancelled;
 
     const handleApprove = async (event) => {
         event.preventDefault();
@@ -139,7 +159,10 @@ const LeaveRequestDetailPopup = ({ request, substituteOptions, onClose, onApprov
                     </FormField>
                 )}
 
-                {!rejected && request.affectedAppointments.length > 0 && <AffectedAppointments request={request} pending={pending} />}
+                {cancelled && <p className="alert alert-info border-0">Nhân viên đã rút đơn này trước khi được duyệt.</p>}
+
+                {showsImpact && request.affectedShifts.length > 0 && <AffectedShifts shifts={request.affectedShifts} />}
+                {showsImpact && request.affectedAppointments.length > 0 && <AffectedAppointments request={request} pending={pending} />}
 
                 <div className="modal-actions -mx-6 mt-2 border-t border-border px-6 pt-4">
                     {pending ? (

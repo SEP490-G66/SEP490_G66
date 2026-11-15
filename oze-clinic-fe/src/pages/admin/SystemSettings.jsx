@@ -21,10 +21,14 @@ const SystemSettings = () => {
     const [confirming, setConfirming] = useState(false);
     const [saving, setSaving] = useState(false);
     const [serverErrors, setServerErrors] = useState({});
+    const [loadError, setLoadError] = useState(null);
 
     useEffect(() => {
         getSystemConfigs().then((result) => {
-            if (!result.success) return;
+            if (!result.success) {
+                setLoadError(result.message || "Không tải được cấu hình. Vui lòng thử lại sau.");
+                return;
+            }
             setGroups(result.data.groups);
             setSaved(result.data.values);
             setValues(result.data.values);
@@ -33,7 +37,7 @@ const SystemSettings = () => {
 
     const configs = groups?.flatMap((group) => group.configs) ?? [];
     const changes = configs.filter((config) => values[config.key] !== saved[config.key]).map((config) => ({ config, value: values[config.key] }));
-    const errors = showErrors ? { ...serverErrors, ...validateSystemConfigs(values) } : {};
+    const errors = showErrors ? { ...serverErrors, ...validateSystemConfigs(values, configs) } : {};
 
     const search = normalizeText(keyword);
     const matches = (config) => !search || [config.label, config.key].some((text) => normalizeText(text).includes(search));
@@ -53,7 +57,7 @@ const SystemSettings = () => {
     };
 
     const requestSave = () => {
-        const nextErrors = validateSystemConfigs(values);
+        const nextErrors = validateSystemConfigs(values, configs);
         setShowErrors(true);
         const firstInvalid = configs.find((config) => nextErrors[config.key]);
         if (firstInvalid) {
@@ -67,12 +71,14 @@ const SystemSettings = () => {
 
     const save = async () => {
         setSaving(true);
-        const response = await saveSystemConfigs(values);
+        const response = await saveSystemConfigs(values, saved);
         setSaving(false);
         setConfirming(false);
         if (!response.success) {
+            // The settings that did save are stored now; the refused ones keep what was typed, with the reason
+            setSaved(response.data);
             setServerErrors(response.errors ?? {});
-            toast.error("Không lưu được cấu hình, vui lòng kiểm tra lại các giá trị.");
+            toast.error(response.message);
             return;
         }
         setSaved(response.data);
@@ -99,7 +105,14 @@ const SystemSettings = () => {
                 className="w-full sm:w-80"
             />
 
+            {loadError && (
+                <p role="alert" className="alert alert-danger">
+                    {loadError}
+                </p>
+            )}
+
             {!groups &&
+                !loadError &&
                 Array.from({ length: SKELETON_SECTION_COUNT }, (_, index) => (
                     <div key={index} className="skeleton h-40 w-full" aria-hidden="true" />
                 ))}

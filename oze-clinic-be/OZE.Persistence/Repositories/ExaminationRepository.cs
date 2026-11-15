@@ -54,7 +54,10 @@ namespace OZE.Persistence.Repositories
 
         public Task<Service?> GetServiceAsync(int serviceId, CancellationToken cancellationToken = default)
         {
-            return _context.Services.FirstOrDefaultAsync(x => x.Id == serviceId, cancellationToken);
+            // Active variants are loaded so the exam can tell a service that needs a variant chosen
+            return _context.Services
+                .Include(x => x.Variants.Where(v => v.IsActive))
+                .FirstOrDefaultAsync(x => x.Id == serviceId, cancellationToken);
         }
 
         public Task<ServiceVariant?> GetVariantAsync(int variantId, CancellationToken cancellationToken = default)
@@ -206,9 +209,20 @@ namespace OZE.Persistence.Repositories
                 .ToListAsync(cancellationToken);
         }
 
-        public async Task AddNotificationAsync(Notification notification, CancellationToken cancellationToken = default)
+        public Task<List<ClinicalRecordAddendum>> GetAddendaAsync(long examinationId, CancellationToken cancellationToken = default)
         {
-            await _context.Notifications.AddAsync(notification, cancellationToken);
+            return _context.ClinicalRecordAddenda
+                .AsNoTracking()
+                .Include(x => x.CreatedByDoctor)
+                .Where(x => x.ExaminationId == examinationId)
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task AddAddendumAsync(ClinicalRecordAddendum addendum, CancellationToken cancellationToken = default)
+        {
+            await _context.ClinicalRecordAddenda.AddAsync(addendum, cancellationToken);
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)

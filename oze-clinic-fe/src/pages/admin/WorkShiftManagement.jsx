@@ -1,5 +1,4 @@
 import { useState } from "react";
-import StatusTabs from "@/components/ui/StatusTabs";
 import { toast } from "react-toastify";
 import MonthlyShiftPopup from "@/components/popup/shift/MonthlyShiftPopup";
 import ShiftAssignPopup from "@/components/popup/shift/ShiftAssignPopup";
@@ -7,17 +6,15 @@ import ShiftDetailPopup from "@/components/popup/shift/ShiftDetailPopup";
 import ShiftEditPopup from "@/components/popup/shift/ShiftEditPopup";
 import UnassignedShiftPopup from "@/components/popup/shift/UnassignedShiftPopup";
 import ShiftWeekGrid from "@/components/shift/ShiftWeekGrid";
+import FilterBar, { FILTER_SELECT_CLASS } from "@/components/ui/FilterBar";
 import FilterSelect from "@/components/ui/FilterSelect";
 import WeekPicker from "@/components/ui/WeekPicker";
 import useAsync from "@/hooks/useAsync";
 import { SHIFT_ROLE_OPTIONS, copyPreviousWeek, getWeekShifts, roomTypeRole } from "@/services/shiftService";
-import { MOCK_ROOMS, ROOM_STATUSES } from "@/utils/data/mockRooms";
-import { SHIFT_STATUSES, SHIFT_STATUS_OPTIONS } from "@/utils/data/mockShifts";
 import { getWeekStart, toDateOnly } from "@/utils/format";
+import { SHIFT_STATUSES, SHIFT_STATUS_OPTIONS } from "@/utils/shift";
 
 const WEEK_NAMES = { 0: "Tuần này", 1: "Tuần sau" };
-
-const ROOM_OPTIONS = MOCK_ROOMS.filter((room) => room.status === ROOM_STATUSES.ACTIVE).map((room) => ({ value: String(room.id), label: room.name }));
 
 const DIALOGS = {
     DETAIL: "detail",
@@ -48,6 +45,8 @@ const WorkShiftManagement = () => {
 
     const { loading, value: result } = useAsync(() => getWeekShifts({ weekStart }), [weekStart, reloadKey]);
     const week = result?.success ? result.data : null;
+    // Rooms that have a row this week (active rooms and the reception desk), for the room filter
+    const roomOptions = (week?.rooms ?? []).map((room) => ({ value: String(room.id), label: room.name }));
 
     const isVisible = (cell) =>
         (!roomId || String(cell.room.id) === roomId) && (!role || roomTypeRole(cell.room.type) === role) && (!status || cell.status === status);
@@ -63,6 +62,12 @@ const WorkShiftManagement = () => {
         setDialog({ type: cell.staff ? DIALOGS.DETAIL : DIALOGS.UNASSIGNED, cell });
     };
 
+    const clearFilters = () => {
+        setRoomId("");
+        setRole("");
+        setStatus("");
+    };
+
     const handleSaved = (message) => {
         setDialog(null);
         toast.success(message);
@@ -73,7 +78,11 @@ const WorkShiftManagement = () => {
         setCopying(true);
         const response = await copyPreviousWeek({ weekStart });
         setCopying(false);
-        toast[response.data?.copied > 0 ? "success" : "info"](response.message);
+        if (!response.success) {
+            toast.error(response.message);
+            return;
+        }
+        toast[response.data.copied > 0 ? "success" : "info"](response.message);
         setReloadKey((current) => current + 1);
     };
 
@@ -81,7 +90,7 @@ const WorkShiftManagement = () => {
     const pendingWork = week?.editable ? pendingWorkText(week) : null;
 
     return (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
             <div className="page-header mb-0 items-center">
                 <div>
                     <h1 className="page-title">Phân ca</h1>
@@ -101,32 +110,45 @@ const WorkShiftManagement = () => {
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <WeekPicker id="shift-week" value={weekStart} onChange={setWeekStart} className="w-full sm:w-auto" />
-                <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
-                    <FilterSelect
-                        className="w-full sm:w-auto sm:min-w-40"
-                        id="shift-room-filter"
-                        label="Phòng"
-                        options={ROOM_OPTIONS}
-                        value={roomId}
-                        onChange={setRoomId}
-                    />
-                    <FilterSelect
-                        className="w-full sm:w-auto sm:min-w-40"
-                        id="shift-role-filter"
-                        label="Vai trò"
-                        options={SHIFT_ROLE_OPTIONS}
-                        value={role}
-                        onChange={setRole}
-                    />
-                    <StatusTabs className="w-full" label="Trạng thái" options={SHIFT_STATUS_OPTIONS} value={status} onChange={setStatus} />
-                </div>
-            </div>
+            <WeekPicker id="shift-week" value={weekStart} onChange={setWeekStart} className="w-full sm:w-auto" />
+
+            <FilterBar
+                canClear={Boolean(roomId || role || status)}
+                onClear={clearFilters}
+            >
+                <FilterSelect
+                    className={FILTER_SELECT_CLASS}
+                    id="shift-room-filter"
+                    label="Phòng"
+                    options={roomOptions}
+                    value={roomId}
+                    onChange={setRoomId}
+                />
+                <FilterSelect
+                    className={FILTER_SELECT_CLASS}
+                    id="shift-role-filter"
+                    label="Vai trò"
+                    options={SHIFT_ROLE_OPTIONS}
+                    value={role}
+                    onChange={setRole}
+                />
+                <FilterSelect
+                    className={FILTER_SELECT_CLASS}
+                    id="shift-status-filter"
+                    label="Trạng thái"
+                    options={SHIFT_STATUS_OPTIONS}
+                    value={status}
+                    onChange={setStatus}
+                />
+            </FilterBar>
 
             {pendingWork && <p className="alert alert-danger border-0">{pendingWork}</p>}
 
-            {loading || !week ? (
+            {!loading && result && !result.success ? (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được lịch phân ca. Vui lòng thử lại sau."}
+                </p>
+            ) : loading || !week ? (
                 <div className="skeleton h-160 w-full" aria-hidden="true" />
             ) : (
                 <ShiftWeekGrid week={week} isVisible={isVisible} onSelect={openCell} />

@@ -4,6 +4,7 @@ using OZE.Application.Helpers;
 using OZE.Application.Interfaces;
 using OZE.Application.Services;
 using OZE.Common.Constants;
+using OZE.Common.Exceptions;
 using OZE.Common.Models;
 using OZE.Domain.Entities;
 using Xunit;
@@ -61,6 +62,78 @@ namespace OZE.UnitTest.Services.Invoices
 
             _invoice.PaidAmount.Should().Be(400_000m);
             _invoice.PaymentStatus.Should().Be(InvoiceConstants.Paid);
+        }
+
+        // UTCID03 (N): a bank transfer waits for confirmation and does not count as paid yet
+        [Fact]
+        public async Task BankTransfer_StaysPending()
+        {
+            var result = await _service.RecordAsync(9, "lt", new RecordPaymentRequest { Amount = 400_000m, PaymentMethod = " bank_transfer " });
+
+            result.PaymentStatus.Should().Be(PaymentConstants.Pending);
+            _invoice.PaidAmount.Should().Be(0m);
+            _invoice.PaymentStatus.Should().Be(InvoiceConstants.PendingConfirmation);
+        }
+
+        // UTCID04 (A): the invoice does not exist
+        [Fact]
+        public async Task RecordAsync_ShouldThrow_WhenInvoiceNotFound()
+        {
+            var act = () => _service.RecordAsync(99, "lt", new RecordPaymentRequest { Amount = 100_000m, PaymentMethod = PaymentConstants.Cash });
+
+            (await act.Should().ThrowAsync<NotFoundException>()).Which.Message.Should().Be(ErrorConstants.PaymentMessage.InvoiceNotFound);
+        }
+
+        // UTCID05 (A): a cancelled invoice
+        [Fact]
+        public async Task RecordAsync_ShouldThrow_WhenInvoiceCancelled()
+        {
+            _invoice.PaymentStatus = InvoiceConstants.Cancelled;
+
+            var act = () => _service.RecordAsync(9, "lt", new RecordPaymentRequest { Amount = 100_000m, PaymentMethod = PaymentConstants.Cash });
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.PaymentMessage.InvoiceNotPayable);
+        }
+
+        // UTCID06 (A): a method outside the list
+        [Fact]
+        public async Task RecordAsync_ShouldThrow_WhenMethodInvalid()
+        {
+            var act = () => _service.RecordAsync(9, "lt", new RecordPaymentRequest { Amount = 100_000m, PaymentMethod = "CARD" });
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.PaymentMessage.MethodInvalid);
+        }
+
+        // UTCID07 (B): amount 0
+        [Fact]
+        public async Task RecordAsync_ShouldThrow_WhenAmountZero()
+        {
+            var act = () => _service.RecordAsync(9, "lt", new RecordPaymentRequest { Amount = 0m, PaymentMethod = PaymentConstants.Cash });
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.PaymentMessage.AmountInvalid);
+        }
+
+        // UTCID08 (B): cash one dong over the balance
+        [Fact]
+        public async Task RecordAsync_ShouldThrow_WhenAmountExceedsRemaining()
+        {
+            var act = () => _service.RecordAsync(9, "lt", new RecordPaymentRequest { Amount = 400_001m, PaymentMethod = PaymentConstants.Cash });
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.PaymentMessage.AmountExceedsRemaining);
+        }
+
+        // UTCID09 (A): an installment payment without its period
+        [Fact]
+        public async Task RecordAsync_ShouldThrow_WhenInstallmentPeriodMissing()
+        {
+            var act = () => _service.RecordAsync(9, "lt", new RecordPaymentRequest
+            {
+                Amount = 100_000m,
+                PaymentMethod = PaymentConstants.Cash,
+                Purpose = PaymentConstants.PurposeInstallment
+            });
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.PaymentMessage.InstallmentPeriodRequired);
         }
     }
 }

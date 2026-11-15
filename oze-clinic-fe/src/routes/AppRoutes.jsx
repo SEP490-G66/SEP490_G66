@@ -18,6 +18,9 @@ import ReceptionCheckIn from "../pages/receptionist/ReceptionCheckIn";
 import ReceptionDebts from "../pages/receptionist/ReceptionDebts";
 import ReceptionInvoices from "../pages/receptionist/ReceptionInvoices";
 import ReceptionPatients from "../pages/receptionist/ReceptionPatients";
+import ReceptionSchedule from "../pages/receptionist/ReceptionSchedule";
+import ReceptionPatientDetail from "../pages/receptionist/ReceptionPatientDetail";
+import ReceptionPatientForm from "../pages/receptionist/ReceptionPatientForm";
 import ReceptionConsultations from "../pages/receptionist/ReceptionConsultations";
 import DailyReconciliation from "../pages/admin/DailyReconciliation";
 import ReceptionConfirm from "../pages/receptionist/ReceptionConfirm";
@@ -25,6 +28,7 @@ import ReceptionFollowUps from "../pages/receptionist/ReceptionFollowUps";
 import ReceptionPayment from "../pages/receptionist/ReceptionPayment";
 import ReceptionQueue from "../pages/receptionist/ReceptionQueue";
 import CashHandover from "../pages/receptionist/CashHandover";
+import CashHandoverDetail from "../pages/receptionist/CashHandoverDetail";
 import WorkSchedule from "../pages/common/WorkSchedule";
 import MyAppointments from "../pages/patient/MyAppointments";
 import AppointmentDetail from "../pages/patient/AppointmentDetail";
@@ -134,14 +138,29 @@ const ROLE_PAGES = {
     // Receptionist sidebar pages open the counter workspace on the matching tab
     [ROUTES.RECEPTION_APPOINTMENTS]: <ReceptionConfirm />,
     [ROUTES.RECEPTION_CHECK_IN]: <ReceptionCheckIn />,
+    [ROUTES.RECEPTION_SCHEDULE]: <ReceptionSchedule />,
     [ROUTES.RECEPTION_INVOICES]: <ReceptionPayment />,
     [ROUTES.RECEPTION_QUEUE]: <ReceptionQueue />,
     [ROUTES.RECEPTION_FOLLOW_UPS]: <ReceptionFollowUps />,
-    [ROUTES.RECEPTION_DEBTS]: <ReceptionDebts />,
+    [ROUTES.RECEPTION_DEBTS]: <Navigate to={`${ROUTES.RECEPTION_INVOICE_LIST}?tab=debt`} replace />,
     [ROUTES.RECEPTION_INVOICE_LIST]: <ReceptionInvoices />,
-    [ROUTES.RECEPTION_PATIENTS]: <ReceptionPatients />,
+    [ROUTES.RECEPTION_PATIENTS]: (
+        <Routes>
+            <Route index element={<ReceptionPatients />} />
+            <Route path="new" element={<ReceptionPatientForm />} />
+            <Route path=":patientId" element={<ReceptionPatientDetail />} />
+            <Route path=":patientId/edit" element={<ReceptionPatientForm />} />
+            <Route path="*" element={NOT_FOUND} />
+        </Routes>
+    ),
     [ROUTES.RECEPTION_CONSULTATIONS]: <ReceptionConsultations />,
-    [ROUTES.RECEPTION_CASH_HANDOVER]: <CashHandover />,
+    [ROUTES.RECEPTION_CASH_HANDOVER]: (
+        <Routes>
+            <Route index element={<CashHandover />} />
+            <Route path=":sessionId" element={<CashHandoverDetail />} />
+            <Route path="*" element={NOT_FOUND} />
+        </Routes>
+    ),
     [ROUTES.WORK_SCHEDULE]: <WorkSchedule />,
     [ROUTES.APPOINTMENTS]: (
         <Routes>

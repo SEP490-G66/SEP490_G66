@@ -5,7 +5,8 @@ import Modal from "@/components/ui/Modal";
 import { createServiceType, updateServiceType } from "@/services/serviceManagementService";
 import { isRequiredEmpty, requiredMessage } from "@/utils/validation";
 
-const TYPE_LIMITS = { NAME_MAX: 200, DESCRIPTION_MAX: 500, PRICE_DIGITS_MAX: 9, DURATION_DIGITS_MAX: 3 };
+// Same limits as SaveServiceVariantRequest on the backend; the price cap keeps typing sane (999.999.999 ₫).
+const TYPE_LIMITS = { NAME_MAX: 100, DESCRIPTION_MAX: 500, PRICE_DIGITS_MAX: 9, DURATION_DIGITS_MAX: 3 };
 const EMPTY_TYPE_FORM = { name: "", price: "", durationMinutes: "", description: "" };
 
 const priceFormatter = new Intl.NumberFormat("vi-VN");
@@ -37,7 +38,8 @@ const toTypeForm = (type) => ({
     description: type.description ?? "",
 });
 
-// "Thêm loại dịch vụ" (type = null) or "Sửa loại dịch vụ" popup for a service. Code and position are generated.
+// "Thêm loại dịch vụ" (type = null) or "Sửa loại dịch vụ" popup for a service ({ id, code, name }).
+// The code (DV009-01…) and position of a new type are worked out by the service.
 // onSaved(message) runs after a successful save.
 // Draft mode, for a service not created yet: pass onSubmit(request) instead; nothing is saved, and onSubmit may
 // return field errors (e.g. { name: "..." }) to keep the popup open.
@@ -82,11 +84,13 @@ const ServiceTypeFormPopup = ({ service, type, onClose, onSaved, onSubmit }) => 
         }
 
         setSaving(true);
-        const response = editing ? await updateServiceType(type.id, request) : await createServiceType(service.id, request);
+        const response = editing ? await updateServiceType(type, request) : await createServiceType(service, request);
         setSaving(false);
         if (!response.success) {
-            setErrors(response.errors ?? {});
-            if (!response.errors) toast.error(response.message);
+            // A clash of the generated code has no field in this form, so it is shown as a toast
+            const fieldErrors = response.errors && !response.errors.code ? response.errors : null;
+            setErrors(fieldErrors ?? {});
+            if (!fieldErrors) toast.error(response.message);
             return;
         }
         onSaved(response.message);

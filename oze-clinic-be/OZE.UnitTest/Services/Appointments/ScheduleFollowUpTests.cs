@@ -39,12 +39,6 @@ namespace OZE.UnitTest.Services.Appointments
                 })
                 .Returns(Task.CompletedTask);
 
-            Notification? createdNotification = null;
-            _appointmentRepoMock
-                .Setup(r => r.AddNotificationAsync(It.IsAny<Notification>(), It.IsAny<CancellationToken>()))
-                .Callback<Notification, CancellationToken>((n, _) => createdNotification = n)
-                .Returns(Task.CompletedTask);
-
             var request = new ScheduleFollowUpRequest
             {
                 Date = followUpDate,
@@ -65,8 +59,9 @@ namespace OZE.UnitTest.Services.Appointments
             original.Examination.FollowUpDate.Should().Be(followUpDate);
             original.Examination.FollowUpNotes.Should().Be("Tái khám theo hẹn");
 
-            createdNotification.Should().NotBeNull();
-            createdNotification!.UserId.Should().Be("user-patient-15");
+            _notificationsMock.Verify(n => n.NotifyPatientAsync(original.PatientId,
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.FollowUpScheduledTitle && c.ReferenceId == "500"),
+                It.IsAny<CancellationToken>()), Times.Once);
 
             _auditLogMock.Verify(a => a.LogAsync(
                 AuditConstants.AppointmentFollowUpScheduled,

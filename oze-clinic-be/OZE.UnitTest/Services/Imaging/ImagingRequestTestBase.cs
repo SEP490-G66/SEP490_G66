@@ -17,11 +17,12 @@ namespace OZE.UnitTest.Services.Imaging
 
         protected readonly Mock<IImagingRequestRepository> _imagingRequestRepository = new();
         protected readonly Mock<IStaffRepository> _staffRepository = new();
+        protected readonly Mock<INotificationService> _notificationsMock = new();
         protected readonly ImagingRequestService _service;
 
         protected ImagingRequestTestBase()
         {
-            _service = new ImagingRequestService(_imagingRequestRepository.Object, _staffRepository.Object);
+            _service = new ImagingRequestService(_imagingRequestRepository.Object, _staffRepository.Object, notifications: _notificationsMock.Object);
         }
 
         protected static ImagingRequest QueueRequest(

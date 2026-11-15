@@ -67,59 +67,10 @@ namespace OZE.Persistence.Repositories
             return _context.SaveChangesAsync(cancellationToken);
         }
 
-        public Task<List<string>> GetActiveTechnicianUserIdsAsync(CancellationToken cancellationToken = default)
+        public async Task AddAsync(ImagingRequest request, CancellationToken cancellationToken = default)
         {
-            return (
-                from profile in _context.StaffProfiles.AsNoTracking()
-                join userRole in _context.UserRoles on profile.UserId equals userRole.UserId
-                join role in _context.Roles on userRole.RoleId equals role.Id
-                where profile.IsActive && role.Name == RoleConstants.DentalImagingTechnicianRole
-                select profile.UserId)
-                .Distinct()
-                .ToListAsync(cancellationToken);
-        }
-
-        public async Task AddAsync(
-            ImagingRequest request,
-            IReadOnlyCollection<string> technicianUserIds,
-            string notificationTitle,
-            string notificationMessage,
-            CancellationToken cancellationToken = default)
-        {
-            await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-
             _context.ImagingRequests.Add(request);
             await _context.SaveChangesAsync(cancellationToken);
-
-            var technicianIds = technicianUserIds
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Distinct()
-                .ToList();
-
-            foreach (var technicianUserId in technicianIds)
-            {
-                _context.Notifications.Add(new Notification
-                {
-                    UserId = technicianUserId,
-                    Title = notificationTitle,
-                    Message = notificationMessage,
-                    NotificationType = ImagingRequestConstants.NotificationTypeInApp,
-                    Channel = ImagingRequestConstants.NotificationChannelInApp,
-                    ReferenceType = ImagingRequestConstants.NotificationReferenceType,
-                    ReferenceId = request.Id.ToString(),
-                    IsRead = false,
-                    SentAt = request.CreatedAt,
-                    DeliveryStatus = ImagingRequestConstants.NotificationDeliverySent,
-                    CreatedAt = request.CreatedAt
-                });
-            }
-
-            if (technicianIds.Count > 0)
-            {
-                await _context.SaveChangesAsync(cancellationToken);
-            }
-
-            await transaction.CommitAsync(cancellationToken);
         }
     }
 }

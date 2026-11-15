@@ -57,6 +57,7 @@ namespace OZE.Application
             services.AddSingleton<IPendingRegistrationStore, PendingRegistrationStore>();
             services.AddSingleton<IPendingProfileUpdateStore, PendingProfileUpdateStore>();
             services.AddSingleton<IPasswordResetStore, PasswordResetStore>();
+            services.AddScoped<INotificationService, NotificationService>();
             services.AddScoped<IAppointmentService, AppointmentService>();
             services.AddScoped<IPatientService, PatientService>();
             services.AddScoped<IDoctorScheduleService, DoctorScheduleService>();
@@ -79,6 +80,8 @@ namespace OZE.Application
             // The audit log reads the signed-in user, IP address and browser from the current request
             services.AddHttpContextAccessor();
             services.AddScoped<IAuditLogService, AuditLogService>();
+            services.AddScoped<IAuditLogQueryService, AuditLogQueryService>();
+            services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
             services.AddHostedService<OZE.Application.BackgroundServices.FollowUpReminderBackgroundService>();
             services.AddHostedService<OZE.Application.BackgroundServices.PaymentReminderBackgroundService>();
             return services;

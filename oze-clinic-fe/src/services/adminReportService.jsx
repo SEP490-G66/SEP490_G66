@@ -1,12 +1,22 @@
 import { formatDate, toDateOnly } from "../utils/format";
-import { MOCK_APPOINTMENT_RATES, MOCK_DEBTS, MOCK_REVENUE_SHARES, REQUEST_TYPES } from "../utils/data/mockAdminReport";
-import { leaveSlotLabel } from "../utils/data/mockShifts";
+import { leaveSlotLabel } from "../utils/shift";
+import api from "./api";
 import { pendingLeaveRequests } from "./leaveRequestService";
+import { call } from "./receptionService";
 import { pendingRefundRequests } from "./refundRequestService";
 
-// TODO(api): mock only. The numbers are made up from the date, so the same day always gives the same figures.
-const MOCK_DELAY_MS = 300;
+// Manager report ("Báo cáo" dashboard) built from the backend:
+// - api/invoice-reports/overview: collected revenue, new invoices, revenue by payment method of a date range
+// - api/invoice-reports/revenue-by-day: collected revenue of each day (at most 31 days per call)
+// - api/Appointments: appointment counts per status (totalCount of a 1-item page)
+// - api/debts: what patients still owe (as of today, whatever the period)
+// Money comes in VND and is turned into million VND for the charts.
+
 const DAY_MS = 86_400_000;
+const MILLION = 1_000_000;
+const DEBT_PREVIEW_COUNT = 3;
+// Days shown around the chosen day when the period is one day
+const DAY_CHART_DAYS = 7;
 
 export const REPORT_PERIODS = {
     DAY: "day",
@@ -15,27 +25,26 @@ export const REPORT_PERIODS = {
     YEAR: "year",
 };
 
-const WEEKDAYS_SHORT = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-// Opening hours split into 1-hour slots for the "day" chart, with each slot's share of the day (lunch break at 12h).
-const DAY_SLOTS = [
-    { label: "08h", weight: 0.08 },
-    { label: "09h", weight: 0.18 },
-    { label: "10h", weight: 0.23 },
-    { label: "11h", weight: 0.1 },
-    { label: "12h", weight: 0 },
-    { label: "13h", weight: 0.12 },
-    { label: "14h", weight: 0.16 },
-    { label: "15h", weight: 0.1 },
-    { label: "16h", weight: 0.03 },
+// Kinds of request waiting for the manager (getPendingRequests).
+export const REQUEST_TYPES = {
+    LEAVE: "leave",
+    REFUND: "refund",
+};
+
+const APPOINTMENT_STATUS = { COMPLETED: "COMPLETED", CANCELLED: "CANCELLED", NO_SHOW: "NO_SHOW" };
+
+const PAYMENT_METHOD_GROUPS = [
+    { label: "Tiền mặt", methods: ["CASH"] },
+    { label: "Chuyển khoản", methods: ["BANK_TRANSFER", "QR_TRANSFER"] },
 ];
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const success = (data) => ({ success: true, message: null, data, errors: null });
+const WEEKDAYS_SHORT = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 const pad = (value) => String(value).padStart(2, "0");
 
 const round1 = (value) => Math.round(value * 10) / 10;
+
+const toMillion = (amount) => round1(Number(amount ?? 0) / MILLION);
 
 const addDays = (date, days) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 
@@ -50,23 +59,7 @@ const daysBetween = (from, to) => {
     return days;
 };
 
-// Number in [0, 1) that only depends on the text, so mock figures stay the same between reloads.
-const seeded = (text) => {
-    let hash = 2166136261;
-    for (const char of text) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    return ((hash >>> 0) % 1000) / 1000;
-};
-
-// Revenue (million VND), visits and new patients of one day.
-const dailyStats = (date) => {
-    const key = toDateOnly(date);
-    const saturday = date.getDay() === 6;
-    return {
-        revenue: round1(14 + seeded(`${key}-revenue`) * 18 + (saturday ? 6 : 0)),
-        visits: 12 + Math.floor(seeded(`${key}-visits`) * 12),
-        newPatients: Math.floor(seeded(`${key}-patients`) * 4),
-    };
-};
+const minDate = (a, b) => (a < b ? a : b);
 
 const getRange = (period, offset, today) => {
     if (period === REPORT_PERIODS.DAY) {
@@ -115,49 +108,6 @@ const comparisonLabels = (period, range, previousRange) => {
     return { current: `Năm ${range.from.getFullYear()}`, previous: `Năm ${previousYear}`, caption: `so với cùng kỳ ${previousYear}` };
 };
 
-const sumRevenue = (days) => round1(days.reduce((sum, day) => sum + dailyStats(day).revenue, 0));
-
-const daysOfMonth = (year, month) => daysBetween(new Date(year, month, 1), new Date(year, month + 1, 0));
-
-// Chart bars; days after today have no data yet (value null). previous = the matching bar of the compared period,
-// filled for the whole period so the comparison line keeps going past today. date = the day / month a bar opens.
-const buildBars = (period, range, previousRange, today) => {
-    const elapsed = (day) => day <= today;
-    const sumElapsed = (days) => (days.some(elapsed) ? sumRevenue(days.filter(elapsed)) : null);
-
-    if (period === REPORT_PERIODS.DAY) {
-        // No comparison line for a single day.
-        const revenue = elapsed(range.from) ? dailyStats(range.from).revenue : null;
-        return DAY_SLOTS.map((slot) => ({ label: slot.label, value: revenue === null ? null : round1(revenue * slot.weight) }));
-    }
-    if (period === REPORT_PERIODS.WEEK || period === REPORT_PERIODS.MONTH) {
-        const week = period === REPORT_PERIODS.WEEK;
-        const previousDays = daysBetween(previousRange.from, previousRange.to);
-        return daysBetween(range.from, range.to).map((day, index) => ({
-            label: week ? WEEKDAYS_SHORT[day.getDay()] : String(day.getDate()),
-            sublabel: week ? `${pad(day.getDate())}/${pad(day.getMonth() + 1)}` : undefined,
-            value: elapsed(day) ? dailyStats(day).revenue : null,
-            // A shorter previous month has no matching day.
-            previous: previousDays[index] ? dailyStats(previousDays[index]).revenue : null,
-            date: toDateOnly(day),
-        }));
-    }
-    const year = range.from.getFullYear();
-    return Array.from({ length: 12 }, (_, month) => ({
-        label: `Th${month + 1}`,
-        value: sumElapsed(daysOfMonth(year, month)),
-        previous: sumRevenue(daysOfMonth(previousRange.from.getFullYear(), month)),
-        date: toDateOnly(new Date(year, month, 1)),
-    }));
-};
-
-// Appointments booked in the period: the completed ones are the visits, plus the cancelled and missed ones.
-const countAppointments = (visits) => {
-    const cancelled = Math.round(visits * MOCK_APPOINTMENT_RATES.cancelled);
-    const noShow = Math.round(visits * MOCK_APPOINTMENT_RATES.noShow);
-    return { total: visits + cancelled + noShow, completed: visits, cancelled, noShow };
-};
-
 // Offset (for getReport) of the day / month / year that contains dateOnly ("2026-10-18").
 export const getReportOffset = (period, dateOnly) => {
     const [year, month, day] = dateOnly.split("-").map(Number);
@@ -167,44 +117,184 @@ export const getReportOffset = (period, dateOnly) => {
     return Math.round((new Date(year, month - 1, day) - today) / DAY_MS);
 };
 
-const percentChange =(current, previous) => (previous > 0 ? Math.round(((current - previous) / previous) * 100) : null);
+const percentChange = (current, previous) => (previous > 0 ? Math.round(((current - previous) / previous) * 100) : null);
+
+// ----- backend calls -----
+
+// Any failed call fails the whole report, so the page never shows a mix of real and missing numbers.
+class ReportError extends Error {
+    constructor(result) {
+        super(result.message);
+        this.result = result;
+    }
+}
+
+const unwrap = async (request) => {
+    const result = await call(request);
+    if (!result.success) throw new ReportError(result);
+    return result.data;
+};
+
+const dateParams = (from, to) => ({ from: toDateOnly(from), to: toDateOnly(to) });
+
+const getOverview = (from, to) => unwrap(() => api.get("/api/invoice-reports/overview", { params: dateParams(from, to) }));
+
+const getRevenueDays = async (from, to) => {
+    const data = await unwrap(() => api.get("/api/invoice-reports/revenue-by-day", { params: dateParams(from, to) }));
+    return new Map(data.days.map((day) => [day.date, Number(day.total)]));
+};
+
+const countAppointments = async (from, to, status) => {
+    const data = await unwrap(() =>
+        api.get("/api/Appointments", { params: { fromDate: toDateOnly(from), toDate: toDateOnly(to), status, pageSize: 1 } }),
+    );
+    return data.totalCount ?? 0;
+};
+
+const getDebts = () => unwrap(() => api.get("/api/debts", { params: { pageSize: DEBT_PREVIEW_COUNT } }));
+
+// ----- report parts -----
+
+// One overview call for a range, or nothing (zeros) when the range has not started yet.
+const overviewOrEmpty = (from, to) =>
+    from > to ? Promise.resolve({ confirmedCollectionsTotal: 0, newInvoiceCount: 0, totalsByMethod: [] }) : getOverview(from, to);
+
+const revenueByMethod = (overview) =>
+    PAYMENT_METHOD_GROUPS.map(({ label, methods }) => ({
+        label,
+        value: toMillion(
+            overview.totalsByMethod.filter((item) => methods.includes(item.paymentMethod)).reduce((sum, item) => sum + Number(item.amount), 0),
+        ),
+    }))
+        .filter((item) => item.value > 0)
+        .sort((a, b) => b.value - a.value);
+
+const debtNote = (item) => {
+    if (item.overdueCount > 0) return `Trả góp · quá hạn ${item.overdueCount} kỳ`;
+    if (item.hasInstallmentPlan) return "Trả góp";
+    return `${item.ageDays} ngày chưa thanh toán đủ`;
+};
+
+const toDebts = (data) => ({
+    total: Number(data.totalRemaining ?? 0),
+    invoiceCount: data.totalCount ?? 0,
+    items: data.items.map((item) => ({
+        invoiceCode: item.invoiceNumber,
+        patientName: item.patientName,
+        note: debtNote(item),
+        remaining: Number(item.remainingAmount),
+    })),
+});
+
+// Chart bars; days after today have no data yet (value null). previous = the matching bar of the compared period.
+// date = the day / month a bar opens.
+const buildBars = async (period, range, previousRange, today) => {
+    if (period === REPORT_PERIODS.DAY) {
+        // The 7 days up to the chosen one, the chosen day in full colour
+        const from = addDays(range.from, -(DAY_CHART_DAYS - 1));
+        const revenue = await getRevenueDays(from, range.from);
+        return daysBetween(from, range.from).map((day) => ({
+            label: WEEKDAYS_SHORT[day.getDay()],
+            sublabel: `${pad(day.getDate())}/${pad(day.getMonth() + 1)}`,
+            value: toMillion(revenue.get(toDateOnly(day)) ?? 0),
+            muted: day < range.from,
+            date: toDateOnly(day),
+        }));
+    }
+
+    if (period === REPORT_PERIODS.WEEK || period === REPORT_PERIODS.MONTH) {
+        const week = period === REPORT_PERIODS.WEEK;
+        const elapsedTo = minDate(range.to, today);
+        const [revenue, previousRevenue] = await Promise.all([
+            range.from <= elapsedTo ? getRevenueDays(range.from, elapsedTo) : new Map(),
+            getRevenueDays(previousRange.from, previousRange.to),
+        ]);
+        const previousDays = daysBetween(previousRange.from, previousRange.to);
+        return daysBetween(range.from, range.to).map((day, index) => ({
+            label: week ? WEEKDAYS_SHORT[day.getDay()] : String(day.getDate()),
+            sublabel: week ? `${pad(day.getDate())}/${pad(day.getMonth() + 1)}` : undefined,
+            value: day <= today ? toMillion(revenue.get(toDateOnly(day)) ?? 0) : null,
+            // A shorter previous month has no matching day.
+            previous: previousDays[index] ? toMillion(previousRevenue.get(toDateOnly(previousDays[index])) ?? 0) : null,
+            date: toDateOnly(day),
+        }));
+    }
+
+    // Year: one overview call per month (revenue-by-day stops at 31 days), months after today stay empty
+    const year = range.from.getFullYear();
+    const previousYear = previousRange.from.getFullYear();
+    const months = Array.from({ length: 12 }, (_, month) => month);
+    const [current, previous] = await Promise.all([
+        Promise.all(
+            months.map((month) => {
+                const from = new Date(year, month, 1);
+                return from > today ? null : getOverview(from, minDate(new Date(year, month + 1, 0), today));
+            }),
+        ),
+        Promise.all(months.map((month) => getOverview(new Date(previousYear, month, 1), new Date(previousYear, month + 1, 0)))),
+    ]);
+    return months.map((month) => ({
+        label: `Th${month + 1}`,
+        value: current[month] ? toMillion(current[month].confirmedCollectionsTotal) : null,
+        previous: toMillion(previous[month].confirmedCollectionsTotal),
+        date: toDateOnly(new Date(year, month, 1)),
+    }));
+};
 
 // Report of one period. offset: 0 = the current period, -1 = the one before, ...
 // Changes compare with the same number of days at the start of the previous period, so a week in progress is fair.
 export const getReport = async ({ period = REPORT_PERIODS.WEEK, offset = 0 } = {}) => {
-    await wait(MOCK_DELAY_MS);
-
     const now = new Date();
     const today = startOfDay(now);
     const range = getRange(period, offset, today);
-    const days = daysBetween(range.from, range.to < today ? range.to : today);
+    const elapsedTo = minDate(range.to, today);
+    const elapsedDays = Math.max(0, Math.round((elapsedTo - range.from) / DAY_MS) + 1);
     const previousRange = getPreviousRange(period, offset, today);
-    const previousDays = daysBetween(previousRange.from, previousRange.to).slice(0, days.length);
+    const previousTo = minDate(addDays(previousRange.from, Math.max(elapsedDays, 1) - 1), previousRange.to);
 
-    const total = (list, field) => list.reduce((sum, day) => sum + dailyStats(day)[field], 0);
-    const revenue = sumRevenue(days);
-    const visits = total(days, "visits");
-    const newPatients = total(days, "newPatients");
+    try {
+        const [overview, previousOverview, visits, previousVisits, appointmentTotal, cancelled, noShow, debts, revenueBars] = await Promise.all([
+            overviewOrEmpty(range.from, elapsedTo),
+            overviewOrEmpty(previousRange.from, previousTo),
+            countAppointments(range.from, elapsedTo, APPOINTMENT_STATUS.COMPLETED),
+            countAppointments(previousRange.from, previousTo, APPOINTMENT_STATUS.COMPLETED),
+            countAppointments(range.from, range.to),
+            countAppointments(range.from, range.to, APPOINTMENT_STATUS.CANCELLED),
+            countAppointments(range.from, range.to, APPOINTMENT_STATUS.NO_SHOW),
+            getDebts(),
+            buildBars(period, range, previousRange, today),
+        ]);
 
-    return success({
-        period,
-        from: toDateOnly(range.from),
-        to: toDateOnly(range.to),
-        label: rangeLabel(period, range),
-        updatedAt: now.toISOString(),
-        comparison: comparisonLabels(period, range, previousRange),
-        revenue: { value: revenue, change: percentChange(revenue, sumRevenue(previousDays)) },
-        visits: { value: visits, change: percentChange(visits, total(previousDays, "visits")) },
-        newPatients: { value: newPatients, change: newPatients - total(previousDays, "newPatients") },
-        appointments: countAppointments(visits),
-        debts: { ...MOCK_DEBTS, items: MOCK_DEBTS.items.map((item) => ({ ...item })) },
-        revenueBars: buildBars(period, range, previousRange, today),
-        revenueByService: MOCK_REVENUE_SHARES.map(({ label, share }) => ({ label, value: round1(revenue * share) })),
-    });
+        const revenue = toMillion(overview.confirmedCollectionsTotal);
+        const previousRevenue = toMillion(previousOverview.confirmedCollectionsTotal);
+
+        return {
+            success: true,
+            message: null,
+            errors: null,
+            data: {
+                period,
+                from: toDateOnly(range.from),
+                to: toDateOnly(range.to),
+                label: rangeLabel(period, range),
+                updatedAt: now.toISOString(),
+                comparison: comparisonLabels(period, range, previousRange),
+                revenue: { value: revenue, change: percentChange(revenue, previousRevenue) },
+                visits: { value: visits, change: percentChange(visits, previousVisits) },
+                newInvoices: { value: overview.newInvoiceCount, change: overview.newInvoiceCount - previousOverview.newInvoiceCount },
+                appointments: { total: appointmentTotal, completed: visits, cancelled, noShow },
+                debts: toDebts(debts),
+                revenueBars,
+                revenueByMethod: revenueByMethod(overview),
+            },
+        };
+    } catch (error) {
+        if (error instanceof ReportError) return error.result;
+        throw error;
+    }
 };
 
 export const getPendingRequests = async () => {
-    await wait(MOCK_DELAY_MS);
     const leaves = (await pendingLeaveRequests()).map((request) => ({
         id: request.id,
         type: REQUEST_TYPES.LEAVE,
@@ -221,5 +311,5 @@ export const getPendingRequests = async () => {
         content: `${request.invoiceNumber} · ${request.reason}`,
         submittedAt: request.createdAt,
     }));
-    return success([...leaves, ...refunds]);
+    return { success: true, message: null, data: [...leaves, ...refunds], errors: null };
 };

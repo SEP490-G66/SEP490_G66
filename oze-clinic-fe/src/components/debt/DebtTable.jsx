@@ -1,14 +1,14 @@
 import { ReceiptText } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { DEBT_STATUS_LABELS, getDebtAgeLevel } from "@/utils/data/mockDebts";
+import { DEBT_STATUS_LABELS, getDebtAgeLevel } from "@/utils/debt";
 import { cx } from "@/utils/cx";
-import { formatDate, formatNumber, formatPhone } from "@/utils/format";
+import { formatNumber, formatPhone } from "@/utils/format";
 
 const SKELETON_ROW_COUNT = 5;
 const COLUMN_COUNT = 10;
 
 // "Công nợ" table; rows older than 30 and 60 days are coloured (see DebtAgeLegend).
-// debts: [{ id, patientName, phone, invoiceNumber, createdAt, totalAmount, paidAmount, remainingAmount, status }].
+// debts: [{ id, patientName, phone, invoiceNumber, createdDate, ageDays, totalAmount, paidAmount, remainingAmount, status, hasInstallmentPlan, overdueCount }].
 // firstNumber: the STT of the first row on this page. filtered: a search or filter is on, which changes the empty message.
 const DebtTable = ({ debts = [], firstNumber = 1, loading = false, filtered = false, onView }) => (
     // Tighter cells than .table, so all ten columns fit at 1366px. relative keeps the sr-only header inside the scroll area.
@@ -62,19 +62,24 @@ const DebtTable = ({ debts = [], firstNumber = 1, loading = false, filtered = fa
                 )}
                 {!loading &&
                     debts.map((debt, index) => {
-                        const ageLevel = getDebtAgeLevel(debt.createdAt);
+                        const ageLevel = getDebtAgeLevel(debt.ageDays);
                         return (
                             <tr key={debt.id} className={ageLevel?.row}>
                                 <td data-hide-stack className={cx("num", ageLevel?.edge)}>{firstNumber + index}</td>
                                 <td data-primary className="min-w-40 font-semibold text-ink">{debt.patientName}</td>
                                 <td data-label="Số điện thoại" className="num whitespace-nowrap">{formatPhone(debt.phone)}</td>
                                 <td data-label="Hoá đơn" className="num font-semibold whitespace-nowrap text-ink">{debt.invoiceNumber}</td>
-                                <td data-label="Ngày tạo" className={cx("num whitespace-nowrap", ageLevel?.date)}>{formatDate(debt.createdAt)}</td>
+                                <td data-label="Ngày tạo" className={cx("num whitespace-nowrap", ageLevel?.date)}>{debt.createdDate}</td>
                                 <td data-label="Phải trả" className="num whitespace-nowrap text-right">{formatNumber(debt.totalAmount)}</td>
                                 <td data-label="Đã trả" className="num whitespace-nowrap text-right">{formatNumber(debt.paidAmount)}</td>
                                 <td data-label="Còn nợ" className="num whitespace-nowrap text-right font-semibold text-danger">{formatNumber(debt.remainingAmount)}</td>
                                 <td data-label="Trạng thái" className="whitespace-nowrap">
                                     <StatusBadge status={debt.status} labels={DEBT_STATUS_LABELS} />
+                                    {debt.hasInstallmentPlan && (
+                                        <span className={cx("mt-1 block text-caption", debt.overdueCount > 0 ? "font-semibold text-danger" : "text-muted")}>
+                                            {debt.overdueCount > 0 ? `Trả góp · quá hạn ${debt.overdueCount} kỳ` : "Trả góp"}
+                                        </span>
+                                    )}
                                 </td>
                                 <td data-actions>
                                     <div className="flex items-center justify-end">

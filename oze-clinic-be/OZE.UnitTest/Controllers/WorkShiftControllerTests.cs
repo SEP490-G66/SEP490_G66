@@ -161,6 +161,7 @@ namespace OZE.UnitTest.Controllers
             error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.InvalidDateRange);
         }
 
+ feat/unittest-get-work-shift-by-id
         [Fact]
         public async Task GetWorkShiftByIdAsync_ShouldReturnOk_WhenShiftExists()
         {
@@ -213,5 +214,6 @@ namespace OZE.UnitTest.Controllers
             var error = await act.Should().ThrowAsync<NotFoundException>();
             error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.WorkShiftNotFound);
         }
+ main
     }
 }

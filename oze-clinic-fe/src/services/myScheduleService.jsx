@@ -1,3 +1,4 @@
+import { leaveMessage } from "../utils/shift";
 import api from "./api";
 import { call } from "./receptionService";
 
@@ -24,7 +25,7 @@ export const slotOfShift = (shiftStart) => (shiftStart < "12:00" ? "Morning" : "
 // The two shifts of a clinic day (value = slotOfShift of a shift in it)
 export const SHIFT_SESSIONS = [
     { value: "Morning", label: "Ca sáng", start: "08:00", end: "12:00" },
-    { value: "Afternoon", label: "Ca chiều", start: "13:30", end: "19:00" },
+    { value: "Afternoon", label: "Ca chiều", start: "13:00", end: "17:00" },
 ];
 
 export const getMyShifts = ({ fromDate, toDate }) => call(() => api.get("/api/schedules/my", { params: { fromDate, toDate } }));
@@ -32,9 +33,16 @@ export const getMyShifts = ({ fromDate, toDate }) => call(() => api.get("/api/sc
 export const getMyLeaveRequests = ({ page = 1, pageSize = 20 } = {}) =>
     call(() => api.get("/api/leave-requests/my", { params: { pageNumber: page, pageSize } }));
 
-export const createLeaveRequest = ({ leaveDate, slot, reason }) => call(() => api.post("/api/leave-requests", { leaveDate, slot: slot || null, reason }));
+// Failure messages of the backend in Vietnamese (the page shows its own text on success)
+const withLeaveMessage = async (request) => {
+    const result = await call(request);
+    return { ...result, message: leaveMessage(result.message) };
+};
 
-export const cancelLeaveRequest = (id) => call(() => api.post(`/api/leave-requests/${id}/cancel`));
+export const createLeaveRequest = ({ leaveDate, slot, reason }) =>
+    withLeaveMessage(() => api.post("/api/leave-requests", { leaveDate, slot: slot || null, reason }));
+
+export const cancelLeaveRequest = (id) => withLeaveMessage(() => api.post(`/api/leave-requests/${id}/cancel`));
 
 // Clock in / clock out on one of the signed-in staff member's own shifts of today (any role)
 export const startMyShift = (shiftId) => call(() => api.post(`/api/schedules/my/${shiftId}/start`));

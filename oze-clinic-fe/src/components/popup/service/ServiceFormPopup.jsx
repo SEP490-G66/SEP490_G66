@@ -1,17 +1,20 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, X } from "lucide-react";
 import { toast } from "react-toastify";
 import ServiceTypeFormPopup from "@/components/popup/service/ServiceTypeFormPopup";
 import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
-import { createService, updateService } from "@/services/serviceManagementService";
+import { createService, getNextServiceCode, updateService } from "@/services/serviceManagementService";
 import { cx } from "@/utils/cx";
-import { ROOM_TYPE_OPTIONS } from "@/utils/data/mockRooms";
+import { ROOM_TYPE_OPTIONS } from "@/utils/room";
 import { isRequiredEmpty, requiredMessage } from "@/utils/validation";
 
 // Same limits as CreateServiceRequest in the backend; the price cap keeps typing sane (999.999.999 ₫).
-const SERVICE_LIMITS = { NAME_MAX: 200, DESCRIPTION_MAX: 500, PRICE_DIGITS_MAX: 9, DURATION_DIGITS_MAX: 3 };
-const EMPTY_SERVICE_FORM = { name: "", price: "", durationMinutes: "", roomType: "", description: "" };
+const SERVICE_LIMITS = { CODE_MAX: 20, NAME_MAX: 200, DESCRIPTION_MAX: 500, PRICE_DIGITS_MAX: 9, DURATION_DIGITS_MAX: 3, RECALL_MIN: 1, RECALL_MAX: 60 };
+const EMPTY_SERVICE_FORM = { code: "", name: "", price: "", durationMinutes: "", recallIntervalMonths: "", roomType: "", description: "" };
+
+// Letters, digits and "-" / "_"; the backend stores the code in upper case.
+const CODE_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 const priceFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -26,9 +29,15 @@ const toNumberOrNull = (digits) => (digits === "" ? null : Number(digits));
 // hasTypes: the price then comes from the cheapest type, so it is not asked for.
 const validateService = (form, hasTypes) => {
     const errors = {};
+    if (isRequiredEmpty(form.code)) errors.code = requiredMessage("mã dịch vụ");
+    else if (!CODE_PATTERN.test(form.code.trim())) errors.code = "Mã chỉ gồm chữ, số, dấu - hoặc _.";
     if (isRequiredEmpty(form.name)) errors.name = requiredMessage("tên dịch vụ");
     if (!hasTypes && form.price === "") errors.price = requiredMessage("giá tham khảo");
     if (form.durationMinutes !== "" && Number(form.durationMinutes) === 0) errors.durationMinutes = "Thời gian phải lớn hơn 0.";
+    const recall = Number(form.recallIntervalMonths);
+    if (form.recallIntervalMonths !== "" && (recall < SERVICE_LIMITS.RECALL_MIN || recall > SERVICE_LIMITS.RECALL_MAX)) {
+        errors.recallIntervalMonths = `Chu kỳ tái khám từ ${SERVICE_LIMITS.RECALL_MIN} đến ${SERVICE_LIMITS.RECALL_MAX} tháng.`;
+    }
     return errors;
 };
 
@@ -36,17 +45,22 @@ const normalize = (value) => value.trim().toLowerCase();
 
 // Form values as they are sent and compared: trimmed, numbers as numbers.
 const toServiceRequest = (form, hasTypes) => ({
+    code: form.code.trim().toUpperCase(),
     name: form.name.trim(),
     price: hasTypes ? null : Number(form.price),
     durationMinutes: toNumberOrNull(form.durationMinutes),
+    recallIntervalMonths: toNumberOrNull(form.recallIntervalMonths),
     roomType: form.roomType,
     description: form.description.trim(),
 });
 
+// basePrice: the service's own price (shown only when it has no types).
 const toServiceForm = (service) => ({
+    code: service.code,
     name: service.name,
-    price: String(service.price),
+    price: String(service.basePrice),
     durationMinutes: service.durationMinutes ? String(service.durationMinutes) : "",
+    recallIntervalMonths: service.recallIntervalMonths ? String(service.recallIntervalMonths) : "",
     roomType: service.roomType ?? "",
     description: service.description ?? "",
 });
@@ -67,6 +81,18 @@ const ServiceFormPopup = ({ service, onClose, onSaved }) => {
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
     const nextTypeKey = useRef(1);
+
+    // A new service starts with the next free code (DV009…); the manager can still change it.
+    useEffect(() => {
+        if (editing) return undefined;
+        let active = true;
+        getNextServiceCode().then((code) => {
+            if (active) setForm((current) => (current.code ? current : { ...current, code }));
+        });
+        return () => {
+            active = false;
+        };
+    }, [editing]);
 
     const hasTypes = editing ? service.typeCount > 0 : types.length > 0;
     const derivedPrice = editing ? service.price : hasTypes ? Math.min(...types.map((type) => type.price)) : null;
@@ -119,7 +145,7 @@ const ServiceFormPopup = ({ service, onClose, onSaved }) => {
 
         setSaving(true);
         const response = editing
-            ? await updateService(service.id, request)
+            ? await updateService(service, request)
             : await createService({
                   ...request,
                   types: types.map(({ name, price, durationMinutes, description }) => ({ name, price, durationMinutes, description })),
@@ -136,16 +162,28 @@ const ServiceFormPopup = ({ service, onClose, onSaved }) => {
     return (
         <Modal title={editing ? "Cập nhật dịch vụ" : "Thêm dịch vụ"} onClose={onClose} closeDisabled={saving}>
             <form noValidate onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-                <FormField id="service-form-name" label="Tên dịch vụ" required error={errors.name}>
-                    <input
-                        {...fieldProps("name")}
-                        className="input"
-                        placeholder="Ví dụ: Tẩy trắng răng"
-                        maxLength={SERVICE_LIMITS.NAME_MAX}
-                        value={form.name}
-                        onChange={(event) => setField("name", event.target.value)}
-                    />
-                </FormField>
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                    <FormField id="service-form-code" label="Mã dịch vụ" required error={errors.code}>
+                        <input
+                            {...fieldProps("code")}
+                            className="input num uppercase"
+                            placeholder="DV009"
+                            maxLength={SERVICE_LIMITS.CODE_MAX}
+                            value={form.code}
+                            onChange={(event) => setField("code", event.target.value)}
+                        />
+                    </FormField>
+                    <FormField id="service-form-name" label="Tên dịch vụ" required error={errors.name}>
+                        <input
+                            {...fieldProps("name")}
+                            className="input"
+                            placeholder="Ví dụ: Tẩy trắng răng"
+                            maxLength={SERVICE_LIMITS.NAME_MAX}
+                            value={form.name}
+                            onChange={(event) => setField("name", event.target.value)}
+                        />
+                    </FormField>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <FormField id="service-form-price" label="Giá tham khảo" required={!hasTypes} error={errors.price}>
                         {hasTypes ? (
@@ -172,21 +210,33 @@ const ServiceFormPopup = ({ service, onClose, onSaved }) => {
                         />
                     </FormField>
                 </div>
-                <FormField id="service-form-roomType" label="Loại phòng yêu cầu">
-                    <select
-                        {...fieldProps("roomType")}
-                        className={cx("input", !form.roomType && "text-placeholder")}
-                        value={form.roomType}
-                        onChange={(event) => setField("roomType", event.target.value)}
-                    >
-                        <option value="">Chọn loại phòng</option>
-                        {ROOM_TYPE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value} className="text-ink">
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-                </FormField>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField id="service-form-roomType" label="Loại phòng yêu cầu" error={errors.roomType}>
+                        <select
+                            {...fieldProps("roomType")}
+                            className={cx("input", !form.roomType && "text-placeholder")}
+                            value={form.roomType}
+                            onChange={(event) => setField("roomType", event.target.value)}
+                        >
+                            <option value="">Không yêu cầu</option>
+                            {ROOM_TYPE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value} className="text-ink">
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                    </FormField>
+                    <FormField id="service-form-recallIntervalMonths" label="Chu kỳ tái khám (tháng)" error={errors.recallIntervalMonths}>
+                        <input
+                            {...fieldProps("recallIntervalMonths")}
+                            className="input num"
+                            inputMode="numeric"
+                            placeholder="Không nhắc tái khám"
+                            value={form.recallIntervalMonths}
+                            onChange={(event) => setField("recallIntervalMonths", toDigits(event.target.value, 2))}
+                        />
+                    </FormField>
+                </div>
                 <FormField id="service-form-description" label="Mô tả">
                     <textarea
                         {...fieldProps("description")}

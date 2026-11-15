@@ -5,7 +5,7 @@ import Modal from "@/components/ui/Modal";
 import useAsync from "@/hooks/useAsync";
 import { WEEKDAYS_SHORT, createMonthlyShifts, getShiftStaff, roomsForRole } from "@/services/shiftService";
 import { cx } from "@/utils/cx";
-import { SHIFT_SLOTS, SHIFT_SLOT_OPTIONS } from "@/utils/data/mockShifts";
+import { SHIFT_SLOTS, SHIFT_SLOT_OPTIONS } from "@/utils/shift";
 import { formatDayMonth, toDateOnly } from "@/utils/format";
 import { requiredMessage } from "@/utils/validation";
 
@@ -71,11 +71,12 @@ const MonthlyShiftPopup = ({ onClose, onSaved }) => {
     const [saving, setSaving] = useState(false);
 
     const { value: staffResult } = useAsync(() => getShiftStaff(), []);
-    const staffList = staffResult?.success ? staffResult.data : [];
-    const staff = staffList.find((member) => member.id === Number(staffId));
-    const rooms = staff ? roomsForRole(staff.role) : [];
+    const staffList = staffResult?.success ? staffResult.data.staff : [];
+    const allRooms = staffResult?.success ? staffResult.data.rooms : [];
+    const staff = staffList.find((member) => member.id === staffId);
+    const rooms = staff ? roomsForRole(allRooms, staff.role) : [];
 
-    const request = { staffId: Number(staffId), from: range.from, to: range.to, pattern };
+    const request = { staffId, staffName: staff?.name, rooms, from: range.from, to: range.to, pattern };
     const previewKey = JSON.stringify(request);
     const preview = useAsync(
         () => (staff ? createMonthlyShifts({ ...request, dryRun: true }).then((result) => ({ key: previewKey, result })) : Promise.resolve(null)),
