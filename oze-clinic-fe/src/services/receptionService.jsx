@@ -133,7 +133,18 @@ export const getAppointmentsInRange = async ({ fromDate, toDate, doctorId } = {}
 export const recordConfirmCall = (id, { outcome, callBackDate, callBackTime }, config = {}) =>
     call(() => api.post(`/api/appointments/${id}/confirm-call`, { outcome, callBackDate, callBackTime }, config));
 
-export const getInvoice = (id) => call(() => api.get(`/api/invoices/${id}`));
+export const getInvoice = (id, config = {}) => call(() => api.get(`/api/invoices/${id}`, config));
+
+export const rejectPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/reject`));
+
+export const cancelInvoice = (id) => call(() => api.post(`/api/invoices/${id}/cancel`));
+
+export const getCashierRefunds = ({ status, page = 1, pageSize = 10 } = {}, config = {}) =>
+    call(() => api.get("/api/refund-requests", { ...config, params: { status: status || undefined, pageNumber: page, pageSize } }));
+
+export const payoutRefund = (id) => call(() => api.post(`/api/refund-requests/${id}/payout`));
+
+export const rejectRefund = (id) => call(() => api.post(`/api/refund-requests/${id}/reject`));
 
 // A bank or QR payment the receptionist has seen arrive in the account
 export const confirmPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/confirm`));
@@ -171,8 +182,13 @@ export const getPaidInvoices = async () => {
 export const requestRefund = (invoiceId, reason) => call(() => api.post(`/api/invoices/${invoiceId}/refund-requests`, { reason }));
 
 // ----- patient debts and payment reminders -----
-export const getDebts = ({ keyword, overdueOnly, page = 1, pageSize = 10 } = {}) =>
-    call(() => api.get("/api/debts", { params: { searchKeyword: keyword || undefined, overdueOnly: overdueOnly || undefined, pageNumber: page, pageSize } }));
+export const getDebts = ({ keyword, overdueOnly, ageBucket, page = 1, pageSize = 10 } = {}, config = {}) =>
+    call(() =>
+        api.get("/api/debts", {
+            ...config,
+            params: { searchKeyword: keyword || undefined, overdueOnly: overdueOnly || undefined, ageBucket: ageBucket || undefined, pageNumber: page, pageSize },
+        }),
+    );
 
 export const remindPayment = (invoiceId, force = false) => call(() => api.post(`/api/debts/${invoiceId}/remind`, { force }));
 
@@ -256,9 +272,10 @@ export const getConsultations = ({ status, keyword, page = 1, pageSize = 10 } = 
 export const handleConsultation = (id, { status, note }) => call(() => api.post(`/api/consultation-requests/${id}/handle`, { status, note: note || null }));
 
 // ----- invoice list and payment history (search by day) -----
-export const searchInvoices = ({ keyword, status, fromDate, toDate, page = 1, pageSize = 15 } = {}) =>
+export const searchInvoices = ({ keyword, status, fromDate, toDate, page = 1, pageSize = 15 } = {}, config = {}) =>
     call(() =>
         api.get("/api/invoices", {
+            ...config,
             params: {
                 searchKeyword: keyword || undefined,
                 paymentStatus: status || undefined,

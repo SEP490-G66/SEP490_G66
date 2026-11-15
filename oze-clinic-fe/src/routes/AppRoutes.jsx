@@ -142,7 +142,7 @@ const ROLE_PAGES = {
     [ROUTES.RECEPTION_INVOICES]: <ReceptionPayment />,
     [ROUTES.RECEPTION_QUEUE]: <ReceptionQueue />,
     [ROUTES.RECEPTION_FOLLOW_UPS]: <ReceptionFollowUps />,
-    [ROUTES.RECEPTION_DEBTS]: <ReceptionDebts />,
+    [ROUTES.RECEPTION_DEBTS]: <Navigate to={`${ROUTES.RECEPTION_INVOICE_LIST}?tab=debt`} replace />,
     [ROUTES.RECEPTION_INVOICE_LIST]: <ReceptionInvoices />,
     [ROUTES.RECEPTION_PATIENTS]: (
         <Routes>

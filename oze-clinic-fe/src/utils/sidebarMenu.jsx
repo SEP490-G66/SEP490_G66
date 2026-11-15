@@ -124,7 +124,6 @@ const SIDEBAR_MENU = {
             children: [
                 { key: "patient-list", label: "Hồ sơ bệnh nhân", to: ROUTES.RECEPTION_PATIENTS },
                 { key: "follow-ups", label: "Nhắc tái khám", to: ROUTES.RECEPTION_FOLLOW_UPS },
-                { key: "consultations", label: "Yêu cầu tư vấn", to: ROUTES.RECEPTION_CONSULTATIONS },
             ],
         },
         {
@@ -133,8 +132,7 @@ const SIDEBAR_MENU = {
             icon: Wallet,
             children: [
                 { key: "invoices", label: "Thu tiền", to: ROUTES.RECEPTION_INVOICES },
-                { key: "invoice-list", label: "Hóa đơn", to: ROUTES.RECEPTION_INVOICE_LIST },
-                { key: "debts", label: "Công nợ", to: ROUTES.RECEPTION_DEBTS },
+                { key: "invoice-list", label: "Hóa đơn & công nợ", to: ROUTES.RECEPTION_INVOICE_LIST },
                 { key: "cash-handover", label: "Phiếu giao ca", to: ROUTES.RECEPTION_CASH_HANDOVER },
             ],
         },
