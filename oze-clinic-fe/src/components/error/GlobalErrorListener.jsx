@@ -2,9 +2,14 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { clearSession, getSessionToken } from "../../services/sessionStore";
-import { ERROR_PAGE_EVENT, SESSION_EXPIRED_EVENT } from "../../utils/errorHandler";
+import { ERROR_PAGE_EVENT, NAVIGATE_EVENT, SESSION_EXPIRED_EVENT } from "../../utils/errorHandler";
 import { BACKEND_LOGIN_CODES, MESSAGES } from "../../utils/messages";
 import { ROUTES, getErrorRoute } from "../../utils/routes";
+
+const NAVIGABLE_PREFIXES = [ROUTES.RECEPTION_PATIENTS, ROUTES.RECEPTION_QUEUE];
+
+const isNavigable = (url) =>
+    typeof url === "string" && NAVIGABLE_PREFIXES.some((p) => url === p || url.startsWith(`${p}/`) || url.startsWith(`${p}?`));
 
 const sessionEndMessage = (code) => {
     if (code === BACKEND_LOGIN_CODES.ACCOUNT_DISABLED) return MESSAGES.MSG80;
@@ -29,11 +34,19 @@ const GlobalErrorListener = () => {
             navigate(ROUTES.SIGN_IN, { replace: true });
         };
 
+        const handleNavigate = (event) => {
+            const { url, state } = event.detail ?? {};
+            if (!getSessionToken() || !isNavigable(url)) return;
+            navigate(url, { state });
+        };
+
         window.addEventListener(ERROR_PAGE_EVENT, handleError);
         window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+        window.addEventListener(NAVIGATE_EVENT, handleNavigate);
         return () => {
             window.removeEventListener(ERROR_PAGE_EVENT, handleError);
             window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+            window.removeEventListener(NAVIGATE_EVENT, handleNavigate);
         };
     }, [navigate]);
 

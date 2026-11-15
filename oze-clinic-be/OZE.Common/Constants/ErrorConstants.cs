@@ -194,6 +194,47 @@ namespace OZE.Common.Constants
             public const string InvalidEstimatedMinutes = "Estimated minutes must be greater than 0";
         }
 
+        // System configuration (clinic manager)
+        public static class SystemConfigMessage
+        {
+            public const string NotFound = "Configuration not found.";
+            public const string ValueRequired = "Please enter a value.";
+            public const string ValueTooLong = "Value cannot exceed 500 characters.";
+            public const string InvalidInt = "Value must be a whole number greater than or equal to 0.";
+            public const string MustBePositive = "Value must be greater than 0.";
+            public const string InvalidBool = "Value must be true or false.";
+            public const string InvalidDecimal = "Value must be a number.";
+            public const string InvalidJson = "Value must be valid JSON.";
+            public const string InvalidTime = "Value must be a time in HH:mm format.";
+            public const string WorkTimeOrder = "Opening time must be earlier than closing time.";
+            public const string ServiceCodeNotFound = "No active service has this code.";
+        }
+
+        // Audit log, read only (clinic manager)
+        public static class AuditLogMessage
+        {
+            public const string NotFound = "Audit log not found.";
+            public const string InvalidDateRange = "From date must be on or before to date.";
+        }
+
+        // In-app notifications (F-CRM-03)
+        public static class NotificationMessage
+        {
+            public const string NotFound = "Notification not found.";
+        }
+
+        // Service variant management for the clinic manager
+        public static class ServiceVariantMessage
+        {
+            public const string VariantNotFound = "Service variant not found in system";
+            public const string VariantCodeExist = "Variant code already exists in system";
+            public const string InvalidPrice = "Reference price must be greater than or equal to 0";
+            public const string InvalidEstimatedMinutes = "Estimated minutes must be greater than 0";
+            public const string InvalidDisplayOrder = "Display order must be greater than or equal to 0";
+            public const string HasOpenAppointments = "This variant is in appointments that are not finished yet; it cannot be turned off now";
+            public const string VariantInUse = "Cannot delete variant because it is already used in appointments. Please deactivate the variant instead.";
+        }
+
         // Track Treatment Progress (UC-52 / SCRUM-351). Texts follow System Messages where applicable.
         public static class TreatmentPlanMessage
         {
@@ -235,6 +276,8 @@ namespace OZE.Common.Constants
             public const string PatientProfileNotFound = "No patient profile is linked to this account";
             public const string VariantNotFound = "Service variant not found";
             public const string VariantInactive = "This service variant is not available for booking";
+            public const string VariantRequired = "Please choose a variant for the service {0}";
+            public const string OneVariantPerService = "Please choose only one variant for the service {0}";
             public const string GeneralExamServiceMissing = "The general exam service is not set up. Please contact the clinic";
             public const string ServicesNeedDifferentRooms = "These services need different rooms and cannot be booked in one appointment";
             public const string DateRequired = "Appointment date is required";
@@ -328,6 +371,13 @@ namespace OZE.Common.Constants
         // Writing the content of an examination: services, notes and diagnoses
         public static class ExaminationMessage
         {
+            // Addenda (F-EXM-08)
+            public const string AddendumOnlyLocked = "Addenda can only be added to a locked examination. Edit the examination directly";
+            public const string AddendumTypeInvalid = "The addendum type must be one of: Correction, Addition, Clarification";
+            public const string AddendumContentRequired = "Please enter the addendum content";
+            public const string AddendumContentTooLong = "Addendum content cannot exceed 2000 characters";
+            public const string AddendumOriginalRequired = "Please enter the original content being corrected";
+            public const string AddendumOriginalTooLong = "Original content cannot exceed 2000 characters";
             public const string NothingRecorded = "Please record at least a diagnosis or clinical notes before completing the examination";
             public const string PrescriptionNotFinalized = "Please finalize the prescription, or delete it, before completing the examination";
             public const string NotExaminingDoctor = "You can only work on the examinations you are performing";
@@ -410,8 +460,6 @@ namespace OZE.Common.Constants
             public const string WebhookPayloadInvalid = "Invalid payload";
             // MSG02
             public const string QueueEmpty = "No Data.";
-            public const string TechnicianNotificationTitle = "New imaging request";
-            public const string TechnicianNotificationMessage = "Imaging request ({0}) for {1} has been submitted.";
         }
 
         public static class InvoiceMessage
