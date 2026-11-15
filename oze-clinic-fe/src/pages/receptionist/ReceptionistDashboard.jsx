@@ -1,399 +1,322 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import ReceptionAlerts from "@/components/reception/ReceptionAlerts";
-import MyShiftBar from "@/components/staff/MyShiftBar";
-import { Card } from "@/components/reception/shared";
+import LabeledSelect from "@/components/ui/LabeledSelect";
+import CheckInDialog from "@/components/reception/CheckInDialog";
+import ConfirmAppointmentDialog from "@/components/reception/ConfirmAppointmentDialog";
+import ConfirmCallDialog from "@/components/reception/ConfirmCallDialog";
+import RevenueChart from "@/components/reception/RevenueChart";
+import ServiceCell from "@/components/reception/ServiceCell";
+import { Card, CancelDialog, RescheduleDialog } from "@/components/reception/shared";
+import { clinicClock, phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
+import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
-    BOOKING_DAYS_AHEAD,
-    STATUS_LABEL,
-    clinicClock,
-    ddmm,
-    dutyText,
-    hhmm,
-    isPendingSoon,
-    minutesSince,
-    money,
-    phoneTail,
-    servicesOf,
-    toMinutes,
-    useDoctorsOnDuty,
-    weekdayDate,
-} from "@/components/reception/receptionUtils";
-import { getCurrentCashSession } from "@/services/cashSessionService";
-import {
+    cancelAppointment,
+    checkInAppointment,
     clinicToday,
-    getAppointments,
-    getOpenInvoices,
-    getPaymentHistory,
-    getRecentInvoices,
+    confirmAppointment,
+    getAppointmentsInRange,
     getTodayAppointments,
     getWaitingList,
+    recordConfirmCall,
+    rescheduleAppointment,
 } from "@/services/receptionService";
 import { getSessionUserName } from "@/services/sessionStore";
+import { addDays, ddmm, isSunday } from "@/utils/calendar";
+import { shiftHours } from "@/utils/cashShift";
+import { allergiesOf, matchesKeyword, serviceNames, slotOf } from "@/utils/checkIn";
+import { callBackText, confirmStateOf, shortDate, sortByVisit } from "@/utils/confirmAppointments";
+import { CHECK_IN_TEXT, CONFIRM_TEXT, DASHBOARD_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
-// "Tổng quan": only the main things, each one opening the page where the work is done.
-// 1) the state of the counter (cash drawer, doctors) and alerts; 2) the work waiting now, as numbers;
-// 3) today in figures; 4) who comes to the counter next; 5) today hour by hour.
-// Lists, actions and revenue charts live on their own pages (Check-in, Xác nhận, Hàng chờ, Thu tiền, Hóa đơn).
-
-const fetchOverview = async () => {
-    const [today, pending, waiting, open, completed, recent, transfers, paidToday, cash] = await Promise.all([
-        getTodayAppointments(),
-        getAppointments({ fromDate: clinicToday(), toDate: clinicToday(BOOKING_DAYS_AHEAD), status: "PENDING" }),
-        getWaitingList(),
-        getOpenInvoices(),
-        getAppointments({ fromDate: clinicToday(-7), toDate: clinicToday(), status: "COMPLETED" }),
-        getRecentInvoices(),
-        getPaymentHistory({ status: "PENDING", pageSize: 50 }),
-        getPaymentHistory({ status: "CONFIRMED", fromDate: clinicToday(), toDate: clinicToday(), pageSize: 1 }),
-        getCurrentCashSession(),
-    ]);
-    const failed = [today, pending, waiting, open].find((r) => !r.success);
-    const invoiced = new Set((recent.data?.items ?? []).filter((i) => i.paymentStatus !== "CANCELLED" && i.appointmentId).map((i) => i.appointmentId));
-    const now = clinicClock();
-    return {
-        error: failed?.message ?? null,
-        today: today.data?.items ?? [],
-        pending: (pending.data?.items ?? []).map((a) => ({ ...a, soon: isPendingSoon(a, clinicToday(), now) })),
-        waiting: waiting.data ?? [],
-        open: open.data?.items ?? [],
-        uninvoiced: (completed.data?.items ?? []).filter((a) => !invoiced.has(a.id)),
-        transfers: transfers.data?.items ?? [],
-        paid: paidToday.success ? paidToday.data.confirmedCash + paidToday.data.confirmedTransfer : 0,
-        cash: cash.success ? cash.data : null,
-    };
-};
+const PER_PAGE = 5;
+const ENDED = ["Ended", "OnLeave"];
+const EMPTY_CI = { keyword: "", slot: "", doctor: "" };
+const EMPTY_CF = { keyword: "", day: "", doctor: "", status: "" };
+const CF_STATUS = [["", CONFIRM_TEXT.ALL_STATUSES], ...["pending", "callback", "noanswer"].map((k) => [k, CONFIRM_TEXT.STATES[k][0]])];
 
 const ReceptionistDashboard = () => {
-    const [data, setData] = useState({
-        loading: true,
-        today: [],
-        pending: [],
-        waiting: [],
-        open: [],
-        uninvoiced: [],
-        transfers: [],
-        paid: 0,
-        cash: null,
-        error: null,
-        round: 0,
-    });
-    // Doctors start and end their shifts during the day: reload them with every refresh
-    const { doctors } = useDoctorsOnDuty(data.round);
+    const [today] = useState(clinicToday);
+    const [version, setVersion] = useState(0);
+    const [data, setData] = useState(null);
+    const [ci, setCi] = useState(EMPTY_CI);
+    const [cf, setCf] = useState(EMPTY_CF);
+    const [dialog, setDialog] = useState(null);
+    const { doctors } = useDoctorsOnDuty(version);
+
+    usePageTitle(TEXT.DOC_TITLE);
 
     useEffect(() => {
-        let active = true;
-        // Refresh in place every 30 seconds; nothing flashes "loading" again
-        const load = () => fetchOverview().then((next) => active && setData((prev) => ({ loading: false, ...next, round: prev.round + 1 })));
-        load();
-        const timer = setInterval(load, 30_000);
-        return () => {
-            active = false;
-            clearInterval(timer);
-        };
-    }, []);
+        const controller = new AbortController();
+        const config = { skipErrorPage: true, signal: controller.signal };
+        Promise.all([getTodayAppointments(), getAppointmentsInRange({ fromDate: today, toDate: addDays(today, 30) }, config), getWaitingList()]).then(
+            ([todayList, range, waiting]) => {
+                if (controller.signal.aborted) return;
+                setData({
+                    ok: todayList.success && range.success,
+                    today: todayList.success ? (todayList.data?.items ?? []) : [],
+                    upcoming: range.success ? range.items : [],
+                    waiting: waiting.success && Array.isArray(waiting.data) ? waiting.data : [],
+                });
+            },
+        );
+        return () => controller.abort();
+    }, [today, version]);
 
-    const toCheckIn = data.today.filter((a) => a.status === "CONFIRMED").sort((a, b) => (a.timeSlotStart ?? "").localeCompare(b.timeSlotStart ?? ""));
-    const pendingToday = data.pending.filter((a) => a.appointmentDate === clinicToday());
-    const inService = data.today.filter((a) => a.status === "IN_SERVICE");
-    const oldTransfers = data.transfers.filter((p) => minutesSince(p.createdAt) > 30);
-    const openTotal = data.open.reduce((sum, i) => sum + Number(i.remainingAmount), 0);
+    const reload = useCallback(() => setVersion((v) => v + 1), []);
+    const act = async (request, successText) => {
+        if (report(await request, successText)) {
+            setDialog(null);
+            reload();
+        }
+    };
+
+    const endedIds = new Set(doctors.filter((d) => ENDED.includes(d.status)).map((d) => d.id));
+    const doctorOptions = (list) => [["", CONFIRM_TEXT.ALL_DOCTORS], ...new Map(list.filter((a) => a.doctorId).map((a) => [String(a.doctorId), a.doctorName])).entries()];
+
+    const notYet = (data?.today ?? []).filter((a) => ["PENDING", "CONFIRMED"].includes(a.status));
+    const ciRows = notYet
+        .filter((a) => matchesKeyword(a, ci.keyword) && (!ci.slot || slotOf(a) === ci.slot) && (!ci.doctor || String(a.doctorId) === ci.doctor))
+        .sort((a, b) => (a.timeSlotStart ?? "99").localeCompare(b.timeSlotStart ?? "99"));
+    const ciPaging = usePaging(ciRows, PER_PAGE);
+
+    const pending = (data?.upcoming ?? []).filter((a) => a.status === "PENDING");
+    const cfRows = sortByVisit(
+        pending.filter(
+            (a) =>
+                matchesKeyword(a, cf.keyword) &&
+                (!cf.day || a.appointmentDate === cf.day) &&
+                (!cf.doctor || String(a.doctorId) === cf.doctor) &&
+                (!cf.status || confirmStateOf(a) === cf.status),
+        ),
+    );
+    const cfPaging = usePaging(cfRows, PER_PAGE);
+    const dayOptions = [["", CONFIRM_TEXT.ALL_STATUSES]];
+    for (let i = 0; i < 14; i += 1) {
+        const k = addDays(today, i);
+        if (!isSunday(k)) dayOptions.push([k, k === today ? TEXT.TODAY : shortDate(k)]);
+    }
+
+    const setter = (set, paging) => (key) => (value) => {
+        set((f) => ({ ...f, [key]: value }));
+        paging.setPage(1);
+    };
+    const setCiFilter = setter(setCi, ciPaging);
+    const setCfFilter = setter(setCf, cfPaging);
+
+    const now = clinicClock();
+    const shift = now < "12:30" ? "Morning" : "Afternoon";
     const firstName = (getSessionUserName() ?? "").trim().split(" ").at(-1);
+    const a = dialog?.item;
+    const close = () => setDialog(null);
 
-    // The work waiting now: each number opens the page that clears it
-    const tiles = [
-        {
-            label: "Chờ xác nhận",
-            count: data.pending.length,
-            hint: pendingToday.length ? `${pendingToday.length} lịch hôm nay` : "Gọi khách xác nhận",
-            to: ROUTES.RECEPTION_APPOINTMENTS,
-            urgent: data.pending.some((a) => a.soon),
-        },
-        {
-            label: "Chờ check-in",
-            count: toCheckIn.length,
-            hint: toCheckIn[0] ? `Kế tiếp ${hhmm(toCheckIn[0].timeSlotStart)}` : "Không còn ai",
-            to: ROUTES.RECEPTION_CHECK_IN,
-        },
-        {
-            label: "Đang chờ khám",
-            count: data.waiting.length,
-            hint: inService.length ? `${inService.length} đang trong phòng` : "Phòng đang trống",
-            to: ROUTES.RECEPTION_QUEUE,
-        },
-        {
-            label: "Chưa lập hóa đơn",
-            count: data.uninvoiced.length,
-            hint: "Khám xong, chưa có hóa đơn",
-            to: ROUTES.RECEPTION_INVOICES,
-            urgent: data.uninvoiced.length > 0,
-        },
-        { label: "Chờ thu tiền", count: data.open.length, hint: data.open.length ? money(openTotal) : "Đã thu hết", to: ROUTES.RECEPTION_INVOICES },
-        {
-            label: "Chuyển khoản chờ",
-            count: data.transfers.length,
-            hint: oldTransfers.length ? `${oldTransfers.length} khoản chờ quá 30 phút` : "Kiểm tra tài khoản",
-            to: ROUTES.RECEPTION_INVOICE_LIST,
-            urgent: oldTransfers.length > 0,
-        },
-    ];
+    const search = (id, value, onChange) => (
+        <div className="flex min-w-56 flex-1 flex-col gap-1">
+            <label htmlFor={id} className="text-caption text-muted">
+                {CHECK_IN_TEXT.PATIENT}
+            </label>
+            <input id={id} type="search" className="input" placeholder={CHECK_IN_TEXT.SEARCH_PLACEHOLDER} value={value} onChange={(e) => onChange(e.target.value)} />
+        </div>
+    );
 
-    // Counter problems only this page knows about, added to the "Cần xử lý ngay" list
-    const counterAlerts = data.loading
-        ? []
-        : [
-              !data.cash && {
-                  key: "cash",
-                  tone: "warning",
-                  text: "Chưa mở két hôm nay. Mở két với số tiền đầu ca trước khi thu tiền mặt.",
-                  to: ROUTES.RECEPTION_CASH_HANDOVER,
-                  action: "Mở két",
-              },
-              oldTransfers.length > 0 && {
-                  key: "transfers",
-                  tone: "warning",
-                  text: `${oldTransfers.length} khoản chuyển khoản chờ xác nhận quá 30 phút. Kiểm tra tài khoản rồi xác nhận hoặc từ chối.`,
-                  to: ROUTES.RECEPTION_INVOICE_LIST,
-                  action: "Kiểm tra",
-              },
-          ].filter(Boolean);
+    const patientCell = (row) => {
+        const allergies = allergiesOf(row);
+        return (
+            <td data-primary>
+                <span className="cell-primary block">{row.patientName}</span>
+                {allergies.length > 0 && <span className="badge badge-danger mt-1 flex w-fit whitespace-normal">{CHECK_IN_TEXT.ALLERGY(allergies[0])}</span>}
+            </td>
+        );
+    };
 
-    // Today in figures
-    const countOf = (statuses) => data.today.filter((a) => statuses.includes(a.status)).length;
-    const figures = [
-        { label: "Lịch hẹn hôm nay", value: data.today.length, to: ROUTES.RECEPTION_CHECK_IN },
-        { label: "Đã khám xong", value: countOf(["COMPLETED"]), to: ROUTES.RECEPTION_CHECK_IN },
-        { label: "Không đến hoặc hủy", value: countOf(["NO_SHOW", "CANCELLED"]), to: ROUTES.RECEPTION_CHECK_IN },
-        { label: "Đã thu hôm nay", value: money(data.paid), to: ROUTES.RECEPTION_INVOICE_LIST },
-    ];
+    const confirmCell = (row) => {
+        const state = confirmStateOf(row);
+        const [label, badge] = CONFIRM_TEXT.STATES[state];
+        const when = state === "callback" ? callBackText(row) : null;
+        return (
+            <>
+                <span className={cx("badge", badge)}>{label}</span>
+                {when && <small className="block pt-0.5 text-caption text-muted">{CONFIRM_TEXT.CALL_BACK_AT(when)}</small>}
+            </>
+        );
+    };
+
+    const table = (columns, paging, empty, renderRow) => (
+        <>
+            {paging.pageItems.length ? (
+                <div className="table-wrap rounded-none border-x-0">
+                    <table className="table table-stack [&_td]:px-3 [&_td]:align-top [&_th]:px-3">
+                        <thead>
+                            <tr>
+                                {columns.map((c, i) => (
+                                    <th key={c}>{i === columns.length - 1 ? <span className="sr-only">{c}</span> : c}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>{paging.pageItems.map(renderRow)}</tbody>
+                    </table>
+                </div>
+            ) : (
+                <p className="px-6 py-8 text-center text-body-sm text-muted">{data ? empty : CHECK_IN_TEXT.LOADING}</p>
+            )}
+            {paging.footer}
+        </>
+    );
 
     return (
-        <div className="app-content min-h-full">
-            <header className="mb-5 flex flex-wrap items-end gap-x-6 gap-y-3">
-                <div className="mr-auto">
-                    <h1 className="page-title">{firstName ? `Chào ${firstName}` : "Tổng quan"}</h1>
-                    <p className="page-description first-letter:uppercase">{weekdayDate(clinicToday())}</p>
-                </div>
-                <CounterStatus cash={data.cash} doctors={doctors} loading={data.loading} />
-            </header>
-
-            {/* The receptionist clocks in here: the counter they work at, then the queue */}
-            <MyShiftBar queueTo={ROUTES.RECEPTION_QUEUE} queueLabel="Mở hàng chờ" />
-            <ReceptionAlerts extra={counterAlerts} showAllClear={!data.loading} />
-            {data.error && (
-                <p role="alert" className="mb-4 rounded-lg border border-danger-solid/40 bg-danger-soft px-4 py-3 text-body-sm text-danger">
-                    Không tải được dữ liệu: {data.error}
+        <div className="app-content min-h-full space-y-5">
+            <div>
+                <h1 className="page-title">{TEXT.HELLO(firstName)}</h1>
+                <p className="page-description first-letter:uppercase">
+                    {TEXT.SHIFT_LINE(weekdayDate(today), `${TEXT.SHIFT_FULL[shift]} ${shiftHours(shift).join(" – ")}`)}
                 </p>
+            </div>
+
+            <RevenueChart />
+
+            {data && !data.ok && (
+                <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
+                    <span className="flex-1">{TEXT.LOAD_ERROR}</span>
+                    <button type="button" className="btn btn-secondary h-9" onClick={reload}>
+                        {TEXT.RETRY}
+                    </button>
+                </div>
             )}
 
-            <nav
-                aria-label="Việc đang chờ"
-                className="mb-5 grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-canvas sm:grid-cols-3 2xl:grid-cols-6"
-            >
-                {tiles.map((t) => (
-                    <Link
-                        key={t.label}
-                        to={t.to}
-                        className={cx(
-                            "group relative border-b border-r border-border px-5 py-4 transition-colors hover:bg-primary-softer focus-visible:z-10",
-                            t.count === 0 && "opacity-60",
-                        )}
-                    >
-                        {t.urgent && t.count > 0 && <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-warning-solid" />}
-                        <span className="block text-body-sm font-medium text-muted group-hover:text-primary">{t.label}</span>
-                        <span
-                            className={cx(
-                                "num block font-heading text-[40px] leading-tight font-bold",
-                                t.count === 0 ? "text-muted" : t.urgent ? "text-warning" : "text-ink",
-                            )}
-                        >
-                            {data.loading ? "–" : t.count}
-                        </span>
-                        <span className="block truncate text-caption text-muted">{t.hint}</span>
+            <Card
+                title={TEXT.CHECK_IN_TITLE}
+                actions={
+                    <Link to={ROUTES.RECEPTION_CHECK_IN} className="btn-link text-label">
+                        {TEXT.CHECK_IN_LINK}
                     </Link>
-                ))}
-            </nav>
-
-            <dl className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {figures.map((f) => (
-                    <Link key={f.label} to={f.to} className="rounded-xl border border-border bg-canvas px-5 py-3 hover:border-primary">
-                        <dt className="text-caption text-muted">{f.label}</dt>
-                        <dd className="num m-0 font-heading text-heading-3 font-bold text-ink">{data.loading ? "–" : f.value}</dd>
-                    </Link>
-                ))}
-            </dl>
-
-            <div className="grid items-start gap-5 xl:grid-cols-2">
-                <CounterFlow inService={inService} uninvoiced={data.uninvoiced} open={data.open} loading={data.loading} />
-                <TodayTimeline appointments={data.today} />
-            </div>
-        </div>
-    );
-};
-
-// The state of the counter at a glance: the cash drawer and each doctor on shift today
-const CounterStatus = ({ cash, doctors, loading }) => {
-    if (loading) return null;
-    const dot = { success: "bg-success-solid", warning: "bg-warning-solid", neutral: "bg-border-strong" };
-    return (
-        <div className="flex flex-wrap items-center gap-2 text-body-sm">
-            <Link
-                to={ROUTES.RECEPTION_CASH_HANDOVER}
-                className={cx(
-                    "inline-flex items-center gap-2 rounded-full border px-3 py-1.5",
-                    cash ? "border-border bg-canvas text-ink" : "border-warning/60 bg-warning-soft text-warning",
-                )}
+                }
             >
-                {cash ? (
-                    <>
-                        Két đang mở <span className="num font-semibold">{money(cash.expectedCash)}</span>
-                    </>
-                ) : (
-                    "Chưa mở két, bấm để mở"
-                )}
-            </Link>
-            {doctors.map((d) => {
-                const [label, tone] = dutyText(d);
-                return (
-                    <span
-                        key={d.id}
-                        className={cx(
-                            "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-ink",
-                            tone === "warning" ? "border-warning/60 bg-warning-soft" : "border-border bg-canvas",
-                        )}
-                        title={`${d.room ?? ""} ca ${d.shift}`}
-                    >
-                        <i aria-hidden className={cx("size-2 rounded-full", dot[tone])} />
-                        {d.name} <span className={tone === "warning" ? "font-semibold text-warning" : "text-muted"}>{label}</span>
-                    </span>
-                );
-            })}
+                <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+                    {search("dci-search", ci.keyword, setCiFilter("keyword"))}
+                    <LabeledSelect
+                        id="dci-slot"
+                        label={CHECK_IN_TEXT.SLOT}
+                        value={ci.slot}
+                        options={[["", CHECK_IN_TEXT.ALL_SLOTS], ...[...new Set(notYet.map(slotOf).filter(Boolean))].sort().map((s) => [s, s])]}
+                        onChange={setCiFilter("slot")}
+                    />
+                    <LabeledSelect id="dci-doctor" label={CHECK_IN_TEXT.DOCTOR} value={ci.doctor} options={doctorOptions(notYet)} onChange={setCiFilter("doctor")} />
+                </div>
+                {table(TEXT.CHECK_IN_COLUMNS, ciPaging, TEXT.CHECK_IN_EMPTY, (row) => (
+                    <tr key={row.id}>
+                        <td data-label={TEXT.CHECK_IN_COLUMNS[0]} className="num whitespace-nowrap">
+                            {slotOf(row) || CHECK_IN_TEXT.WALK_IN_SLOT}
+                        </td>
+                        {patientCell(row)}
+                        <td data-label={TEXT.CHECK_IN_COLUMNS[2]} className="num whitespace-nowrap">
+                            {phoneText(row.patientPhoneNumber)}
+                        </td>
+                        <td data-label={TEXT.CHECK_IN_COLUMNS[3]} className="min-w-40">
+                            <ServiceCell names={serviceNames(row)} />
+                        </td>
+                        <td data-label={TEXT.CHECK_IN_COLUMNS[4]} className="min-w-36">
+                            {row.doctorName ?? CHECK_IN_TEXT.NO_DOCTOR}
+                            {endedIds.has(row.doctorId) && <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ENDED}</small>}
+                        </td>
+                        <td data-label={TEXT.CHECK_IN_COLUMNS[5]}>
+                            {row.status === "CONFIRMED" ? <span className="badge badge-success">{CONFIRM_TEXT.STATES.confirmed[0]}</span> : confirmCell(row)}
+                        </td>
+                        <td data-actions>
+                            <div className="flex justify-end">
+                                <button type="button" className="btn btn-primary h-8 px-3" onClick={() => setDialog({ type: "checkIn", item: row })}>
+                                    {CHECK_IN_TEXT.CHECK_IN}
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                ))}
+            </Card>
+
+            <Card
+                title={TEXT.CONFIRM_TITLE}
+                actions={
+                    <Link to={ROUTES.RECEPTION_APPOINTMENTS} className="btn-link text-label">
+                        {TEXT.CONFIRM_LINK}
+                    </Link>
+                }
+            >
+                <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+                    {search("dcf-search", cf.keyword, setCfFilter("keyword"))}
+                    <LabeledSelect id="dcf-day" label={TEXT.APPOINTMENT_DAY} value={cf.day} options={dayOptions} onChange={setCfFilter("day")} />
+                    <LabeledSelect id="dcf-doctor" label={CHECK_IN_TEXT.DOCTOR} value={cf.doctor} options={doctorOptions(pending)} onChange={setCfFilter("doctor")} />
+                    <LabeledSelect id="dcf-status" label={CONFIRM_TEXT.STATUS} value={cf.status} options={CF_STATUS} onChange={setCfFilter("status")} />
+                </div>
+                {table(TEXT.CONFIRM_COLUMNS, cfPaging, TEXT.CONFIRM_EMPTY, (row) => {
+                    const open = (type) => () => setDialog({ type, item: row });
+                    return (
+                        <tr key={row.id}>
+                            <td data-label={TEXT.CONFIRM_COLUMNS[0]} className="whitespace-nowrap font-semibold text-ink">
+                                {row.appointmentDate === today ? TEXT.TODAY : shortDate(row.appointmentDate)}
+                            </td>
+                            <td data-label={TEXT.CONFIRM_COLUMNS[1]} className="num whitespace-nowrap">
+                                {slotOf(row)}
+                            </td>
+                            {patientCell(row)}
+                            <td data-label={TEXT.CONFIRM_COLUMNS[3]} className="num whitespace-nowrap">
+                                {phoneText(row.patientPhoneNumber)}
+                            </td>
+                            <td data-label={TEXT.CONFIRM_COLUMNS[4]} className="min-w-36">
+                                {row.doctorName ?? CHECK_IN_TEXT.NO_DOCTOR}
+                            </td>
+                            <td data-label={TEXT.CONFIRM_COLUMNS[5]} className="min-w-36">
+                                <ServiceCell names={serviceNames(row)} />
+                            </td>
+                            <td data-label={TEXT.CONFIRM_COLUMNS[6]}>{confirmCell(row)}</td>
+                            <td data-actions>
+                                <div className="ml-auto grid w-max grid-cols-2 gap-2">
+                                    <button type="button" className="btn btn-primary h-8 px-2.5" onClick={open("confirm")}>
+                                        {CONFIRM_TEXT.CONFIRM}
+                                    </button>
+                                    <button type="button" className="btn btn-secondary h-8 px-2.5" onClick={open("call")}>
+                                        {CONFIRM_TEXT.CALL_BACK}
+                                    </button>
+                                    <button type="button" className="btn btn-secondary h-8 px-2.5" onClick={open("reschedule")}>
+                                        {CONFIRM_TEXT.RESCHEDULE}
+                                    </button>
+                                    <button type="button" className="btn btn-secondary h-8 px-2.5" onClick={open("cancel")}>
+                                        {CONFIRM_TEXT.CANCEL}
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    );
+                })}
+            </Card>
+
+            {dialog?.type === "checkIn" && (
+                <CheckInDialog
+                    appointment={a}
+                    doctors={doctors}
+                    waiting={data?.waiting ?? []}
+                    onClose={close}
+                    onSubmit={(v) => act(checkInAppointment(a.id, v), CHECK_IN_TEXT.CHECKED_IN(a.patientName, v.room))}
+                />
+            )}
+            {dialog?.type === "confirm" && <ConfirmAppointmentDialog appointment={a} onClose={close} onSubmit={() => act(confirmAppointment(a.id), CONFIRM_TEXT.CONFIRMED(a.patientName))} />}
+            {dialog?.type === "call" && (
+                <ConfirmCallDialog
+                    appointment={a}
+                    today={today}
+                    onClose={close}
+                    onSubmit={(v) => {
+                        const when = `${ddmm(v.callBackDate)} ${v.callBackTime}`;
+                        return act(
+                            recordConfirmCall(a.id, v),
+                            v.outcome === "CallBack" ? CONFIRM_TEXT.WILL_CALL_BACK(a.patientName, when) : CONFIRM_TEXT.NO_ANSWER(a.patientName, when),
+                        );
+                    }}
+                />
+            )}
+            {dialog?.type === "reschedule" && (
+                <RescheduleDialog appointment={a} onClose={close} onSubmit={(v) => act(rescheduleAppointment(a.id, v), CONFIRM_TEXT.RESCHEDULED(a.patientName))} />
+            )}
+            {dialog?.type === "cancel" && <CancelDialog appointment={a} onClose={close} onSubmit={(reason) => act(cancelAppointment(a.id, reason), CONFIRM_TEXT.CANCELLED(a.patientName))} />}
         </div>
-    );
-};
-
-// The way to the counter: people in the room now will come to pay; visits done without an invoice must not leave unbilled
-const CounterFlow = ({ inService, uninvoiced, open, loading }) => {
-    const todayOpen = open.filter((i) => i.createdAt && new Date(i.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }) === clinicToday());
-    return (
-        <Card title="Ra quầy">
-            <div className="grid divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
-                <div className="p-4">
-                    <h3 className="mb-2 text-label text-muted">Đang khám, sắp ra quầy ({inService.length})</h3>
-                    {loading ? null : inService.length === 0 ? (
-                        <p className="text-body-sm text-muted">Chưa có ai trong phòng khám.</p>
-                    ) : (
-                        <ul className="space-y-2">
-                            {inService.map((a) => (
-                                <li key={a.id} className="rounded-lg bg-primary-softer px-3 py-2 text-body-sm">
-                                    <span className="font-semibold text-ink">{a.patientName}</span>{" "}
-                                    <span className="text-muted">{phoneTail(a.patientPhoneNumber)}</span>
-                                    <span className="block text-caption text-muted">
-                                        {a.doctorName} · {servicesOf(a)}
-                                    </span>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-                <div className="p-4">
-                    <h3 className="mb-2 text-label text-muted">Chờ thanh toán hôm nay ({uninvoiced.length + todayOpen.length})</h3>
-                    {loading ? null : uninvoiced.length + todayOpen.length === 0 ? (
-                        <p className="text-body-sm text-muted">Không còn ai chờ thanh toán.</p>
-                    ) : (
-                        <ul className="space-y-2">
-                            {uninvoiced.map((a) => (
-                                <li key={`v${a.id}`} className="flex items-center gap-3 rounded-lg border border-warning/50 px-3 py-2 text-body-sm">
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block font-semibold text-ink">{a.patientName}</span>
-                                        <span className="block text-caption text-warning">Khám xong {ddmm(a.appointmentDate)}, chưa lập hóa đơn</span>
-                                    </span>
-                                    <Link to={ROUTES.RECEPTION_INVOICES} className="btn btn-primary h-9">
-                                        Lập hóa đơn
-                                    </Link>
-                                </li>
-                            ))}
-                            {todayOpen.map((i) => (
-                                <li key={`i${i.id}`} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-body-sm">
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block font-semibold text-ink">{i.patientName}</span>
-                                        <span className="block text-caption text-muted">{i.invoiceNumber}</span>
-                                    </span>
-                                    <span className="num font-semibold text-ink">{money(i.remainingAmount)}</span>
-                                    <Link to={`${ROUTES.RECEPTION_INVOICES}?invoice=${i.id}`} className="btn btn-primary h-9">
-                                        Thu tiền
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            </div>
-        </Card>
-    );
-};
-
-const DOT = {
-    PENDING: "bg-warning-solid",
-    CONFIRMED: "bg-success-solid",
-    CHECKED_IN: "bg-primary",
-    IN_SERVICE: "bg-primary",
-    COMPLETED: "bg-success",
-    NO_SHOW: "bg-danger-solid",
-    CANCELLED: "bg-border-strong",
-};
-
-// Today on one line: each booking is a dot at its time, the blue line is now. Bunches show the rush hours;
-// a booked dot left of "now" is someone late.
-const TodayTimeline = ({ appointments }) => {
-    const booked = appointments.filter((a) => a.timeSlotStart && a.status !== "CANCELLED");
-    const now = toMinutes(clinicClock());
-    const [start, end] = useMemo(() => {
-        const times = booked.map((a) => toMinutes(a.timeSlotStart));
-        return [Math.min(7 * 60, ...times), Math.max(21 * 60, ...times.map((t) => t + 30))];
-    }, [booked]);
-    const pos = (minutes) => `${((minutes - start) / (end - start)) * 100}%`;
-    const hours = [];
-    for (let h = Math.ceil(start / 60); h * 60 <= end; h += 2) hours.push(h);
-
-    return (
-        <Card title="Hôm nay theo giờ">
-            <div className="px-5 pt-6 pb-3">
-                <div className="relative h-10">
-                    <div className="absolute inset-x-0 top-1/2 h-px bg-border-strong" />
-                    {hours.map((h) => (
-                        <span key={h} className="num absolute top-full -translate-x-1/2 pt-1 text-caption text-muted" style={{ left: pos(h * 60) }}>
-                            {h}h
-                        </span>
-                    ))}
-                    {booked.map((a, i) => (
-                        <span
-                            key={a.id}
-                            title={`${hhmm(a.timeSlotStart)} ${a.patientName}: ${STATUS_LABEL[a.status]?.[0] ?? a.status}`}
-                            className={cx("absolute size-3 -translate-x-1/2 rounded-full ring-2 ring-canvas", DOT[a.status])}
-                            style={{ left: pos(toMinutes(a.timeSlotStart)), top: `${8 + (i % 3) * 8}px` }}
-                        />
-                    ))}
-                    {now >= start && now <= end && (
-                        <span className="absolute -top-3 bottom-0 w-0.5 bg-primary" style={{ left: pos(now) }}>
-                            <span className="absolute -top-4 -translate-x-1/2 rounded bg-primary px-1 text-caption text-on-primary">Bây giờ</span>
-                        </span>
-                    )}
-                </div>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border px-5 py-3 text-caption text-muted">
-                {Object.entries(DOT)
-                    .filter(([s]) => s !== "CANCELLED")
-                    .map(([s, cls]) => (
-                        <span key={s} className="inline-flex items-center gap-1.5">
-                            <i aria-hidden className={cx("size-2 rounded-full", cls)} />
-                            {STATUS_LABEL[s][0]}
-                        </span>
-                    ))}{" "}
-            </div>
-        </Card>
     );
 };
 
