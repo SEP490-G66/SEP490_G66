@@ -123,6 +123,13 @@ namespace OZE.Application.Services
                 return ApiResponse<ServiceDto>.FailureResult(ErrorConstants.ServiceMessage.ServiceCodeExist);
             }
 
+            var normalizedName = request.ServiceName.Trim();
+            var isNameInUse = await _serviceRepository.ExistsByNameAsync(normalizedName, null, cancellationToken);
+            if (isNameInUse)
+            {
+                return ApiResponse<ServiceDto>.FailureResult(ErrorConstants.ServiceMessage.ServiceNameExist);
+            }
+
             var service = _mapper.Map<Service>(request);
             service.ServiceCode = normalizedCode;
             service.ServiceName = request.ServiceName.Trim();
@@ -172,6 +179,13 @@ namespace OZE.Application.Services
             if (isCodeInUse)
             {
                 return ApiResponse<ServiceDto>.FailureResult(ErrorConstants.ServiceMessage.ServiceCodeExist);
+            }
+
+            var normalizedName = request.ServiceName.Trim();
+            var isNameInUse = await _serviceRepository.ExistsByNameAsync(normalizedName, id, cancellationToken);
+            if (isNameInUse)
+            {
+                return ApiResponse<ServiceDto>.FailureResult(ErrorConstants.ServiceMessage.ServiceNameExist);
             }
 
             service.ServiceCode = normalizedCode;
@@ -238,6 +252,20 @@ namespace OZE.Application.Services
             var dto = _mapper.Map<ServiceDto>(service);
             var statusText = isActive ? "activated" : "deactivated";
             return ApiResponse<ServiceDto>.SuccessResult(dto, $"Service {statusText} successfully");
+        }
+
+        public Task<ApiResponse<ServiceDto>> DeactivateServiceAsync(
+            int id,
+            CancellationToken cancellationToken = default)
+        {
+            return ToggleServiceStatusAsync(id, false, cancellationToken);
+        }
+
+        public Task<ApiResponse<ServiceDto>> ActivateServiceAsync(
+            int id,
+            CancellationToken cancellationToken = default)
+        {
+            return ToggleServiceStatusAsync(id, true, cancellationToken);
         }
 
         public async Task<ApiResponse<bool>> DeleteServiceAsync(

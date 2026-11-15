@@ -75,6 +75,25 @@ namespace OZE.Persistence.Repositories
                 cancellationToken);
         }
 
+        public async Task<bool> ExistsByNameAsync(string serviceName, int? excludeId = null, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(serviceName))
+            {
+                return false;
+            }
+
+            var normalizedName = serviceName.Trim().ToLower();
+            var query = _context.Services.AsNoTracking().AsQueryable();
+            if (excludeId.HasValue)
+            {
+                query = query.Where(s => s.Id != excludeId.Value);
+            }
+
+            return await query.AnyAsync(
+                s => s.ServiceName.ToLower() == normalizedName,
+                cancellationToken);
+        }
+
         public async Task<PagedResult<Service>> GetAllAsync(ServiceQueryParameters parameters, CancellationToken cancellationToken = default)
         {
             var query = _context.Services.AsNoTracking().AsQueryable();
