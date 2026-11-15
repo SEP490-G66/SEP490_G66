@@ -5,7 +5,8 @@ import { DialogActions } from "./shared";
 import { phoneText } from "./receptionUtils";
 import { clinicToday, recordFollowUpContact } from "@/services/receptionService";
 import { FOLLOW_UP_TEXT as TEXT } from "@/utils/messages";
-import { OUTCOME_OF_CHOICE, addDays } from "@/utils/followUp";
+import { addDays } from "@/utils/calendar";
+import { OUTCOME_OF_CHOICE } from "@/utils/followUp";
 
 const CHOICES = Object.entries(TEXT.RESULT_OPTIONS).map(([value, label]) => ({ value, label }));
 const WRITE = { skipErrorPage: true };
