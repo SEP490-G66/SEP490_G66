@@ -11,13 +11,10 @@ import FilterSelect from "@/components/ui/FilterSelect";
 import WeekPicker from "@/components/ui/WeekPicker";
 import useAsync from "@/hooks/useAsync";
 import { SHIFT_ROLE_OPTIONS, copyPreviousWeek, getWeekShifts, roomTypeRole } from "@/services/shiftService";
-import { MOCK_ROOMS, ROOM_STATUSES } from "@/utils/data/mockRooms";
-import { SHIFT_STATUSES, SHIFT_STATUS_OPTIONS } from "@/utils/data/mockShifts";
 import { getWeekStart, toDateOnly } from "@/utils/format";
+import { SHIFT_STATUSES, SHIFT_STATUS_OPTIONS } from "@/utils/shift";
 
 const WEEK_NAMES = { 0: "Tuần này", 1: "Tuần sau" };
-
-const ROOM_OPTIONS = MOCK_ROOMS.filter((room) => room.status === ROOM_STATUSES.ACTIVE).map((room) => ({ value: String(room.id), label: room.name }));
 
 const DIALOGS = {
     DETAIL: "detail",
@@ -48,6 +45,8 @@ const WorkShiftManagement = () => {
 
     const { loading, value: result } = useAsync(() => getWeekShifts({ weekStart }), [weekStart, reloadKey]);
     const week = result?.success ? result.data : null;
+    // Rooms that have a row this week (active rooms and the reception desk), for the room filter
+    const roomOptions = (week?.rooms ?? []).map((room) => ({ value: String(room.id), label: room.name }));
 
     const isVisible = (cell) =>
         (!roomId || String(cell.room.id) === roomId) && (!role || roomTypeRole(cell.room.type) === role) && (!status || cell.status === status);
@@ -79,7 +78,11 @@ const WorkShiftManagement = () => {
         setCopying(true);
         const response = await copyPreviousWeek({ weekStart });
         setCopying(false);
-        toast[response.data?.copied > 0 ? "success" : "info"](response.message);
+        if (!response.success) {
+            toast.error(response.message);
+            return;
+        }
+        toast[response.data.copied > 0 ? "success" : "info"](response.message);
         setReloadKey((current) => current + 1);
     };
 
@@ -117,7 +120,7 @@ const WorkShiftManagement = () => {
                     className={FILTER_SELECT_CLASS}
                     id="shift-room-filter"
                     label="Phòng"
-                    options={ROOM_OPTIONS}
+                    options={roomOptions}
                     value={roomId}
                     onChange={setRoomId}
                 />
@@ -141,7 +144,11 @@ const WorkShiftManagement = () => {
 
             {pendingWork && <p className="alert alert-danger border-0">{pendingWork}</p>}
 
-            {loading || !week ? (
+            {!loading && result && !result.success ? (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được lịch phân ca. Vui lòng thử lại sau."}
+                </p>
+            ) : loading || !week ? (
                 <div className="skeleton h-160 w-full" aria-hidden="true" />
             ) : (
                 <ShiftWeekGrid week={week} isVisible={isVisible} onSelect={openCell} />

@@ -1,51 +1,67 @@
-import { DEBT_AGE_FILTERS, DEBT_PAYMENT_STATUSES, DEBT_SORTS, DEBT_STATUSES, MOCK_DEBT_INVOICES, getDebtAgeInDays } from "../utils/data/mockDebts";
-import { MOCK_STAFF } from "../utils/data/mockStaff";
-import { normalizeText } from "../utils/format";
+import { DEBT_AGE_FILTERS, DEBT_SORTS, DEBT_TYPES } from "../utils/debt";
+import { getClinicDateTimeParts } from "../utils/format";
 import { PAYMENT_METHOD_LABELS } from "../utils/messages";
+import api from "./api";
+import { call } from "./receptionService";
 
-// TODO(api): mock only, swap for the debt endpoints once the backend has them.
-const MOCK_DELAY_MS = 300;
+// Patient debts of the manager (api/debts): invoices not fully paid, with installments and payment reminders.
+// The backend searches (invoice number, patient name / code / phone) and sorts overdue first; it has no filters by
+// status, age or installment, so the open invoices are read in full (they are few) and filtered and paged here.
+// Details of one invoice come from api/Invoices/{id} and api/debts/{id}/reminders.
 
 export const DEBT_PAGE_SIZE = 8;
+// Largest page the backend returns; the list is read page by page until it is complete.
+const FETCH_PAGE_SIZE = 100;
+const MAX_FETCH_PAGES = 20;
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const success = (data, message = null) => ({ success: true, message, data, errors: null });
-
-const failure = (message) => ({ success: false, message, data: null, errors: null });
-
-const staffName = (id) => MOCK_STAFF.find((member) => member.id === id)?.fullName ?? null;
-
-const debtStatus = (paidAmount, payments) => {
-    if (paidAmount > 0) return DEBT_STATUSES.PARTIALLY_PAID;
-    return payments.some((payment) => payment.status === DEBT_PAYMENT_STATUSES.PENDING) ? DEBT_STATUSES.PENDING : DEBT_STATUSES.UNPAID;
+const MESSAGES = {
+    "Invoice not found.": "Không tìm thấy hoá đơn.",
 };
 
-// Only confirmed payments count as paid: a failed or waiting one leaves the debt as it was.
-const toDebt = (invoice) => {
-    const services = invoice.services.map((service, index) => ({ ...service, id: index + 1, amount: service.unitPrice * service.quantity }));
-    const payments = invoice.payments.map((payment, index) => ({
-        ...payment,
-        id: index + 1,
-        methodLabel: PAYMENT_METHOD_LABELS[payment.method],
-        confirmedByName: staffName(payment.confirmedById),
-    }));
-    const totalAmount = services.reduce((sum, service) => sum + service.amount, 0);
-    const paidAmount = payments.filter((payment) => payment.status === DEBT_PAYMENT_STATUSES.CONFIRMED).reduce((sum, payment) => sum + payment.amount, 0);
+const withMessage = (result) => ({ ...result, message: MESSAGES[result.message] ?? result.message });
 
-    return {
-        ...invoice,
-        services,
-        payments,
-        doctorName: staffName(invoice.doctorId),
-        totalAmount,
-        paidAmount,
-        remainingAmount: totalAmount - paidAmount,
-        status: debtStatus(paidAmount, payments),
-    };
+const toLocalPhone = (phone) => (phone ?? "").replace(/^\+84/, "0");
+
+// Phones are stored as +84...; a search typed as 0977... is sent the same way.
+const toSearch = (keyword) => {
+    const text = keyword.trim().replace(/\s/g, "");
+    return /^0\d+$/.test(text) ? `+84${text.slice(1)}` : keyword.trim();
 };
 
-const debts = MOCK_DEBT_INVOICES.map(toDebt).filter((debt) => debt.remainingAmount > 0);
+const toDebt = (item) => ({
+    id: item.invoiceId,
+    invoiceNumber: item.invoiceNumber,
+    patientName: item.patientName,
+    patientCode: item.patientCode,
+    phone: toLocalPhone(item.patientPhoneNumber),
+    createdAt: item.createdAt,
+    createdDate: getClinicDateTimeParts(item.createdAt).date,
+    ageDays: item.ageDays,
+    totalAmount: Number(item.finalAmount),
+    paidAmount: Number(item.paidAmount),
+    remainingAmount: Number(item.remainingAmount),
+    status: item.paymentStatus,
+    hasInstallmentPlan: item.hasInstallmentPlan,
+    nextDueDate: item.nextDueDate,
+    nextDueAmount: item.nextDueAmount == null ? null : Number(item.nextDueAmount),
+    overdueCount: item.overdueCount,
+    overdueAmount: Number(item.overdueAmount ?? 0),
+    lastRemindedAt: item.lastRemindedAt,
+    reminderCount: item.reminderCount,
+});
+
+const loadOpenDebts = async (keyword) => {
+    const items = [];
+    for (let page = 1; page <= MAX_FETCH_PAGES; page++) {
+        const result = await call(() =>
+            api.get("/api/debts", { params: { pageNumber: page, pageSize: FETCH_PAGE_SIZE, searchKeyword: keyword ? toSearch(keyword) : undefined } }),
+        );
+        if (!result.success) return withMessage(result);
+        items.push(...result.data.items.map(toDebt));
+        if (page >= result.data.totalPages) break;
+    }
+    return { success: true, message: null, errors: null, data: items };
+};
 
 const AGE_MATCHERS = {
     [DEBT_AGE_FILTERS.WITHIN_30]: (days) => days <= 30,
@@ -53,18 +69,10 @@ const AGE_MATCHERS = {
     [DEBT_AGE_FILTERS.OVER_60]: (days) => days > 60,
 };
 
-// Search by the patient's name or phone, or the invoice number. The phone ignores spaces, since the table shows "0977 404 219".
-const matches = (debt, { keyword = "", status = "", age = "", source = "" }) => {
-    const search = normalizeText(keyword);
-    return (
-        (!search ||
-            normalizeText(debt.patientName).includes(search) ||
-            debt.phone.includes(search.replace(/\s/g, "")) ||
-            normalizeText(debt.invoiceNumber).includes(search)) &&
-        (!status || debt.status === status) &&
-        (!age || AGE_MATCHERS[age](getDebtAgeInDays(debt.createdAt))) &&
-        (!source || debt.source === source)
-    );
+const TYPE_MATCHERS = {
+    [DEBT_TYPES.INSTALLMENT]: (debt) => debt.hasInstallmentPlan,
+    [DEBT_TYPES.OVERDUE]: (debt) => debt.overdueCount > 0,
+    [DEBT_TYPES.REGULAR]: (debt) => !debt.hasInstallmentPlan,
 };
 
 const oldestFirst = (a, b) => a.createdAt.localeCompare(b.createdAt) || a.invoiceNumber.localeCompare(b.invoiceNumber);
@@ -75,30 +83,91 @@ const COMPARATORS = {
     [DEBT_SORTS.LARGEST]: (a, b) => b.remainingAmount - a.remainingAmount || oldestFirst(a, b),
 };
 
-const filterDebts = ({ sort = DEBT_SORTS.OLDEST, ...filters }) => debts.filter((debt) => matches(debt, filters)).sort(COMPARATORS[sort]);
+const filterDebts = async ({ keyword = "", status = "", age = "", type = "", sort = DEBT_SORTS.OLDEST }) => {
+    const result = await loadOpenDebts(keyword);
+    if (!result.success) return result;
+    const items = result.data
+        .filter((debt) => (!status || debt.status === status) && (!age || AGE_MATCHERS[age](debt.ageDays)) && (!type || TYPE_MATCHERS[type](debt)))
+        .sort(COMPARATORS[sort] ?? oldestFirst);
+    return { ...result, data: items };
+};
 
 export const getDebts = async ({ page = 1, pageSize = DEBT_PAGE_SIZE, ...filters } = {}) => {
-    await wait(MOCK_DELAY_MS);
+    const result = await filterDebts(filters);
+    if (!result.success) return result;
 
-    const filtered = filterDebts(filters);
-    const totalItems = filtered.length;
+    const totalItems = result.data.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const currentPage = Math.min(Math.max(1, page), totalPages);
     const start = (currentPage - 1) * pageSize;
-    const items = filtered.slice(start, start + pageSize);
-
-    return success({ items, page: currentPage, pageSize, totalItems, totalPages, updatedAt: new Date().toISOString() });
+    return {
+        ...result,
+        data: {
+            items: result.data.slice(start, start + pageSize),
+            page: currentPage,
+            pageSize,
+            totalItems,
+            totalPages,
+            totalRemaining: result.data.reduce((sum, debt) => sum + debt.remainingAmount, 0),
+            updatedAt: new Date().toISOString(),
+        },
+    };
 };
 
 // Every debt that matches the filters, for "Xuất danh sách".
-export const getAllDebts = async (filters = {}) => {
-    await wait(MOCK_DELAY_MS);
-    return success(filterDebts(filters));
-};
+export const getAllDebts = (filters = {}) => filterDebts(filters);
 
+// One invoice with what is still owed, its services, its payments and the payment reminders sent.
 export const getDebt = async (id) => {
-    await wait(MOCK_DELAY_MS);
+    const [invoice, reminders, debts] = await Promise.all([
+        call(() => api.get(`/api/Invoices/${id}`)),
+        call(() => api.get(`/api/debts/${id}/reminders`)),
+        loadOpenDebts(""),
+    ]);
+    if (!invoice.success) return withMessage(invoice);
 
-    const debt = debts.find((item) => item.id === id);
-    return debt ? success(debt) : failure("Không tìm thấy hoá đơn công nợ.");
+    const debt = debts.success ? debts.data.find((item) => item.id === id) : null;
+    const data = invoice.data;
+    return {
+        success: true,
+        message: null,
+        errors: null,
+        data: {
+            ...(debt ?? {}),
+            id: data.id,
+            invoiceNumber: data.invoiceNumber,
+            patientName: data.patientName ?? debt?.patientName ?? "",
+            createdAt: data.createdAt,
+            createdDate: getClinicDateTimeParts(data.createdAt).date,
+            fromTreatmentPlan: data.treatmentPlanId != null,
+            totalAmount: Number(data.finalAmount),
+            discountAmount: Number(data.discountAmount ?? 0),
+            paidAmount: Number(data.paidAmount),
+            remainingAmount: Number(data.remainingAmount),
+            status: data.paymentStatus,
+            notes: data.notes,
+            services: data.items.map((item) => ({
+                id: item.id,
+                name: item.serviceName,
+                quantity: item.quantity,
+                unitPrice: Number(item.unitPrice),
+                amount: Number(item.amount),
+            })),
+            payments: data.payments.map((payment) => ({
+                id: payment.id,
+                paidAt: payment.paidAt ?? payment.createdAt,
+                amount: Number(payment.amount),
+                methodLabel: PAYMENT_METHOD_LABELS[payment.paymentMethod] ?? payment.paymentMethod,
+                status: payment.paymentStatus,
+            })),
+            reminders: reminders.success
+                ? reminders.data.map((reminder) => ({
+                      id: reminder.id,
+                      sentAt: reminder.sentAt,
+                      channels: reminder.channels,
+                      sentByName: reminder.isAutomatic ? "Hệ thống tự động" : (reminder.sentByName ?? "—"),
+                  }))
+                : [],
+        },
+    };
 };

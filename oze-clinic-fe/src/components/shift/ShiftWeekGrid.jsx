@@ -1,17 +1,18 @@
 import { useState } from "react";
 import { cx } from "@/utils/cx";
-import { ROOM_TYPE_OPTIONS, ROOM_TYPES } from "@/utils/data/mockRooms";
-import { SHIFT_STATUSES } from "@/utils/data/mockShifts";
+import { RECEPTION_DESK, ROOM_TYPE_OPTIONS, ROOM_TYPES } from "@/utils/room";
+import { SHIFT_STATUSES } from "@/utils/shift";
 import { ShiftStatusText } from "./ShiftStatus";
 
 // Card border per room type; the legend under the grid uses the same colours.
 const ROOM_TYPE_BORDERS = {
-    [ROOM_TYPES.GENERAL]: "border-chart-1",
+    [ROOM_TYPES.GENERAL_TREATMENT]: "border-chart-1",
     [ROOM_TYPES.MINOR_SURGERY]: "border-warning-solid",
-    [ROOM_TYPES.SPECIALIZED]: "border-chart-7",
     [ROOM_TYPES.XRAY]: "border-success-solid",
-    [ROOM_TYPES.RECEPTION]: "border-neutral",
+    [RECEPTION_DESK.type]: "border-neutral",
 };
+
+const LEGEND = [...ROOM_TYPE_OPTIONS, { value: RECEPTION_DESK.type, label: RECEPTION_DESK.name }];
 
 const EMPTY_LOOK = "border-dashed border-danger-solid bg-danger-soft";
 const LEAVE_LOOK = "border-dashed border-warning-solid bg-warning-soft";
@@ -166,7 +167,7 @@ const ShiftWeekGrid = ({ week, isVisible, onSelect }) => {
             </div>
 
             <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-caption text-muted">
-                {ROOM_TYPE_OPTIONS.map((option) => (
+                {LEGEND.map((option) => (
                     <LegendItem key={option.value} className={ROOM_TYPE_BORDERS[option.value]}>
                         {option.label}
                     </LegendItem>

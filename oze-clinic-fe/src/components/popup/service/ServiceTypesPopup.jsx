@@ -8,32 +8,21 @@ import Toggle from "@/components/ui/Toggle";
 import useAsync from "@/hooks/useAsync";
 import { activateServiceType, getServiceTypes } from "@/services/serviceManagementService";
 import { cx } from "@/utils/cx";
-import { roomTypeLabel } from "@/utils/data/mockRooms";
+import { roomTypeLabel } from "@/utils/room";
 
 const SKELETON_ROW_COUNT = 3;
 const COLUMN_COUNT = 6;
 
 const priceFormatter = new Intl.NumberFormat("vi-VN");
 
-// "2026-10-20" -> "20/10/2026"
-const formatDate = (value) => value.split("-").reverse().join("/");
-
 // Price of the service: the cheapest active type ("Từ ..."), or its own price when it has none.
 const servicePrice = (service, activeTypes) => {
     if (activeTypes.length > 0) return `Từ ${priceFormatter.format(Math.min(...activeTypes.map((type) => type.price)))} ₫`;
-    if (service.price === 0) return "Miễn phí";
-    return `${service.priceFrom ? "Từ " : ""}${priceFormatter.format(service.price)} ₫`;
+    if (service.basePrice === 0) return "Miễn phí";
+    return `${priceFormatter.format(service.basePrice)} ₫`;
 };
 
-// A scheduled stop shows its date (reason on hover).
 const StatusBadge = ({ type }) => {
-    if (type.isActive && type.deactivateFrom) {
-        return (
-            <span className="badge badge-warning num whitespace-nowrap" title={type.deactivateReason ?? undefined}>
-                Ngừng từ {formatDate(type.deactivateFrom)}
-            </span>
-        );
-    }
     return (
         <span className={cx("badge whitespace-nowrap", type.isActive ? "badge-success" : "badge-neutral")}>
             {type.isActive ? "Đang hoạt động" : "Ngưng hoạt động"}
@@ -73,7 +62,7 @@ const ServiceTypesPopup = ({ service, onClose, onChanged }) => {
             setDeactivating(type);
             return false;
         }
-        const response = await activateServiceType(type.id);
+        const response = await activateServiceType(type);
         if (!response.success) {
             toast.error(response.message);
             return false;
@@ -146,7 +135,10 @@ const ServiceTypesPopup = ({ service, onClose, onChanged }) => {
                             types.map((type, index) => (
                                 <tr key={type.id}>
                                     <td className="num">{index + 1}</td>
-                                    <td className="font-semibold text-ink">{type.name}</td>
+                                    <td>
+                                        <p className="font-semibold text-ink">{type.name}</p>
+                                        <p className="num text-caption text-muted">{type.code}</p>
+                                    </td>
                                     <td className="num whitespace-nowrap text-right text-ink">{priceFormatter.format(type.price)} ₫</td>
                                     <td className="num whitespace-nowrap">{type.durationMinutes ? `${type.durationMinutes} phút` : "—"}</td>
                                     <td>

@@ -1,134 +1,116 @@
-import { ACCOUNT_STATUSES, MOCK_LOCK_IMPACT, MOCK_STAFF } from "../utils/data/mockStaff";
-import { USER_ROLES } from "../utils/messages";
+import { BACKEND_ROLE_NAMES, USER_ROLES, VALIDATION_MESSAGES } from "../utils/messages";
+import { ACCOUNT_STATUSES } from "../utils/staff";
 import { normalizePhone } from "../utils/validation";
+import api from "./api";
+import { call } from "./receptionService";
 
-// TODO(api): mock only, swap for the staff account endpoints once the backend has them.
-const MOCK_DELAY_MS = 300;
+// Staff accounts (api/Staff, ClinicManager only). The backend returns the whole list; it is small, so the paging
+// is done here. Locking an account = deactivate (the staff member can no longer sign in), unlocking = activate.
 
 export const STAFF_PAGE_SIZE = 10;
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const GENERIC_ERROR = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
-const success = (data, message = null) => ({ success: true, message, data, errors: null });
-
-const failure = (message, errors = null) => ({ success: false, message, data: null, errors });
-
-const staff = MOCK_STAFF.map((member) => ({ ...member }));
-
-const normalize = (value) => value.trim().toLowerCase();
-
-// Phone numbers match with or without spaces: "0912 111" finds 0912111222.
-const digitsOf = (value) => value.replace(/\D/g, "");
-
-const matches = (member, search) => {
-    if (!search) return true;
-    if ([member.code, member.fullName, member.email].some((field) => normalize(field).includes(search))) return true;
-    // Only a number-like search looks at phones, so "NV0012" does not match phones containing "0012".
-    return /^[\d\s.]+$/.test(search) && member.phone.includes(digitsOf(search));
+// Texts of ErrorConstants (StaffMessage / AuthMessage), put on the form field they are about.
+const FIELD_MESSAGES = {
+    "Email already exists in the system.": ["email", VALIDATION_MESSAGES.EMAIL_IN_USE],
+    "Email is invalid. Please check again.": ["email", VALIDATION_MESSAGES.EMAIL_INVALID],
+    "Phone number already exists in the system.": ["phone", VALIDATION_MESSAGES.PHONE_IN_USE],
+    "Phone number is invalid. Please check again.": ["phone", VALIDATION_MESSAGES.PHONE_INVALID],
+    "License number already exists in the system.": ["licenseNumber", "Số chứng chỉ hành nghề đã tồn tại."],
+    "Please enter license number.": ["licenseNumber", "Vui lòng nhập số chứng chỉ hành nghề."],
+    "License number is invalid. Please check again.": ["licenseNumber", "Số chứng chỉ hành nghề không hợp lệ."],
+    "Specialization is invalid. Please check again.": ["specialization", "Chuyên khoa không hợp lệ."],
+    "Full name is invalid. Please check again.": ["fullName", VALIDATION_MESSAGES.FULL_NAME_TOO_LONG],
+    "Role is invalid. Please check again.": ["role", "Vai trò không hợp lệ."],
 };
 
-const findMember = (id) => staff.find((member) => member.id === id);
+// Messages shown for the whole form or as a toast.
+const MESSAGES = {
+    "Create staff success!": "Đã tạo tài khoản. Thông tin đăng nhập đã được gửi qua email của nhân viên.",
+    "Update staff success!": "Đã cập nhật tài khoản.",
+    "Deactivate staff success!": "Đã khoá tài khoản.",
+    "Activate staff success!": "Đã mở khoá tài khoản.",
+    "Staff not found.": "Tài khoản không còn tồn tại.",
+    "You cannot change your own role.": "Bạn không thể đổi vai trò của chính mình.",
+    "You cannot deactivate your own account.": "Bạn không thể khoá tài khoản của chính mình.",
+    "Cannot deactivate because staff is inactive.": "Tài khoản đã bị khoá trước đó.",
+    "Cannot activate because staff is active.": "Tài khoản đang hoạt động.",
+    "This staff member still has shifts or appointments from now on; move or cancel them first":
+        "Nhân viên vẫn còn ca làm hoặc lịch hẹn sắp tới. Hãy chuyển hoặc huỷ chúng trước.",
+    "The clinic must keep at least one active clinic manager": "Phòng khám phải còn ít nhất một quản lý đang hoạt động.",
+    "Could not send the email. Please try again later.": "Không gửi được email thông tin đăng nhập. Vui lòng thử lại sau.",
+};
 
-const isEmailInUse = (email, exceptId) => staff.some((member) => member.id !== exceptId && normalize(member.email) === normalize(email));
+const toVietnamese = (message) => MESSAGES[message] ?? message ?? GENERIC_ERROR;
 
-const isPhoneInUse = (phone, exceptId) => staff.some((member) => member.id !== exceptId && member.phone === phone);
+const roleFromBackend = (backendRole) => Object.keys(BACKEND_ROLE_NAMES).find((key) => BACKEND_ROLE_NAMES[key] === backendRole) ?? "";
 
-// Form values -> stored fields. licenseNumber is kept for doctors only.
-const toStaffFields = (request) => ({
-    fullName: request.fullName.trim(),
-    role: request.role,
-    gender: request.gender,
-    email: request.email.trim(),
-    phone: normalizePhone(request.phone),
-    birthDate: request.birthDate || null,
-    licenseNumber: request.role === USER_ROLES.DOCTOR ? request.licenseNumber.trim() : undefined,
+// The backend stores phones as +84...; the page shows and edits them as 0...
+const toLocalPhone = (phone) => (phone ?? "").replace(/^\+84/, "0");
+
+const toMember = (item) => ({
+    id: item.userId,
+    fullName: item.fullName,
+    email: item.email ?? "",
+    phone: toLocalPhone(item.phoneNumber),
+    role: roleFromBackend(item.role),
+    specialization: item.specialization ?? "",
+    licenseNumber: item.licenseNumber ?? "",
+    status: item.isActive ? ACCOUNT_STATUSES.ACTIVE : ACCOUNT_STATUSES.LOCKED,
 });
 
-const findConflicts = (fields, exceptId) => {
-    const errors = {};
-    if (isEmailInUse(fields.email, exceptId)) errors.email = "Email đã tồn tại";
-    if (isPhoneInUse(fields.phone, exceptId)) errors.phone = "Số điện thoại đã tồn tại";
-    return errors;
+// Specialization and license number are only kept for doctors (the backend drops them for other roles).
+const toApiRequest = (request) => {
+    const isDoctor = request.role === USER_ROLES.DOCTOR;
+    return {
+        fullName: request.fullName.trim(),
+        email: request.email.trim(),
+        phoneNumber: normalizePhone(request.phone),
+        role: BACKEND_ROLE_NAMES[request.role],
+        specialization: isDoctor ? request.specialization.trim() || null : null,
+        licenseNumber: isDoctor ? request.licenseNumber.trim() || null : null,
+    };
 };
 
-// Search by code, name, email or phone; filter by role and status.
+// A failure tied to a field goes to errors[field]; any other one to message (shown at the top of the form or in a toast).
+const toFailure = (result) => {
+    const field = FIELD_MESSAGES[result.message];
+    if (field) return { ...result, message: null, errors: { [field[0]]: field[1] } };
+    return { ...result, message: toVietnamese(result.message), errors: null };
+};
+
+const toResult = (result) => (result.success ? { ...result, message: toVietnamese(result.message), data: toMember(result.data) } : toFailure(result));
+
+// Search by name, email or phone (done by the backend); filter by role and status.
 export const getStaffAccounts = async ({ keyword = "", role = "", status = "", page = 1, pageSize = STAFF_PAGE_SIZE } = {}) => {
-    await wait(MOCK_DELAY_MS);
-
-    const search = normalize(keyword);
-    const filtered = staff.filter(
-        (member) => matches(member, search) && (!role || member.role === role) && (!status || member.status === status),
+    const result = await call(() =>
+        api.get("/api/Staff", {
+            params: {
+                keyword: keyword || undefined,
+                role: BACKEND_ROLE_NAMES[role],
+                isActive: status ? status === ACCOUNT_STATUSES.ACTIVE : undefined,
+            },
+        }),
     );
+    if (!result.success) return { ...result, message: toVietnamese(result.message) };
 
-    const totalItems = filtered.length;
+    const members = result.data.map(toMember);
+    const totalItems = members.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const currentPage = Math.min(Math.max(1, page), totalPages);
     const start = (currentPage - 1) * pageSize;
-    const items = filtered.slice(start, start + pageSize).map((member) => ({ ...member }));
 
-    return success({ items, page: currentPage, pageSize, totalItems, totalPages });
+    return { ...result, data: { items: members.slice(start, start + pageSize), page: currentPage, pageSize, totalItems, totalPages } };
 };
 
-// The temporary password goes to the staff member by SMS (done by the backend).
-export const createStaffAccount = async (request) => {
-    await wait(MOCK_DELAY_MS);
+// request: { fullName, role, email, phone, specialization, licenseNumber }.
+// The backend makes a temporary password and emails the login information to the staff member.
+export const createStaffAccount = async (request) => toResult(await call(() => api.post("/api/Staff", toApiRequest(request))));
 
-    const fields = toStaffFields(request);
-    const errors = findConflicts(fields);
-    if (Object.keys(errors).length > 0) return failure(null, errors);
+export const updateStaffAccount = async (id, request) => toResult(await call(() => api.put(`/api/Staff/${id}`, toApiRequest(request))));
 
-    const id = Math.max(0, ...staff.map((member) => member.id)) + 3;
-    const member = { id, code: `NV${String(id).padStart(4, "0")}`, ...fields, status: ACCOUNT_STATUSES.ACTIVE };
-    // New accounts go to the top of the list.
-    staff.unshift(member);
-    return success({ ...member }, `Đã tạo tài khoản ${member.code}. Mật khẩu tạm đã được gửi qua SMS.`);
-};
+// The backend refuses while the staff member still has upcoming shifts or appointments.
+export const lockStaffAccount = async (id) => toResult(await call(() => api.put(`/api/Staff/${id}/deactivate`)));
 
-export const updateStaffAccount = async (id, request) => {
-    await wait(MOCK_DELAY_MS);
-
-    const member = findMember(id);
-    if (!member) return failure("Tài khoản không còn tồn tại.");
-
-    const fields = toStaffFields(request);
-    const errors = findConflicts(fields, id);
-    if (Object.keys(errors).length > 0) return failure(null, errors);
-
-    Object.assign(member, fields);
-    return success({ ...member }, `Đã cập nhật tài khoản ${member.code}.`);
-};
-
-// Upcoming shifts to reassign and, for doctors, upcoming appointments to move to another doctor.
-export const getLockImpact = async (id) => {
-    await wait(MOCK_DELAY_MS);
-
-    const member = findMember(id);
-    if (!member) return failure("Tài khoản không còn tồn tại.");
-
-    const isDoctor = member.role === USER_ROLES.DOCTOR;
-    const impact = MOCK_LOCK_IMPACT[id] ?? { upcomingShifts: id % 5, upcomingAppointments: (id * 7) % 11 };
-    return success({ upcomingShifts: impact.upcomingShifts, upcomingAppointments: isDoctor ? impact.upcomingAppointments : 0 });
-};
-
-export const lockStaffAccount = async (id, { reason, note }) => {
-    await wait(MOCK_DELAY_MS);
-
-    const member = findMember(id);
-    if (!member) return failure("Tài khoản không còn tồn tại.");
-    if (member.status === ACCOUNT_STATUSES.LOCKED) return failure("Tài khoản đã bị khoá trước đó.");
-
-    member.status = ACCOUNT_STATUSES.LOCKED;
-    member.lock = { reason, note: note.trim() };
-    return success(null, `Đã khoá tài khoản ${member.code}.`);
-};
-
-export const unlockStaffAccount = async (id) => {
-    await wait(MOCK_DELAY_MS);
-
-    const member = findMember(id);
-    if (!member) return failure("Tài khoản không còn tồn tại.");
-
-    member.status = ACCOUNT_STATUSES.ACTIVE;
-    member.lock = null;
-    return success(null, `Đã mở khoá tài khoản ${member.code}.`);
-};
+export const unlockStaffAccount = async (id) => toResult(await call(() => api.put(`/api/Staff/${id}/activate`)));

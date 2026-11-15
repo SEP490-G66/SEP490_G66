@@ -1,258 +1,211 @@
-import { MOCK_ADMIN_SERVICES, MOCK_SERVICE_TYPES } from "../utils/data/mockServicesAdmin";
+import api from "./api";
+import { call } from "./receptionService";
 
-// TODO(api): mock only, swap for /api/Services once the backend has the room type, duration and "price from".
-const MOCK_DELAY_MS = 300;
+// Services and their variants ("loại dịch vụ") of the clinic manager: api/Services and api/Services/{id}/variants.
+// A service with active variants is booked by variant, so its price shows as "Từ" the cheapest active variant.
+// ServiceDto has no variant count, so the variants of each service on the page are read alongside the list.
+// Turning off is immediate (no date or reason on the backend); nothing is deleted, a service or variant is turned off.
 
 export const SERVICE_PAGE_SIZE = 10;
+const CODE_PAGE_SIZE = 100;
+const CODE_PREFIX = "DV";
+const GENERIC_ERROR = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const success = (data, message = null) => ({ success: true, message, data, errors: null });
-
-const failure = (message) => ({ success: false, message, data: null, errors: null });
-
-// Failure tied to one form field, e.g. a name already in use.
-const fieldFailure = (field, message) => ({ ...failure(message), errors: { [field]: message } });
-
-const services = MOCK_ADMIN_SERVICES.map((service) => ({ ...service }));
-
-const serviceTypes = MOCK_SERVICE_TYPES.map((type) => ({ ...type }));
-
-const normalize = (value) => value.trim().toLowerCase();
-
-const nextId = (list) => Math.max(0, ...list.map((item) => item.id)) + 1;
-
-const typesOf = (serviceId) => serviceTypes.filter((type) => type.serviceId === serviceId);
-
-// Next service code: DV001, DV002, ...
-const nextServiceCode = () => {
-    const last = Math.max(0, ...services.map((service) => Number(service.code.replace(/\D/g, "")) || 0));
-    return `DV${String(last + 1).padStart(3, "0")}`;
+// Texts of ErrorConstants.ServiceMessage / ServiceVariantMessage and the success texts of ClinicServiceService.
+// [field, text]: a failure about one form field; a plain text: a message for the whole form or a toast.
+const MESSAGES = {
+    "Service not found in system": "Dịch vụ không còn tồn tại.",
+    "Service code already exists in system": ["code", "Mã dịch vụ đã tồn tại."],
+    "Required room type must be one of: GeneralTreatment, MinorSurgery, XRay": ["roomType", "Loại phòng không hợp lệ."],
+    "Reference price must be greater than or equal to 0": ["price", "Giá tham khảo không được âm."],
+    "Estimated minutes must be greater than 0": ["durationMinutes", "Thời gian phải lớn hơn 0."],
+    "This service is in appointments that are not finished yet; it cannot be turned off now":
+        "Dịch vụ đang có lịch hẹn chưa hoàn thành nên chưa thể ngưng hoạt động.",
+    "Service variant not found in system": "Loại dịch vụ không còn tồn tại.",
+    "Variant code already exists in system": ["code", "Mã loại dịch vụ đã tồn tại."],
+    "Display order must be greater than or equal to 0": "Thứ tự hiển thị không hợp lệ.",
+    "This variant is in appointments that are not finished yet; it cannot be turned off now":
+        "Loại dịch vụ đang có lịch hẹn chưa hoàn thành nên chưa thể ngưng hoạt động.",
+    "Service created successfully": "Đã thêm dịch vụ.",
+    "Service updated successfully": "Đã cập nhật dịch vụ.",
+    "Service activated successfully": "Đã kích hoạt lại dịch vụ.",
+    "Service deactivated successfully": "Đã ngưng hoạt động dịch vụ.",
+    "Variant created successfully": "Đã thêm loại dịch vụ.",
+    "Variant updated successfully": "Đã cập nhật loại dịch vụ.",
+    "Variant activated successfully": "Đã kích hoạt lại loại dịch vụ.",
+    "Variant deactivated successfully": "Đã ngưng hoạt động loại dịch vụ.",
 };
 
-// Next type code of a service: DV002-01, DV002-02, ...
-const nextTypeCode = (service) => {
-    const last = Math.max(0, ...typesOf(service.id).map((type) => Number(type.code.split("-").at(-1)) || 0));
-    return `${service.code}-${String(last + 1).padStart(2, "0")}`;
+const translate = (result) => {
+    const text = MESSAGES[result.message];
+    if (Array.isArray(text)) return { ...result, message: text[1], errors: result.success ? null : { [text[0]]: text[1] } };
+    return { ...result, message: text ?? result.message ?? (result.success ? null : GENERIC_ERROR), errors: null };
 };
 
-// A service with active types takes the price of the cheapest one, shown as "Từ ...".
-const syncServicePrice = (serviceId) => {
-    const service = services.find((item) => item.id === serviceId);
-    const activePrices = typesOf(serviceId)
-        .filter((type) => type.isActive)
-        .map((type) => type.price);
-    if (!service || activePrices.length === 0) return;
-    Object.assign(service, { price: Math.min(...activePrices), priceFrom: true });
-};
+const toType = (item) => ({
+    id: item.id,
+    serviceId: item.serviceId,
+    code: item.variantCode,
+    name: item.variantName,
+    description: item.description ?? "",
+    price: Number(item.referencePrice),
+    durationMinutes: item.estimatedMinutes,
+    sortOrder: item.displayOrder,
+    isActive: item.isActive,
+});
 
-const isServiceNameInUse = (name, exceptId) =>
-    services.some((service) => service.id !== exceptId && normalize(service.name) === normalize(name));
-
-const isTypeNameInUse = (serviceId, name, exceptId) =>
-    typesOf(serviceId).some((type) => type.id !== exceptId && normalize(type.name) === normalize(name));
-
-// roomType: "" (all) or a ROOM_TYPES value. Each item also carries typeCount (its number of service types).
-export const getServices = async ({ keyword = "", roomType = "", page = 1, pageSize = SERVICE_PAGE_SIZE } = {}) => {
-    await wait(MOCK_DELAY_MS);
-    applyScheduledStops(services);
-
-    const search = normalize(keyword);
-    const filtered = services.filter(
-        (service) =>
-            (!search || normalize(service.name).includes(search) || normalize(service.code).includes(search)) &&
-            (!roomType || service.roomType === roomType),
-    );
-
-    const totalItems = filtered.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const currentPage = Math.min(Math.max(1, page), totalPages);
-    const start = (currentPage - 1) * pageSize;
-    const items = filtered
-        .slice(start, start + pageSize)
-        .map((service) => ({ ...service, typeCount: typesOf(service.id).length }));
-
-    return success({ items, page: currentPage, pageSize, totalItems, totalPages });
-};
-
-const addServiceType = (service, request) => {
-    const types = typesOf(service.id);
-    const type = {
-        id: nextId(serviceTypes),
-        serviceId: service.id,
-        code: nextTypeCode(service),
-        name: request.name.trim(),
-        price: request.price,
-        durationMinutes: request.durationMinutes,
-        sortOrder: Math.max(0, ...types.map((item) => item.sortOrder ?? 0)) + 1,
-        description: (request.description ?? "").trim(),
-        isActive: true,
+// basePrice: the service's own price, used when it is booked without a variant.
+// price / priceFrom: what the list shows, the cheapest active variant ("Từ ...") when there is one.
+const toService = (item, types = []) => {
+    const activePrices = types.filter((type) => type.isActive).map((type) => type.price);
+    const basePrice = Number(item.referencePrice);
+    return {
+        id: item.id,
+        code: item.serviceCode,
+        name: item.serviceName,
+        description: item.description ?? "",
+        roomType: item.requiredRoomType ?? "",
+        basePrice,
+        price: activePrices.length ? Math.min(...activePrices) : basePrice,
+        priceFrom: activePrices.length > 0,
+        durationMinutes: item.estimatedMinutes,
+        recallIntervalMonths: item.recallIntervalMonths,
+        isActive: item.isActive,
+        typeCount: types.length,
     };
-    serviceTypes.push(type);
-    return type;
 };
 
-// request: { name, price, durationMinutes, roomType, description, types: [{ name, price, durationMinutes }] }.
-// The code is generated. With types, the price comes from the cheapest type and request.price is ignored.
-export const createService = async (request) => {
-    await wait(MOCK_DELAY_MS);
-
-    if (isServiceNameInUse(request.name)) return fieldFailure("name", "Tên dịch vụ đã tồn tại.");
-
-    const service = {
-        id: nextId(services),
-        code: nextServiceCode(),
-        name: request.name.trim(),
-        description: request.description.trim(),
-        roomType: request.roomType,
-        price: request.price ?? 0,
-        durationMinutes: request.durationMinutes,
-        priceFrom: false,
-        isActive: true,
-    };
-    services.unshift(service);
-    (request.types ?? []).forEach((type) => addServiceType(service, type));
-    syncServicePrice(service.id);
-
-    return success({ ...service }, `Đã thêm dịch vụ ${service.code}.`);
+const loadTypes = async (serviceId) => {
+    const result = await call(() => api.get(`/api/Services/${serviceId}/variants`));
+    return result.success ? { ...result, data: result.data.map(toType) } : translate(result);
 };
 
-// Same fields as createService, without types; code, status and the price of a service with types stay as they are.
-export const updateService = async (id, request) => {
-    await wait(MOCK_DELAY_MS);
-
-    const service = services.find((item) => item.id === id);
-    if (!service) return failure("Dịch vụ không còn tồn tại.");
-    if (isServiceNameInUse(request.name, id)) return fieldFailure("name", "Tên dịch vụ đã tồn tại.");
-
-    Object.assign(service, {
-        name: request.name.trim(),
-        description: request.description.trim(),
-        roomType: request.roomType,
-        durationMinutes: request.durationMinutes,
-    });
-    if (typesOf(id).length === 0) Object.assign(service, { price: request.price, priceFrom: false });
-
-    return success({ ...service }, `Đã cập nhật dịch vụ ${service.code}.`);
-};
-
-// Local date as YYYY-MM-DD.
-const today = () => new Date().toLocaleDateString("en-CA");
-
-// "2026-10-20" -> "20/10/2026"
-const formatDate = (value) => value.split("-").reverse().join("/");
-
-// Services and types whose stop date has come are switched off (the backend would do this with a daily job).
-const applyScheduledStops = (list) => {
-    list.forEach((item) => {
-        if (item.deactivateFrom && item.deactivateFrom <= today()) {
-            item.isActive = false;
-            item.deactivateFrom = null;
-        }
-    });
-};
-
-// Turning back on also cancels a scheduled stop.
-const activate = (item) => {
-    Object.assign(item, { isActive: true, deactivateFrom: null, deactivateReason: null });
-    return success({ ...item }, `Đã kích hoạt lại ${item.code}.`);
-};
-
-// Stops from effectiveFrom (today = now, a later date = scheduled). Existing appointments stay.
-const deactivate = (item, list, { effectiveFrom, reason }) => {
-    Object.assign(item, { deactivateFrom: effectiveFrom, deactivateReason: reason.trim() });
-    applyScheduledStops(list);
-    return success(
-        { ...item },
-        item.isActive ? `${item.code} sẽ ngừng hoạt động từ ${formatDate(effectiveFrom)}.` : `Đã ngừng hoạt động ${item.code}.`,
+// status: "" (all), "active" or "inactive"; roomType: "" or a ROOM_TYPES value of utils/room.
+export const getServices = async ({ keyword = "", roomType = "", status = "", page = 1, pageSize = SERVICE_PAGE_SIZE } = {}) => {
+    const result = await call(() =>
+        api.get("/api/Services", {
+            params: {
+                pageNumber: page,
+                pageSize,
+                searchKeyword: keyword || undefined,
+                requiredRoomType: roomType || undefined,
+                isActive: status ? status === "active" : undefined,
+                sortBy: "code",
+            },
+        }),
     );
+    if (!result.success) return translate(result);
+
+    const data = result.data;
+    const typeResults = await Promise.all(data.items.map((item) => loadTypes(item.id)));
+    return {
+        ...result,
+        data: {
+            items: data.items.map((item, index) => toService(item, typeResults[index].success ? typeResults[index].data : [])),
+            page: data.pageNumber,
+            pageSize: data.pageSize,
+            totalItems: data.totalCount,
+            totalPages: Math.max(1, data.totalPages),
+        },
+    };
 };
 
-// TODO(api): made up, read the booked appointments not yet done from the appointments.
-const countUpcomingAppointments = (seed) => (seed * 7) % 5;
-
-export const activateService = async (id) => {
-    await wait(MOCK_DELAY_MS);
-    const service = services.find((item) => item.id === id);
-    return service ? activate(service) : failure("Dịch vụ không còn tồn tại.");
+// Next free "DVnnn" code, to fill the code field of a new service (the manager can change it).
+export const getNextServiceCode = async () => {
+    let highest = 0;
+    for (let page = 1; ; page++) {
+        const result = await call(() => api.get("/api/Services", { params: { pageNumber: page, pageSize: CODE_PAGE_SIZE } }));
+        if (!result.success) break;
+        result.data.items.forEach((item) => {
+            const match = /^DV(\d+)$/i.exec(item.serviceCode);
+            if (match) highest = Math.max(highest, Number(match[1]));
+        });
+        if (page >= result.data.totalPages) break;
+    }
+    return `${CODE_PREFIX}${String(highest + 1).padStart(3, "0")}`;
 };
 
-export const deactivateService = async (id, request) => {
-    await wait(MOCK_DELAY_MS);
-    const service = services.find((item) => item.id === id);
-    return service ? deactivate(service, services, request) : failure("Dịch vụ không còn tồn tại.");
+// request: { code, name, price, durationMinutes, roomType, description, recallIntervalMonths }.
+const toServiceBody = (request, isActive) => ({
+    serviceCode: request.code.trim(),
+    serviceName: request.name.trim(),
+    description: request.description.trim() || null,
+    referencePrice: request.price ?? 0,
+    estimatedMinutes: request.durationMinutes ?? null,
+    recallIntervalMonths: request.recallIntervalMonths ?? null,
+    requiredRoomType: request.roomType || null,
+    isActive,
+});
+
+// Variant codes follow the service code: DV009-01, DV009-02, ...
+const nextTypeCode = (serviceCode, types) => {
+    const last = Math.max(0, ...types.map((type) => Number(type.code.split("-").at(-1)) || 0));
+    return `${serviceCode}-${String(last + 1).padStart(2, "0")}`;
 };
 
-// What stopping a service touches: its active types and the upcoming appointments.
-export const getDeactivationImpact = async (id) => {
-    await wait(MOCK_DELAY_MS);
-    applyScheduledStops(serviceTypes);
-    const activeTypes = typesOf(id).filter((type) => type.isActive).length;
-    return success({ activeTypes, upcomingAppointments: countUpcomingAppointments(id) });
+// request: { name, price, durationMinutes, description }.
+const toTypeBody = (request, code, displayOrder, isActive) => ({
+    variantCode: code,
+    variantName: request.name.trim(),
+    description: request.description.trim() || null,
+    referencePrice: request.price,
+    estimatedMinutes: request.durationMinutes ?? null,
+    displayOrder,
+    isActive,
+});
+
+// A new service, then its types one by one. With types, the service's own price is the cheapest type.
+export const createService = async ({ types = [], ...request }) => {
+    const price = types.length ? Math.min(...types.map((type) => type.price)) : request.price;
+    const created = translate(await call(() => api.post("/api/Services", toServiceBody({ ...request, price }, true))));
+    if (!created.success) return created;
+
+    const service = created.data;
+    let failed = 0;
+    for (const [index, type] of types.entries()) {
+        const code = `${service.serviceCode}-${String(index + 1).padStart(2, "0")}`;
+        const result = await call(() => api.post(`/api/Services/${service.id}/variants`, toTypeBody(type, code, index + 1, true)));
+        if (!result.success) failed++;
+    }
+    const message = failed ? `Đã thêm dịch vụ ${service.serviceCode}, nhưng ${failed} loại chưa tạo được. Hãy thêm lại trong danh sách loại.` : `Đã thêm dịch vụ ${service.serviceCode}.`;
+    return { ...created, message };
 };
+
+// service: the row being edited (its price is kept when it has types; its status is kept).
+export const updateService = async (service, request) => {
+    const price = service.typeCount > 0 ? service.basePrice : request.price;
+    return translate(await call(() => api.put(`/api/Services/${service.id}`, toServiceBody({ ...request, price }, service.isActive))));
+};
+
+const setServiceStatus = async (id, isActive) => translate(await call(() => api.patch(`/api/Services/${id}/status`, { isActive })));
+
+export const activateService = (id) => setServiceStatus(id, true);
+
+// Immediate; refused while unfinished appointments still use the service.
+export const deactivateService = (id) => setServiceStatus(id, false);
 
 export const getServiceTypes = async (serviceId) => {
-    await wait(MOCK_DELAY_MS);
-    applyScheduledStops(serviceTypes);
-    syncServicePrice(serviceId);
-    return success(
-        typesOf(serviceId)
-            .sort((a, b) => a.sortOrder - b.sortOrder)
-            .map((type) => ({ ...type })),
-    );
+    const result = await loadTypes(serviceId);
+    return result.success ? { ...result, data: [...result.data].sort((a, b) => a.sortOrder - b.sortOrder) } : result;
 };
 
-// request: { name, price, durationMinutes, description }. Code and position are generated; a new type is active.
-export const createServiceType = async (serviceId, request) => {
-    await wait(MOCK_DELAY_MS);
-
-    const service = services.find((item) => item.id === serviceId);
-    if (!service) return failure("Dịch vụ không còn tồn tại.");
-    if (isTypeNameInUse(serviceId, request.name)) return fieldFailure("name", "Tên loại đã tồn tại trong dịch vụ này.");
-
-    const type = addServiceType(service, request);
-    syncServicePrice(serviceId);
-
-    return success({ ...type }, `Đã thêm loại ${type.name}.`);
+// service: { id, code }. The code and position of the new type are worked out from the existing types.
+export const createServiceType = async (service, request) => {
+    const existing = await loadTypes(service.id);
+    if (!existing.success) return existing;
+    const types = existing.data;
+    const displayOrder = Math.max(0, ...types.map((type) => type.sortOrder)) + 1;
+    const body = toTypeBody(request, nextTypeCode(service.code, types), displayOrder, true);
+    return translate(await call(() => api.post(`/api/Services/${service.id}/variants`, body)));
 };
 
-export const updateServiceType = async (id, request) => {
-    await wait(MOCK_DELAY_MS);
+// type: the type being edited (code, position and status are kept).
+export const updateServiceType = async (type, request) =>
+    translate(await call(() => api.put(`/api/Services/${type.serviceId}/variants/${type.id}`, toTypeBody(request, type.code, type.sortOrder, null))));
 
-    const type = serviceTypes.find((item) => item.id === id);
-    if (!type) return failure("Loại dịch vụ không còn tồn tại.");
-    if (isTypeNameInUse(type.serviceId, request.name, id)) return fieldFailure("name", "Tên loại đã tồn tại trong dịch vụ này.");
+const setTypeStatus = async (type, isActive) =>
+    translate(await call(() => api.patch(`/api/Services/${type.serviceId}/variants/${type.id}/status`, { isActive })));
 
-    Object.assign(type, {
-        name: request.name.trim(),
-        price: request.price,
-        durationMinutes: request.durationMinutes,
-        description: request.description.trim(),
-    });
-    syncServicePrice(type.serviceId);
+export const activateServiceType = (type) => setTypeStatus(type, true);
 
-    return success({ ...type }, `Đã cập nhật loại ${type.name}.`);
-};
-
-export const activateServiceType = async (id) => {
-    await wait(MOCK_DELAY_MS);
-    const type = serviceTypes.find((item) => item.id === id);
-    if (!type) return failure("Loại dịch vụ không còn tồn tại.");
-    const response = activate(type);
-    syncServicePrice(type.serviceId);
-    return response;
-};
-
-export const deactivateServiceType = async (id, request) => {
-    await wait(MOCK_DELAY_MS);
-    const type = serviceTypes.find((item) => item.id === id);
-    if (!type) return failure("Loại dịch vụ không còn tồn tại.");
-    const response = deactivate(type, serviceTypes, request);
-    syncServicePrice(type.serviceId);
-    return response;
-};
-
-export const getServiceTypeDeactivationImpact = async (id) => {
-    await wait(MOCK_DELAY_MS);
-    return success({ activeTypes: 0, upcomingAppointments: countUpcomingAppointments(id + 1) });
-};
+export const deactivateServiceType = (type) => setTypeStatus(type, false);

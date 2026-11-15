@@ -957,10 +957,6 @@ export const REFUND_REQUEST_STATUS_GUIDE = [
     },
 ];
 
-export const REFUND_REQUEST_ADMIN_TEXT = {
-    AMOUNT: "Số tiền yêu cầu",
-};
-
 export const PATIENT_RECORD_TEXT = {
     TITLE: "Hồ sơ bệnh nhân",
     PATIENTS_CRUMB: "Bệnh nhân",

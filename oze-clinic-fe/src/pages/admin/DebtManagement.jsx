@@ -9,8 +9,8 @@ import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
 import useAsync from "@/hooks/useAsync";
 import { getAllDebts, getDebt, getDebts } from "@/services/debtService";
-import { DEBT_AGE_FILTER_LABELS, DEBT_SORTS, DEBT_SORT_LABELS, DEBT_SOURCE_LABELS, DEBT_STATUS_LABELS } from "@/utils/data/mockDebts";
-import { formatDate, formatDateTime, getClinicToday } from "@/utils/format";
+import { DEBT_AGE_FILTER_LABELS, DEBT_SORTS, DEBT_SORT_LABELS, DEBT_STATUS_LABELS, DEBT_STATUS_OPTIONS, DEBT_TYPE_LABELS } from "@/utils/debt";
+import { formatCurrency, formatDateTime, getClinicToday } from "@/utils/format";
 import { downloadExcel } from "@/utils/reportExport";
 
 const SEARCH_DELAY_MS = 300;
@@ -20,23 +20,24 @@ const FILTER_CLASS = "w-full min-w-0 pl-3 pr-2";
 
 const toOptions = (labels) => Object.entries(labels).map(([value, label]) => ({ value, label }));
 
-const STATUS_OPTIONS = Object.entries(DEBT_STATUS_LABELS).map(([value, { label }]) => ({ value, label }));
 const AGE_OPTIONS = toOptions(DEBT_AGE_FILTER_LABELS);
-const SOURCE_OPTIONS = toOptions(DEBT_SOURCE_LABELS);
+const TYPE_OPTIONS = toOptions(DEBT_TYPE_LABELS);
 const SORT_OPTIONS = [DEBT_SORTS.NEWEST, DEBT_SORTS.LARGEST].map((value) => ({ value, label: DEBT_SORT_LABELS[value] }));
 
-const EXPORT_HEADER = ["Bệnh nhân", "Số điện thoại", "Hoá đơn", "Ngày tạo", "Nguồn", "Phải trả", "Đã trả", "Còn nợ", "Trạng thái"];
+const EXPORT_HEADER = ["Bệnh nhân", "Mã bệnh nhân", "Số điện thoại", "Hoá đơn", "Ngày tạo", "Số ngày nợ", "Trả góp", "Phải trả", "Đã trả", "Còn nợ", "Trạng thái"];
 
 const toExportRow = (debt) => [
     debt.patientName,
+    debt.patientCode,
     debt.phone,
     debt.invoiceNumber,
-    formatDate(debt.createdAt),
-    DEBT_SOURCE_LABELS[debt.source],
+    debt.createdDate,
+    debt.ageDays,
+    debt.hasInstallmentPlan ? (debt.overdueCount > 0 ? `Quá hạn ${debt.overdueCount} kỳ` : "Có") : "Không",
     debt.totalAmount,
     debt.paidAmount,
     debt.remainingAmount,
-    DEBT_STATUS_LABELS[debt.status].label,
+    DEBT_STATUS_LABELS[debt.status]?.label ?? debt.status,
 ];
 
 const DebtManagement = () => {
@@ -44,7 +45,7 @@ const DebtManagement = () => {
     const [keyword, setKeyword] = useState("");
     const [status, setStatus] = useState("");
     const [age, setAge] = useState("");
-    const [source, setSource] = useState("");
+    const [type, setType] = useState("");
     const [sort, setSort] = useState(DEBT_SORTS.OLDEST);
     const [page, setPage] = useState(1);
     const [exporting, setExporting] = useState(false);
@@ -53,7 +54,7 @@ const DebtManagement = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const openId = searchParams.get("id");
 
-    const { loading, value: result } = useAsync(() => getDebts({ keyword, status, age, source, sort, page }), [keyword, status, age, source, sort, page]);
+    const { loading, value: result } = useAsync(() => getDebts({ keyword, status, age, type, sort, page }), [keyword, status, age, type, sort, page]);
 
     useEffect(() => {
         const nextKeyword = searchInput.trim();
@@ -98,7 +99,7 @@ const DebtManagement = () => {
 
     const handleExport = async () => {
         setExporting(true);
-        const response = await getAllDebts({ keyword, status, age, source, sort });
+        const response = await getAllDebts({ keyword, status, age, type, sort });
         setExporting(false);
         if (!response.success) {
             toast.error(response.message);
@@ -114,7 +115,7 @@ const DebtManagement = () => {
                     <h1 className="page-title">Công nợ</h1>
                     <p className="page-description">
                         Hoá đơn còn nợ (Phải trả − Đã trả &gt; 0)
-                        {data && ` · cập nhật ${formatDateTime(data.updatedAt)}`}
+                        {data && ` · còn phải thu ${formatCurrency(data.totalRemaining)} · cập nhật ${formatDateTime(data.updatedAt)}`}
                     </p>
                 </div>
                 <button type="button" className="btn btn-secondary" disabled={exporting || !data?.totalItems} onClick={handleExport}>
@@ -126,14 +127,14 @@ const DebtManagement = () => {
                 <SearchInput
                     id="debt-search"
                     label="Tìm hoá đơn còn nợ"
-                    placeholder="Tìm theo tên, SĐT hoặc số hoá đơn"
+                    placeholder="Tìm theo tên, mã BN, SĐT, số hoá đơn"
                     value={searchInput}
                     onChange={setSearchInput}
                     className="col-span-full w-full xl:col-span-1"
                 />
-                <FilterSelect id="debt-status" label="Trạng thái" options={STATUS_OPTIONS} value={status} onChange={changeFilter(setStatus)} className={FILTER_CLASS} />
+                <FilterSelect id="debt-status" label="Trạng thái" options={DEBT_STATUS_OPTIONS} value={status} onChange={changeFilter(setStatus)} className={FILTER_CLASS} />
                 <FilterSelect id="debt-age" label="Thời gian nợ" options={AGE_OPTIONS} value={age} onChange={changeFilter(setAge)} className={FILTER_CLASS} />
-                <FilterSelect id="debt-source" label="Nguồn" options={SOURCE_OPTIONS} value={source} onChange={changeFilter(setSource)} className={FILTER_CLASS} />
+                <FilterSelect id="debt-type" label="Trả góp" options={TYPE_OPTIONS} value={type} onChange={changeFilter(setType)} className={FILTER_CLASS} />
                 <FilterSelect
                     id="debt-sort"
                     label="Sắp xếp"
@@ -145,6 +146,12 @@ const DebtManagement = () => {
                 />
             </div>
 
+            {!loading && result && !result.success && (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được danh sách công nợ. Vui lòng thử lại sau."}
+                </p>
+            )}
+
             <div>
                 <div className="flex flex-col gap-3">
                     <DebtAgeLegend />
@@ -152,7 +159,7 @@ const DebtManagement = () => {
                         debts={debts}
                         firstNumber={firstNumber}
                         loading={loading}
-                        filtered={Boolean(keyword || status || age || source)}
+                        filtered={Boolean(keyword || status || age || type)}
                         onView={(id) => setSearchParams({ id: String(id) }, { replace: true })}
                     />
                 </div>

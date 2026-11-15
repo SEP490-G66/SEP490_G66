@@ -103,23 +103,47 @@ const statusFromApi = {
 };
 const statusToApi = Object.fromEntries(Object.entries(statusFromApi).map(([backend, page]) => [page, backend]));
 
-const toRequest = (item) => ({
-    id: item.id,
-    code: `RF${String(item.id).padStart(6, "0")}`,
-    patientName: item.patientName ?? "",
-    patientCode: item.patientCode ?? "",
-    doctorName: "—",
-    requestedByName: "Lễ tân",
-    createdAt: item.createdAt,
-    invoiceNumber: item.invoiceNumber ?? "",
-    serviceNames: item.serviceNames ?? "—",
-    treatmentContent: item.workDoneAmount != null ? `Phần đã làm: ${Number(item.workDoneAmount).toLocaleString("vi-VN")} ₫` : "—",
-    paidAmount: Number(item.invoicePaidAmount ?? item.amount),
-    refundAmount: Number(item.amount) - Number(item.workDoneAmount ?? 0),
-    reason: item.reason,
-    status: statusFromApi[item.status] ?? REFUND_REQUEST_STATUSES.PENDING,
-    rejectReason: item.rejectionReason,
-});
+// Texts of ErrorConstants.RefundMessage that the manager page can get.
+const MESSAGES = {
+    "Refund request not found.": "Không tìm thấy yêu cầu hoàn tiền.",
+    "Work-done amount is required before approval.": "Vui lòng nhập giá trị phần việc đã làm trước khi duyệt.",
+    "Work-done amount is invalid.": "Giá trị phần việc đã làm không hợp lệ.",
+    "Work-done amount cannot exceed confirmed paid amount.": "Giá trị phần việc đã làm phải nhỏ hơn số tiền đã thanh toán.",
+    "Only pending refund requests can be processed.": "Yêu cầu này đã được xử lý trước đó.",
+    "Please enter a rejection reason.": "Vui lòng nhập lý do từ chối.",
+    "Refund request has been approved.": "Đã duyệt và hoàn tiền cho bệnh nhân.",
+    "Refund request has been rejected.": "Đã từ chối yêu cầu hoàn tiền.",
+    "Work-done amount has been updated.": "Đã lưu giá trị phần việc đã làm.",
+    "Refund request was modified by another user. Please reload and try again.": "Yêu cầu vừa được người khác cập nhật. Vui lòng tải lại trang.",
+};
+
+const withMessage = (result) => ({ ...result, message: MESSAGES[result.message] ?? result.message });
+
+// paidAmount: what the patient paid on the invoice. workDoneAmount: value of the work already done (entered by the
+// manager, null until then). refundAmount: what is paid back = paid - work done; the backend fixes it on approval.
+const toRequest = (item) => {
+    const status = statusFromApi[item.status] ?? REFUND_REQUEST_STATUSES.PENDING;
+    const paidAmount = Number(item.invoicePaidAmount ?? item.amount);
+    const workDoneAmount = item.workDoneAmount == null ? null : Number(item.workDoneAmount);
+    return {
+        id: item.id,
+        code: `RF${String(item.id).padStart(6, "0")}`,
+        patientName: item.patientName ?? "",
+        patientCode: item.patientCode ?? "",
+        // Only the reception desk sends refund requests
+        requestedByName: "Lễ tân",
+        createdAt: item.createdAt,
+        processedAt: item.processedAt ?? item.approvedAt ?? null,
+        invoiceNumber: item.invoiceNumber ?? "",
+        serviceNames: item.serviceNames ?? "—",
+        paidAmount,
+        workDoneAmount,
+        refundAmount: status === REFUND_REQUEST_STATUSES.REFUNDED ? Number(item.amount) : workDoneAmount == null ? null : paidAmount - workDoneAmount,
+        reason: item.reason,
+        status,
+        rejectReason: item.rejectionReason,
+    };
+};
 
 // Waiting requests first, then the latest.
 const byPendingThenDate = (a, b) => {
@@ -129,7 +153,7 @@ const byPendingThenDate = (a, b) => {
 
 const loadAll = async (status) => {
     const result = await call(() => api.get("/api/refund-requests", { params: { status: statusToApi[status] } }));
-    return result.success ? { ...result, data: result.data.map(toRequest).sort(byPendingThenDate) } : result;
+    return result.success ? { ...result, data: result.data.map(toRequest).sort(byPendingThenDate) } : withMessage(result);
 };
 
 // Search by the patient's name or code, or the invoice number (the list is small, filtered here)
@@ -164,17 +188,22 @@ const notifyChanged = () => {
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") window.dispatchEvent(new CustomEvent(REFUND_REQUESTS_CHANGED_EVENT));
 };
 
-// Approving pays the money back at once (backend status Processed)
-export const confirmRefundRequest = async (id) => {
+// Approving pays the money back at once (backend status Processed). The backend needs the work-done value first,
+// so it is saved before the approval when it is new or changed (0 = nothing done, the whole payment goes back).
+export const confirmRefundRequest = async ({ id, workDoneAmount, savedWorkDoneAmount = null }) => {
+    if (workDoneAmount !== savedWorkDoneAmount) {
+        const saved = await call(() => api.put(`/api/refund-requests/${id}/work-done`, { workDoneAmount }));
+        if (!saved.success) return withMessage(saved);
+    }
     const result = await call(() => api.post(`/api/refund-requests/${id}/approve`));
     if (result.success) notifyChanged();
-    return result.success ? { ...result, data: toRequest(result.data) } : result;
+    return withMessage(result);
 };
 
 export const rejectRefundRequest = async ({ id, reason }) => {
     const result = await call(() => api.post(`/api/refund-requests/${id}/reject`, { rejectionReason: reason }));
     if (result.success) notifyChanged();
-    return result.success ? { ...result, data: toRequest(result.data) } : result;
+    return withMessage(result);
 };
 
 const currentUserId = () => getMockCurrentUser()?.id ?? null;

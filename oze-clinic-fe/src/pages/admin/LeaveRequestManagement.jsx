@@ -59,6 +59,8 @@ const LeaveRequestManagement = () => {
     const [status, setStatus] = useState("");
     const [role, setRole] = useState("");
     const [slot, setSlot] = useState("");
+    const [from, setFrom] = useState("");
+    const [to, setTo] = useState("");
     const [page, setPage] = useState(1);
     const [version, setVersion] = useState(0);
     const [viewing, setViewing] = useState(null);
@@ -66,7 +68,10 @@ const LeaveRequestManagement = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const openId = searchParams.get("id");
 
-    const { loading, value: result } = useAsync(() => getLeaveRequests({ keyword, status, role, slot, page }), [keyword, status, role, slot, page, version]);
+    const { loading, value: result } = useAsync(
+        () => getLeaveRequests({ keyword, status, role, slot, from, to, page }),
+        [keyword, status, role, slot, from, to, page, version],
+    );
 
     useEffect(() => {
         const nextKeyword = searchInput.trim();
@@ -97,7 +102,7 @@ const LeaveRequestManagement = () => {
 
     const data = result?.success ? result.data : null;
     const requests = data?.items ?? [];
-    const filtered = Boolean(keyword || status || role || slot);
+    const filtered = Boolean(keyword || status || role || slot || from || to);
     const firstNumber = data ? (data.page - 1) * data.pageSize + 1 : 0;
 
     const changeFilter = (setter) => (value) => {
@@ -111,6 +116,8 @@ const LeaveRequestManagement = () => {
         setStatus("");
         setRole("");
         setSlot("");
+        setFrom("");
+        setTo("");
         setPage(1);
     };
 
@@ -154,6 +161,27 @@ const LeaveRequestManagement = () => {
                     onChange={setSearchInput}
                     className={FILTER_SEARCH_CLASS}
                 />
+                <div className="flex w-full items-center gap-2 sm:w-auto">
+                    <input
+                        type="date"
+                        className="input min-w-0 flex-1 sm:w-auto sm:flex-none"
+                        aria-label="Nghỉ từ ngày"
+                        max={to || undefined}
+                        value={from}
+                        onChange={(event) => changeFilter(setFrom)(event.target.value)}
+                    />
+                    <span className="text-muted" aria-hidden="true">
+                        –
+                    </span>
+                    <input
+                        type="date"
+                        className="input min-w-0 flex-1 sm:w-auto sm:flex-none"
+                        aria-label="Nghỉ đến ngày"
+                        min={from || undefined}
+                        value={to}
+                        onChange={(event) => changeFilter(setTo)(event.target.value)}
+                    />
+                </div>
                 <FilterSelect
                     className={FILTER_SELECT_CLASS}
                     id="leave-request-role"
@@ -179,6 +207,12 @@ const LeaveRequestManagement = () => {
                     onChange={changeFilter(setStatus)}
                 />
             </FilterBar>
+
+            {!loading && result && !result.success && (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được danh sách đơn xin nghỉ. Vui lòng thử lại sau."}
+                </p>
+            )}
 
             <div>
                 <div className="table-wrap">
