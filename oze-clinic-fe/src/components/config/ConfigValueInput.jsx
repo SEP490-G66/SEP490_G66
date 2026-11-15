@@ -1,12 +1,7 @@
 import { cx } from "@/utils/cx";
+import { CONFIG_DATA_TYPES as DATA_TYPES } from "@/utils/systemConfig";
 
-// Kinds of value a system setting can hold.
-const DATA_TYPES = {
-    INT: "int",
-    TIME: "time",
-};
-
-// Value field of one setting. config: { key, label, dataType: "int" | "time", unit?, min?, max? }.
+// Value field of one setting. config: { key, label, dataType: "int" | "time" | "text", unit?, min?, max?, maxLength? }.
 // An int shows its unit ("ngày", "giờ", "phút") inside the box; a time is "HH:mm". value is always a string.
 const ConfigValueInput = ({ id, config, value, onChange, invalid = false, describedBy }) => {
     const shared = {
@@ -20,6 +15,10 @@ const ConfigValueInput = ({ id, config, value, onChange, invalid = false, descri
 
     if (config.dataType === DATA_TYPES.TIME) {
         return <input {...shared} type="time" className="input num" />;
+    }
+
+    if (config.dataType === DATA_TYPES.TEXT) {
+        return <input {...shared} type="text" className="input" maxLength={config.maxLength} />;
     }
 
     return (
