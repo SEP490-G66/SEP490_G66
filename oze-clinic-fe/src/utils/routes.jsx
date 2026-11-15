@@ -131,7 +131,12 @@ export const getMedicalRecordDetailRoute = (examinationId) => generatePath(ROUTE
 
 export const getErrorRoute = (code) => generatePath(ROUTES.ERROR, { code: String(code) });
 
-export const getPostLoginRoute = (role) => (role === USER_ROLES.PATIENT ? ROUTES.HOME : ROUTES.DASHBOARD);
+// The technician has no overview page and starts on the imaging queue.
+export const getPostLoginRoute = (role) => {
+    if (role === USER_ROLES.PATIENT) return ROUTES.HOME;
+    if (role === USER_ROLES.DENTAL_IMAGING_TECHNICIAN) return ROUTES.TECHNICIAN_IMAGING_REQUESTS;
+    return ROUTES.DASHBOARD;
+};
 
 const RECEPTION_CASH_HANDOVER_DETAIL = `${ROUTES.RECEPTION_CASH_HANDOVER}/:sessionId`;
 
