@@ -26,3 +26,7 @@ export const ROOM_STATUS_OPTIONS = [
 ];
 
 export const roomTypeLabel = (type) => ROOM_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
+
+// The reception desk is not a room on the backend: a receptionist's shift has no room (roomId null).
+// The shift schedule shows it as one more row, with this id and type.
+export const RECEPTION_DESK = { id: "reception", name: "Quầy lễ tân", type: "Reception", floor: "" };

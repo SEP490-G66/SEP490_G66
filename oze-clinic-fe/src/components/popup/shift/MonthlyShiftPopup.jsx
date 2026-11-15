@@ -71,11 +71,12 @@ const MonthlyShiftPopup = ({ onClose, onSaved }) => {
     const [saving, setSaving] = useState(false);
 
     const { value: staffResult } = useAsync(() => getShiftStaff(), []);
-    const staffList = staffResult?.success ? staffResult.data : [];
-    const staff = staffList.find((member) => member.id === Number(staffId));
-    const rooms = staff ? roomsForRole(staff.role) : [];
+    const staffList = staffResult?.success ? staffResult.data.staff : [];
+    const allRooms = staffResult?.success ? staffResult.data.rooms : [];
+    const staff = staffList.find((member) => member.id === staffId);
+    const rooms = staff ? roomsForRole(allRooms, staff.role) : [];
 
-    const request = { staffId: Number(staffId), from: range.from, to: range.to, pattern };
+    const request = { staffId, staffName: staff?.name, rooms, from: range.from, to: range.to, pattern };
     const previewKey = JSON.stringify(request);
     const preview = useAsync(
         () => (staff ? createMonthlyShifts({ ...request, dryRun: true }).then((result) => ({ key: previewKey, result })) : Promise.resolve(null)),

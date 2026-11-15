@@ -16,7 +16,7 @@ const STAFF_ID = "shift-assign-staff";
 // onSaved(message) runs after a successful save.
 const ShiftAssignPopup = ({ cell, replace = false, onClose, onSaved }) => {
     const { loading, value: result } = useAsync(
-        () => getShiftCandidates({ date: cell.date, slot: cell.slot, roomId: cell.room.id }),
+        () => getShiftCandidates({ cell }),
         [cell.key],
     );
     const [staffId, setStaffId] = useState(null);
@@ -40,7 +40,7 @@ const ShiftAssignPopup = ({ cell, replace = false, onClose, onSaved }) => {
         }
 
         setSaving(true);
-        const response = await saveShift({ date: cell.date, slot: cell.slot, roomId: cell.room.id, staffId });
+        const response = await saveShift({ cell, staffId });
         setSaving(false);
         if (!response.success) {
             if (response.errors?.staffId) setErrors({ staffId: response.errors.staffId });
