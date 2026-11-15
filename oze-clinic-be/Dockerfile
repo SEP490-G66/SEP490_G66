@@ -1,7 +1,7 @@
 # =======================================================
-# Stage 1: Build & Publish (.NET 8 SDK)
+# Stage 1: Build & Publish (.NET 10 SDK)
 # =======================================================
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution and project definitions first for layer caching
@@ -23,12 +23,12 @@ WORKDIR /src/OZE
 RUN dotnet publish OZE.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 # =======================================================
-# Stage 2: Runtime Image (ASP.NET Core 8 Runtime)
+# Stage 2: Runtime Image (ASP.NET Core 10 Runtime)
 # =======================================================
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Run under secure non-root user provided by .NET 8
+# Run under secure non-root user provided by .NET 10
 USER app
 
 EXPOSE 8080
