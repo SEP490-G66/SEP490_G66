@@ -18,6 +18,7 @@ import ReceptionCheckIn from "../pages/receptionist/ReceptionCheckIn";
 import ReceptionDebts from "../pages/receptionist/ReceptionDebts";
 import ReceptionInvoices from "../pages/receptionist/ReceptionInvoices";
 import ReceptionPatients from "../pages/receptionist/ReceptionPatients";
+import ReceptionSchedule from "../pages/receptionist/ReceptionSchedule";
 import ReceptionPatientDetail from "../pages/receptionist/ReceptionPatientDetail";
 import ReceptionPatientForm from "../pages/receptionist/ReceptionPatientForm";
 import ReceptionConsultations from "../pages/receptionist/ReceptionConsultations";
@@ -27,6 +28,7 @@ import ReceptionFollowUps from "../pages/receptionist/ReceptionFollowUps";
 import ReceptionPayment from "../pages/receptionist/ReceptionPayment";
 import ReceptionQueue from "../pages/receptionist/ReceptionQueue";
 import CashHandover from "../pages/receptionist/CashHandover";
+import CashHandoverDetail from "../pages/receptionist/CashHandoverDetail";
 import WorkSchedule from "../pages/common/WorkSchedule";
 import MyAppointments from "../pages/patient/MyAppointments";
 import AppointmentDetail from "../pages/patient/AppointmentDetail";
@@ -136,6 +138,7 @@ const ROLE_PAGES = {
     // Receptionist sidebar pages open the counter workspace on the matching tab
     [ROUTES.RECEPTION_APPOINTMENTS]: <ReceptionConfirm />,
     [ROUTES.RECEPTION_CHECK_IN]: <ReceptionCheckIn />,
+    [ROUTES.RECEPTION_SCHEDULE]: <ReceptionSchedule />,
     [ROUTES.RECEPTION_INVOICES]: <ReceptionPayment />,
     [ROUTES.RECEPTION_QUEUE]: <ReceptionQueue />,
     [ROUTES.RECEPTION_FOLLOW_UPS]: <ReceptionFollowUps />,
@@ -151,7 +154,13 @@ const ROLE_PAGES = {
         </Routes>
     ),
     [ROUTES.RECEPTION_CONSULTATIONS]: <ReceptionConsultations />,
-    [ROUTES.RECEPTION_CASH_HANDOVER]: <CashHandover />,
+    [ROUTES.RECEPTION_CASH_HANDOVER]: (
+        <Routes>
+            <Route index element={<CashHandover />} />
+            <Route path=":sessionId" element={<CashHandoverDetail />} />
+            <Route path="*" element={NOT_FOUND} />
+        </Routes>
+    ),
     [ROUTES.WORK_SCHEDULE]: <WorkSchedule />,
     [ROUTES.APPOINTMENTS]: (
         <Routes>

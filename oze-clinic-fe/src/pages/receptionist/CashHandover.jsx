@@ -1,355 +1,237 @@
-import { useCallback, useEffect, useState } from "react";
-import { Trash2, Wallet } from "lucide-react";
-import Modal from "@/components/ui/Modal";
-import { Card, EmptyState, ErrorLine, PageHeader } from "@/components/reception/shared";
-import { clockOf, money, report } from "@/components/reception/receptionUtils";
-import {
-    EXPENSE_CATEGORIES,
-    addCashExpense,
-    closeCashSession,
-    expenseCategoryLabel,
-    getCashSessions,
-    getCurrentCashSession,
-    getHandoverCandidates,
-    openCashSession,
-    removeCashExpense,
-} from "@/services/cashSessionService";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Breadcrumb from "@/components/navigation/Breadcrumb";
+import LabeledSelect from "@/components/ui/LabeledSelect";
+import Pagination from "@/components/ui/Pagination";
+import ShiftOpenDialog from "@/components/handover/ShiftOpenDialog";
+import { Card } from "@/components/reception/shared";
+import { clinicClock, money, report } from "@/components/reception/receptionUtils";
+import { usePageTitle } from "@/hooks/usePatientRecordNav";
+import { getCashSessions, getCurrentCashSession, getHandoverCandidates, getNextCashShift, openCashSession } from "@/services/cashSessionService";
+import { clinicToday } from "@/services/receptionService";
+import { getSessionUserName } from "@/services/sessionStore";
+import { addDays } from "@/utils/calendar";
+import { dateKey, dateTimeOf, isOpen, openingPlan, shiftTypeOf, signedMoney } from "@/utils/cashShift";
+import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
+import { getCashHandoverRoute } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
-// "Bàn giao ca" (F-PAY-06, BR-PAY-09..10): open the drawer with the starting cash, money in and out during the
-// shift, then count and hand over. Cash taken in "Thu tiền" counts by itself (payments this receptionist confirmed
-// while the drawer is open); transfers are listed but are not in the drawer. The steps are a real sequence.
+const READ = { skipErrorPage: true };
+const PAGE_SIZE = 10;
+const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
+const STATUS_OPTIONS = [["", TEXT.ALL], ...Object.entries(TEXT.STATUS_LABEL)];
 
-const METHOD_LABEL = { CASH: "Tiền mặt", BANK_TRANSFER: "Chuyển khoản", QR_TRANSFER: "Quét QR" };
-const toNumber = (text) => Number(String(text).replace(/[^\d]/g, ""));
-const dateTime = (moment) =>
-    moment ? new Date(moment).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", timeZone: "Asia/Ho_Chi_Minh" }) : "";
-
-const fetchAll = () => Promise.all([getCurrentCashSession(), getCashSessions({ pageSize: 5 })]);
+const defaults = (today) => ({ from: addDays(today, -6), to: today, status: "", staff: "" });
 
 const CashHandover = () => {
-    const [state, setState] = useState({ loading: true, session: null, history: [], error: null });
-    const [version, setVersion] = useState(0);
-    const [expenseOpen, setExpenseOpen] = useState(false);
+    const navigate = useNavigate();
+    const [today] = useState(clinicToday);
+    const [filters, setFilters] = useState(() => defaults(today));
+    const [page, setPage] = useState(1);
+    const [reload, setReload] = useState(0);
+    const [result, setResult] = useState(null);
+    const [current, setCurrent] = useState(undefined);
+    const [staff, setStaff] = useState([]);
+    const [plan, setPlan] = useState(null);
+
+    usePageTitle(TEXT.DOC_TITLE);
+
+    const requestKey = `${filters.from}|${filters.to}|${filters.status}|${filters.staff}|${page}|${reload}`;
 
     useEffect(() => {
-        let active = true;
-        fetchAll().then(([current, past]) => {
-            if (!active) return;
-            setState({
-                loading: false,
-                session: current.success ? current.data : null,
-                history: past.success ? past.data.items.filter((x) => x.status === "Closed") : [],
-                error: current.success ? null : current.message,
+        const controller = new AbortController();
+        getCashSessions(
+            { fromDate: filters.from, toDate: filters.to, status: filters.status, openedByUserId: filters.staff, page, pageSize: PAGE_SIZE },
+            { ...READ, signal: controller.signal },
+        ).then((response) => {
+            if (controller.signal.aborted || response.aborted) return;
+            setResult({
+                key: requestKey,
+                ok: response.success,
+                items: response.success ? (response.data?.items ?? []) : [],
+                total: Number(response.data?.totalCount ?? response.data?.items?.length ?? 0),
+                totalPages: Math.max(1, Number(response.data?.totalPages ?? 1)),
             });
         });
-        return () => {
-            active = false;
-        };
-    }, [version]);
-
-    const reload = useCallback(() => setVersion((v) => v + 1), []);
-    const act = async (request, successText) => {
-        const ok = report(await request, successText);
-        if (ok) {
-            setExpenseOpen(false);
-            reload();
-        }
-        return ok;
-    };
-
-    const { session } = state;
-
-    return (
-        <div className="app-content min-h-full space-y-5">
-            <PageHeader
-                title="Bàn giao ca"
-                description={session ? `Mở két lúc ${clockOf(session.openedAt)} · ${session.openedByName}` : "Mở két đầu ca, ghi khoản chi, cuối ca đếm tiền và bàn giao cho ca sau."}
-            />
-            <ErrorLine message={state.error} />
-
-            {state.loading ? (
-                <Card><EmptyState text="Đang tải…" /></Card>
-            ) : session ? (
-                <>
-                    <Step number={1} title={`Khoản thu trong ca (${session.payments.length})`}>
-                        {session.payments.length === 0 ? (
-                            <EmptyState text="Chưa thu khoản nào. Thu ở trang Thu tiền, số tiền tự cộng vào đây." />
-                        ) : (
-                            <div className="table-wrap rounded-none border-x-0 border-b-0">
-                                <table className="table">
-                                    <thead><tr><th>Giờ</th><th>Số hóa đơn</th><th>Bệnh nhân</th><th>Phương thức</th><th className="text-right">Số tiền</th></tr></thead>
-                                    <tbody>
-                                        {session.payments.map((p) => (
-                                            <tr key={p.paymentId}>
-                                                <td className="num">{clockOf(p.paidAt)}</td>
-                                                <td>{p.invoiceNumber}</td>
-                                                <td className="cell-primary">{p.patientName}</td>
-                                                <td>{METHOD_LABEL[p.paymentMethod] ?? p.paymentMethod}</td>
-                                                <td className="num text-right">{money(p.amount)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                        <dl className="grid gap-x-8 gap-y-1 border-t border-border px-5 py-4 text-body-sm sm:grid-cols-2">
-                            <Line label="Tiền mặt đã thu" value={money(session.cashCollected)} />
-                            <Line label="Chuyển khoản đã xác nhận (không ở két)" value={money(session.transferConfirmed)} />
-                        </dl>
-                    </Step>
-
-                    <Step
-                        number={2}
-                        title={`Tiền đã chi trong ca (${session.expenses.length})`}
-                        actions={<button type="button" className="btn btn-secondary h-9" onClick={() => setExpenseOpen(true)}>Ghi khoản chi</button>}
-                    >
-                        {session.expenses.length === 0 ? (
-                            <EmptyState text="Chưa chi khoản nào. Mua vật tư, gửi xe… thì bấm Ghi khoản chi." />
-                        ) : (
-                            <div className="table-wrap rounded-none border-x-0 border-b-0">
-                                <table className="table">
-                                    <thead><tr><th>Giờ</th><th>Nội dung</th><th>Loại</th><th className="text-right">Số tiền</th><th /></tr></thead>
-                                    <tbody>
-                                        {session.expenses.map((x) => (
-                                            <tr key={x.id}>
-                                                <td className="num">{clockOf(x.createdAt)}</td>
-                                                <td className="cell-primary">{x.description}</td>
-                                                <td>{expenseCategoryLabel(x.category)}</td>
-                                                <td className="num text-right">{money(x.amount)}</td>
-                                                <td className="text-right">
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-secondary btn-icon h-9"
-                                                        aria-label={`Xóa khoản chi ${x.description}`}
-                                                        onClick={() => act(removeCashExpense(x.id), `Đã xóa khoản chi "${x.description}".`)}
-                                                    >
-                                                        <Trash2 className="size-4" aria-hidden />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                        <dl className="border-t border-border px-5 py-4 text-body-sm">
-                            <Line label="Tổng đã chi" value={money(session.expenseTotal)} />
-                        </dl>
-                    </Step>
-
-                    <Step number={3} title="Chốt số tiền">
-                        <CloseForm session={session} onSubmit={(values) => act(closeCashSession(values), "Đã chốt két và bàn giao.")} />
-                    </Step>
-                </>
-            ) : (
-                <OpenForm onSubmit={(values) => act(openCashSession(values), "Đã mở két. Tiền mặt thu từ giờ được cộng vào ca này.")} />
-            )}
-
-            <HistoryTable sessions={state.history} />
-
-            {expenseOpen && session && (
-                <ExpenseDialog available={session.expectedCash} onClose={() => setExpenseOpen(false)} onSubmit={(values) => act(addCashExpense(values), `Đã ghi khoản chi ${money(values.amount)}.`)} />
-            )}
-        </div>
-    );
-};
-
-// A numbered card: the hand-over goes 1 → 2 → 3
-const Step = ({ number, title, actions, children }) => (
-    <Card
-        title={
-            <span className="flex items-center gap-3">
-                <span className="num grid size-7 place-items-center rounded-full bg-primary text-caption font-bold text-on-primary">{number}</span>
-                {title}
-            </span>
-        }
-        actions={actions}
-    >
-        {children}
-    </Card>
-);
-
-const Line = ({ label, value, strong }) => (
-    <div className={cx("flex justify-between gap-6 py-0.5", strong && "text-title font-semibold text-ink")}>
-        <dt className={strong ? "" : "text-muted"}>{label}</dt>
-        <dd className="num m-0">{value}</dd>
-    </div>
-);
-
-const MoneyInput = ({ id, value, onChange, required }) => (
-    <input id={id} className="input num" inputMode="numeric" required={required} value={value === "" ? "" : toNumber(value).toLocaleString("vi-VN")} onChange={(e) => onChange(e.target.value)} />
-);
-
-const OpenForm = ({ onSubmit }) => {
-    const [opening, setOpening] = useState("");
-    const [notes, setNotes] = useState("");
-    const [busy, setBusy] = useState(false);
-    return (
-        <Card>
-            <form
-                className="max-w-xl space-y-4 px-6 py-6"
-                onSubmit={async (event) => {
-                    event.preventDefault();
-                    setBusy(true);
-                    await onSubmit({ openingCash: toNumber(opening), notes });
-                    setBusy(false);
-                }}
-            >
-                <div className="flex items-center gap-3">
-                    <span className="grid size-10 place-items-center rounded-lg bg-primary-soft text-primary"><Wallet className="size-5" aria-hidden /></span>
-                    <div>
-                        <h2 className="font-heading text-heading-3 text-ink">Bạn chưa mở két</h2>
-                        <p className="text-body-sm text-muted">Đếm tiền mặt đang có trong két rồi nhập vào đây.</p>
-                    </div>
-                </div>
-                <div className="field">
-                    <label htmlFor="opening-cash" className="label label-required">Tiền đầu ca</label>
-                    <MoneyInput id="opening-cash" value={opening} onChange={setOpening} required />
-                </div>
-                <div className="field">
-                    <label htmlFor="opening-notes" className="label">Ghi chú</label>
-                    <input id="opening-notes" className="input" maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} />
-                </div>
-                <button type="submit" className="btn btn-primary" disabled={busy || opening === ""}>Mở két</button>
-            </form>
-        </Card>
-    );
-};
-
-const CloseForm = ({ session, onSubmit }) => {
-    const [counted, setCounted] = useState("");
-    const [handoverTo, setHandoverTo] = useState("");
-    const [notes, setNotes] = useState("");
-    const [candidates, setCandidates] = useState([]);
-    const [busy, setBusy] = useState(false);
+        return () => controller.abort();
+    }, [filters, page, requestKey]);
 
     useEffect(() => {
-        let active = true;
-        getHandoverCandidates().then((result) => active && result.success && setCandidates(result.data));
-        return () => {
-            active = false;
-        };
+        const controller = new AbortController();
+        getCurrentCashSession().then((response) => !controller.signal.aborted && setCurrent(response.success ? response.data : null));
+        return () => controller.abort();
+    }, [reload]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        getHandoverCandidates().then((response) => {
+            if (controller.signal.aborted || !response.success) return;
+            setStaff((response.data ?? []).map((c) => [String(c.userId), c.fullName]));
+        });
+        return () => controller.abort();
     }, []);
 
-    const value = toNumber(counted);
-    const difference = counted === "" ? null : value - session.expectedCash;
-    const needsNote = difference !== null && difference !== 0;
+    const setFilter = (key) => (value) => {
+        setFilters((f) => {
+            const next = { ...f, [key]: value };
+            if (key === "from" && next.to < value) next.to = value;
+            if (key === "to" && next.from > value) next.from = value;
+            return next;
+        });
+        setPage(1);
+    };
 
-    return (
-        <div className="grid gap-6 px-5 py-5 lg:grid-cols-2">
-            <dl className="text-body-sm">
-                <Line label="Tiền đầu ca" value={money(session.openingCash)} />
-                <Line label="+ Tiền mặt thu trong ca" value={money(session.cashCollected)} />
-                <Line label="− Tiền đã chi" value={money(session.expenseTotal)} />
-                <div className="mt-2 border-t border-border pt-2">
-                    <Line label="Tiền mặt phải có" value={money(session.expectedCash)} strong />
-                </div>
-            </dl>
-            <form
-                className="space-y-4"
-                onSubmit={async (event) => {
-                    event.preventDefault();
-                    setBusy(true);
-                    await onSubmit({ countedCash: value, handoverToUserId: handoverTo, notes: notes.trim() });
-                    setBusy(false);
-                }}
-            >
-                <div className="field">
-                    <label htmlFor="counted-cash" className="label label-required">Tiền mặt đếm được</label>
-                    <MoneyInput id="counted-cash" value={counted} onChange={setCounted} required />
-                    {difference !== null && (
-                        <p role="status" className={cx("text-body-sm", difference === 0 ? "text-success" : "text-danger")}>
-                            {difference === 0 ? "Khớp với số phải có." : `Chênh lệch: ${difference > 0 ? "thừa" : "thiếu"} ${money(Math.abs(difference))}.`}
-                        </p>
-                    )}
-                </div>
-                <div className="field">
-                    <label htmlFor="handover-to" className="label">Người nhận bàn giao</label>
-                    <select id="handover-to" className="input" value={handoverTo} onChange={(e) => setHandoverTo(e.target.value)}>
-                        <option value="">Không có ai, chốt cuối ngày</option>
-                        {candidates.map((c) => <option key={c.userId} value={c.userId}>{c.fullName}</option>)}
-                    </select>
-                </div>
-                <div className="field">
-                    <label htmlFor="close-notes" className={cx("label", needsNote && "label-required")}>Ghi chú</label>
-                    <textarea id="close-notes" className="input py-2" rows={3} maxLength={500} required={needsNote} placeholder={needsNote ? "Giải thích vì sao tiền đếm được khác số phải có" : ""} value={notes} onChange={(e) => setNotes(e.target.value)} />
-                </div>
-                <div className="flex justify-end">
-                    <button type="submit" className="btn btn-primary" disabled={busy || counted === "" || (needsNote && !notes.trim())}>
-                        {busy && <span className="btn-spinner" aria-hidden />}
-                        {handoverTo ? "Chốt và bàn giao" : "Chốt cuối ngày"}
-                    </button>
-                </div>
-            </form>
-        </div>
-    );
-};
+    const startOpen = async () => {
+        const next = await getNextCashShift(READ);
+        const lastClosed = (result?.items ?? []).find((s) => !isOpen(s) && dateKey(s.openedAt) === today);
+        setPlan(
+            openingPlan({
+                next: next.success ? next.data : null,
+                lastClosed,
+                now: clinicClock(),
+                staff: getSessionUserName(),
+                labels: TEXT.SHIFT,
+                sourceDay: TEXT.SOURCE_DAY,
+                sourcePrev: TEXT.SOURCE_PREV,
+            }),
+        );
+    };
 
-const ExpenseDialog = ({ available, onClose, onSubmit }) => {
-    const [amount, setAmount] = useState("");
-    const [category, setCategory] = useState("Other");
-    const [description, setDescription] = useState("");
-    const [busy, setBusy] = useState(false);
-    const value = toNumber(amount);
-    const tooMuch = value > available;
-    return (
-        <Modal title="Ghi khoản chi" description={`Trong két đang có ${money(available)}.`} onClose={onClose}>
-            <form
-                className="space-y-4"
-                onSubmit={async (event) => {
-                    event.preventDefault();
-                    setBusy(true);
-                    await onSubmit({ amount: value, category, description: description.trim() });
-                    setBusy(false);
-                }}
-            >
-                <div className="field">
-                    <label htmlFor="expense-amount" className="label label-required">Số tiền</label>
-                    <MoneyInput id="expense-amount" value={amount} onChange={setAmount} required />
-                    {tooMuch && <p className="error-text">Không chi quá số tiền đang có trong két.</p>}
-                </div>
-                <div className="field">
-                    <label htmlFor="expense-category" className="label">Loại</label>
-                    <select id="expense-category" className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
-                        {EXPENSE_CATEGORIES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                    </select>
-                </div>
-                <div className="field">
-                    <label htmlFor="expense-description" className="label label-required">Chi cho việc gì</label>
-                    <input id="expense-description" className="input" required maxLength={300} value={description} onChange={(e) => setDescription(e.target.value)} />
-                </div>
-                <div className="flex justify-end gap-2">
-                    <button type="button" className="btn btn-secondary" onClick={onClose}>Đóng</button>
-                    <button type="submit" className="btn btn-primary" disabled={busy || value <= 0 || tooMuch || !description.trim()}>Ghi khoản chi</button>
-                </div>
-            </form>
-        </Modal>
-    );
-};
+    const fresh = result?.key === requestKey ? result : null;
+    const items = result?.items ?? [];
+    const dash = <span className="text-muted">—</span>;
 
-const HistoryTable = ({ sessions }) =>
-    sessions.length === 0 ? null : (
-        <Card title="Các ca đã bàn giao gần đây">
-            <div className="table-wrap rounded-none border-x-0 border-b-0">
-                <table className="table table-stack">
+    const table = () => {
+        if (!result) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.LOADING}</p>;
+        if (!items.length) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.EMPTY}</p>;
+        return (
+            <div className={cx("table-wrap rounded-none border-x-0", !fresh && "opacity-60")} aria-busy={!fresh ? "true" : undefined}>
+                <table className="table table-stack [&_td]:px-3 [&_th]:px-3 [&_th]:whitespace-nowrap">
                     <thead>
-                        <tr><th>Ca</th><th className="text-right">Phải có</th><th className="text-right">Đếm được</th><th className="text-right">Chênh lệch</th><th>Bàn giao cho</th></tr>
+                        <tr>
+                            {TEXT.COLUMNS.map((c, i) => (
+                                <th key={c} className={i >= 3 && i <= 6 ? "text-right" : undefined}>
+                                    {c}
+                                </th>
+                            ))}
+                        </tr>
                     </thead>
                     <tbody>
-                        {sessions.map((s) => (
-                            <tr key={s.id}>
-                                <td data-primary className="num">{dateTime(s.openedAt)} – {clockOf(s.closedAt)}</td>
-                                <td data-label="Phải có" className="num text-right">{money(s.expectedCash)}</td>
-                                <td data-label="Đếm được" className="num text-right">{money(s.countedCash)}</td>
-                                <td data-label="Chênh lệch" className={cx("num text-right", s.difference ? "text-danger" : "text-success")}>{money(s.difference)}</td>
-                                <td data-label="Bàn giao cho">{s.handoverToName ?? "Chốt cuối ngày"}</td>
-                            </tr>
-                        ))}
+                        {items.map((s) => {
+                            const open = isOpen(s);
+                            const diff = s.difference ?? (s.countedCash != null && s.expectedCash != null ? s.countedCash - s.expectedCash : null);
+                            return (
+                                <tr key={s.id}>
+                                    <td data-primary>
+                                        <Link to={getCashHandoverRoute(s.id)} className="font-semibold text-primary hover:underline">
+                                            {s.code ?? `#${s.id}`}
+                                        </Link>
+                                        <small className="block whitespace-nowrap text-caption text-muted">{s.openedByName}</small>
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[1]} className="num whitespace-nowrap">
+                                        {dateTimeOf(s.openedAt)}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[2]} className="num whitespace-nowrap">
+                                        {open ? dash : dateTimeOf(s.closedAt)}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[3]} className="num text-right">
+                                        {money(s.openingCash)}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[4]} className="num text-right">
+                                        {open ? dash : money(s.expectedCash)}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[5]} className="num text-right">
+                                        {open ? dash : money(s.countedCash)}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[6]} className="num text-right">
+                                        {open || diff == null ? dash : signedMoney(diff)}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[7]}>
+                                        <span className={cx("badge", open ? "badge-success" : "badge-neutral")}>{TEXT.STATUS_LABEL[open ? "Open" : "Closed"]}</span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
-        </Card>
+        );
+    };
+
+    return (
+        <div className="app-content min-h-full space-y-5">
+            <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-64 flex-1">
+                    <Breadcrumb items={CRUMBS} className="mb-2" />
+                    <h1 className="page-title">{TEXT.TITLE}</h1>
+                </div>
+                {current !== undefined &&
+                    (current ? (
+                        <button type="button" className="btn btn-primary" onClick={() => navigate(getCashHandoverRoute(current.id))}>
+                            {TEXT.CLOSE_SHIFT(TEXT.SHIFT[shiftTypeOf(current)])}
+                        </button>
+                    ) : (
+                        <button type="button" className="btn btn-primary" onClick={startOpen}>
+                            {TEXT.OPEN_SHIFT}
+                        </button>
+                    ))}
+            </div>
+            <Card>
+                <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+                    {[
+                        ["from", TEXT.FROM],
+                        ["to", TEXT.TO],
+                    ].map(([key, label]) => (
+                        <div key={key} className="flex flex-col gap-1">
+                            <label htmlFor={`hc-${key}`} className="text-caption text-muted">
+                                {label}
+                            </label>
+                            <input
+                                id={`hc-${key}`}
+                                type="date"
+                                className="input w-auto"
+                                max={today}
+                                value={filters[key]}
+                                onChange={(e) => e.target.value && setFilter(key)(e.target.value)}
+                            />
+                        </div>
+                    ))}
+                    <LabeledSelect id="hc-status" label={TEXT.STATUS} value={filters.status} options={STATUS_OPTIONS} onChange={setFilter("status")} />
+                    <LabeledSelect id="hc-staff" label={TEXT.STAFF} value={filters.staff} options={[["", TEXT.ALL_STAFF], ...staff]} onChange={setFilter("staff")} />
+                </div>
+            </Card>
+            {result && !result.ok && result.key === requestKey && (
+                <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
+                    <span className="flex-1">{TEXT.LOAD_ERROR}</span>
+                    <button type="button" className="btn btn-secondary h-9" onClick={() => setReload((n) => n + 1)}>
+                        {TEXT.RETRY}
+                    </button>
+                </div>
+            )}
+            <Card>
+                {table()}
+                {items.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
+                        <p className="num text-body-sm text-muted">
+                            {(page - 1) * PAGE_SIZE + 1}–{(page - 1) * PAGE_SIZE + items.length} / {result.total}
+                        </p>
+                        {result.totalPages > 1 && <Pagination page={page} totalPages={result.totalPages} onChange={setPage} busy={!fresh} />}
+                    </div>
+                )}
+            </Card>
+            {plan && (
+                <ShiftOpenDialog
+                    plan={plan}
+                    onClose={() => setPlan(null)}
+                    onSubmit={async (values) => {
+                        if (!report(await openCashSession(values), TEXT.OPENED_TOAST(plan.label, plan.now))) return;
+                        setPlan(null);
+                        setReload((n) => n + 1);
+                    }}
+                />
+            )}
+        </div>
     );
+};
 
 export default CashHandover;

@@ -112,6 +112,7 @@ const SIDEBAR_MENU = {
             label: "Lịch hẹn",
             icon: CalendarDays,
             children: [
+                { key: "schedule", label: "Quản lý lịch hẹn", to: ROUTES.RECEPTION_SCHEDULE },
                 { key: "check-in", label: "Check-in hôm nay", to: ROUTES.RECEPTION_CHECK_IN },
                 { key: "confirm-appointments", label: "Xác nhận lịch hẹn", to: ROUTES.RECEPTION_APPOINTMENTS },
             ],
@@ -134,7 +135,7 @@ const SIDEBAR_MENU = {
                 { key: "invoices", label: "Thu tiền", to: ROUTES.RECEPTION_INVOICES },
                 { key: "invoice-list", label: "Hóa đơn", to: ROUTES.RECEPTION_INVOICE_LIST },
                 { key: "debts", label: "Công nợ", to: ROUTES.RECEPTION_DEBTS },
-                { key: "cash-handover", label: "Bàn giao ca", to: ROUTES.RECEPTION_CASH_HANDOVER },
+                { key: "cash-handover", label: "Phiếu giao ca", to: ROUTES.RECEPTION_CASH_HANDOVER },
             ],
         },
         WORK_GROUP,
