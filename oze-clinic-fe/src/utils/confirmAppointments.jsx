@@ -1,7 +1,10 @@
 import { addDays, ddmm, hhmm, weekdayIndex } from "./calendar";
 import { SCHEDULE_TEXT } from "./messages";
 
-export const confirmDefaults = (today) => ({ from: addDays(today, 1), to: addDays(today, 7), slot: "", doctor: "", status: "", keyword: "" });
+export const confirmDefaults = (today) => ({ from: addDays(today, 1), to: addDays(today, 7), slot: "", doctor: "", status: "need", keyword: "" });
+
+// "need" = not confirmed yet: waiting, asked to call back or did not answer.
+export const NEEDS_CONFIRM = ["pending", "callback", "noanswer"];
 
 export const CONFIRM_STATES = ["pending", "confirmed", "callback", "noanswer", "cancelled"];
 
@@ -12,6 +15,9 @@ export const confirmStateOf = (appointment) => {
     if (appointment.status === "PENDING") return CALL_STATE[appointment.confirmCallOutcome] ?? "pending";
     return "confirmed";
 };
+
+export const matchesConfirmState = (appointment, status) =>
+    !status || (status === "need" ? NEEDS_CONFIRM.includes(confirmStateOf(appointment)) : confirmStateOf(appointment) === status);
 
 export const shortDate = (date) => `${SCHEDULE_TEXT.WEEKDAYS_SHORT[weekdayIndex(date)]} ${ddmm(date)}`;
 

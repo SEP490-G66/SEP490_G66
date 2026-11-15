@@ -39,7 +39,7 @@ import {
 } from "@/services/receptionService";
 import { getMyShifts } from "@/services/myScheduleService";
 import { addDays, ddmm, hhmm, isSunday } from "@/utils/calendar";
-import { allergiesOf, matchesKeyword, serviceNames, slotOf, stateOf } from "@/utils/checkIn";
+import { allergiesOf, appointmentMenu, isLate as lateAt, matchesKeyword, serviceNames, slotOf, stateOf } from "@/utils/checkIn";
 import { callBackText, confirmStateOf, shortDate, sortByVisit } from "@/utils/confirmAppointments";
 import { CHECK_IN_TEXT, CONFIRM_TEXT, DASHBOARD_TEXT as TEXT, QUEUE_TEXT } from "@/utils/messages";
 import { entryRows, examRooms, examRows, orderRows, otherRooms, waitingCount } from "@/utils/queueBoard";
@@ -103,7 +103,7 @@ const ReceptionistDashboard = () => {
     const now = clinicClock();
     const todays = data?.today ?? [];
     const upcoming = data?.upcoming ?? [];
-    const isLate = (a) => stateOf(a) === "notyet" && Boolean(a.timeSlotEnd) && hhmm(a.timeSlotEnd) <= now;
+    const isLate = (a) => lateAt(a, now);
 
     const serving = todays.filter((a) => a.status === "IN_SERVICE");
     const rooms = [...examRooms(doctors, data?.waiting ?? [], serving), ...otherRooms(data?.entries ?? [])];
@@ -169,18 +169,8 @@ const ReceptionistDashboard = () => {
     ];
 
     const menuFor = (a) => {
-        const unconfirmed = a.status === "PENDING";
         const isToday = a.appointmentDate === today;
-        const lateNow = isToday && isLate(a);
-        const open = (type) => () => setDialog({ type, item: a });
-        return [
-            ...(unconfirmed && isToday && !lateNow ? [{ label: TEXT.ACT_CONFIRM, onSelect: open("confirm") }] : []),
-            ...(unconfirmed && !lateNow ? [{ label: TEXT.ACT_CALL, onSelect: open("call") }] : []),
-            ...(lateNow ? [{ label: TEXT.ACT_NO_SHOW, onSelect: open("noShow") }] : []),
-            ...(a.timeSlotStart ? [{ label: TEXT.ACT_RESCHEDULE, onSelect: open("reschedule") }] : []),
-            null,
-            { label: TEXT.ACT_CANCEL, danger: true, onSelect: open("cancel") },
-        ];
+        return appointmentMenu(a, { isToday, late: isToday && isLate(a), open: (type) => () => setDialog({ type, item: a }) });
     };
 
     const patientCell = (a) => {
@@ -436,11 +426,10 @@ const ReceptionistDashboard = () => {
             {dialog?.type === "noShow" && (
                 <ConfirmActionDialog
                     title={TEXT.NO_SHOW_TITLE}
-                    description={a.patientName}
-                    body={TEXT.NO_SHOW_BODY(a.patientName, slotOf(a))}
+                    description={TEXT.NO_SHOW_SUB(a.patientName, hhmm(a.timeSlotStart))}
+                    body={TEXT.NO_SHOW_BODY(slotOf(a), a.doctorName)}
                     closeLabel={CONFIRM_TEXT.CLOSE}
                     submitLabel={TEXT.ACT_NO_SHOW}
-                    danger
                     onClose={close}
                     onSubmit={() => act(markNoShow(a.id), TEXT.NO_SHOW_DONE(a.patientName))}
                 />
