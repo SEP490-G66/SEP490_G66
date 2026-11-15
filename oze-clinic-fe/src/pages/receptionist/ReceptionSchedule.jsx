@@ -8,28 +8,15 @@ import BookingDialog from "@/components/reception/BookingDialog";
 import { Card } from "@/components/reception/shared";
 import { clinicClock } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { clinicToday, getAppointments, getBookableServices, getDoctorOptions } from "@/services/receptionService";
+import { clinicToday, getAppointmentsInRange, getAvailableSlots, getBookableServices, getDoctorOptions } from "@/services/receptionService";
 import { addDays, ddmm, dmy, hhmm, isSunday, mondayOf, weekdayIndex } from "@/utils/calendar";
-import { CELL_DOT, CELL_KEYS, LEGEND, NOON, cellKeyOf, currentRow, hasService, rowOf, scheduleRows, slotLabel, slotPhase } from "@/utils/appointmentSchedule";
+import { CELL_DOT, CELL_KEYS, LEGEND, breakBefore, cellKeyOf, currentRow, hasService, rowOf, scheduleRows, slotLabel, slotPhase, slotStep } from "@/utils/appointmentSchedule";
 import { SCHEDULE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
-const PAGE_SIZE = 100;
-const MAX_PAGES = 20;
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
-
-const loadWeek = async (fromDate, doctorId, signal) => {
-    const items = [];
-    for (let page = 1; page <= MAX_PAGES; page += 1) {
-        const result = await getAppointments({ fromDate, toDate: addDays(fromDate, 6), doctorId, page, pageSize: PAGE_SIZE }, { ...READ, signal });
-        if (!result.success) return result;
-        items.push(...(result.data?.items ?? []));
-        if (page >= Number(result.data?.totalPages ?? 1)) break;
-    }
-    return { success: true, items };
-};
 
 const ReceptionSchedule = () => {
     const navigate = useNavigate();
@@ -49,10 +36,20 @@ const ReceptionSchedule = () => {
 
     useEffect(() => {
         const controller = new AbortController();
-        loadWeek(week, doctorId, controller.signal).then((response) => {
+        const config = { ...READ, signal: controller.signal };
+        const open = Array.from({ length: 7 }, (_, i) => addDays(week, i)).filter((d) => d >= clinicToday() && !isSunday(d));
+        Promise.all([
+            getAppointmentsInRange({ fromDate: week, toDate: addDays(week, 6), doctorId }, config),
+            ...open.map((date) => getAvailableSlots({ date, doctorId: doctorId || undefined }, config)),
+        ]).then(([response, ...free]) => {
             if (controller.signal.aborted || response.aborted) return;
             setClock({ today: clinicToday(), now: clinicClock() });
-            setResult({ key: requestKey, ok: response.success, items: response.success ? response.items : [] });
+            setResult({
+                key: requestKey,
+                ok: response.success,
+                items: response.success ? response.items : [],
+                free: free.flatMap((r) => (r.success && Array.isArray(r.data) ? r.data.map((x) => hhmm(x.slotStart)) : [])),
+            });
         });
         return () => controller.abort();
     }, [week, doctorId, requestKey]);
@@ -76,9 +73,11 @@ const ReceptionSchedule = () => {
     const current = result?.key === requestKey ? result : null;
     const appointments = (current?.items ?? result?.items ?? []).filter((a) => a.timeSlotStart && hasService(a, serviceId));
     const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
-    const rows = scheduleRows(appointments);
+    const free = current?.free ?? result?.free ?? [];
+    const step = slotStep([...free, ...appointments.map((a) => hhmm(a.timeSlotStart))]);
+    const rows = scheduleRows(appointments, free, step);
     const nowRow = week === mondayOf(today) ? currentRow(rows, now) : null;
-    const inCell = (day, time) => appointments.filter((a) => a.appointmentDate === day && rowOf(a.timeSlotStart) === time);
+    const inCell = (day, time) => appointments.filter((a) => a.appointmentDate === day && rowOf(a.timeSlotStart, step) === time);
     const dayName = (day) => `${TEXT.WEEKDAYS[weekdayIndex(day)]} ${ddmm(day)}`;
 
     const openCell = (day, time, items) => {
@@ -90,7 +89,7 @@ const ReceptionSchedule = () => {
     const cell = (day, time) => {
         if (isSunday(day)) return <td key={day} className="h-14 border-b border-l border-border bg-surface-tint p-1" />;
         const items = inCell(day, time);
-        const phase = slotPhase(day, time, today, now);
+        const phase = slotPhase(day, time, today, now, step);
         const label = `${dayName(day)}, ${time}`;
         const tdClass = cx("h-14 border-b border-l border-border p-1 align-top", day === today && "bg-primary-softer", day === today && phase === "now" && "bg-warning-soft");
         if (!items.length) {
@@ -148,7 +147,7 @@ const ReceptionSchedule = () => {
     return (
         <div className="app-content min-h-full space-y-5">
             <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-64 flex-1">
                     <Breadcrumb items={CRUMBS} className="mb-2" />
                     <h1 className="page-title">{TEXT.TITLE}</h1>
                     <p className="page-description">{TEXT.DESCRIPTION}</p>
@@ -214,13 +213,15 @@ const ReceptionSchedule = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {rows.map((time, index) => (
+                            {rows.map((time, index) => {
+                                const gap = breakBefore(rows, index, step);
+                                return (
                                 <Fragment key={time}>
-                                    {time >= NOON && (index === 0 || rows[index - 1] < NOON) && (
+                                    {gap && (
                                         <tr>
                                             <th className="border-b border-border" />
                                             <td colSpan={7} className="border-b border-l border-border bg-surface-tint p-1.5 text-center text-caption text-muted">
-                                                {TEXT.LUNCH}
+                                                {TEXT.BREAK(gap.lunch, gap.from, gap.to)}
                                             </td>
                                         </tr>
                                     )}
@@ -234,7 +235,8 @@ const ReceptionSchedule = () => {
                                         {days.map((day) => cell(day, time))}
                                     </tr>
                                 </Fragment>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

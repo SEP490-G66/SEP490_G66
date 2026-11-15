@@ -49,8 +49,8 @@ export const getTodayAppointments = () =>
 
 export const confirmAppointment = (id) => call(() => api.post(`/api/appointments/${id}/confirm`));
 
-export const checkInAppointment = (id, { priority, reason }) =>
-    call(() => api.post(`/api/appointments/${id}/check-in`, { priority, reason: reason || null }));
+export const checkInAppointment = (id, { priority, reason, doctorId }) =>
+    call(() => api.post(`/api/appointments/${id}/check-in`, { priority, reason: reason || null, doctorId: doctorId || undefined }));
 
 export const cancelAppointment = (id, reason) => call(() => api.post(`/api/appointments/${id}/cancel`, { reason }));
 
@@ -99,7 +99,8 @@ export const remindDueFollowUps = () => call(() => api.post("/api/examinations/f
 
 // ----- reports -----
 // Confirmed collections per clinic day, cash vs transfer (at most 31 days)
-export const getRevenueByDay = ({ from, to }) => call(() => api.get("/api/invoice-reports/revenue-by-day", { params: { from, to } }));
+export const getRevenueByDay = ({ from, to, groupBy }, config = {}) =>
+    call(() => api.get("/api/invoice-reports/revenue-by-day", { ...config, params: { from, to, groupBy: groupBy === "shift" ? "shift" : undefined } }));
 
 // ----- doctors on duty -----
 // Doctors with a shift today: room, time and status (NotStarted, Working, Ended, OnLeave)
@@ -108,14 +109,42 @@ export const getDoctorsOnDuty = (date = clinicToday(), config = {}) =>
 
 // ----- lists for the receptionist pages -----
 // Appointments of a date range (or one date), newest filters on the server; pageSize up to 100
-export const getAppointments = ({ fromDate, toDate, date, doctorId, status, keyword, pageSize = 100 } = {}) =>
+export const getAppointments = ({ fromDate, toDate, date, doctorId, status, keyword, page, pageSize = 100 } = {}, config = {}) =>
     call(() =>
         api.get("/api/appointments", {
-            params: { fromDate, toDate, date, doctorId: doctorId || undefined, status: status || undefined, searchKeyword: keyword || undefined, pageSize },
+            ...config,
+            params: { fromDate, toDate, date, doctorId: doctorId || undefined, status: status || undefined, searchKeyword: keyword || undefined, pageNumber: page, pageSize },
         }),
     );
 
-export const getInvoice = (id) => call(() => api.get(`/api/invoices/${id}`));
+const RANGE_PAGE_LIMIT = 20;
+
+export const getAppointmentsInRange = async ({ fromDate, toDate, doctorId } = {}, config = {}) => {
+    const items = [];
+    for (let page = 1; page <= RANGE_PAGE_LIMIT; page += 1) {
+        const result = await getAppointments({ fromDate, toDate, doctorId, page, pageSize: 100 }, config);
+        if (!result.success) return result;
+        items.push(...(result.data?.items ?? []));
+        if (page >= Number(result.data?.totalPages ?? 1)) break;
+    }
+    return { success: true, items };
+};
+
+export const recordConfirmCall = (id, { outcome, callBackDate, callBackTime }, config = {}) =>
+    call(() => api.post(`/api/appointments/${id}/confirm-call`, { outcome, callBackDate, callBackTime }, config));
+
+export const getInvoice = (id, config = {}) => call(() => api.get(`/api/invoices/${id}`, config));
+
+export const rejectPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/reject`));
+
+export const cancelInvoice = (id) => call(() => api.post(`/api/invoices/${id}/cancel`));
+
+export const getCashierRefunds = ({ status, page = 1, pageSize = 10 } = {}, config = {}) =>
+    call(() => api.get("/api/refund-requests", { ...config, params: { status: status || undefined, pageNumber: page, pageSize } }));
+
+export const payoutRefund = (id) => call(() => api.post(`/api/refund-requests/${id}/payout`));
+
+export const rejectRefund = (id) => call(() => api.post(`/api/refund-requests/${id}/reject`));
 
 // A bank or QR payment the receptionist has seen arrive in the account
 export const confirmPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/confirm`));
@@ -153,8 +182,13 @@ export const getPaidInvoices = async () => {
 export const requestRefund = (invoiceId, reason) => call(() => api.post(`/api/invoices/${invoiceId}/refund-requests`, { reason }));
 
 // ----- patient debts and payment reminders -----
-export const getDebts = ({ keyword, overdueOnly, page = 1, pageSize = 10 } = {}) =>
-    call(() => api.get("/api/debts", { params: { searchKeyword: keyword || undefined, overdueOnly: overdueOnly || undefined, pageNumber: page, pageSize } }));
+export const getDebts = ({ keyword, overdueOnly, ageBucket, page = 1, pageSize = 10 } = {}, config = {}) =>
+    call(() =>
+        api.get("/api/debts", {
+            ...config,
+            params: { searchKeyword: keyword || undefined, overdueOnly: overdueOnly || undefined, ageBucket: ageBucket || undefined, pageNumber: page, pageSize },
+        }),
+    );
 
 export const remindPayment = (invoiceId, force = false) => call(() => api.post(`/api/debts/${invoiceId}/remind`, { force }));
 
@@ -195,7 +229,7 @@ export const scheduleFollowUpAppointment = (examinationId, { date, slotStart, do
 export const getDoctorOptions = (config = {}) => call(() => api.get("/api/doctors", { ...config, params: { pageSize: 100 } }));
 
 // ----- booking on behalf (F-APT-09) -----
-export const getBookableServices = () => call(() => api.get("/api/appointments/bookable-services"));
+export const getBookableServices = (config = {}) => call(() => api.get("/api/appointments/bookable-services", config));
 
 // patientId for a known record, or fullName + phoneNumber (+ email) for a new one; confirmed at once
 export const bookForPatient = (request, config = {}) => call(() => api.post("/api/appointments/reception-booking", request, config));
@@ -238,9 +272,10 @@ export const getConsultations = ({ status, keyword, page = 1, pageSize = 10 } = 
 export const handleConsultation = (id, { status, note }) => call(() => api.post(`/api/consultation-requests/${id}/handle`, { status, note: note || null }));
 
 // ----- invoice list and payment history (search by day) -----
-export const searchInvoices = ({ keyword, status, fromDate, toDate, page = 1, pageSize = 15 } = {}) =>
+export const searchInvoices = ({ keyword, status, fromDate, toDate, page = 1, pageSize = 15 } = {}, config = {}) =>
     call(() =>
         api.get("/api/invoices", {
+            ...config,
             params: {
                 searchKeyword: keyword || undefined,
                 paymentStatus: status || undefined,
@@ -271,3 +306,13 @@ export const getPaymentHistory = ({ keyword, method, status, fromDate, toDate, p
 
 // Active entries of every room queue (Examination, Imaging, Treatment): WAITING, CALLED, IN_PROGRESS
 export const getQueueEntries = (queueType) => call(() => api.get("/api/queues", { params: { queueType: queueType || undefined } }));
+
+export const setQueuePriority = (id, priority) => call(() => api.post(`/api/queues/${id}/priority`, { priority }));
+
+export const moveQueueEntry = (id, roomId) => call(() => api.post(`/api/queues/${id}/move`, { roomId }));
+
+export const removeQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/remove`));
+
+export const callAppointment = (id) => call(() => api.post(`/api/appointments/${id}/call`));
+
+export const callQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/call`));

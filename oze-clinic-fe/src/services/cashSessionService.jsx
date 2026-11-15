@@ -13,19 +13,27 @@ export const expenseCategoryLabel = (value) => EXPENSE_CATEGORIES.find((option) 
 // data is null when the receptionist has no open drawer
 export const getCurrentCashSession = () => call(() => api.get("/api/cash-sessions/current"));
 
-export const openCashSession = ({ openingCash, notes }) => call(() => api.post("/api/cash-sessions/open", { openingCash, notes: notes || null }));
+export const openCashSession = ({ openingCash, expectedOpeningCash, notes }) =>
+    call(() => api.post("/api/cash-sessions/open", { openingCash, expectedOpeningCash, notes: notes || null }));
+
+export const getNextCashShift = (config = {}) => call(() => api.get("/api/cash-sessions/next-shift", config));
 
 export const addCashExpense = ({ amount, category, description }) =>
     call(() => api.post("/api/cash-sessions/current/expenses", { amount, category, description }));
 
 export const removeCashExpense = (expenseId) => call(() => api.delete(`/api/cash-sessions/current/expenses/${expenseId}`));
 
-export const closeCashSession = ({ countedCash, handoverToUserId, notes }) =>
-    call(() => api.post("/api/cash-sessions/current/close", { countedCash, handoverToUserId: handoverToUserId || null, notes: notes || null }));
+export const closeCashSession = ({ countedCash, countedTransfer, denominations, notes }) =>
+    call(() => api.post("/api/cash-sessions/current/close", { countedCash, countedTransfer, denominations: denominations ?? null, notes: notes || null }));
 
 export const getHandoverCandidates = () => call(() => api.get("/api/cash-sessions/handover-candidates"));
 
-export const getCashSessions = ({ page = 1, pageSize = 5 } = {}) =>
-    call(() => api.get("/api/cash-sessions", { params: { pageNumber: page, pageSize } }));
+export const getCashSessions = ({ fromDate, toDate, status, openedByUserId, page = 1, pageSize = 10 } = {}, config = {}) =>
+    call(() =>
+        api.get("/api/cash-sessions", {
+            ...config,
+            params: { fromDate, toDate, status: status || undefined, openedByUserId: openedByUserId || undefined, pageNumber: page, pageSize },
+        }),
+    );
 
-export const getCashSession = (id) => call(() => api.get(`/api/cash-sessions/${id}`));
+export const getCashSession = (id, config = {}) => call(() => api.get(`/api/cash-sessions/${id}`, config));
