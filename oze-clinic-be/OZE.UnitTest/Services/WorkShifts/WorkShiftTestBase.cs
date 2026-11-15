@@ -98,7 +98,6 @@ namespace OZE.UnitTest.Services.WorkShifts
             };
         }
 
-
         protected CreateWorkShiftRequest CreateValidRequest()
         {
             return new CreateWorkShiftRequest

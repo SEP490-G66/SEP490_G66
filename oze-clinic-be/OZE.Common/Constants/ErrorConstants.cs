@@ -188,6 +188,7 @@ namespace OZE.Common.Constants
             public const string HasOpenAppointments = "This service is in appointments that are not finished yet; it cannot be turned off now";
             public const string ServiceNotFound = "Service not found in system";
             public const string ServiceCodeExist = "Service code already exists in system";
+            public const string ServiceNameExist = "Service name already exists in system";
             public const string ServiceInUse = "Cannot delete service because it is currently linked to existing invoices or treatment plan stages. Please deactivate the service instead.";
             public const string InvalidRoomType = "Required room type must be one of: GeneralTreatment, MinorSurgery, XRay";
             public const string InvalidPrice = "Reference price must be greater than or equal to 0";

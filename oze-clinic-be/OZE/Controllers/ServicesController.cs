@@ -147,6 +147,50 @@ namespace OZE.Controllers
         }
 
         /// <summary>
+        /// Deactivates a clinic service (SDS Section 7.5). Requires ClinicManager role.
+        /// </summary>
+        [HttpPatch("{id:int}/deactivate")]
+        [Authorize(Roles = RoleConstants.ClinicManagerRole)]
+        public async Task<ActionResult<ApiResponse<ServiceDto>>> DeactivateServiceAsync(
+            [FromRoute] int id,
+            CancellationToken cancellationToken)
+        {
+            var result = await _clinicService.DeactivateServiceAsync(id, cancellationToken);
+            if (!result.Success)
+            {
+                if (result.Message == ErrorConstants.ServiceMessage.ServiceNotFound)
+                {
+                    return NotFound(result);
+                }
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Activates a clinic service. Requires ClinicManager role.
+        /// </summary>
+        [HttpPatch("{id:int}/activate")]
+        [Authorize(Roles = RoleConstants.ClinicManagerRole)]
+        public async Task<ActionResult<ApiResponse<ServiceDto>>> ActivateServiceAsync(
+            [FromRoute] int id,
+            CancellationToken cancellationToken)
+        {
+            var result = await _clinicService.ActivateServiceAsync(id, cancellationToken);
+            if (!result.Success)
+            {
+                if (result.Message == ErrorConstants.ServiceMessage.ServiceNotFound)
+                {
+                    return NotFound(result);
+                }
+                return BadRequest(result);
+            }
+
+            return Ok(result);
+        }
+
+        /// <summary>
         /// Deletes a clinic service. If the service is referenced by invoices or treatment plans, deletion is rejected. Requires ClinicManager role.
         /// </summary>
         [HttpDelete("{id:int}")]

@@ -1,193 +1,296 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import FilterSelect from "@/components/ui/FilterSelect";
-import SearchInput from "@/components/ui/SearchInput";
-import StatusTabs from "@/components/ui/StatusTabs";
-import { countBy } from "@/utils/countBy";
-import { Badge, Card, EmptyState, ErrorLine, FilterBar, PageHeader } from "@/components/reception/shared";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { toast } from "react-toastify";
+import Breadcrumb from "@/components/navigation/Breadcrumb";
+import LabeledSelect from "@/components/ui/LabeledSelect";
+import BookingDialog from "@/components/reception/BookingDialog";
+import RowActions from "@/components/reception-dashboard/RowActions";
+import ConfirmAppointmentDialog from "@/components/reception/ConfirmAppointmentDialog";
+import ConfirmCallDialog from "@/components/reception/ConfirmCallDialog";
+import ServiceCell from "@/components/reception/ServiceCell";
+import { Card, CancelDialog, RescheduleDialog } from "@/components/reception/shared";
+import { phoneText, report, usePaging } from "@/components/reception/receptionUtils";
+import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
-    BOOKING_DAYS_AHEAD,
-    STATUS_LABEL,
-    clinicClock,
-    ddmm,
-    isPendingSoon,
-    phoneText,
-    report,
-    servicesOf,
-    slotText,
-    usePaging,
-} from "@/components/reception/receptionUtils";
-import { clinicToday, getAppointments } from "@/services/receptionService";
-import { AppointmentDialogs, RowActions } from "./ReceptionCheckIn";
+    cancelAppointment,
+    clinicToday,
+    confirmAppointment,
+    getAppointmentsInRange,
+    getDoctorOptions,
+    recordConfirmCall,
+    rescheduleAppointment,
+} from "@/services/receptionService";
+import { addDays, ddmm, hhmm } from "@/utils/calendar";
+import { allergiesOf, appointmentMenu, matchesKeyword, serviceNames, slotOf } from "@/utils/checkIn";
+import { CONFIRM_STATES, callBackText, confirmDefaults, confirmStateOf, isConfirmFiltered, matchesConfirmState, shortDate, sortByVisit } from "@/utils/confirmAppointments";
+import { CONFIRM_TEXT as TEXT } from "@/utils/messages";
+import { cx } from "@/utils/cx";
 
-// "Xác nhận lịch hẹn": bookings made online wait as PENDING until the receptionist calls the patient and confirms.
-// A pending booking keeps its slot. No call log yet (F-APT-11 is still a proposal), so the outcome is confirm, reschedule or cancel.
-
-const STATUS_OPTIONS = ["PENDING", "CONFIRMED", "CANCELLED"].map((value) => ({ value, label: STATUS_LABEL[value][0], tone: STATUS_LABEL[value][1] }));
+const READ = { skipErrorPage: true };
+const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
+const STATUS_OPTIONS = [["need", TEXT.NEEDS_CONFIRM], ["", TEXT.ALL_STATUSES], ...CONFIRM_STATES.map((key) => [key, TEXT.STATES[key][0]])];
+const WIDTHS = ["128px", "", "136px", "190px", "", "150px", "150px"];
 
 const ReceptionConfirm = () => {
-    const [range, setRange] = useState({ from: clinicToday(), to: clinicToday(BOOKING_DAYS_AHEAD) });
-    const [filters, setFilters] = useState({ keyword: "", status: "PENDING", doctor: "", slot: "" });
-    const [state, setState] = useState({ loading: true, items: [], error: null });
-    const [version, setVersion] = useState(0);
+    const { state: navState } = useLocation();
+    const [today] = useState(clinicToday);
+    const defaults = confirmDefaults(today);
+    const [filters, setFilters] = useState(() => ({
+        ...defaults,
+        ...Object.fromEntries(["from", "to", "slot", "doctor", "status"].filter((k) => navState?.[k] != null).map((k) => [k, navState[k]])),
+    }));
+    const [reload, setReload] = useState(0);
+    const [result, setResult] = useState(null);
+    const [doctorList, setDoctorList] = useState([]);
     const [dialog, setDialog] = useState(null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
+
+    usePageTitle(TEXT.DOC_TITLE);
+
+    const requestKey = `${filters.from}|${filters.to}|${reload}`;
 
     useEffect(() => {
-        let active = true;
-        getAppointments({ fromDate: range.from, toDate: range.to }).then((result) => {
-            if (!active) return;
-            setState({ loading: false, items: result.success ? result.data.items : [], error: result.success ? null : result.message });
+        const controller = new AbortController();
+        getAppointmentsInRange({ fromDate: filters.from, toDate: filters.to }, { ...READ, signal: controller.signal }).then((response) => {
+            if (controller.signal.aborted || response.aborted) return;
+            setResult({ key: requestKey, ok: response.success, items: response.success ? response.items : [] });
         });
-        return () => {
-            active = false;
-        };
-    }, [range, version]);
+        return () => controller.abort();
+    }, [filters.from, filters.to, requestKey]);
 
-    const reload = useCallback(() => setVersion((v) => v + 1), []);
-    const act = async (request, successText) => {
-        if (report(await request, successText)) {
-            setDialog(null);
-            reload();
-        }
-    };
+    useEffect(() => {
+        const controller = new AbortController();
+        getDoctorOptions({ ...READ, signal: controller.signal }).then((response) => {
+            if (!response.success || controller.signal.aborted) return;
+            const items = Array.isArray(response.data) ? response.data : (response.data?.items ?? []);
+            setDoctorList(items.map((d) => [String(d.id), d.fullName]));
+        });
+        return () => controller.abort();
+    }, []);
 
-    const doctorOptions = useMemo(
-        () =>
-            [...new Map(state.items.filter((a) => a.doctorId).map((a) => [String(a.doctorId), a.doctorName])).entries()].map(([value, label]) => ({
-                value,
-                label,
-            })),
-        [state.items],
+    const current = result?.key === requestKey ? result : null;
+    const appointments = (current?.items ?? result?.items ?? []).filter((a) => a.appointmentDate > today);
+    const slotOptions = [["", TEXT.ALL_SLOTS], ...[...new Set(appointments.map(slotOf).filter(Boolean))].sort().map((s) => [s, s])];
+    const known = new Map(doctorList);
+    appointments.forEach((a) => a.doctorId && !known.has(String(a.doctorId)) && known.set(String(a.doctorId), a.doctorName));
+    const doctorOptions = [["", TEXT.ALL_DOCTORS], ...known.entries()];
+
+    const shown = sortByVisit(
+        appointments.filter(
+            (a) =>
+                matchesKeyword(a, filters.keyword) &&
+                (!filters.slot || slotOf(a) === filters.slot) &&
+                (!filters.doctor || String(a.doctorId) === filters.doctor) &&
+                matchesConfirmState(a, filters.status),
+        ),
     );
-    const slotOptions = useMemo(() => [...new Set(state.items.map(slotText))].sort().map((value) => ({ value, label: value })), [state.items]);
-
-    const q = filters.keyword.trim().toLowerCase();
-    // Search, doctor and time first: the status buttons count what is left
-    const narrowed = state.items
-        .filter((a) => !q || `${a.patientName} ${a.patientPhoneNumber} ${a.patientCode}`.toLowerCase().includes(q))
-        .filter((a) => !filters.doctor || String(a.doctorId) === filters.doctor)
-        .filter((a) => !filters.slot || slotText(a) === filters.slot);
-    const counts = countBy(narrowed);
-    const shown = narrowed
-        .filter((a) => !filters.status || a.status === filters.status)
-        .map((a) => ({ ...a, soon: isPendingSoon(a, clinicToday(), clinicClock()) }))
-        .sort(
-            (a, b) =>
-                Number(b.soon) - Number(a.soon) ||
-                a.appointmentDate.localeCompare(b.appointmentDate) ||
-                (a.timeSlotStart ?? "").localeCompare(b.timeSlotStart ?? ""),
-        );
     const { pageItems, footer, setPage } = usePaging(shown, 10);
+    const filtered = isConfirmFiltered(filters, defaults);
+
     const setFilter = (key) => (value) => {
-        setFilters((current) => ({ ...current, [key]: value }));
+        setFilters((f) => {
+            const next = { ...f, [key]: value };
+            if (key === "from" && next.to < value) next.to = value;
+            if (key === "to" && next.from > value) next.from = value;
+            return next;
+        });
+        setPage(1);
+    };
+    const clearFilters = () => {
+        setFilters(defaults);
         setPage(1);
     };
 
-    return (
-        <div className="app-content min-h-full">
-            <PageHeader title="Xác nhận lịch hẹn" description="Gọi điện cho bệnh nhân rồi xác nhận, đổi lịch hoặc hủy. Lịch chưa xác nhận vẫn giữ chỗ." />
-            <ErrorLine message={state.error} />
+    const act = async (request, successText) => {
+        if (report(await request, successText)) {
+            setDialog(null);
+            setReload((n) => n + 1);
+        }
+    };
 
-            <Card>
-                <FilterBar>
-                    <SearchInput
-                        id="cf-search"
-                        label="Tìm bệnh nhân"
-                        placeholder="Tên, số điện thoại hoặc mã bệnh nhân"
-                        value={filters.keyword}
-                        onChange={setFilter("keyword")}
-                        className="min-w-64 flex-1"
-                    />
-                    <label className="flex items-center gap-2 text-body-sm text-muted">
-                        Từ
-                        <input
-                            type="date"
-                            className="input w-auto"
-                            value={range.from}
-                            onChange={(e) => e.target.value && setRange((r) => ({ from: e.target.value, to: r.to < e.target.value ? e.target.value : r.to }))}
-                        />
-                    </label>
-                    <label className="flex items-center gap-2 text-body-sm text-muted">
-                        đến
-                        <input
-                            type="date"
-                            className="input w-auto"
-                            min={range.from}
-                            value={range.to}
-                            onChange={(e) => e.target.value && setRange((r) => ({ ...r, to: e.target.value }))}
-                        />
-                    </label>
-                    <FilterSelect id="cf-slot" label="Ca" options={slotOptions} value={filters.slot} onChange={setFilter("slot")} allLabel="Tất cả giờ" />
-                    <FilterSelect id="cf-doctor" label="Bác sĩ" options={doctorOptions} value={filters.doctor} onChange={setFilter("doctor")} />
-                </FilterBar>
-                <div className="px-5 pb-4">
-                    <StatusTabs label="Trạng thái" options={STATUS_OPTIONS} value={filters.status} onChange={setFilter("status")} counts={counts} />
-                </div>
-                {state.loading ? (
-                    <EmptyState text="Đang tải lịch hẹn…" />
-                ) : shown.length === 0 ? (
-                    <EmptyState
-                        text={
-                            filters.status === "PENDING"
-                                ? "Không còn lịch nào chờ xác nhận trong khoảng ngày này. Lịch đặt được trước tối đa 30 ngày."
-                                : "Không có lịch nào khớp bộ lọc."
-                        }
-                    />
-                ) : (
-                    <div className="table-wrap rounded-none border-x-0">
-                        <table className="table table-stack">
-                            <thead>
-                                <tr>
-                                    <th>Ngày hẹn</th>
-                                    <th>Ca</th>
-                                    <th>Bệnh nhân</th>
-                                    <th>Số điện thoại</th>
-                                    <th>Bác sĩ chỉ định</th>
-                                    <th>Dịch vụ</th>
-                                    <th>Trạng thái</th>
-                                    <th className="text-right">Thao tác</th>
+    const close = () => setDialog(null);
+    const a = dialog?.item;
+
+    const actions = (row, state) => {
+        if (state === "cancelled") return null;
+        const open = (type) => () => setDialog({ type, item: row });
+        return (
+            <RowActions
+                name={row.patientName}
+                primary={state !== "confirmed" ? { label: TEXT.CONFIRM, onClick: open("confirm") } : null}
+                items={appointmentMenu(row, { isToday: false, late: false, open })}
+            />
+        );
+    };
+
+    const body = () => {
+        if (!result) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.LOADING}</p>;
+        if (!shown.length)
+            return (
+                <p className="px-6 py-10 text-center text-body-sm text-muted">
+                    {TEXT.EMPTY}{" "}
+                    {filtered && (
+                        <button type="button" className="btn-link" onClick={clearFilters}>
+                            {TEXT.CLEAR_FILTERS}
+                        </button>
+                    )}
+                </p>
+            );
+        return (
+            <div className={cx("table-wrap rounded-none border-0", !current && "opacity-60")} aria-busy={!current ? "true" : undefined}>
+                <table className="table table-stack table-fixed-acts [&_td]:px-3 [&_td]:py-2.5 [&_td]:align-middle [&_th]:px-3">
+                    <colgroup>
+                        {WIDTHS.map((w, i) => (
+                            <col key={i} style={w ? { width: w } : undefined} />
+                        ))}
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            {TEXT.COLUMNS.map((c, i) => (
+                                <th key={c}>{i === TEXT.COLUMNS.length - 1 ? <span className="sr-only">{c}</span> : c}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {pageItems.map((row) => {
+                            const state = confirmStateOf(row);
+                            const [label, badge] = TEXT.STATES[state];
+                            const allergies = allergiesOf(row);
+                            const when = state === "callback" ? callBackText(row) : null;
+                            return (
+                                <tr key={row.id} className={state === "cancelled" ? "opacity-60" : undefined}>
+                                    <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
+                                        <div>
+                                            <span className="font-semibold text-ink">{shortDate(row.appointmentDate)}</span>
+                                            {row.timeSlotStart && <small className="block text-caption text-muted">{TEXT.SLOT_LINE(slotOf(row))}</small>}
+                                        </div>
+                                    </td>
+                                    <td data-primary>
+                                        <span className="cell-primary block">{row.patientName}</span>
+                                        {row.patientCode && <small className="block text-caption text-muted">{row.patientCode}</small>}
+                                        {allergies.length > 0 && <span className="badge badge-danger mt-1 flex w-fit whitespace-normal">{TEXT.ALLERGY(allergies.join(", "))}</span>}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[2]} className="num whitespace-nowrap [overflow-wrap:normal]">
+                                        {phoneText(row.patientPhoneNumber)}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[3]}>{row.doctorName ?? TEXT.NO_DOCTOR}</td>
+                                    <td data-label={TEXT.COLUMNS[4]}>
+                                        <ServiceCell names={serviceNames(row)} />
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[5]}>
+                                        <div>
+                                            <span className={cx("badge", badge, state === "cancelled" && "line-through")}>{label}</span>
+                                            {when && <small className="block pt-0.5 text-caption text-muted">{TEXT.CALL_BACK_AT(when)}</small>}
+                                        </div>
+                                    </td>
+                                    <td data-actions>{actions(row, state)}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {pageItems.map((a) => (
-                                    <tr key={a.id} className={a.status === "CANCELLED" ? "opacity-60" : undefined}>
-                                        <td data-label="Ngày hẹn" className="num whitespace-nowrap">
-                                            {a.appointmentDate === clinicToday() ? "Hôm nay" : ddmm(a.appointmentDate)}
-                                        </td>
-                                        <td data-label="Ca" className="num whitespace-nowrap">
-                                            {slotText(a)}
-                                        </td>
-                                        <td data-primary>
-                                            <div className="cell-primary">{a.patientName}</div>
-                                            <div className="text-caption text-muted">{a.patientCode}</div>
-                                        </td>
-                                        <td data-label="Số điện thoại" className="num whitespace-nowrap">
-                                            <a className="btn-link" href={`tel:${a.patientPhoneNumber}`}>
-                                                {phoneText(a.patientPhoneNumber)}
-                                            </a>
-                                        </td>
-                                        <td data-label="Bác sĩ">{a.doctorName ?? "Chưa gán"}</td>
-                                        <td data-label="Dịch vụ" className="max-w-56">
-                                            {servicesOf(a)}
-                                        </td>
-                                        <td data-label="Trạng thái">
-                                            <div className="flex flex-wrap gap-1">
-                                                <Badge map={STATUS_LABEL} value={a.status} />
-                                                {a.soon && <span className="badge badge-danger">Sắp đến giờ, gọi ngay</span>}
-                                            </div>
-                                        </td>
-                                        <td data-actions>
-                                            <RowActions appointment={a} onOpen={(type) => setDialog({ type, item: a })} />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
+    return (
+        <div className="app-content min-h-full space-y-5">
+            <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-64 flex-1">
+                    <Breadcrumb items={CRUMBS} className="mb-2" />
+                    <h1 className="page-title">{TEXT.TITLE}</h1>
+                    <p className="page-description">{TEXT.DESCRIPTION}</p>
+                </div>
+                <button type="button" className="btn btn-primary max-md:w-full" onClick={() => setDialog({ type: "book" })}>
+                    {TEXT.BOOK}
+                </button>
+            </div>
+            <Card>
+                <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+                    <button type="button" className="btn btn-secondary w-full md:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
+                        {TEXT.FILTERS}
+                    </button>
+                    <div className={cx("contents", !filtersOpen && "max-md:hidden")}>
+                        {[
+                            ["from", TEXT.FROM],
+                            ["to", TEXT.TO],
+                        ].map(([key, label]) => (
+                            <div key={key} className="flex flex-col gap-1">
+                                <label htmlFor={`cf-${key}`} className="text-caption text-muted">
+                                    {label}
+                                </label>
+                                <input
+                                    id={`cf-${key}`}
+                                    type="date"
+                                    className="input w-auto"
+                                    min={addDays(today, 1)}
+                                    value={filters[key]}
+                                    onChange={(e) => e.target.value && setFilter(key)(e.target.value)}
+                                />
+                            </div>
+                        ))}
+                        <LabeledSelect id="cf-slot" label={TEXT.SLOT} value={filters.slot} options={slotOptions} onChange={setFilter("slot")} />
+                        <LabeledSelect id="cf-doctor" label={TEXT.DOCTOR} value={filters.doctor} options={doctorOptions} onChange={setFilter("doctor")} />
+                        <LabeledSelect id="cf-status" label={TEXT.STATUS} value={filters.status} options={STATUS_OPTIONS} onChange={setFilter("status")} />
                     </div>
-                )}
+                    <div className="flex min-w-48 flex-1 flex-col gap-1">
+                        <label htmlFor="cf-search" className="text-caption text-muted">
+                            {TEXT.PATIENT}
+                        </label>
+                        <input
+                            id="cf-search"
+                            type="search"
+                            className="input"
+                            placeholder={TEXT.SEARCH_PLACEHOLDER}
+                            value={filters.keyword}
+                            onChange={(e) => setFilter("keyword")(e.target.value)}
+                        />
+                    </div>
+                    {filtered && (
+                        <button type="button" className="btn-link h-control" onClick={clearFilters}>
+                            {TEXT.CLEAR_FILTERS}
+                        </button>
+                    )}
+                </div>
+            </Card>
+            {result && !result.ok && result.key === requestKey && (
+                <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
+                    <span className="flex-1">{TEXT.LOAD_ERROR}</span>
+                    <button type="button" className="btn btn-secondary h-9" onClick={() => setReload((n) => n + 1)}>
+                        {TEXT.RETRY}
+                    </button>
+                </div>
+            )}
+            <Card>
+                {body()}
                 {footer}
             </Card>
 
-            <AppointmentDialogs dialog={dialog} onClose={() => setDialog(null)} act={act} />
+            {dialog?.type === "confirm" && <ConfirmAppointmentDialog appointment={a} onClose={close} onSubmit={() => act(confirmAppointment(a.id), TEXT.CONFIRMED(a.patientName))} />}
+            {dialog?.type === "call" && (
+                <ConfirmCallDialog
+                    appointment={a}
+                    today={today}
+                    onClose={close}
+                    onSubmit={(v) => {
+                        const when = `${ddmm(v.callBackDate)} ${v.callBackTime}`;
+                        return act(recordConfirmCall(a.id, v), v.outcome === "CallBack" ? TEXT.WILL_CALL_BACK(a.patientName, when) : TEXT.NO_ANSWER(a.patientName, when));
+                    }}
+                />
+            )}
+            {dialog?.type === "reschedule" && <RescheduleDialog appointment={a} onClose={close} onSubmit={(v) => act(rescheduleAppointment(a.id, v), TEXT.RESCHEDULED(a.patientName))} />}
+            {dialog?.type === "cancel" && <CancelDialog appointment={a} onClose={close} onSubmit={(reason) => act(cancelAppointment(a.id, reason), TEXT.CANCELLED(a.patientName))} />}
+            {dialog?.type === "book" && (
+                <BookingDialog
+                    initial={{ date: addDays(today, 1) }}
+                    onClose={close}
+                    onBooked={(booked) => {
+                        toast.success(TEXT.BOOKED(booked.patientName, shortDate(booked.appointmentDate), hhmm(booked.timeSlotStart)), { role: "status" });
+                        setDialog(null);
+                        setReload((n) => n + 1);
+                    }}
+                />
+            )}
         </div>
     );
 };
