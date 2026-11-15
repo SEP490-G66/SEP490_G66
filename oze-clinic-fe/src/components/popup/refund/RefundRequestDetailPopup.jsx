@@ -1,10 +1,12 @@
 import { useState } from "react";
+import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { REFUND_REQUEST_STATUSES, REFUND_REQUEST_STATUS_LABELS } from "@/utils/refundRequest";
 import { formatCurrency, formatDateTime } from "@/utils/format";
-import { REFUND_REQUEST_ADMIN_TEXT } from "@/utils/messages";
 import RejectRefundRequestPopup from "./RejectRefundRequestPopup";
+
+const WORK_DONE_ID = "refund-work-done";
 
 const InfoPanel = ({ rows }) => (
     <dl className="flex flex-col gap-2 rounded-lg bg-surface-tint px-4 py-3">
@@ -24,19 +26,56 @@ const TextPanel = ({ title, children }) => (
     </section>
 );
 
-// "Yêu cầu hoàn tiền" popup. Only a pending request can be decided; onConfirm() and onReject(reason) save the decision and
-// the parent closes the popup when that succeeds.
+const money = (value) => <span className="num">{formatCurrency(value)}</span>;
+
+// Whole VND; "" while nothing is typed.
+const parseAmount = (text) => (/^\d+$/.test(text.trim()) ? Number(text.trim()) : null);
+
+const workDoneError = (text, paidAmount) => {
+    if (!text.trim()) return "Vui lòng nhập giá trị phần việc đã làm (nhập 0 nếu chưa làm gì).";
+    const amount = parseAmount(text);
+    if (amount === null) return "Vui lòng nhập số tiền là số nguyên, không âm.";
+    if (amount >= paidAmount) return "Giá trị phần việc đã làm phải nhỏ hơn số tiền đã thanh toán.";
+    return null;
+};
+
+// "Yêu cầu hoàn tiền" popup. A pending request is approved after the manager enters the value of the work already done:
+// the patient gets back what they paid minus that value. onConfirm(workDoneAmount) and onReject(reason) save the
+// decision; the parent closes the popup when that succeeds.
 const RefundRequestDetailPopup = ({ request, onClose, onConfirm, onReject }) => {
+    const [workDone, setWorkDone] = useState(request.workDoneAmount == null ? "" : String(request.workDoneAmount));
+    const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
     const [rejecting, setRejecting] = useState(false);
 
     const pending = request.status === REFUND_REQUEST_STATUSES.PENDING;
+    const refunded = request.status === REFUND_REQUEST_STATUSES.REFUNDED;
+    const workDoneAmount = parseAmount(workDone);
+    const previewRefund = workDoneAmount !== null && workDoneAmount < request.paidAmount ? request.paidAmount - workDoneAmount : null;
 
     const handleConfirm = async () => {
+        const nextError = workDoneError(workDone, request.paidAmount);
+        setError(nextError);
+        if (nextError) {
+            document.getElementById(WORK_DONE_ID)?.focus();
+            return;
+        }
         setSaving(true);
-        await onConfirm();
+        await onConfirm(workDoneAmount);
         setSaving(false);
     };
+
+    const invoiceRows = [
+        { label: "Dịch vụ đăng ký", value: request.serviceNames },
+        { label: "Số tiền đã thanh toán", value: money(request.paidAmount) },
+    ];
+    if (refunded) {
+        invoiceRows.push(
+            { label: "Phần việc đã làm", value: money(request.workDoneAmount ?? 0) },
+            { label: "Số tiền đã hoàn", value: <span className="num font-semibold text-success">{formatCurrency(request.refundAmount)}</span> },
+        );
+        if (request.processedAt) invoiceRows.push({ label: "Hoàn lúc", value: <span className="num">{formatDateTime(request.processedAt)}</span> });
+    }
 
     return (
         <Modal
@@ -51,29 +90,48 @@ const RefundRequestDetailPopup = ({ request, onClose, onConfirm, onReject }) => 
             closeDisabled={saving}
         >
             <div className="mt-6 flex flex-col gap-4">
-                <InfoPanel
-                    rows={[
-                        { label: "Bệnh nhân", value: `${request.patientName} · ${request.patientCode}` },
-                        { label: "Bác sĩ phụ trách", value: request.doctorName },
-                    ]}
-                />
+                <InfoPanel rows={[{ label: "Bệnh nhân", value: `${request.patientName} · ${request.patientCode}` }]} />
 
                 <section>
                     <h3 className="mb-2 text-body-sm font-semibold text-ink">Hoá đơn cần hoàn · {request.invoiceNumber}</h3>
-                    <InfoPanel
-                        rows={[
-                            { label: "Dịch vụ đăng ký", value: request.serviceNames },
-                            { label: "Nội dung điều trị", value: request.treatmentContent },
-                            { label: "Số tiền đã thanh toán", value: <span className="num">{formatCurrency(request.paidAmount)}</span> },
-                            ...(Number.isFinite(request.amount)
-                                ? [{ label: REFUND_REQUEST_ADMIN_TEXT.AMOUNT, value: <span className="num">{formatCurrency(request.amount)}</span> }]
-                                : []),
-                        ]}
-                    />
+                    <InfoPanel rows={invoiceRows} />
                 </section>
 
                 <TextPanel title="Lý do">{request.reason}</TextPanel>
                 {request.status === REFUND_REQUEST_STATUSES.REJECTED && <TextPanel title="Lý do từ chối">{request.rejectReason}</TextPanel>}
+
+                {pending && (
+                    <section className="flex flex-col gap-3 rounded-lg border border-border p-4">
+                        <FormField id={WORK_DONE_ID} label="Giá trị phần việc đã làm" required error={error}>
+                            <div className="relative">
+                                <input
+                                    id={WORK_DONE_ID}
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={0}
+                                    step={1000}
+                                    className="input num pr-10"
+                                    placeholder="Nhập 0 nếu chưa làm gì"
+                                    aria-invalid={Boolean(error)}
+                                    aria-describedby={error ? `${WORK_DONE_ID}-error` : undefined}
+                                    value={workDone}
+                                    onChange={(event) => {
+                                        setWorkDone(event.target.value);
+                                        setError(null);
+                                    }}
+                                />
+                                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-caption text-muted" aria-hidden="true">
+                                    ₫
+                                </span>
+                            </div>
+                        </FormField>
+                        <div className="flex items-baseline justify-between gap-3" role="status">
+                            <span className="text-muted">Số tiền hoàn cho bệnh nhân</span>
+                            <span className="num font-heading text-heading-3 text-primary">{previewRefund === null ? "—" : formatCurrency(previewRefund)}</span>
+                        </div>
+                        <p className="text-caption text-muted">Số tiền hoàn = số tiền đã thanh toán − giá trị phần việc đã làm. Tiền được hoàn ngay khi xác nhận.</p>
+                    </section>
+                )}
 
                 <div className="modal-actions -mx-6 mt-2 border-t border-border px-6 pt-4">
                     {pending ? (
