@@ -1,5 +1,5 @@
-// Room types and statuses of the Rooms API (RoomConstants / RoomTypeConstants on the backend).
-// The shift and service pages still use the mock values in utils/data/mockRooms until they are wired to the API.
+// Room types and statuses of the Rooms API (RoomConstants / RoomTypeConstants on the backend), used by the room,
+// shift and service pages.
 
 export const ROOM_TYPES = {
     GENERAL_TREATMENT: "GeneralTreatment",

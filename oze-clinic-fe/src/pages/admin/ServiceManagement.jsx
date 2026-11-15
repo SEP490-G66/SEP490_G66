@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import DeactivateServicePopup from "@/components/popup/service/DeactivateServicePopup";
 import ServiceFormPopup from "@/components/popup/service/ServiceFormPopup";
 import ServiceTypesPopup from "@/components/popup/service/ServiceTypesPopup";
+import FilterBar, { FILTER_SEARCH_CLASS, FILTER_SELECT_CLASS } from "@/components/ui/FilterBar";
 import FilterSelect from "@/components/ui/FilterSelect";
 import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
@@ -11,16 +12,18 @@ import Toggle from "@/components/ui/Toggle";
 import useAsync from "@/hooks/useAsync";
 import { activateService, getServices } from "@/services/serviceManagementService";
 import { cx } from "@/utils/cx";
-import { ROOM_TYPE_OPTIONS, roomTypeLabel } from "@/utils/data/mockRooms";
+import { ROOM_TYPE_OPTIONS, roomTypeLabel } from "@/utils/room";
 
 const SEARCH_DELAY_MS = 300;
 const SKELETON_ROW_COUNT = 5;
 const COLUMN_COUNT = 8;
 
-const priceFormatter = new Intl.NumberFormat("vi-VN");
+const STATUS_OPTIONS = [
+    { value: "active", label: "Đang hoạt động" },
+    { value: "inactive", label: "Ngừng hoạt động" },
+];
 
-// "2026-10-20" -> "20/10/2026"
-const formatDate = (value) => value.split("-").reverse().join("/");
+const priceFormatter = new Intl.NumberFormat("vi-VN");
 
 const PriceCell = ({ service }) => {
     if (service.price === 0) return <span className="font-bold text-ink">Miễn phí</span>;
@@ -58,15 +61,9 @@ const ServiceRow = ({ service, index, selected, onOpen, onEdit, onToggleActive }
                 {service.durationMinutes ? `${service.durationMinutes} phút` : "—"}
             </td>
             <td data-label="Trạng thái">
-                {service.isActive && service.deactivateFrom ? (
-                    <span className="badge badge-warning num" title={service.deactivateReason ?? undefined}>
-                        Ngừng từ {formatDate(service.deactivateFrom)}
-                    </span>
-                ) : (
-                    <span className={cx("badge", service.isActive ? "badge-success" : "badge-neutral")}>
-                        {service.isActive ? "Đang hoạt động" : "Ngừng hoạt động"}
-                    </span>
-                )}
+                <span className={cx("badge", service.isActive ? "badge-success" : "badge-neutral")}>
+                    {service.isActive ? "Đang hoạt động" : "Ngừng hoạt động"}
+                </span>
             </td>
             <td data-actions>
                 <div className="flex items-center justify-end gap-3">
@@ -98,6 +95,7 @@ const ServiceManagement = () => {
     const [searchInput, setSearchInput] = useState("");
     const [keyword, setKeyword] = useState("");
     const [roomType, setRoomType] = useState("");
+    const [status, setStatus] = useState("");
     const [page, setPage] = useState(1);
     const [reloadKey, setReloadKey] = useState(0);
     // null = closed; { service: null } = add; { service } = update.
@@ -107,8 +105,8 @@ const ServiceManagement = () => {
     const [viewing, setViewing] = useState(null);
 
     const { loading, value: result } = useAsync(
-        () => getServices({ keyword, roomType, page }),
-        [keyword, roomType, page, reloadKey],
+        () => getServices({ keyword, roomType, status, page }),
+        [keyword, roomType, status, page, reloadKey],
     );
 
     useEffect(() => {
@@ -123,29 +121,38 @@ const ServiceManagement = () => {
 
     const data = result?.success ? result.data : null;
     const services = data?.items ?? [];
-    const filtered = Boolean(keyword || roomType);
+    const filtered = Boolean(keyword || roomType || status);
     const firstItem = data ? (data.page - 1) * data.pageSize + 1 : 0;
+
+    const changeFilter = (setter) => (value) => {
+        setter(value);
+        setPage(1);
+    };
+
+    const clearFilters = () => {
+        setSearchInput("");
+        setKeyword("");
+        setRoomType("");
+        setStatus("");
+        setPage(1);
+    };
 
     const openCreate = () => setEditor({ service: null });
     const openEdit = (service) => setEditor({ service });
 
-    // A new service goes to the top of the list, so show page 1 without filters.
+    // After a new service, clear the filters so it can be found (the list is sorted by code).
     // After an update, keep the filters and page so the edited row stays in view.
     const handleSaved = (message) => {
         const created = !editor?.service;
         setEditor(null);
         toast.success(message);
         setReloadKey((current) => current + 1);
-        if (!created) return;
-        setSearchInput("");
-        setKeyword("");
-        setRoomType("");
-        setPage(1);
+        if (created) clearFilters();
     };
 
     const openDetail = (service) => setViewing(service);
 
-    // Turning off asks for the date and reason first, so the Toggle stays on (return false) until the popup is saved.
+    // Turning off asks for a confirmation first, so the Toggle stays on (return false) until the popup is saved.
     // Turning on happens straight away; false when it failed, so the Toggle flips back.
     const handleToggleActive = async (service, isActive) => {
         if (!isActive) {
@@ -176,27 +183,38 @@ const ServiceManagement = () => {
                 </button>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <FilterBar canClear={Boolean(filtered || searchInput)} onClear={clearFilters}>
                 <SearchInput
                     id="service-search"
                     label="Tìm kiếm dịch vụ"
                     placeholder="Tìm theo mã, tên dịch vụ"
                     value={searchInput}
                     onChange={setSearchInput}
-                    className="w-full sm:w-72"
+                    className={FILTER_SEARCH_CLASS}
                 />
                 <FilterSelect
-                    className="w-full sm:w-auto sm:min-w-40"
+                    className={FILTER_SELECT_CLASS}
                     id="service-room-type"
                     label="Loại phòng"
                     options={ROOM_TYPE_OPTIONS}
                     value={roomType}
-                    onChange={(value) => {
-                        setRoomType(value);
-                        setPage(1);
-                    }}
+                    onChange={changeFilter(setRoomType)}
                 />
-            </div>
+                <FilterSelect
+                    className={FILTER_SELECT_CLASS}
+                    id="service-status"
+                    label="Trạng thái"
+                    options={STATUS_OPTIONS}
+                    value={status}
+                    onChange={changeFilter(setStatus)}
+                />
+            </FilterBar>
+
+            {!loading && result && !result.success && (
+                <p role="alert" className="alert alert-danger">
+                    {result.message || "Không tải được danh sách dịch vụ. Vui lòng thử lại sau."}
+                </p>
+            )}
 
             <div>
                 <div className="table-wrap">
