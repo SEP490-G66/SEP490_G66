@@ -94,7 +94,6 @@ namespace OZE.UnitTest.Controllers
             var error = await act.Should().ThrowAsync<NotFoundException>();
             error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.StaffNotFound);
         }
- feat/SCRUM-879-Unittest-for-CreateWorkShift
 
         [Fact]
         public async Task GetWorkShiftsAsync_ShouldReturnOk_WithShiftList()
@@ -162,6 +161,57 @@ namespace OZE.UnitTest.Controllers
             error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.InvalidDateRange);
         }
 
- main
+        [Fact]
+        public async Task GetWorkShiftByIdAsync_ShouldReturnOk_WhenShiftExists()
+        {
+            // Arrange
+            const long shiftId = 55;
+            var expectedResponse = new WorkShipResponse
+            {
+                Id = shiftId,
+                StaffUserId = "staff-user-1",
+                StaffName = "Bs. Nguyen Van A",
+                RoomId = 1,
+                RoomName = "Phong 101",
+                ScheduleDate = new DateOnly(2026, 11, 20),
+                ShiftStart = new TimeOnly(8, 0),
+                ShiftEnd = new TimeOnly(12, 0),
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            _workShiftServiceMock
+                .Setup(s => s.GetWorkShiftByIdAsync(shiftId))
+                .ReturnsAsync(expectedResponse);
+
+            // Act
+            var actionResult = await _controller.GetWorkShiftByIdAsync(shiftId);
+
+            // Assert
+            var okResult = actionResult.Result.Should().BeOfType<OkObjectResult>().Subject;
+            var response = okResult.Value.Should().BeOfType<ApiResponse<WorkShipResponse>>().Subject;
+            response.Success.Should().BeTrue();
+            response.Data.Should().NotBeNull();
+            response.Data!.Id.Should().Be(shiftId);
+
+            _workShiftServiceMock.Verify(s => s.GetWorkShiftByIdAsync(shiftId), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetWorkShiftByIdAsync_ShouldPropagateNotFoundException_WhenShiftNotFound()
+        {
+            // Arrange
+            const long nonExistentId = 999;
+
+            _workShiftServiceMock
+                .Setup(s => s.GetWorkShiftByIdAsync(nonExistentId))
+                .ThrowsAsync(new NotFoundException(ErrorConstants.WorkShiftMessage.WorkShiftNotFound));
+
+            // Act
+            var act = () => _controller.GetWorkShiftByIdAsync(nonExistentId);
+
+            // Assert
+            var error = await act.Should().ThrowAsync<NotFoundException>();
+            error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.WorkShiftNotFound);
+        }
     }
 }
