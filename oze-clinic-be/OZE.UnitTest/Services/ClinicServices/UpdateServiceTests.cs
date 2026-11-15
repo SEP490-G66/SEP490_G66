@@ -84,5 +84,45 @@ namespace OZE.UnitTest.Services.ClinicServices
             result.Success.Should().BeFalse();
             result.Message.Should().Be(ErrorConstants.ServiceMessage.ServiceNotFound);
         }
+
+        [Fact]
+        public async Task UpdateServiceAsync_ShouldFail_WhenNameAlreadyExists()
+        {
+            // Arrange
+            var existingService = new Service
+            {
+                Id = 5,
+                ServiceCode = "DV-05",
+                ServiceName = "Old name",
+                ReferencePrice = 100000m,
+                IsActive = true
+            };
+
+            var request = new UpdateServiceRequest
+            {
+                ServiceCode = "DV-05",
+                ServiceName = "Trùng tên dịch vụ khác",
+                ReferencePrice = 100000m
+            };
+
+            _serviceRepositoryMock
+                .Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(existingService);
+
+            _serviceRepositoryMock
+                .Setup(r => r.ExistsByCodeAsync("DV-05", 5, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(false);
+
+            _serviceRepositoryMock
+                .Setup(r => r.ExistsByNameAsync("Trùng tên dịch vụ khác", 5, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            // Act
+            var result = await _service.UpdateServiceAsync(5, request);
+
+            // Assert
+            result.Success.Should().BeFalse();
+            result.Message.Should().Be(ErrorConstants.ServiceMessage.ServiceNameExist);
+        }
     }
 }

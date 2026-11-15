@@ -26,16 +26,27 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 |---|---|---|---|---|---|---|---|---|
 | 0 | Cover, MethodList, Statistics | 1–3 | 3 | 0 | – | – | – | – |
 | 1 | OZ-AUTH | 4–14 | 11 | 11 | 0 | 0 | 0 | 0 |
+ feat/unittest-get-work-shift-by-id
+| 2 | OZ-ME | 15–19 | 5 | 4 | 1 | 0 | 0 | 0 |
+| 3 | OZ-PAT | 20–26 | 7 | 0 | 7 | 0 | 0 | 0 |
+| 4 | OZ-SVC | 27–35 | 9 | 0 | 8 | 0 | 1 | 0 |
+| 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 3 | 0 | 22 | 0 | 0 |
+
 | 2 | OZ-ME | 15–19 | 5 | 5 | 0 | 0 | 0 | 0 |
 | 3 | OZ-PAT | 20–26 | 7 | 7 | 0 | 0 | 0 | 0 |
 | 4 | OZ-SVC | 27–35 | 9 | 8 | 0 | 0 | 1 | 0 |
 | 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 2 | 0 | 23 | 0 | 0 |
+ main
 | 6 | OZ-APPT, OZ-Q | 61–84 | 24 | 0 | 6 | 17 | 1 | 0 |
 | 7 | OZ-EXAM, OZ-IMG, OZ-MR | 85–113 | 29 | 0 | 5 | 22 | 2 | 0 |
 | 8 | OZ-TP, OZ-INV | 114–125 | 12 | 0 | 1 | 7 | 4 | 0 |
 | 9 | OZ-HOME, OZ-CFG, OZ-LEAVE, OZ-NOTIF, OZ-WH | 126–133 | 8 | 0 | 2 | 2 | 4 | 0 |
 | 10 | OZ-SIM | 134–142 | 9 | 0 | 0 | 0 | 0 | 9 |
+feat/unittest-get-work-shift-by-id
+| | **Tổng tab hàm** | 4–142 | **139** | **18** | **30** | **70** | **12** | **9** |
+
 | | **Tổng tab hàm** | 4–142 | **139** | **33** | **14** | **71** | **12** | **9** |
+ main
 
 **Thứ tự đề xuất:** đợt 3 → 4 → 7 (phần chụp phim) → 6 (phần có test) → 0, rồi viết test cho các tab ✍️ theo đợt 2 → 5 → 6 → 7 → 8 → 9.
 
@@ -122,7 +133,7 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 50 | ActivateStaff | OZ-STAFF-06 | 0 | ✍️ | | | |
 | 51 | CreateWorkShift | OZ-WS-01 | WorkShifts/CreateWorkShiftTests: 13 (2) | ✅ | HungPVA | 13/11/2026 | 13 UTCID (3N, 3B, 7A) + 2 test controller |
 | 52 | GetWorkShifts | OZ-WS-02 | WorkShifts/GetWorkShiftsTests: 12 (2) | ✅ | HungPVA | 14/11/2026 | 12 UTCID (7N, 3B, 2A) + 2 test controller |
-| 53 | GetWorkShiftById | OZ-WS-03 | 0 | ✍️ | | | |
+| 53 | GetWorkShiftById | OZ-WS-03 | WorkShifts/GetWorkShiftByIdTests: 7 (2) | ✅ | HungPVA | 14/11/2026 | 7 UTCID (4N, 2B, 1A) + 2 test controller |
 | 54 | UpdateWorkShift | OZ-WS-04 | 0 | ✍️ | | | |
 | 55 | DeleteWorkShift | OZ-WS-05 | 0 | ✍️ | | | |
 | 56 | ReopenShift | OZ-WS-06 | 0 | ✍️ | | | |
@@ -291,6 +302,7 @@ Cần thêm tab (copy một tab mẫu, thêm dòng vào MethodList và Statistic
 | 15/11/2026 | DuongDH | OZ-SVC-08 DeleteService: 🔄→✅. Dùng test sẵn (2 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-08` → 2 Passed. Sheet đã điền và được xác nhận. |
 | 13/11/2026 | HungPVA | OZ-WS-01 CreateWorkShift: ✍️→✅. Viết 13 unit test service (3N, 3B, 7A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-01` → 13 Passed. Điền sheet CreateWorkShift. |
 | 14/11/2026 | HungPVA | OZ-WS-02 GetWorkShifts: ✍️→✅. Viết 12 unit test service (7N, 3B, 2A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-02` → 12 Passed. Điền sheet GetWorkShifts. |
+| 14/11/2026 | HungPVA | OZ-WS-03 GetWorkShiftById: ✍️→✅. Viết 7 unit test service (4N, 2B, 1A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-03` → 7 Passed. Điền sheet GetWorkShiftById. |
 
 ---
 

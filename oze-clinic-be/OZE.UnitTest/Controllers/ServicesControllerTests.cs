@@ -139,6 +139,66 @@ namespace OZE.UnitTest.Controllers
         }
 
         [Fact]
+        public async Task DeactivateServiceAsync_ShouldReturnOk_WhenServiceDeactivatedSuccessfully()
+        {
+            // Arrange
+            var serviceId = 1;
+            var updatedDto = new ServiceDto
+            {
+                Id = serviceId,
+                ServiceCode = "DV-001",
+                ServiceName = "Lấy cao răng",
+                IsActive = false
+            };
+
+            var expectedResponse = ApiResponse<ServiceDto>.SuccessResult(updatedDto, "Service deactivated successfully");
+
+            _clinicServiceMock
+                .Setup(s => s.DeactivateServiceAsync(serviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(expectedResponse);
+
+            // Act
+            var actionResult = await _controller.DeactivateServiceAsync(serviceId, CancellationToken.None);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            var response = Assert.IsType<ApiResponse<ServiceDto>>(okResult.Value);
+            Assert.True(response.Success);
+            Assert.NotNull(response.Data);
+            Assert.False(response.Data.IsActive);
+        }
+
+        [Fact]
+        public async Task ActivateServiceAsync_ShouldReturnOk_WhenServiceActivatedSuccessfully()
+        {
+            // Arrange
+            var serviceId = 1;
+            var updatedDto = new ServiceDto
+            {
+                Id = serviceId,
+                ServiceCode = "DV-001",
+                ServiceName = "Lấy cao răng",
+                IsActive = true
+            };
+
+            var expectedResponse = ApiResponse<ServiceDto>.SuccessResult(updatedDto, "Service activated successfully");
+
+            _clinicServiceMock
+                .Setup(s => s.ActivateServiceAsync(serviceId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(expectedResponse);
+
+            // Act
+            var actionResult = await _controller.ActivateServiceAsync(serviceId, CancellationToken.None);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(actionResult.Result);
+            var response = Assert.IsType<ApiResponse<ServiceDto>>(okResult.Value);
+            Assert.True(response.Success);
+            Assert.NotNull(response.Data);
+            Assert.True(response.Data.IsActive);
+        }
+
+        [Fact]
         public async Task DeleteServiceAsync_ShouldReturnOk_WhenServiceDeletedSuccessfully()
         {
             // Arrange
