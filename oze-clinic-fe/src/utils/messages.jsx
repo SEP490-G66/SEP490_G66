@@ -35,6 +35,8 @@ export const PROFILE_LIMITS = { FULL_NAME_MAX: 100, ADDRESS_MAX: 500 };
 export const VALIDATION_MESSAGES = {
     PHONE_INVALID: "Số điện thoại không hợp lệ.",
     PASSWORD_LENGTH: `Mật khẩu phải có từ ${PASSWORD_LENGTH.MIN} đến ${PASSWORD_LENGTH.MAX} ký tự.`,
+    PASSWORD_LOWERCASE: "Mật khẩu phải có ít nhất một chữ cái thường.",
+    PASSWORD_DIGIT: "Mật khẩu phải có ít nhất một chữ số.",
     EMAIL_INVALID: "Email không hợp lệ.",
     FULL_NAME_TOO_LONG: `Họ và tên không được vượt quá ${PROFILE_LIMITS.FULL_NAME_MAX} ký tự.`,
     BIRTHDATE_IN_FUTURE: "Ngày sinh không được lớn hơn ngày hiện tại.",

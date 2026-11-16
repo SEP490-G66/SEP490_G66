@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import Card from "@/components/ui/Card";
 import { toast } from "react-toastify";
-import { requestPasswordReset, resendRegisterOtp, verifyOtp, verifyRegisterOtp } from "../../services/authService";
+import { requestPasswordReset, resendRegisterOtp, verifyRegisterOtp, verifyResetOtp } from "../../services/authService";
 import { cancelProfileOtp, hasPendingProfileChanges, resendProfileOtp, verifyProfileOtp } from "../../services/profileService";
 import { OTP_LENGTH, OTP_RESEND_SECONDS, PROFILE_MESSAGES } from "../../utils/messages";
 import { ROUTES } from "../../utils/routes";
@@ -42,11 +42,11 @@ const VerifyOtpPage = () => {
     const isProfile = state?.flow === "profile";
     if (isProfile) {
         if (!hasPendingProfileChanges()) return <Navigate to={ROUTES.PROFILE} replace />;
-    } else if (isRegister ? !state.sessionId : !state?.phone || !state?.method) {
+    } else if (isRegister ? !state.sessionId : !state?.sessionId || !state?.identifier) {
         return <Navigate to={isRegister ? ROUTES.REGISTER : ROUTES.FORGOT_PASSWORD} replace />;
     }
 
-    const { phone, method, sessionId, maskedDestination } = state;
+    const { identifier, sessionId, maskedDestination } = state;
     const busy = loading || resending;
 
     const focusBox = (index) => inputRefs.current[index]?.focus();
@@ -105,8 +105,15 @@ const VerifyOtpPage = () => {
             let result;
             if (isProfile) result = await resendProfileOtp();
             else if (isRegister) result = await resendRegisterOtp({ sessionId });
-            else result = await requestPasswordReset({ phone, method });
+            else result = await requestPasswordReset({ identifier });
             if (result.success) {
+                if (!isProfile && !isRegister) {
+                    const { sessionId: nextSessionId, maskedDestination: nextDestination } = result.data;
+                    navigate(ROUTES.VERIFY_OTP, {
+                        replace: true,
+                        state: { ...state, sessionId: nextSessionId, maskedDestination: nextDestination },
+                    });
+                }
                 setDigits(EMPTY_CODE);
                 setCodeError(undefined);
                 setSecondsLeft(OTP_RESEND_SECONDS);
@@ -167,9 +174,9 @@ const VerifyOtpPage = () => {
                 return;
             }
 
-            const result = await verifyOtp({ phone, code });
+            const result = await verifyResetOtp({ sessionId, code });
             if (result.success) {
-                navigate(ROUTES.RESET_PASSWORD, { replace: true, state: { phone, resetToken: result.data.resetToken } });
+                navigate(ROUTES.RESET_PASSWORD, { replace: true, state: { sessionId } });
                 return;
             }
             setCodeError(result.message);

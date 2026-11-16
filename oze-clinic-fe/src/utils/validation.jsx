@@ -47,9 +47,18 @@ export const validateIdentifier = (value) => {
     return isEmailIdentifier(trimmed) ? validateEmail(trimmed) : validatePhone(trimmed);
 };
 
+const LOWERCASE_PATTERN = /\p{Ll}/u;
+const DIGIT_PATTERN = /\d/;
+
+export const hasLowercase = (value) => LOWERCASE_PATTERN.test(value);
+
+export const hasDigit = (value) => DIGIT_PATTERN.test(value);
+
 // For Register / Reset / Change Password. Sign In only checks that the password is filled.
 export const validatePassword = (value) => {
     if (isPasswordEmpty(value)) return requiredMessage("mật khẩu");
     if (value.length < PASSWORD_LENGTH.MIN || value.length > PASSWORD_LENGTH.MAX) return VALIDATION_MESSAGES.PASSWORD_LENGTH;
+    if (!hasLowercase(value)) return VALIDATION_MESSAGES.PASSWORD_LOWERCASE;
+    if (!hasDigit(value)) return VALIDATION_MESSAGES.PASSWORD_DIGIT;
     return undefined;
 };
