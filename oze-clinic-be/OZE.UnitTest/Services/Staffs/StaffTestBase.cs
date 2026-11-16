@@ -21,6 +21,9 @@ namespace OZE.UnitTest.Services.Staffs
 
         protected const string ValidUserId = "staff-user-1";
         protected const string ValidFullName = "Nguyen Van A";
+        protected const string ValidStaffEmail = "doctor@oze.vn";
+        protected const string ValidLocalPhone = "0912345678";
+        protected const string ValidE164Phone = "+84912345678";
 
         protected StaffTestBase()
         {
@@ -32,6 +35,11 @@ namespace OZE.UnitTest.Services.Staffs
             _refreshTokenRepositoryMock = new Mock<IUserRefreshTokenRepository>();
             _emailSenderMock = new Mock<IEmailSender>();
 
+            // The transaction just runs the work it is given, whatever its result type
+            _registrationRepositoryMock
+                .Setup(r => r.ExecuteInTransactionAsync(It.IsAny<Func<Task<It.IsAnyType>>>(), It.IsAny<Func<It.IsAnyType, bool>>()))
+                .Returns(new InvocationFunc(invocation => ((Delegate)invocation.Arguments[0]).DynamicInvoke()!));
+
             _service = new StaffService(
                 _userManagerMock.Object,
                 _staffRepositoryMock.Object,
@@ -39,6 +47,32 @@ namespace OZE.UnitTest.Services.Staffs
                 _refreshTokenRepositoryMock.Object,
                 _emailSenderMock.Object,
                 Mock.Of<ILogger<StaffService>>());
+        }
+
+        protected void SetupCreateUniquenessPasses()
+        {
+            _userManagerMock
+                .Setup(m => m.FindByEmailAsync(It.IsAny<string>()))
+                .ReturnsAsync((ApplicationUser?)null);
+            _registrationRepositoryMock
+                .Setup(r => r.FindUserByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>()))
+                .ReturnsAsync((ApplicationUser?)null);
+            _staffRepositoryMock
+                .Setup(r => r.IsLicenseNumberInUseAsync(It.IsAny<string>(), 0))
+                .ReturnsAsync(false);
+        }
+
+        protected void SetupCreateAccountSucceeds()
+        {
+            _userManagerMock
+                .Setup(m => m.CreateAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
+                .ReturnsAsync(IdentityResult.Success);
+            _userManagerMock
+                .Setup(m => m.AddToRoleAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
+                .ReturnsAsync(IdentityResult.Success);
+            _emailSenderMock
+                .Setup(e => e.SendTemporaryPasswordAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
         }
 
         protected static StaffResponse CreateSampleStaffResponse(
