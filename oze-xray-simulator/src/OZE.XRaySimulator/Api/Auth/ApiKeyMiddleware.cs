@@ -17,6 +17,13 @@ public sealed class ApiKeyMiddleware
     {
         var path = context.Request.Path.Value ?? string.Empty;
 
+        // Opening the bare site in a browser lands on the API page instead of a missing-key error
+        if (path is "" or "/")
+        {
+            context.Response.Redirect("/swagger");
+            return;
+        }
+
         // Bypass public/health/swagger endpoints
         if (path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase))
