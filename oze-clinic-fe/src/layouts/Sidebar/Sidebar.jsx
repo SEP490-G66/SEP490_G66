@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { NavLink, matchPath, useLocation } from "react-router-dom";
 import { ChevronDown, X } from "lucide-react";
 import LogoOze from "@/assets/logo/Logo.png";
-import LogoOzeSquare from "@/assets/logo/Logo_OZE.png";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { REQUEST_TYPES, getPendingRequests } from "@/services/adminReportService";
@@ -98,25 +97,28 @@ const useOpenGroups = (menu) => {
     return { isOpen: (key) => !closed.has(key), toggle, pathname };
 };
 
-// The logo files are white (made for the blue public header), so they are used as a mask and painted in the brand colour.
-const logoMaskStyle = (src) => ({
-    maskImage: `url(${src})`,
-    WebkitMaskImage: `url(${src})`,
+// The logo file is white (made for the blue public header), so it is used as a mask and painted in the brand colour.
+// size/position: "contain"/"center" shows the whole logo; "auto 100%"/"left center" keeps only its left part.
+const logoMaskStyle = (size, position) => ({
+    maskImage: `url(${LogoOze})`,
+    WebkitMaskImage: `url(${LogoOze})`,
     maskRepeat: "no-repeat",
     WebkitMaskRepeat: "no-repeat",
-    maskSize: "contain",
-    WebkitMaskSize: "contain",
-    maskPosition: "center",
-    WebkitMaskPosition: "center",
+    maskSize: size,
+    WebkitMaskSize: size,
+    maskPosition: position,
+    WebkitMaskPosition: position,
 });
 
-// Horizontal logo; the square one when the sidebar is collapsed.
+// Logo.png is 2170×725; the tooth icon takes its left ~650px.
+// Expanded: the whole logo, 56px high (≈168px wide) to fit the 64px top row of the 256px sidebar.
+// Collapsed (72px): only the tooth icon, cropped from the same file.
 const Brand = ({ collapsed }) => (
     <span
         role="img"
         aria-label={GUEST_HEADER_TEXT.LOGO_ALT}
-        className={cx("block shrink-0 bg-primary", collapsed ? "size-11" : "aspect-[2170/725] h-14")}
-        style={logoMaskStyle(collapsed ? LogoOzeSquare : LogoOze)}
+        className={cx("block shrink-0 bg-primary", collapsed ? "aspect-650/725 h-12" : "aspect-2170/725 h-14")}
+        style={collapsed ? logoMaskStyle("auto 100%", "left center") : logoMaskStyle("contain", "center")}
     />
 );
 
