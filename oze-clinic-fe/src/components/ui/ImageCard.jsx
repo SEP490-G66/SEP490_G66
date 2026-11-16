@@ -1,10 +1,14 @@
+import { Link } from "react-router-dom";
 import { Image as ImageIcon } from "lucide-react";
 import { cx } from "@/utils/cx";
 
-const ImageCard = ({ imageUrl, imageAlt, title, description, className }) => {
-    return (
-        <article className={cx("card-public flex flex-col overflow-hidden p-0", className)}>
-            <div className="aspect-square w-full shrink-0 bg-surface-tint">
+// Picture + title + short description. With `to`, the whole card is a link (e.g. to a service page).
+// imageClassName sets the picture's shape (square by default).
+// Without a picture it shows an empty frame, so the layout stays the same until the picture is added.
+const ImageCard = ({ imageUrl, imageAlt, title, description, className, to, imageClassName = "aspect-square" }) => {
+    const body = (
+        <>
+            <div className={cx("w-full shrink-0 bg-surface-tint", imageClassName)}>
                 {imageUrl ? (
                     <img src={imageUrl} alt={imageAlt} loading="lazy" className="size-full object-contain" />
                 ) : (
@@ -14,11 +18,21 @@ const ImageCard = ({ imageUrl, imageAlt, title, description, className }) => {
                 )}
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
-                <h3 className="card-title">{title}</h3>
+                <h3 className={cx("card-title", to && "transition-colors group-hover:text-primary")}>{title}</h3>
                 {description && <p className="line-clamp-3 text-body-sm text-body">{description}</p>}
             </div>
-        </article>
+        </>
     );
+
+    if (to) {
+        return (
+            <Link to={to} className={cx("card-public card-hover group flex flex-col overflow-hidden p-0", className)}>
+                {body}
+            </Link>
+        );
+    }
+
+    return <article className={cx("card-public flex flex-col overflow-hidden p-0", className)}>{body}</article>;
 };
 
 export default ImageCard;

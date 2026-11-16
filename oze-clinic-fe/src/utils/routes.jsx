@@ -10,8 +10,9 @@ export const ROUTES = {
     VERIFY_OTP: "/verify-otp",
     RESET_PASSWORD: "/reset-password",
     SERVICES: "/services",
-    SERVICE_DETAIL: "/services/:serviceId",
+    SERVICE_DETAIL: "/services/:serviceSlug",
     DOCTORS: "/doctors",
+    SEARCH: "/search",
     CONTACT: "/contact",
     BOOK_APPOINTMENT: "/book-appointment",
     PROFILE: "/profile",
@@ -108,7 +109,15 @@ export const ROLE_ROUTES = [
     }
 ];
 
-export const getServiceDetailRoute = (serviceId) => generatePath(ROUTES.SERVICE_DETAIL, { serviceId: String(serviceId) });
+// slug of a public service, e.g. "nieng-rang" (utils/data/publicServices.jsx)
+export const getServiceDetailRoute = (serviceSlug) => generatePath(ROUTES.SERVICE_DETAIL, { serviceSlug });
+
+export const getServiceSearchRoute = (keyword) => (keyword ? `${ROUTES.SERVICES}?q=${encodeURIComponent(keyword)}` : ROUTES.SERVICES);
+
+export const getDoctorSearchRoute = (keyword) => (keyword ? `${ROUTES.DOCTORS}?q=${encodeURIComponent(keyword)}` : ROUTES.DOCTORS);
+
+// Header search: services and doctors together
+export const getSearchRoute = (keyword) => `${ROUTES.SEARCH}?q=${encodeURIComponent(keyword)}`;
 
 export const getAppointmentDetailRoute = (appointmentId) => generatePath(ROUTES.APPOINTMENT_DETAIL, { appointmentId: String(appointmentId) });
 

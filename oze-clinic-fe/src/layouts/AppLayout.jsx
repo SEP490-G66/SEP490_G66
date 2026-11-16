@@ -4,6 +4,8 @@ import Header from "./Header/Header.jsx";
 import Sidebar from "./Sidebar/Sidebar.jsx";
 import Footer from "./Footer/Footer.jsx";
 import ErrorBoundary from "../components/error/ErrorBoundary.jsx";
+import useSession from "../hooks/useSession";
+import { USER_ROLES } from "../utils/messages";
 
 const SIDEBAR_ID = "app-sidebar";
 const DESKTOP_QUERY = "(min-width: 64rem)";
@@ -21,6 +23,7 @@ const getPageGroupKey = (pathname) => `/${pathname.split("/")[1] ?? ""}`.toLower
 // publicPage: a public page (home, services...) opened by a signed-in patient. Keeps the sidebar, drops the app padding, adds the footer.
 const AppLayout = ({ publicPage = false }) => {
     const location = useLocation();
+    const { role } = useSession();
     const isDesktop = useSyncExternalStore(subscribeToDesktop, getIsDesktop);
     const toggleRef = useRef(null);
     const [collapsed, setCollapsed] = useState(false);
@@ -40,26 +43,51 @@ const AppLayout = ({ publicPage = false }) => {
         else setDrawerOpen((current) => !current);
     };
 
+    const header = (
+        <Header
+            onToggleSidebar={handleToggle}
+            sidebarOpen={sidebarOpen}
+            sidebarId={sidebarInDom ? SIDEBAR_ID : undefined}
+            sidebarToggleRef={toggleRef}
+        />
+    );
+
+    const content = (
+        <>
+            <main className={publicPage ? "flex-1" : "app-content flex-1"}>
+                <ErrorBoundary key={getPageGroupKey(location.pathname)}>
+                    <Outlet />
+                </ErrorBoundary>
+            </main>
+            {publicPage && <Footer />}
+        </>
+    );
+
+    const drawer = drawerOpen && (
+        <Sidebar id={SIDEBAR_ID} drawer onClose={() => setDrawerOpen(false)} returnFocusRef={toggleRef} />
+    );
+
+    if (role === USER_ROLES.PATIENT) {
+        return (
+            <div className="flex min-h-dvh flex-col">
+                {header}
+                <div className="flex flex-1">
+                    {isDesktop && <Sidebar id={SIDEBAR_ID} collapsed={collapsed} underHeader />}
+                    <div className="flex min-w-0 flex-1 flex-col">{content}</div>
+                </div>
+                {drawer}
+            </div>
+        );
+    }
+
     return (
         <div className="flex min-h-dvh">
             {isDesktop && <Sidebar id={SIDEBAR_ID} collapsed={collapsed} />}
             <div className="flex min-w-0 flex-1 flex-col">
-                <Header
-                    onToggleSidebar={handleToggle}
-                    sidebarOpen={sidebarOpen}
-                    sidebarId={sidebarInDom ? SIDEBAR_ID : undefined}
-                    sidebarToggleRef={toggleRef}
-                />
-                <main className={publicPage ? "flex-1" : "app-content flex-1"}>
-                    <ErrorBoundary key={getPageGroupKey(location.pathname)}>
-                        <Outlet />
-                    </ErrorBoundary>
-                </main>
-                {publicPage && <Footer />}
+                {header}
+                {content}
             </div>
-            {drawerOpen && (
-                <Sidebar id={SIDEBAR_ID} drawer onClose={() => setDrawerOpen(false)} returnFocusRef={toggleRef} />
-            )}
+            {drawer}
         </div>
     );
 };

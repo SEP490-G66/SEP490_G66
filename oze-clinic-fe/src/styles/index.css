@@ -346,6 +346,7 @@
   /* ---------- App shell ---------- */
   .app-shell { @apply grid min-h-dvh grid-cols-1 lg:grid-cols-[var(--spacing-sidebar)_1fr]; }
   .sidebar { @apply hidden flex-col gap-1 border-r border-border bg-canvas p-3 text-label text-body lg:flex; }
+  .sidebar-under-header { @apply sticky top-public-nav; height: calc(100dvh - var(--spacing-public-nav)); }
   .sidebar-item { @apply flex h-control items-center gap-3 rounded-md px-3 text-label text-body hover:bg-surface-tint; }
   .sidebar-item > svg { @apply size-5 text-muted; }
   .sidebar-item-active, .sidebar-item[aria-current="page"] { @apply bg-primary-soft text-primary hover:bg-primary-soft; }

@@ -1,8 +1,11 @@
 import { MapPin, Phone, Clock, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { FaFacebookF, FaTiktok, FaYoutube } from "react-icons/fa";
 import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { getFooterServices } from "@/services/dentalService";
+import { getServiceDetailRoute } from "@/utils/routes";
 
 const PHONE_ID = "footer-consult-phone";
 
@@ -10,15 +13,6 @@ const CONTACTS = [
     { icon: MapPin, text: "Số nhà 55-59, tổ 4, quốc lộ 3, Đông Anh, Hà Nội" },
     { icon: Phone, text: "0866 866 010", href: "tel:0866866010" },
     { icon: Clock, text: "Mở cửa: Thứ 2 - Chủ Nhật" },
-];
-
-const SERVICES = [
-    "Cấy ghép Implant",
-    "Niềng răng chỉnh nha",
-    "Thẩm mỹ răng sứ",
-    "Phục hình sứ Inlay - Onlay - Overlay",
-    "Tẩy Trắng Răng",
-    "Phục hồi tủy nhân tạo",
 ];
 
 const SOCIALS = [
@@ -74,12 +68,15 @@ const Footer = () => {
                         Dịch vụ nha khoa
                     </h3>
                     <ul className="flex flex-col gap-1 sm:gap-2">
-                        {SERVICES.map((service) => (
-                            <li key={service}>
-                                <a href="#" className="group flex min-h-9 items-center gap-2 rounded-md py-1 pointer-coarse:min-h-11">
+                        {getFooterServices().map((service) => (
+                            <li key={service.slug}>
+                                <Link
+                                    to={getServiceDetailRoute(service.slug)}
+                                    className="group flex min-h-9 items-center gap-2 rounded-md py-1 pointer-coarse:min-h-11"
+                                >
                                     <ChevronRight className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-1" aria-hidden="true" />
-                                    <span className="text-body-md text-body transition-colors group-hover:text-primary">{service}</span>
-                                </a>
+                                    <span className="text-body-md text-body transition-colors group-hover:text-primary">{service.name}</span>
+                                </Link>
                             </li>
                         ))}
                     </ul>
