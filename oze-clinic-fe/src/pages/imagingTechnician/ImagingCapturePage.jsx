@@ -189,17 +189,7 @@ const ImagingCapturePage = () => {
     const complete = async () => {
         const target = order;
         const owner = patient;
-        const result = captures[target.id] ?? initialCapture(target);
-        const response = await completeImagingRequest(target.id, {
-            createdAt: target.createdAt,
-            patientName: owner.patientName,
-            imagingType: target.imagingType,
-            targetArea: target.targetArea,
-            clinicalIndication: target.clinicalIndication,
-            doctorName: target.doctorName,
-            deviceId: result.session.deviceId ?? null,
-            images: result.images,
-        });
+        const response = await completeImagingRequest(target.id);
         setDialog(null);
         if (response.success) {
             toast.success(`Đã gửi kết quả IR-${target.id} cho ${target.doctorName || "bác sĩ"}.`);

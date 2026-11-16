@@ -10,6 +10,10 @@ namespace OZE.Common.Constants
 
         // BR-081: the technician queue shows these statuses in request-time order.
         public static readonly string[] QueueStatuses = { Pending, InProgress };
+        // Requests shown on the technician history page
+        public static readonly string[] HistoryStatuses = { Completed, Cancelled };
+        public const int HistoryDefaultPageSize = 10;
+        public const int HistoryMaxPageSize = 100;
 
         // BR-190
         public const string PeriapicalXRay = "Periapical X-ray";

@@ -66,6 +66,7 @@ namespace OZE.Application
             services.AddScoped<IMedicalRecordService, MedicalRecordService>();
             services.AddScoped<IImagingRequestService, ImagingRequestService>();
             services.AddScoped<IImagingCaptureService, ImagingCaptureService>();
+            services.AddScoped<IImagingHistoryService, ImagingHistoryService>();
             services.AddSingleton<IImagingFileStore, LocalImagingFileStore>();
             // X-ray simulator: XRaySimulator:BaseUrl and XRaySimulator:ApiKey; a development machine falls back to the simulator's own defaults
             services.AddHttpClient<ISimulatorClient, SimulatorClient>((provider, client) =>
