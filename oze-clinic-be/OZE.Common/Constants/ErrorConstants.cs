@@ -195,15 +195,6 @@ namespace OZE.Common.Constants
             public const string InvalidEstimatedMinutes = "Estimated minutes must be greater than 0";
         }
 
-        // Pictures of services and service variants
-        public static class ServiceImageMessage
-        {
-            public const string ImageRequired = "Please choose an image";
-            public const string ImageTooLarge = "The image must not be larger than 2 MB";
-            public const string InvalidImageType = "Only JPG, PNG or WebP images are allowed";
-            public const string ImageNotFound = "This item has no image";
-        }
-
         // System configuration (clinic manager)
         public static class SystemConfigMessage
         {

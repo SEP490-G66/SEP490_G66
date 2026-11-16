@@ -11,7 +11,6 @@ namespace OZE.Common.Models
         public int Id { get; set; }
         public string ServiceName { get; set; } = string.Empty;
         public string? Description { get; set; }
-        public string? ImageUrl { get; set; }
         public decimal ReferencePrice { get; set; }
         public int? EstimatedMinutes { get; set; }
     }

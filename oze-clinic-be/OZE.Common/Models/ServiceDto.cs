@@ -6,8 +6,6 @@ namespace OZE.Common.Models
         public string ServiceCode { get; set; } = string.Empty;
         public string ServiceName { get; set; } = string.Empty;
         public string? Description { get; set; }
-        // Address of the picture (relative to the API), null when the service has none
-        public string? ImageUrl { get; set; }
         public decimal ReferencePrice { get; set; }
         public int? EstimatedMinutes { get; set; }
         public int? RecallIntervalMonths { get; set; }
