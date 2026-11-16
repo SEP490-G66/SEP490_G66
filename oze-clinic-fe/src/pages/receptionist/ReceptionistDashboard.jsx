@@ -42,7 +42,7 @@ import { addDays, ddmm, hhmm, isSunday } from "@/utils/calendar";
 import { allergiesOf, appointmentMenu, isLate as lateAt, matchesKeyword, serviceNames, slotOf, stateOf } from "@/utils/checkIn";
 import { callBackText, confirmStateOf, shortDate, sortByVisit } from "@/utils/confirmAppointments";
 import { CHECK_IN_TEXT, CONFIRM_TEXT, DASHBOARD_TEXT as TEXT, QUEUE_TEXT } from "@/utils/messages";
-import { entryRows, examRooms, examRows, orderRows, otherRooms, waitingCount } from "@/utils/queueBoard";
+import { NO_DOCTOR_KEY, entryRows, examRooms, examRows, orderRows, otherRooms, waitingCount } from "@/utils/queueBoard";
 import { RECEPTION_PATIENT_CREATE_ROUTE, ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
@@ -204,7 +204,15 @@ const ReceptionistDashboard = () => {
 
     const moveTargets = (room) => rooms.filter((r) => r.tab === room.tab && r.key !== room.key && r.active && !r.off).map((r) => ({ ...r, waiting: waitingCount(rows, r.key) }));
 
-    const moveRows = async (moving, { target, reason }) => {
+    const moveRows = async (picked, fromKey, { target, reason }) => {
+        // The rows still waiting in that room now, not the ones seen when the dialog opened
+        const moving = rows.filter((r) => r.roomKey === fromKey && r.state !== "serving" && picked.some((p) => p.key === r.key || picked.length > 1));
+        if (!moving.length) {
+            toast.info(QUEUE_TEXT.MOVE_NOTHING);
+            setDialog(null);
+            reload();
+            return;
+        }
         const failures = [];
         for (const row of moving) {
             const result =
@@ -336,14 +344,14 @@ const ReceptionistDashboard = () => {
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                 <Card title={TEXT.ROOMS_TITLE} link={{ to: ROUTES.RECEPTION_QUEUE, label: TEXT.ROOMS_LINK }}>
                     <ul className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {rooms.map((room) => (
+                        {rooms.filter((room) => room.key !== NO_DOCTOR_KEY).map((room) => (
                             <RoomCard
                                 key={room.key}
                                 room={room}
                                 rows={rows.filter((r) => r.roomKey === room.key)}
                                 later={room.ended ? laterOf(room) : 0}
                                 onCall={callNext}
-                                onMoveAll={(from, moving) => setDialog({ type: "move", from, rows: moving })}
+                                onMoveAll={(from, moving) => setDialog({ type: "move", from, rows: moving, reason: QUEUE_TEXT.MOVE_REASON_ENDED(from.staff) })}
                             />
                         ))}
                     </ul>
@@ -439,7 +447,15 @@ const ReceptionistDashboard = () => {
                 <RescheduleDialog appointment={a} onClose={close} onSubmit={(v) => act(rescheduleAppointment(a.id, v), CONFIRM_TEXT.RESCHEDULED(a.patientName))} />
             )}
             {dialog?.type === "cancel" && <CancelDialog appointment={a} onClose={close} onSubmit={(reason) => act(cancelAppointment(a.id, reason), CONFIRM_TEXT.CANCELLED(a.patientName))} />}
-            {dialog?.type === "move" && <QueueMoveDialog rows={dialog.rows} targets={moveTargets(dialog.from)} onClose={close} onSubmit={(choice) => moveRows(dialog.rows, choice)} />}
+            {dialog?.type === "move" && (
+                <QueueMoveDialog
+                    rows={dialog.rows}
+                    targets={moveTargets(dialog.from)}
+                    defaultReason={dialog.reason}
+                    onClose={close}
+                    onSubmit={(choice) => moveRows(dialog.rows, dialog.from.key, choice)}
+                />
+            )}
             {dialog?.type === "walkIn" && (
                 <WalkInDialog doctors={available} onClose={close} onSubmit={(request) => act(createWalkIn(request), CHECK_IN_TEXT.WALKED_IN(request.fullName))} />
             )}

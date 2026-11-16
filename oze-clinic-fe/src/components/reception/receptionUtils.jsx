@@ -111,9 +111,14 @@ export const usePaging = (items, pageSize = 10) => {
 // Doctors with a shift today, one row per doctor (the shift that matters now), and the ones still able to take patients
 export const useDoctorsOnDuty = (refreshKey = 0) => {
     const [shifts, setShifts] = useState([]);
+    const [loaded, setLoaded] = useState(false);
     useEffect(() => {
         let active = true;
-        getDoctorsOnDuty().then((result) => active && result.success && setShifts(result.data));
+        getDoctorsOnDuty().then((result) => {
+            if (!active || !result.success) return;
+            setShifts(result.data);
+            setLoaded(true);
+        });
         return () => {
             active = false;
         };
@@ -140,8 +145,8 @@ export const useDoctorsOnDuty = (refreshKey = 0) => {
             });
         });
         const doctors = [...map.values()];
-        return { doctors, available: doctors.filter((d) => d.status === "Working" || d.status === "NotStarted") };
-    }, [shifts]);
+        return { doctors, loaded, available: doctors.filter((d) => d.status === "Working" || d.status === "NotStarted") };
+    }, [shifts, loaded]);
 };
 
 // A doctor counts as late after this many minutes past the shift start without pressing "start shift"

@@ -11,9 +11,11 @@ const QueuePriorityDialog = ({ row, roomName, onClose, onSubmit }) => {
     const current = row.priority ?? PRIORITY.NORMAL;
     const [priority, setPriority] = useState(current);
     const [reason, setReason] = useState(row.priorityReason ?? "");
+    const [tried, setTried] = useState(false);
     const [busy, submit] = useSubmit(onSubmit);
     const needsReason = priority > PRIORITY.NORMAL && !reason.trim();
-    const unchanged = priority === current && reason.trim() === (row.priorityReason ?? "");
+    // Back to Thường needs no reason, so a typed reason there changes nothing
+    const unchanged = priority === current && (priority === PRIORITY.NORMAL || reason.trim() === (row.priorityReason ?? ""));
 
     return (
         <Modal title={TEXT.PRIORITY_TITLE} description={[row.patientName, roomName].filter(Boolean).join(" · ")} onClose={onClose} closeDisabled={busy}>
@@ -22,10 +24,16 @@ const QueuePriorityDialog = ({ row, roomName, onClose, onSubmit }) => {
                 className="mt-5 space-y-4"
                 onSubmit={(event) => {
                     event.preventDefault();
+                    setTried(true);
                     if (!busy && !needsReason && !unchanged) submit({ priority, reason: priority > PRIORITY.NORMAL ? reason.trim() : null });
                 }}
             >
                 <PriorityFields priority={priority} setPriority={setPriority} reason={reason} setReason={setReason} idPrefix="qp" />
+                {tried && needsReason && (
+                    <p role="alert" className="text-caption text-danger">
+                        {TEXT.ERR_REASON}
+                    </p>
+                )}
                 <p className="text-sm text-muted">{TEXT.PRIORITY_NOTE}</p>
                 <DialogActions
                     onClose={onClose}
@@ -33,7 +41,7 @@ const QueuePriorityDialog = ({ row, roomName, onClose, onSubmit }) => {
                     submitLabel={TEXT.PRIORITY_SUBMIT}
                     busy={busy}
                     closeDisabled={busy}
-                    disabled={unchanged || needsReason}
+                    disabled={unchanged}
                 />
             </form>
         </Modal>

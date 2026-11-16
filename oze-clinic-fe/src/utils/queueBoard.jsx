@@ -50,7 +50,8 @@ export const examRooms = (doctors, waiting, serving) => {
             return;
         }
         if (map.has(String(x.doctorId))) return;
-        map.set(String(x.doctorId), { key: String(x.doctorId), tab: "kham", doctorId: x.doctorId, name: x.roomName, staff: x.doctorName, ended: false, active: true });
+        // A doctor missing from today's duty list: the shift is unknown, so never a move target
+        map.set(String(x.doctorId), { key: String(x.doctorId), tab: "kham", doctorId: x.doctorId, name: x.roomName, staff: x.doctorName, ended: false, active: false });
     });
     // Patients without a doctor come last, after every named room
     return [...map.values()].sort(
@@ -152,9 +153,12 @@ export const needsDecision = (row) => row.state !== "serving" && (row.skips ?? 0
 
 export const matchesQueue = (row, filters) => {
     const q = filters.keyword.trim();
-    const digits = q.replace(/\D/g, "").replace(/^84/, "0");
+    const digits = q.replace(/\D/g, "");
+    // "84…" typed as a full number becomes "0…"; a run of digits from the middle still matches as typed
+    const local = digits.replace(/^84/, "0");
     const phone = String(row.patientPhoneNumber ?? "").replace(/\D/g, "").replace(/^84/, "0");
-    const keywordOk = !q || norm(row.patientName).includes(norm(q)) || norm(row.patientCode).includes(norm(q)) || (digits.length >= 3 && phone.includes(digits));
+    const phoneOk = digits.length >= 3 && (phone.includes(digits) || (local.length >= 3 && phone.includes(local)));
+    const keywordOk = !q || norm(row.patientName).includes(norm(q)) || norm(row.patientCode).includes(norm(q)) || phoneOk;
     return keywordOk && (!filters.room || row.roomKey === filters.room) && (!filters.state || (filters.state === "absent" ? row.absent || (row.skips ?? 0) > 0 : row.state === filters.state)) && (!filters.priority || String(row.priority) === filters.priority);
 };
 
