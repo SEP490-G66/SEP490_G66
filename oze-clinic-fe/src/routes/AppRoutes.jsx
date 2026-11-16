@@ -47,6 +47,8 @@ import WorkShiftManagement from "../pages/admin/WorkShiftManagement";
 import SystemSettings from "../pages/admin/SystemSettings";
 import ExaminationPage from "../pages/doctor/examination/ExaminationPage";
 import ImagingReviewPage from "../pages/doctor/ImagingReviewPage";
+import ImagingCapturePage from "../pages/imagingTechnician/ImagingCapturePage";
+import ImagingHistoryPage from "../pages/imagingTechnician/ImagingHistoryPage";
 import GlobalException from "../pages/globalException/GlobalException";
 import GlobalErrorListener from "../components/error/GlobalErrorListener";
 import useSession from "../hooks/useSession";
@@ -201,6 +203,8 @@ const ROLE_PAGES = {
     ),
     [ROUTES.DOCTOR_EXAMINATION]: <ExaminationPage />,
     [ROUTES.DOCTOR_IMAGING_REVIEWS]: <ImagingReviewPage />,
+    [ROUTES.TECHNICIAN_IMAGING_REQUESTS]: <ImagingCapturePage />,
+    [ROUTES.TECHNICIAN_IMAGING_RESULTS]: <ImagingHistoryPage />,
     [ROUTES.ADMIN_ROOMS]: <RoomManagement />,
     [ROUTES.ADMIN_SERVICES]: <ServiceManagement />,
     [ROUTES.ADMIN_STAFF]: <StaffManagement />,
@@ -221,8 +225,6 @@ const COMING_SOON_TITLES = {
     [ROUTES.DOCTOR_PATIENTS]: "Bệnh nhân",
     [ROUTES.DOCTOR_TREATMENT_PLANS]: "Kế hoạch điều trị",
     [ROUTES.DOCTOR_IMAGING_REQUESTS]: "Yêu cầu chụp phim",
-    [ROUTES.TECHNICIAN_IMAGING_REQUESTS]: "Yêu cầu chụp phim",
-    [ROUTES.TECHNICIAN_IMAGING_RESULTS]: "Kết quả hình ảnh",
     [ROUTES.ADMIN_ROLES]: "Vai trò",
 }
 

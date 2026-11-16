@@ -5,7 +5,7 @@ File theo dõi tiến độ điền báo cáo unit test trên Google Sheet `Repo
 - Sheet: https://docs.google.com/spreadsheets/d/14Ji9LXKToC5fVQj5RDwWtV1jwaQhX5bUR-UHQSfSAZQ/edit
 - Quy ước điền từng tab: mục [Quy ước](#quy-ước-điền-tab) cuối file.
 - Đặc tả chức năng (danh sách ca cần test ở mục 8 mỗi file): [`docs/chuc-nang/README.md`](../../docs/chuc-nang/README.md)
-- Cập nhật lần cuối: **15/11/2026** – DuongDH
+- Cập nhật lần cuối: **16/11/2026** – DuongDH
 
 ## Ký hiệu trạng thái
 
@@ -26,27 +26,16 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 |---|---|---|---|---|---|---|---|---|
 | 0 | Cover, MethodList, Statistics | 1–3 | 3 | 0 | – | – | – | – |
 | 1 | OZ-AUTH | 4–14 | 11 | 11 | 0 | 0 | 0 | 0 |
- feat/unittest-get-work-shift-by-id
-| 2 | OZ-ME | 15–19 | 5 | 4 | 1 | 0 | 0 | 0 |
-| 3 | OZ-PAT | 20–26 | 7 | 0 | 7 | 0 | 0 | 0 |
-| 4 | OZ-SVC | 27–35 | 9 | 0 | 8 | 0 | 1 | 0 |
-| 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 3 | 0 | 22 | 0 | 0 |
-
 | 2 | OZ-ME | 15–19 | 5 | 5 | 0 | 0 | 0 | 0 |
 | 3 | OZ-PAT | 20–26 | 7 | 7 | 0 | 0 | 0 | 0 |
 | 4 | OZ-SVC | 27–35 | 9 | 8 | 0 | 0 | 1 | 0 |
-| 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 2 | 0 | 23 | 0 | 0 |
- main
+| 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 11 | 0 | 14 | 0 | 0 |
 | 6 | OZ-APPT, OZ-Q | 61–84 | 24 | 0 | 6 | 17 | 1 | 0 |
 | 7 | OZ-EXAM, OZ-IMG, OZ-MR | 85–113 | 29 | 0 | 5 | 22 | 2 | 0 |
 | 8 | OZ-TP, OZ-INV | 114–125 | 12 | 0 | 1 | 7 | 4 | 0 |
 | 9 | OZ-HOME, OZ-CFG, OZ-LEAVE, OZ-NOTIF, OZ-WH | 126–133 | 8 | 0 | 2 | 2 | 4 | 0 |
 | 10 | OZ-SIM | 134–142 | 9 | 0 | 0 | 0 | 0 | 9 |
-feat/unittest-get-work-shift-by-id
-| | **Tổng tab hàm** | 4–142 | **139** | **18** | **30** | **70** | **12** | **9** |
-
-| | **Tổng tab hàm** | 4–142 | **139** | **33** | **14** | **71** | **12** | **9** |
- main
+| | **Tổng tab hàm** | 4–142 | **139** | **42** | **14** | **62** | **12** | **9** |
 
 **Thứ tự đề xuất:** đợt 3 → 4 → 7 (phần chụp phim) → 6 (phần có test) → 0, rồi viết test cho các tab ✍️ theo đợt 2 → 5 → 6 → 7 → 8 → 9.
 
@@ -116,14 +105,14 @@ feat/unittest-get-work-shift-by-id
 
 | # | Tab | Mã | Test trong code | Trạng thái | Người làm | Cập nhật | Ghi chú |
 |---|---|---|---|---|---|---|---|
-| 36 | GetRooms | OZ-ROOM-01 | 0 | ✍️ | | | |
-| 37 | GetRoomById | OZ-ROOM-02 | 0 | ✍️ | | | |
-| 38 | CreateRoom | OZ-ROOM-03 | 0 | ✍️ | | | |
-| 39 | UpdateRoom | OZ-ROOM-04 | 0 | ✍️ | | | |
-| 40 | DeleteRoom | OZ-ROOM-05 | 0 | ✍️ | | | |
-| 41 | GetRoles | OZ-ROLE-01 | 0 | ✍️ | | | |
-| 42 | GetRole | OZ-ROLE-02 | 0 | ✍️ | | | |
-| 43 | CreateRole | OZ-ROLE-03 | 0 | ✍️ | | | |
+| 36 | GetRooms | OZ-ROOM-01 | Rooms/GetRoomsTests: 4 | ✅ | DuongDH | 16/11/2026 | 4 UTCID (3N, 1B), sheet đã điền |
+| 37 | GetRoomById | OZ-ROOM-02 | Rooms/GetRoomByIdTests: 4 | ✅ | DuongDH | 16/11/2026 | 4 UTCID (2N, 1B, 1A), sheet đã điền |
+| 38 | CreateRoom | OZ-ROOM-03 | Rooms/CreateRoomTests: 5 | ✅ | DuongDH | 16/11/2026 | 5 UTCID (2N, 1B, 2A), sheet đã điền |
+| 39 | UpdateRoom | OZ-ROOM-04 | Rooms/UpdateRoomTests: 10 | ✅ | DuongDH | 16/11/2026 | 10 UTCID (3N, 1B, 6A), sheet đã điền |
+| 40 | DeleteRoom | OZ-ROOM-05 | Rooms/DeleteRoomTests: 4 | ✅ | DuongDH | 16/11/2026 | 4 UTCID (1N, 1B, 2A), sheet đã điền |
+| 41 | GetRoles | OZ-ROLE-01 | Roles/GetRolesTests: 4 | ✅ | DuongDH | 16/11/2026 | 4 UTCID (3N, 1B), sheet đã điền |
+| 42 | GetRole | OZ-ROLE-02 | Roles/GetRoleTests: 4 | ✅ | DuongDH | 16/11/2026 | 4 UTCID (2N, 1B, 1A), sheet đã điền |
+| 43 | CreateRole | OZ-ROLE-03 | Roles/CreateRoleTests: 5 | ✅ | DuongDH | 16/11/2026 | 5 UTCID (2N, 1B, 2A), sheet đã điền |
 | 44 | UpdateRole | OZ-ROLE-04 | 0 | ✍️ | | | |
 | 45 | GetStaffList | OZ-STAFF-01 | 0 | ✍️ | | | |
 | 46 | GetStaff | OZ-STAFF-02 | 0 | ✍️ | | | |
@@ -300,6 +289,22 @@ Cần thêm tab (copy một tab mẫu, thêm dòng vào MethodList và Statistic
 | 15/11/2026 | DuongDH | OZ-SVC-06 UpdateService: 🔄→✅. Dùng test sẵn (2 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-06` → 2 Passed. Sheet đã điền và được xác nhận. |
 | 15/11/2026 | DuongDH | OZ-SVC-07 ToggleServiceStatus: 🔄→✅. Dùng test sẵn (2 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-07` → 2 Passed. Sheet đã điền và được xác nhận. |
 | 15/11/2026 | DuongDH | OZ-SVC-08 DeleteService: 🔄→✅. Dùng test sẵn (2 UTCID), không viết thêm. `dotnet test --filter Tab=OZ-SVC-08` → 2 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROOM-01 GetRooms: ✍️→🔄. Viết 4 service unit test (3N, 1B). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROOM-01 GetRooms: 🔄→✅. Viết 4 UTCID (3N, 1B). `dotnet test --filter Tab=OZ-ROOM-01` → 4 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROOM-02 GetRoomById: ✍️→🔄. Viết 4 service unit test (2N, 1B, 1A). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROOM-02 GetRoomById: 🔄→✅. Viết 4 UTCID (2N, 1B, 1A). `dotnet test --filter Tab=OZ-ROOM-02` → 4 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROOM-03 CreateRoom: ✍️→🔄. Viết 5 service unit test (2N, 1B, 2A). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROOM-03 CreateRoom: 🔄→✅. Viết 5 UTCID (2N, 1B, 2A). `dotnet test --filter Tab=OZ-ROOM-03` → 5 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROOM-04 UpdateRoom: ✍️→🔄. Viết 10 service unit test (3N, 1B, 6A). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROOM-04 UpdateRoom: 🔄→✅. Viết 10 UTCID (3N, 1B, 6A). `dotnet test --filter Tab=OZ-ROOM-04` → 10 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROOM-05 DeleteRoom: ✍️→🔄. Viết 4 service unit test (1N, 1B, 2A). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROOM-05 DeleteRoom: 🔄→✅. Viết 4 UTCID (1N, 1B, 2A). `dotnet test --filter Tab=OZ-ROOM-05` → 4 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROLE-01 GetRoles: ✍️→🔄. Viết 4 service unit test (3N, 1B). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROLE-01 GetRoles: 🔄→✅. Viết 4 UTCID (3N, 1B). `dotnet test --filter Tab=OZ-ROLE-01` → 4 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROLE-02 GetRole: ✍️→🔄. Viết 4 service unit test (2N, 1B, 1A). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROLE-02 GetRole: 🔄→✅. Viết 4 UTCID (2N, 1B, 1A). `dotnet test --filter Tab=OZ-ROLE-02` → 4 Passed. Sheet đã điền và được xác nhận. |
+| 16/11/2026 | DuongDH | OZ-ROLE-03 CreateRole: ✍️→🔄. Viết 5 service unit test (2N, 1B, 2A). Đang chạy test + xuất JSON handoff. |
+| 16/11/2026 | DuongDH | OZ-ROLE-03 CreateRole: 🔄→✅. Viết 5 UTCID (2N, 1B, 2A). `dotnet test --filter Tab=OZ-ROLE-03` → 5 Passed. Sheet đã điền và được xác nhận. |
 | 13/11/2026 | HungPVA | OZ-WS-01 CreateWorkShift: ✍️→✅. Viết 13 unit test service (3N, 3B, 7A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-01` → 13 Passed. Điền sheet CreateWorkShift. |
 | 14/11/2026 | HungPVA | OZ-WS-02 GetWorkShifts: ✍️→✅. Viết 12 unit test service (7N, 3B, 2A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-02` → 12 Passed. Điền sheet GetWorkShifts. |
 | 14/11/2026 | HungPVA | OZ-WS-03 GetWorkShiftById: ✍️→✅. Viết 7 unit test service (4N, 2B, 1A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-03` → 7 Passed. Điền sheet GetWorkShiftById. |
