@@ -8,6 +8,8 @@ namespace OZE.Common.Models
         public string VariantCode { get; set; } = string.Empty;
         public string VariantName { get; set; } = string.Empty;
         public string? Description { get; set; }
+        // Address of the picture (relative to the API), null when the variant has none
+        public string? ImageUrl { get; set; }
         public decimal ReferencePrice { get; set; }
         public int? EstimatedMinutes { get; set; }
         public int DisplayOrder { get; set; }

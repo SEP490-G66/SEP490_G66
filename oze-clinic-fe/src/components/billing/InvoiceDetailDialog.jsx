@@ -14,21 +14,29 @@ import { cx } from "@/utils/cx";
 const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
     const [state, setState] = useState(null);
     const [cancelling, setCancelling] = useState(false);
+    const [version, setVersion] = useState(0);
 
     useEffect(() => {
         const controller = new AbortController();
         getInvoice(invoiceId, { skipErrorPage: true, signal: controller.signal }).then((response) => {
-            if (!controller.signal.aborted) setState(response);
+            if (!controller.signal.aborted && !response.aborted) setState(response);
         });
         return () => controller.abort();
-    }, [invoiceId]);
+    }, [invoiceId, version]);
 
     const invoice = state?.success ? state.data : null;
     const payments = invoice?.payments ?? [];
     const paid = Number(invoice?.paidAmount ?? 0);
     const waiting = payments.filter((p) => p.paymentStatus === "PENDING").reduce((s, p) => s + Number(p.amount), 0);
-    const canCancel = invoice && invoice.paymentStatus !== "CANCELLED" && !paid && !waiting;
-    const [label, tone] = TEXT.INVOICE_STATUS[invoice?.paymentStatus] ?? [];
+    // Only an invoice nothing was paid on, nothing is waiting on and nothing was refunded on can be cancelled.
+    const canCancel =
+        invoice &&
+        !["CANCELLED", "PENDING_CONFIRMATION", "PARTIALLY_REFUNDED", "REFUNDED"].includes(invoice.paymentStatus) &&
+        !invoice.pendingPayment &&
+        !paid &&
+        !waiting;
+    const [label, tone] = TEXT.INVOICE_STATUS[invoice?.paymentStatus] ?? [invoice?.paymentStatus ?? "—", "badge-neutral"];
+    const remaining = Number(invoice?.remainingAmount ?? 0);
 
     if (cancelling && invoice) {
         return (
@@ -39,12 +47,16 @@ const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
                 closeLabel={TEXT.KEEP_INVOICE}
                 submitLabel={TEXT.CANCEL_INVOICE}
                 danger
+                reasonLabel={TEXT.CANCEL_REASON}
+                reasonPlaceholder={TEXT.CANCEL_REASON_PLACEHOLDER}
                 onClose={() => setCancelling(false)}
-                onSubmit={async () => {
-                    if (report(await cancelInvoice(invoice.id), TEXT.CANCELLED_INVOICE(invoice.invoiceNumber))) {
-                        onChanged();
-                        onClose();
-                    }
+                onSubmit={async (reason) => {
+                    const ok = report(await cancelInvoice(invoice.id, reason), TEXT.CANCELLED_INVOICE(invoice.invoiceNumber));
+                    onChanged();
+                    if (ok) return onClose();
+                    // It may have been paid or changed meanwhile: show it as it is now.
+                    setCancelling(false);
+                    setVersion((v) => v + 1);
                 }}
             />
         );
@@ -53,7 +65,7 @@ const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
     return (
         <Modal
             title={invoice ? TEXT.DETAIL_TITLE(invoice.invoiceNumber) : TEXT.DETAIL}
-            description={invoice ? TEXT.DETAIL_SUB(invoice.patientName, dmy(dateKey(invoice.createdAt))) : undefined}
+            description={invoice ? TEXT.DETAIL_SUB(invoice.patientName, invoice.createdAt ? dmy(dateKey(invoice.createdAt)) : "—") : undefined}
             onClose={onClose}
             size="lg"
         >
@@ -79,8 +91,8 @@ const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
                                 <dd className="num m-0 text-right text-ink">{money(waiting)}</dd>
                             </>
                         )}
-                        <dt className="border-t border-border pt-1 font-semibold text-ink">{TEXT.OWED}</dt>
-                        <dd className="num m-0 border-t border-border pt-1 text-right font-semibold text-ink">{money(Math.max(0, Number(invoice.remainingAmount ?? 0)))}</dd>
+                        <dt className="border-t border-border pt-1 font-semibold text-ink">{remaining < 0 ? TEXT.OVERPAID : TEXT.OWED}</dt>
+                        <dd className={cx("num m-0 border-t border-border pt-1 text-right font-semibold", remaining < 0 ? "text-warning" : "text-ink")}>{money(Math.abs(remaining))}</dd>
                     </dl>
                     <h3 className="text-label font-semibold text-ink">{TEXT.HISTORY}</h3>
                     {payments.length ? (
@@ -98,10 +110,10 @@ const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
                                 <tbody>
                                     {payments.map((p) => {
                                         const at = p.paidAt ?? p.createdAt;
-                                        const [st, stTone] = TEXT.PAYMENT_STATUS[p.paymentStatus] ?? TEXT.PAYMENT_STATUS.CONFIRMED;
+                                        const [st, stTone] = TEXT.PAYMENT_STATUS[p.paymentStatus] ?? [p.paymentStatus ?? "—", "badge-neutral"];
                                         return (
                                             <tr key={p.id}>
-                                                <td data-label={TEXT.HISTORY_COLUMNS[0]} className="num">{`${ddmm(dateKey(at))} ${clockOf(at)}`}</td>
+                                                <td data-label={TEXT.HISTORY_COLUMNS[0]} className="num">{at ? `${ddmm(dateKey(at))} ${clockOf(at)}` : "—"}</td>
                                                 <td data-label={TEXT.HISTORY_COLUMNS[1]}>{TEXT.METHODS[p.paymentMethod] ?? p.paymentMethod}</td>
                                                 <td data-label={TEXT.HISTORY_COLUMNS[2]}>{p.transactionReference || "—"}</td>
                                                 <td data-label={TEXT.HISTORY_COLUMNS[3]} className="num text-right">

@@ -11,7 +11,7 @@ export const EXPENSE_CATEGORIES = [
 export const expenseCategoryLabel = (value) => EXPENSE_CATEGORIES.find((option) => option.value === value)?.label ?? value;
 
 // data is null when the receptionist has no open drawer
-export const getCurrentCashSession = () => call(() => api.get("/api/cash-sessions/current"));
+export const getCurrentCashSession = (config = {}) => call(() => api.get("/api/cash-sessions/current", config));
 
 export const openCashSession = ({ openingCash, expectedOpeningCash, notes }) =>
     call(() => api.post("/api/cash-sessions/open", { openingCash, expectedOpeningCash, notes: notes || null }));
@@ -23,8 +23,16 @@ export const addCashExpense = ({ amount, category, description }) =>
 
 export const removeCashExpense = (expenseId) => call(() => api.delete(`/api/cash-sessions/current/expenses/${expenseId}`));
 
-export const closeCashSession = ({ countedCash, countedTransfer, denominations, notes }) =>
-    call(() => api.post("/api/cash-sessions/current/close", { countedCash, countedTransfer, denominations: denominations ?? null, notes: notes || null }));
+// sessionId and the system figures the cashier saw go along so the backend can refuse a close of another session
+// or one whose figures changed meanwhile (proposed, see be-api-requests GC-6 / GC-7).
+export const closeCashSession = ({ sessionId, countedCash, countedTransfer, denominations, notes, expectedCash, expectedTransfer }, config = {}) =>
+    call(() =>
+        api.post(
+            "/api/cash-sessions/current/close",
+            { sessionId, countedCash, countedTransfer, denominations: denominations ?? null, notes: notes || null, expectedCash, expectedTransfer },
+            config,
+        ),
+    );
 
 export const getHandoverCandidates = () => call(() => api.get("/api/cash-sessions/handover-candidates"));
 

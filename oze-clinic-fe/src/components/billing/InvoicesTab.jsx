@@ -12,13 +12,15 @@ import { BILLING_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
 const PAGE_SIZE = 10;
-const STATUS_OPTIONS = [["", TEXT.ALL], ...["PAID", "PARTIALLY_PAID", "UNPAID", "PENDING_CONFIRMATION", "CANCELLED"].map((k) => [k, TEXT.INVOICE_STATUS[k][0]])];
+const STATUS_OPTIONS = [["", TEXT.ALL], ...Object.entries(TEXT.INVOICE_STATUS).map(([k, [label]]) => [k, label])];
 
-const defaults = (today) => ({ keyword: "", from: addDays(today, -30), to: today, status: "" });
+// "to" left empty means up to now, so a tab left open overnight still shows the new day's invoices.
+const defaults = (today) => ({ keyword: "", from: addDays(today, -30), to: "", status: "" });
 
 const InvoicesTab = () => {
-    const [today] = useState(clinicToday);
+    const today = clinicToday();
     const [filters, setFilters] = useState(() => defaults(today));
+    const [opening, setOpening] = useState(null);
     const [page, setPage] = useState(1);
     const [reload, setReload] = useState(0);
     const [result, setResult] = useState(null);
@@ -34,6 +36,12 @@ const InvoicesTab = () => {
                 { skipErrorPage: true, signal: controller.signal },
             ).then((response) => {
                 if (controller.signal.aborted || response.aborted) return;
+                // An action can empty the last page: step back to the last page that still has rows.
+                const lastPage = Math.max(1, Number(response.data?.totalPages ?? 1));
+                if (response.success && page > lastPage) {
+                    setPage(lastPage);
+                    return;
+                }
                 setResult({
                     key,
                     ok: response.success,
@@ -50,26 +58,35 @@ const InvoicesTab = () => {
     }, [filters, page, key]);
 
     const base = defaults(today);
-    const dirty = Object.keys(base).some((k) => filters[k] !== base[k]);
+    const dirty = filters.keyword !== "" || filters.status !== "" || filters.to !== "" || filters.from !== addDays(today, -30);
     const setFilter = (k) => (v) => {
         setFilters((f) => {
             const next = { ...f, [k]: v };
-            if (k === "from" && next.to < v) next.to = v;
-            if (k === "to" && next.from > v) next.from = v;
+            if (k === "from" && next.to && next.to < v) next.to = v;
+            if (k === "to" && v && next.from > v) next.from = v;
             return next;
         });
         setPage(1);
     };
     const refresh = () => setReload((n) => n + 1);
+    // After an action, failed or not, the dialog closes and the list reloads: the row may have been handled by someone else.
+    const settle = () => {
+        setDialog(null);
+        refresh();
+    };
 
+    // The amount and reference always come from a fresh read, never from the list row.
     const openPending = async (invoice, type) => {
-        const detail = invoice.pendingPayment ? { success: true, data: invoice } : await getInvoice(invoice.id);
+        setOpening(invoice.id);
+        const detail = await getInvoice(invoice.id, { skipErrorPage: true });
+        setOpening(null);
         const payment = detail.success ? (detail.data.pendingPayment ?? detail.data.payments?.find((p) => p.paymentStatus === "PENDING")) : null;
         if (!payment) {
             report({ success: false, message: detail.success ? TEXT.NO_PENDING : detail.message });
+            refresh();
             return;
         }
-        setDialog({ type, invoice, payment });
+        setDialog({ type, invoice: detail.data, payment });
     };
 
     const items = result?.items ?? [];
@@ -93,7 +110,7 @@ const InvoicesTab = () => {
                             <label htmlFor={`inv-${k}`} className="text-caption text-muted">
                                 {label}
                             </label>
-                            <input id={`inv-${k}`} type="date" className="input w-auto" max={today} value={filters[k]} onChange={(e) => e.target.value && setFilter(k)(e.target.value)} />
+                            <input id={`inv-${k}`} type="date" className="input w-auto" max={today} value={filters[k]} onChange={(e) => (k === "to" || e.target.value) && setFilter(k)(e.target.value)} />
                         </div>
                     ))}
                     <LabeledSelect id="inv-status" label={TEXT.STATUS} value={filters.status} options={STATUS_OPTIONS} onChange={setFilter("status")} />
@@ -125,7 +142,7 @@ const InvoicesTab = () => {
                         <div className="skeleton h-10 rounded" />
                         <div className="skeleton h-10 rounded" />
                     </div>
-                ) : !items.length ? (
+                ) : !result.ok && !items.length ? null : !items.length ? (
                     <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.INV_EMPTY}</p>
                 ) : (
                     <div className={cx("table-wrap rounded-none border-x-0", !fresh && "opacity-60")} aria-busy={!fresh ? "true" : undefined}>
@@ -142,14 +159,14 @@ const InvoicesTab = () => {
                             <tbody>
                                 {items.map((i) => {
                                     const [label, tone] = TEXT.INVOICE_STATUS[i.paymentStatus] ?? [i.paymentStatus, "badge-neutral"];
-                                    const waiting = i.paymentStatus === "PENDING_CONFIRMATION";
+                                    const waiting = i.paymentStatus === "PENDING_CONFIRMATION" || Boolean(i.pendingPayment);
                                     return (
                                         <tr key={i.id} className={i.paymentStatus === "CANCELLED" ? "opacity-60" : undefined}>
                                             <td data-label={TEXT.INV_COLUMNS[0]} className="whitespace-nowrap">
                                                 {i.invoiceNumber}
                                             </td>
                                             <td data-label={TEXT.INV_COLUMNS[1]} className="num whitespace-nowrap">
-                                                {dmy(dateKey(i.createdAt))}
+                                                {i.createdAt ? dmy(dateKey(i.createdAt)) : "—"}
                                             </td>
                                             <td data-primary>
                                                 <span className="cell-primary">{i.patientName}</span>
@@ -170,10 +187,20 @@ const InvoicesTab = () => {
                                                 <div className="ml-auto grid w-max gap-2">
                                                     {waiting && (
                                                         <>
-                                                            <button type="button" className="btn btn-primary h-8 px-2.5" onClick={() => openPending(i, "confirm")}>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-primary h-8 px-2.5"
+                                                                disabled={!fresh || opening === i.id}
+                                                                onClick={() => openPending(i, "confirm")}
+                                                            >
                                                                 {TEXT.CONFIRM_CK}
                                                             </button>
-                                                            <button type="button" className="btn btn-secondary h-8 px-2.5" onClick={() => openPending(i, "reject")}>
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-secondary h-8 px-2.5"
+                                                                disabled={!fresh || opening === i.id}
+                                                                onClick={() => openPending(i, "reject")}
+                                                            >
                                                                 {TEXT.REJECT_CK}
                                                             </button>
                                                         </>
@@ -209,10 +236,8 @@ const InvoicesTab = () => {
                     submitLabel={TEXT.CONFIRM}
                     onClose={() => setDialog(null)}
                     onSubmit={async () => {
-                        if (report(await confirmPayment(dialog.payment.id), TEXT.CK_DONE(money(dialog.payment.amount), dialog.invoice.patientName))) {
-                            setDialog(null);
-                            refresh();
-                        }
+                        report(await confirmPayment(dialog.payment.id), TEXT.CK_DONE(money(dialog.payment.amount), dialog.invoice.patientName));
+                        settle();
                     }}
                 />
             )}
@@ -226,10 +251,8 @@ const InvoicesTab = () => {
                     danger
                     onClose={() => setDialog(null)}
                     onSubmit={async () => {
-                        if (report(await rejectPayment(dialog.payment.id), TEXT.CK_REJECTED)) {
-                            setDialog(null);
-                            refresh();
-                        }
+                        report(await rejectPayment(dialog.payment.id), TEXT.CK_REJECTED);
+                        settle();
                     }}
                 />
             )}

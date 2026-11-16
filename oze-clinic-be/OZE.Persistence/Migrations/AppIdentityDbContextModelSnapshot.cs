@@ -17,7 +17,7 @@ namespace OZE.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -2301,6 +2301,9 @@ namespace OZE.Persistence.Migrations
                     b.Property<int?>("EstimatedMinutes")
                         .HasColumnType("int");
 
+                    b.Property<DateTimeOffset?>("ImageUpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -2351,6 +2354,28 @@ namespace OZE.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OZE.Domain.Entities.ServiceImage", b =>
+                {
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("ServiceId");
+
+                    b.ToTable("ServiceImages", (string)null);
+                });
+
             modelBuilder.Entity("OZE.Domain.Entities.ServiceVariant", b =>
                 {
                     b.Property<int>("Id")
@@ -2375,6 +2400,9 @@ namespace OZE.Persistence.Migrations
 
                     b.Property<int?>("EstimatedMinutes")
                         .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ImageUpdatedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -2416,6 +2444,28 @@ namespace OZE.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_ServiceVariants_ReferencePrice", "[ReferencePrice] >= 0");
                         });
+                });
+
+            modelBuilder.Entity("OZE.Domain.Entities.ServiceVariantImage", b =>
+                {
+                    b.Property<int>("ServiceVariantId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("ServiceVariantId");
+
+                    b.ToTable("ServiceVariantImages", (string)null);
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.StaffProfile", b =>
@@ -3579,6 +3629,18 @@ namespace OZE.Persistence.Migrations
                     b.Navigation("Payment");
                 });
 
+            modelBuilder.Entity("OZE.Domain.Entities.ServiceImage", b =>
+                {
+                    b.HasOne("OZE.Domain.Entities.Service", "Service")
+                        .WithOne("Image")
+                        .HasForeignKey("OZE.Domain.Entities.ServiceImage", "ServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ServiceImages_Services");
+
+                    b.Navigation("Service");
+                });
+
             modelBuilder.Entity("OZE.Domain.Entities.ServiceVariant", b =>
                 {
                     b.HasOne("OZE.Domain.Entities.Service", "Service")
@@ -3589,6 +3651,18 @@ namespace OZE.Persistence.Migrations
                         .HasConstraintName("FK_ServiceVariants_Services");
 
                     b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("OZE.Domain.Entities.ServiceVariantImage", b =>
+                {
+                    b.HasOne("OZE.Domain.Entities.ServiceVariant", "ServiceVariant")
+                        .WithOne("Image")
+                        .HasForeignKey("OZE.Domain.Entities.ServiceVariantImage", "ServiceVariantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_ServiceVariantImages_ServiceVariants");
+
+                    b.Navigation("ServiceVariant");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.StaffProfile", b =>
@@ -3777,7 +3851,14 @@ namespace OZE.Persistence.Migrations
 
             modelBuilder.Entity("OZE.Domain.Entities.Service", b =>
                 {
+                    b.Navigation("Image");
+
                     b.Navigation("Variants");
+                });
+
+            modelBuilder.Entity("OZE.Domain.Entities.ServiceVariant", b =>
+                {
+                    b.Navigation("Image");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.StaffProfile", b =>

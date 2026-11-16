@@ -25,9 +25,10 @@ const ShiftClosePanel = ({ openingCash, system, onRequestClose }) => {
 
     const request = (print) => {
         const next = {};
+        // Every missing field is reported at once, not one after the other.
         if (actualCash == null) next.cash = TEXT.ERR_CASH;
-        else if (actualTransfer == null) next.transfer = TEXT.ERR_TRANSFER;
-        if (needsNote && !note.trim()) next.note = TEXT.ERR_NOTE;
+        if (actualTransfer == null) next.transfer = TEXT.ERR_TRANSFER;
+        if (needsNote && note.trim().length < TEXT.NOTE_MIN) next.note = TEXT.ERR_NOTE;
         setErrors(next);
         const first = next.cash ? (byNote ? `hc-note-${DENOMINATIONS[0]}` : "hc-cash") : next.transfer ? "hc-transfer" : next.note ? "hc-note" : null;
         if (first) {
@@ -72,10 +73,11 @@ const ShiftClosePanel = ({ openingCash, system, onRequestClose }) => {
                                             id={`hc-note-${d}`}
                                             className="input num h-8 px-2 text-right"
                                             inputMode="numeric"
+                                            maxLength={4}
                                             aria-label={TEXT.NOTE_COUNT(money(d))}
                                             value={counts[d] ?? ""}
                                             onChange={(e) => {
-                                                setCounts((c) => ({ ...c, [d]: e.target.value.replace(/\D/g, "") }));
+                                                setCounts((c) => ({ ...c, [d]: e.target.value.replace(/\D/g, "").slice(0, 4) }));
                                                 clear("cash");
                                             }}
                                         />
@@ -139,7 +141,12 @@ const ShiftClosePanel = ({ openingCash, system, onRequestClose }) => {
                             type="button"
                             className="btn-link w-fit text-label"
                             onClick={() => {
-                                setTransfer(String(system.transfer));
+                                // A negative system transfer (more refunded than collected) cannot be typed as a counted amount.
+                                if (system.transfer < 0) {
+                                    setErrors((e) => ({ ...e, transfer: TEXT.ERR_NEGATIVE_TRANSFER }));
+                                    return;
+                                }
+                                setTransfer(String(Math.round(system.transfer)));
                                 clear("transfer");
                             }}
                         >

@@ -5,7 +5,7 @@ import Pagination from "@/components/ui/Pagination";
 import InvoiceDetailDialog from "./InvoiceDetailDialog";
 import { Card } from "@/components/reception/shared";
 import { money, phoneText } from "@/components/reception/receptionUtils";
-import { getDebts } from "@/services/receptionService";
+import { clinicToday, getDebts } from "@/services/receptionService";
 import { debtAgeTone } from "@/utils/billing";
 import { dmy } from "@/utils/calendar";
 import { dateKey } from "@/utils/cashShift";
@@ -14,6 +14,14 @@ import { ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
 const PAGE_SIZE = 10;
+
+// Days the debt has been open: from the backend, else counted from the invoice date; null when neither is known.
+const ageOf = (debt, today) => {
+    const given = Number(debt.ageDays);
+    if (debt.ageDays != null && Number.isFinite(given)) return Math.max(0, Math.floor(given));
+    const since = dateKey(debt.createdAt);
+    return since ? Math.max(0, Math.round((Date.parse(today) - Date.parse(since)) / 86400000)) : null;
+};
 
 const DebtsTab = () => {
     const navigate = useNavigate();
@@ -31,6 +39,11 @@ const DebtsTab = () => {
         const timer = setTimeout(() => {
             getDebts({ keyword: keyword.trim(), ageBucket: age, page, pageSize: PAGE_SIZE }, { skipErrorPage: true, signal: controller.signal }).then((response) => {
                 if (controller.signal.aborted || response.aborted) return;
+                const lastPage = Math.max(1, Number(response.data?.totalPages ?? 1));
+                if (response.success && page > lastPage) {
+                    setPage(lastPage);
+                    return;
+                }
                 const items = response.success ? (response.data?.items ?? []) : [];
                 setResult({
                     key,
@@ -38,7 +51,8 @@ const DebtsTab = () => {
                     items,
                     total: Number(response.data?.totalCount ?? items.length),
                     totalPages: Math.max(1, Number(response.data?.totalPages ?? 1)),
-                    sum: Number(response.data?.totalRemaining ?? items.reduce((s, d) => s + Number(d.remainingAmount ?? 0), 0)),
+                    // Only the backend knows the total over every page; a page's own sum would understate it.
+                    sum: response.success && response.data?.totalRemaining != null ? Number(response.data.totalRemaining) : null,
                 });
             });
         }, 250);
@@ -50,6 +64,7 @@ const DebtsTab = () => {
 
     const items = result?.items ?? [];
     const fresh = result?.key === key;
+    const today = clinicToday();
 
     return (
         <div className="space-y-5">
@@ -84,7 +99,7 @@ const DebtsTab = () => {
                     <span className="flex-1" />
                     <div className="text-right">
                         <small className="block text-caption text-muted">{TEXT.DEBT_TOTAL}</small>
-                        <b className="num font-heading text-heading-3 text-danger">{money(result?.sum ?? 0)}</b>
+                        <b className="num font-heading text-heading-3 text-danger">{fresh && result?.sum != null ? money(result.sum) : "—"}</b>
                     </div>
                 </div>
             </Card>
@@ -102,7 +117,7 @@ const DebtsTab = () => {
                         <div className="skeleton h-10 rounded" />
                         <div className="skeleton h-10 rounded" />
                     </div>
-                ) : !items.length ? (
+                ) : !result.ok && !items.length ? null : !items.length ? (
                     <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.DEBT_EMPTY}</p>
                 ) : (
                     <div className={cx("table-wrap rounded-none border-x-0", !fresh && "opacity-60")} aria-busy={!fresh ? "true" : undefined}>
@@ -118,7 +133,7 @@ const DebtsTab = () => {
                             </thead>
                             <tbody>
                                 {items.map((d) => {
-                                    const days = Number(d.ageDays ?? 0);
+                                    const days = ageOf(d, today);
                                     return (
                                         <tr key={d.invoiceId}>
                                             <td data-label={TEXT.DEBT_COLUMNS[0]} className="whitespace-nowrap">
@@ -143,13 +158,14 @@ const DebtsTab = () => {
                                                 {money(d.remainingAmount)}
                                             </td>
                                             <td data-label={TEXT.DEBT_COLUMNS[7]}>
-                                                <span className={cx("badge", debtAgeTone(days))}>{days === 0 ? TEXT.TODAY : TEXT.DAYS(days)}</span>
+                                                {days == null ? "—" : <span className={cx("badge", debtAgeTone(days))}>{days === 0 ? TEXT.TODAY : TEXT.DAYS(days)}</span>}
                                             </td>
                                             <td data-actions>
                                                 <div className="ml-auto grid w-max grid-cols-2 gap-2">
                                                     <button
                                                         type="button"
                                                         className="btn btn-primary h-8 px-2.5"
+                                                        disabled={!fresh}
                                                         onClick={() => navigate(`${ROUTES.RECEPTION_INVOICES}?invoice=${d.invoiceId}`)}
                                                     >
                                                         {TEXT.COLLECT}

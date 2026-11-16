@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ChevronLeft } from "lucide-react";
@@ -10,9 +10,10 @@ import ShiftTransactions from "@/components/handover/ShiftTransactions";
 import { Card } from "@/components/reception/shared";
 import { clinicClock, report } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { closeCashSession, getCashSession } from "@/services/cashSessionService";
+import { closeCashSession, getCashSession, getCurrentCashSession } from "@/services/cashSessionService";
+import { clinicToday } from "@/services/receptionService";
 import { getMyShifts } from "@/services/myScheduleService";
-import { weekdayIndex } from "@/utils/calendar";
+import { dmy, weekdayIndex } from "@/utils/calendar";
 import { dateKey, isOpen, shiftEndOf, shiftTypeOf, summarize, systemTotals, timeOf, transactionsOf } from "@/utils/cashShift";
 import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
@@ -34,6 +35,9 @@ const CashHandoverDetail = () => {
     const [result, setResult] = useState(null);
     const [closing, setClosing] = useState(null);
     const [myShifts, setMyShifts] = useState([]);
+    const [mineId, setMineId] = useState(undefined);
+    // Set when "close and print" succeeds; the slip is printed once the reloaded page shows the closed result.
+    const printAfterReload = useRef(false);
 
     const key = `${sessionId}|${reload}`;
 
@@ -46,17 +50,35 @@ const CashHandoverDetail = () => {
         return () => controller.abort();
     }, [sessionId, key]);
 
-    const session = result?.session;
-    const sessionDay = session ? dateKey(session.openedAt) : null;
+    // Only the person who opened a shift may close it: the session on screen must be the viewer's own open session.
+    useEffect(() => {
+        const controller = new AbortController();
+        getCurrentCashSession({ ...READ, signal: controller.signal }).then((response) => {
+            if (controller.signal.aborted || response.aborted) return;
+            setMineId(response.success ? (response.data?.id ?? null) : null);
+        });
+        return () => controller.abort();
+    }, [reload]);
+
+    const loaded = result?.key === key;
+    const session = loaded ? result.session : null;
+    const mine = Boolean(session) && mineId != null && String(mineId) === String(session.id);
+    const sessionDay = mine ? dateKey(session.openedAt) : null;
 
     useEffect(() => {
         if (!sessionDay) return undefined;
         let active = true;
-        getMyShifts({ fromDate: sessionDay, toDate: sessionDay }).then((r) => active && r.success && Array.isArray(r.data) && setMyShifts(r.data));
+        getMyShifts({ fromDate: sessionDay, toDate: sessionDay }, READ).then((r) => active && r.success && Array.isArray(r.data) && setMyShifts(r.data));
         return () => {
             active = false;
         };
     }, [sessionDay]);
+
+    useEffect(() => {
+        if (!printAfterReload.current || !session || isOpen(session)) return;
+        printAfterReload.current = false;
+        printSlip();
+    }, [session]);
     usePageTitle(session?.code ? `${session.code} – ${TEXT.DOC_TITLE}` : TEXT.DOC_TITLE);
 
     const back = (
@@ -66,7 +88,8 @@ const CashHandoverDetail = () => {
         </Link>
     );
 
-    if (!result || (result.key !== key && !session)) {
+    // Anything not loaded for this exact id and reload is never shown, so a previous session's figures cannot be acted on.
+    if (!loaded) {
         return (
             <div className="app-content min-h-full space-y-5">
                 {back}
@@ -80,8 +103,8 @@ const CashHandoverDetail = () => {
             <div className="app-content min-h-full space-y-5">
                 {back}
                 <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
-                    <span className="flex-1">{result.status === 404 ? TEXT.NOT_FOUND : TEXT.LOAD_ERROR}</span>
-                    {result.status !== 404 && (
+                    <span className="flex-1">{[400, 404].includes(result.status) ? TEXT.NOT_FOUND : result.status === 403 ? TEXT.FORBIDDEN : TEXT.LOAD_ERROR}</span>
+                    {![400, 403, 404].includes(result.status) && (
                         <button type="button" className="btn btn-secondary h-9" onClick={() => setReload((n) => n + 1)}>
                             {TEXT.RETRY}
                         </button>
@@ -99,10 +122,11 @@ const CashHandoverDetail = () => {
     const system = systemTotals(session, summary);
     const day = dateKey(session.openedAt);
     const code = session.code ?? `#${session.id}`;
+    const staleDay = open && mine && day && day < clinicToday() ? dmy(day) : null;
     const meta = [
         [TEXT.META[0], session.openedByName],
         [TEXT.META[1], label],
-        [TEXT.META[2], `${TEXT.WEEKDAYS_SHORT[weekdayIndex(day)]} ${day.split("-").reverse().join("/")}`],
+        [TEXT.META[2], day ? `${TEXT.WEEKDAYS_SHORT[weekdayIndex(day)]} ${dmy(day)}` : "—"],
         [TEXT.META[3], timeOf(session.openedAt)],
         [TEXT.META[4], open ? "—" : timeOf(session.closedAt)],
     ];
@@ -112,7 +136,7 @@ const CashHandoverDetail = () => {
             {back}
             <div className="flex flex-wrap items-center gap-3">
                 <h1 className="page-title">{code}</h1>
-                <span className={cx("badge", open ? "badge-success" : "badge-neutral")}>{TEXT.STATUS_LABEL[open ? "Open" : "Closed"]}</span>
+                <span className={cx("badge", open ? "badge-success" : "badge-neutral")}>{open ? TEXT.STATUS_LABEL.Open : (TEXT.STATUS_LABEL[session.status] ?? session.status)}</span>
             </div>
             <Card>
                 <dl className="grid grid-cols-2 gap-4 px-5 py-4 sm:grid-cols-5">
@@ -125,12 +149,18 @@ const CashHandoverDetail = () => {
                 </dl>
             </Card>
             <ShiftSummary summary={summary} />
-            {open ? (
+            {staleDay && <p className="alert alert-warning">{TEXT.STALE_OPEN(staleDay)}</p>}
+            {open && mine ? (
                 <ShiftClosePanel key={key} openingCash={session.openingCash} system={system} onRequestClose={(values, print) => setClosing({ values, print })} />
+            ) : open ? (
+                mineId !== undefined && <p className="alert alert-info">{TEXT.NOT_MINE(session.openedByName)}</p>
             ) : (
                 <ShiftResultPanel
                     system={system}
-                    actual={{ cash: Number(session.countedCash ?? 0), transfer: Number(session.countedTransfer ?? system.transfer) }}
+                    actual={{
+                        cash: session.countedCash == null ? null : Number(session.countedCash),
+                        transfer: session.countedTransfer == null ? null : Number(session.countedTransfer),
+                    }}
                     notes={session.notes}
                     onPrint={printSlip}
                 />
@@ -142,17 +172,34 @@ const CashHandoverDetail = () => {
                     subtitle={[code, session.openedByName, clinicClock()].filter(Boolean).join(" · ")}
                     values={closing.values}
                     system={system}
-                    shiftEnd={day === dateKey(new Date()) ? shiftEndOf(session, myShifts) : null}
+                    shiftEnd={day === clinicToday() ? shiftEndOf(session, myShifts) : null}
                     now={clinicClock()}
                     print={closing.print}
+                    warning={staleDay ? TEXT.STALE_OPEN(staleDay) : null}
                     onClose={() => setClosing(null)}
                     onSubmit={async () => {
-                        const at = clinicClock();
-                        if (!report(await closeCashSession(closing.values), TEXT.CLOSED_TOAST(label, at))) return;
-                        const print = closing.print;
-                        setClosing(null);
-                        setReload((n) => n + 1);
-                        if (print) setTimeout(printSlip, 300);
+                        const done = () => {
+                            setClosing(null);
+                            setReload((n) => n + 1);
+                        };
+                        // The figures the cashier counted against must still be the system's: a payment taken meanwhile changes them.
+                        const latest = await getCashSession(session.id, READ);
+                        if (!latest.success) {
+                            report(latest);
+                            return done();
+                        }
+                        if (!isOpen(latest.data)) return done();
+                        const now = systemTotals(latest.data, summarize(transactionsOf(latest.data)));
+                        if (now.cash !== system.cash || now.transfer !== system.transfer) {
+                            toast.warning(TEXT.FIGURES_CHANGED);
+                            return done();
+                        }
+                        const closed = report(
+                            await closeCashSession({ ...closing.values, sessionId: session.id, expectedCash: system.cash, expectedTransfer: system.transfer }, READ),
+                            TEXT.CLOSED_TOAST(label, clinicClock()),
+                        );
+                        if (closed && closing.print) printAfterReload.current = true;
+                        done();
                     }}
                 />
             )}

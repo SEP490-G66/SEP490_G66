@@ -41,7 +41,13 @@ const RowMenu = ({ label, items }) => {
             const step = event.key === "ArrowDown" ? 1 : -1;
             list[(index + step + list.length) % list.length]?.focus();
         }
-        if (event.key === "Escape") {
+        if (event.key === "Home" || event.key === "End") {
+            event.preventDefault();
+            (event.key === "Home" ? list[0] : list.at(-1))?.focus();
+        }
+        // The menu lives at the end of <body>: Tab would leave the page, so it closes the menu and returns to the button instead
+        if (event.key === "Escape" || event.key === "Tab") {
+            event.preventDefault();
             event.stopPropagation();
             close(true);
         }
@@ -85,7 +91,8 @@ const RowMenu = ({ label, items }) => {
                                     tabIndex={-1}
                                     autoFocus={index === 0}
                                     onClick={() => {
-                                        close(false);
+                                        // Focus goes back to the ⋯ button first, so a dialog opened by the item returns focus there when it closes
+                                        close(true);
                                         item.onSelect();
                                     }}
                                     className={cx(

@@ -30,6 +30,14 @@ namespace OZE.Application.Interfaces
         Task<bool> IsVariantInUseAsync(int variantId, CancellationToken cancellationToken = default);
         Task AddVariantAsync(ServiceVariant variant, CancellationToken cancellationToken = default);
         Task DeleteVariantAsync(ServiceVariant variant, CancellationToken cancellationToken = default);
+
+        // Pictures (tracked unless asNoTracking, so a found picture can be replaced in place)
+        Task<ServiceImage?> GetServiceImageAsync(int serviceId, bool asNoTracking, CancellationToken cancellationToken = default);
+        Task<ServiceVariantImage?> GetVariantImageAsync(int serviceId, int variantId, bool asNoTracking, CancellationToken cancellationToken = default);
+        Task AddServiceImageAsync(ServiceImage image, CancellationToken cancellationToken = default);
+        Task AddVariantImageAsync(ServiceVariantImage image, CancellationToken cancellationToken = default);
+        void RemoveServiceImage(ServiceImage image);
+        void RemoveVariantImage(ServiceVariantImage image);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 }
