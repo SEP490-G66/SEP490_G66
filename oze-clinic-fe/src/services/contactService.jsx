@@ -1,14 +1,25 @@
 import api from "./api";
+import { CONSULTATION_TEXT, VALIDATION_MESSAGES } from "../utils/messages";
+import { requiredMessage } from "../utils/validation";
 
-// Public "Đăng ký tư vấn" form (POST api/consultation-requests, no sign-in). The receptionist sees it in
-// "Yêu cầu tư vấn" and calls back. Returns the ApiResponse shape: { success, message, data, errors }.
+const ERROR_MESSAGES = new Map([
+    ["A request from this phone number was sent a few minutes ago. The clinic will call you back.", CONSULTATION_TEXT.ALREADY_SENT],
+    ["Phone number is invalid. Please check again.", VALIDATION_MESSAGES.PHONE_INVALID],
+    ["Please enter full name.", requiredMessage("họ và tên")],
+    ["Email is invalid. Please check again.", VALIDATION_MESSAGES.EMAIL_INVALID],
+]);
+
+const failure = (message) => ({ success: false, message, data: null, errors: null });
+
 export const submitConsultationRequest = async ({ fullName, phone, email, note }) => {
     try {
-        const response = await api.post("/api/consultation-requests", { fullName, phoneNumber: phone, email: email || null, note: note || null });
+        const response = await api.post(
+            "/api/consultation-requests",
+            { fullName, phoneNumber: phone, email: email || null, note: note || null },
+            { skipErrorPage: true },
+        );
         return response.data;
     } catch (error) {
-        const body = error.response?.data;
-        if (body && typeof body.success === "boolean") return body;
-        return { success: false, message: "Không gửi được yêu cầu. Vui lòng thử lại hoặc gọi phòng khám.", data: null, errors: null };
+        return failure(ERROR_MESSAGES.get(error.response?.data?.message) ?? CONSULTATION_TEXT.SEND_FAILED);
     }
 };

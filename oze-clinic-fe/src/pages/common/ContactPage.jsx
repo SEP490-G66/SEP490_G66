@@ -11,17 +11,16 @@ import {
     CLINIC_MAP_EMBED_URL,
     CLINIC_OPENING_HOURS,
     CONSULTATION_NOTE_MAX_LENGTH,
+    CONSULTATION_TEXT,
 } from "../../utils/messages";
 import { ROUTES } from "../../utils/routes";
-import { isRequiredEmpty, normalizePhone, requiredMessage, validateEmail, validatePhone } from "../../utils/validation";
+import { normalizePhone, validateEmail, validateFullName, validatePhone } from "../../utils/validation";
 
 const BREADCRUMB_ITEMS = [{ label: "Trang chủ", href: ROUTES.HOME }, { label: "Liên hệ" }];
 
 const SECTION_CLASS = "py-12 md:py-16";
 
 const EMPTY_VALUES = { fullName: "", phone: "", email: "", note: "" };
-
-const validateFullName = (value) => (isRequiredEmpty(value) ? requiredMessage("họ và tên") : undefined);
 
 // Fields in form order; the first field with an error gets the focus on submit.
 const FIELDS = {
@@ -85,8 +84,7 @@ const ContactPage = () => {
                 note: values.note.trim(),
             });
             if (result.success) {
-                // TODO(spec): no system message is defined for a consultation request yet.
-                toast.success("Đăng ký tư vấn thành công! Chúng tôi sẽ liên hệ với bạn sớm.");
+                toast.success(CONSULTATION_TEXT.SUCCESS);
                 setValues(EMPTY_VALUES);
                 return;
             }

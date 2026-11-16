@@ -1,4 +1,4 @@
-import { MESSAGES, PASSWORD_LENGTH, VALIDATION_MESSAGES } from "./messages";
+import { MESSAGES, PASSWORD_LENGTH, PROFILE_LIMITS, VALIDATION_MESSAGES } from "./messages";
 
 // Shared form rules (BR-002). Each validator returns the message to show, or undefined when the value is valid.
 
@@ -8,6 +8,12 @@ export const requiredMessage = (fieldName) => MESSAGES.MSG07.replace("[tên trư
 export const invalidMessage = (fieldName) => MESSAGES.MSG66.replace("[Tên trường]", fieldName);
 
 export const isRequiredEmpty = (value) => value.trim() === "";
+
+export const validateFullName = (value) => {
+    if (isRequiredEmpty(value)) return requiredMessage("họ và tên");
+    if (value.trim().length > PROFILE_LIMITS.FULL_NAME_MAX) return VALIDATION_MESSAGES.FULL_NAME_TOO_LONG;
+    return undefined;
+};
 
 export const validateEmail = (value) => {
     if (!value) return undefined;
