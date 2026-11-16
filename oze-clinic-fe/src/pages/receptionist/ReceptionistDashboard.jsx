@@ -64,6 +64,7 @@ const loadOverview = async (today, signal) => {
     ]);
     return {
         ok: todayList.success && upcoming.success && waiting.success,
+        waitingOk: waiting.success,
         today: list(todayList),
         upcoming: upcoming.success ? upcoming.items : [],
         waiting: list(waiting),
@@ -81,7 +82,8 @@ const ReceptionistDashboard = () => {
     const [ci, setCi] = useState(EMPTY_CI);
     const [cf, setCf] = useState(EMPTY_CF);
     const [dialog, setDialog] = useState(null);
-    const { doctors, available } = useDoctorsOnDuty(version);
+    const { doctors, available, loaded: doctorsLoaded } = useDoctorsOnDuty(version);
+    const doctorById = new Map(doctors.map((d) => [d.id, d]));
 
     usePageTitle(TEXT.DOC_TITLE);
 
@@ -322,8 +324,11 @@ const ReceptionistDashboard = () => {
                             </td>
                             <td data-label={TEXT.CHECK_IN_COLUMNS[4]} className="min-w-36">
                                 {row.doctorName ?? CHECK_IN_TEXT.NO_DOCTOR}
-                                {state === "notyet" && rooms.find((r) => r.doctorId === row.doctorId)?.ended && (
-                                    <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ENDED(rooms.find((r) => r.doctorId === row.doctorId)?.endAt)}</small>
+                                {state === "notyet" && doctorById.get(row.doctorId)?.status === "Ended" && (
+                                    <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ENDED(doctorById.get(row.doctorId).end)}</small>
+                                )}
+                                {state === "notyet" && doctorById.get(row.doctorId)?.status === "OnLeave" && (
+                                    <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ON_LEAVE}</small>
                                 )}
                             </td>
                             <td data-label={TEXT.CHECK_IN_COLUMNS[5]}>{state === "notyet" ? confirmCell(row) : <span className={cx("badge", badge)}>{label}</span>}</td>
@@ -412,9 +417,11 @@ const ReceptionistDashboard = () => {
                 <CheckInDialog
                     appointment={a}
                     doctors={doctors}
-                    waiting={data?.waiting ?? []}
+                    doctorsLoaded={doctorsLoaded}
+                    waiting={data?.waitingOk ? data.waiting : null}
                     onClose={close}
-                    onSubmit={(v) => act(checkInAppointment(a.id, v), CHECK_IN_TEXT.CHECKED_IN(a.patientName, v.room))}
+                    onReschedule={() => setDialog({ type: "reschedule", item: a })}
+                    onSubmit={(v) => act(checkInAppointment(a.id, v), CHECK_IN_TEXT.CHECKED_IN(a.patientName, v.room, v.doctorId ? doctorById.get(v.doctorId)?.name : null))}
                 />
             )}
             {dialog?.type === "confirm" && <ConfirmAppointmentDialog appointment={a} onClose={close} onSubmit={() => act(confirmAppointment(a.id), CONFIRM_TEXT.CONFIRMED(a.patientName))} />}

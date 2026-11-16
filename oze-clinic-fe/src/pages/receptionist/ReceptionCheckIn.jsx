@@ -73,7 +73,7 @@ const ReceptionCheckIn = () => {
         Promise.all([getTodayAppointments(READ), getWaitingList(READ)]).then(([today, queue]) => {
             if (!active) return;
             setResult({ ok: today.success, items: today.success ? (today.data?.items ?? []) : [] });
-            setWaiting(queue.success && Array.isArray(queue.data) ? queue.data : []);
+            setWaiting(queue.success && Array.isArray(queue.data) ? queue.data : null);
         });
         return () => {
             active = false;
@@ -124,6 +124,7 @@ const ReceptionCheckIn = () => {
     const nextAfter = (id) => {
         const pending = shown.filter((x) => stateOf(x) === "notyet");
         const index = pending.findIndex((x) => x.id === id);
+        if (index < 0) return null;
         return pending[index + 1]?.id ?? pending[index - 1]?.id ?? null;
     };
     const slotOptions = [["", TEXT.ALL_SLOTS], ...[...new Set(appointments.map(slotOf).filter(Boolean))].sort().map((s) => [s, s])];
@@ -191,8 +192,8 @@ const ReceptionCheckIn = () => {
                             const doctor = doctorOf.get(a.doctorId);
                             const done = DONE_STATES.includes(state);
                             return (
-                                <tr key={a.id} className={cx(late && "shadow-[inset_4px_0_0_var(--color-warning)]", done && "text-muted")}>
-                                    <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
+                                <tr key={a.id} className={cx(done && "text-muted")}>
+                                    <td data-label={TEXT.COLUMNS[0]} className={cx("num whitespace-nowrap [overflow-wrap:normal]", late && "border-l-4 border-l-warning")}>
                                         <div>
                                             <span className={done ? "text-muted" : "font-semibold text-ink"}>{slotOf(a) || TEXT.WALK_IN_SLOT}</span>
                                             {late && <span className="badge badge-warning mt-1 flex w-fit">{TEXT.LATE_BY(lateMinutes(a))}</span>}
@@ -334,8 +335,8 @@ const ReceptionCheckIn = () => {
                 <CheckInDialog
                     appointment={a}
                     doctors={doctors}
+                    doctorsLoaded={doctorsLoaded}
                     waiting={waiting}
-                    late={dialog.late}
                     onClose={() => setDialog(null)}
                     onReschedule={() => setDialog({ type: "reschedule", item: a })}
                     onSubmit={(v) =>

@@ -135,12 +135,14 @@ export const RescheduleDialog = ({ appointment, onClose, onSubmit }) => {
     );
 };
 
-export const DialogActions = ({ onClose, submitLabel, disabled, danger, busy, closeDisabled, closeLabel }) => (
-    <div className="mt-6 flex justify-end gap-2">
+// submitRef: a ref on the submit button (e.g. to focus it on open); extra: more buttons between Close and submit
+export const DialogActions = ({ onClose, submitLabel, disabled, danger, busy, closeDisabled, closeLabel, submitRef, extra }) => (
+    <div className="mt-6 flex flex-wrap justify-end gap-2">
         <button type="button" className="btn btn-secondary" onClick={onClose} disabled={closeDisabled}>
             {closeLabel ?? "Đóng"}
         </button>
-        <button type="submit" className={cx("btn", danger ? "btn-danger" : "btn-primary")} disabled={disabled || busy}>
+        {extra}
+        <button ref={submitRef} type="submit" className={cx("btn", danger ? "btn-danger" : "btn-primary")} disabled={disabled || busy}>
             {busy && <span className="btn-spinner" aria-hidden />}
             {submitLabel}
         </button>
