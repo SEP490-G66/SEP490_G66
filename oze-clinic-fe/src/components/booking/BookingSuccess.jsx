@@ -13,7 +13,6 @@ const Row = ({ label, children }) => (
     </>
 );
 
-// guest: booked without an account, so there is no "Lịch hẹn của tôi" to go to
 const BookingSuccess = ({ result, guest = false }) => (
     <BookingStateBox
         tone="success"

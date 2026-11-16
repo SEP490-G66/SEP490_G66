@@ -81,8 +81,8 @@ const NoSlotsBox = ({ showAllDoctors, onAllDoctors }) => (
     </BookingStateBox>
 );
 
-export const BookingLoadingCard = () => (
-    <section className="card-app" aria-busy="true">
+export const BookingLoadingCard = ({ card = "card-app" }) => (
+    <section className={card} aria-busy="true">
         <div className="skeleton h-11" />
         <div className="skeleton mt-3 h-22" />
         <div className="skeleton mt-3 h-30" />
@@ -105,8 +105,6 @@ const DoctorSelect = ({ doctors, value, onChange }) => (
     </>
 );
 
-// Block 2 "Thông tin lịch khám" with its states (load error, blocked, no slots), shared by the patient and guest booking pages.
-// form: the value of useBookingForm().
 const BookingSchedule = ({ form }) => {
     const { state, actions, services, earliest, unfinished, blocked, bounds, rangeBusy, slotsBusy, busy, slotsKey } = form;
     const { context } = state;

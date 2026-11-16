@@ -31,7 +31,6 @@ const handleGoogleSignIn = () => { };
 
 const SignInPage = () => {
     const navigate = useNavigate();
-    // The guest booking page sends here with { from } so a patient goes back to book with the profile filled in
     const { state: locationState } = useLocation();
     const identifierRef = useRef(null);
     const passwordRef = useRef(null);

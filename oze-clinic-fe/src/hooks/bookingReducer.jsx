@@ -198,7 +198,6 @@ const submitFailed = (state, { result, today, snapshot }) => {
         case BOOKING_ERROR_CODE.PROFILE_NOT_FOUND:
             return requestFocus({ ...base, page: { status: "unlinked", profileLoaded: false } }, [BOOKING_IDS.STATE_TITLE]);
         default:
-            // result.submitError: a message the service already chose (e.g. the guest booking errors)
             return requestFocus({ ...base, submitError: result.submitError ?? BOOKING_TEXT.SUBMIT_ERROR }, [BOOKING_IDS.SUBMIT]);
     }
 };

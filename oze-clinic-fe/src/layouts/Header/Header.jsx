@@ -7,7 +7,7 @@ import Avatar from "@/components/ui/Avatar";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { signOut } from "@/services/authService";
-import { getPublicServices } from "@/services/dentalService";
+import { getMenuServices } from "@/services/dentalService";
 import {
     getNotifications,
     getUnreadNotificationCount,
@@ -292,7 +292,7 @@ const NavMenu = ({ id, label, to, items, open, onOpenChange }) => {
                 aria-label={label}
                 onKeyDown={handleMenuKeyDown}
                 className={cx(
-                    "absolute left-0 top-full z-40 max-h-80 min-w-56 overflow-y-auto rounded-md border border-border bg-canvas py-2 shadow-sm transition-[opacity,translate,visibility] duration-200 ease-out",
+                    "absolute left-0 top-full z-40 min-w-56 rounded-md border border-border bg-canvas py-2 shadow-sm transition-[opacity,translate,visibility] duration-200 ease-out",
                     open ? "visible translate-y-0 opacity-100" : "pointer-events-none invisible -translate-y-1 opacity-0",
                 )}
             >
@@ -784,7 +784,7 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
     const [drawerKey, setDrawerKey] = useState(null);
     const menuButtonRef = useRef(null);
 
-    const serviceItems = toServiceItems(getPublicServices());
+    const serviceItems = toServiceItems(getMenuServices());
     const openMenuId = openMenu?.key === location.key ? openMenu.id : null;
     const drawerOpen = drawerKey === location.key;
 

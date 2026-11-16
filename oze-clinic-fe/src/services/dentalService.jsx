@@ -22,3 +22,5 @@ export const searchServices = (keyword) => {
 };
 
 export const getFooterServices = () => FOOTER_SERVICE_SLUGS.map((slug) => getServiceBySlug(slug)).filter(Boolean);
+
+export const getMenuServices = () => PUBLIC_SERVICES.filter((service) => !service.hiddenInMenu);

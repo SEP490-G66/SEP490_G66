@@ -13,17 +13,14 @@ import { EMPTY_GUEST, firstGuestError, guestPayload, validateGuest } from "@/uti
 
 const BREADCRUMB = [{ label: TEXT.HOME, href: ROUTES.HOME }, { label: TEXT.TITLE }];
 
-// /book-appointment for a guest (no account): the guest's details + the same schedule block as the patient page, with the real API.
 const GuestBookAppointment = () => {
     const today = getClinicToday();
     const [values, setValues] = useState(EMPTY_GUEST);
     const [errors, setErrors] = useState({});
-    // After the first "Đặt lịch khám" the errors follow what is typed
     const [checked, setChecked] = useState(false);
 
     const form = useBookingForm({
         api: GUEST_BOOKING_API,
-        // Called when "Đặt lịch khám" is pressed, with the values of that render
         guest: {
             validate: () => {
                 const found = validateGuest(values, getClinicToday());
@@ -57,21 +54,21 @@ const GuestBookAppointment = () => {
     const renderCard = () => {
         if (done) {
             return (
-                <section className="card-app">
+                <section className="card-public">
                     <BookingSuccess result={done} guest />
                 </section>
             );
         }
-        if (page.status === "loading") return <BookingLoadingCard />;
+        if (page.status === "loading") return <BookingLoadingCard card="card-public" />;
         if (page.status === "error" && !page.profileLoaded) {
             return (
-                <section className="card-app">
+                <section className="card-public">
                     <LoadErrorBox headingLevel={2} onRetry={actions.retryContext} />
                 </section>
             );
         }
         return (
-            <section className="card-app">
+            <section className="card-public">
                 <BookingSectionHeading number={1} title={BOOKING_TEXT.PATIENT_SECTION} />
                 <GuestPatientForm values={values} errors={errors} onChange={change} note={state.note} onNoteChange={actions.changeNote} today={today} />
                 <hr className="my-7 border-border" />
@@ -88,7 +85,7 @@ const GuestBookAppointment = () => {
             </div>
             <div className="container-public flex flex-col gap-6 pb-12 md:pb-16">
                 <div>
-                    <h1 id={BOOKING_IDS.PAGE_TITLE} tabIndex={-1} className="font-heading text-display-section text-ink">
+                    <h1 id={BOOKING_IDS.PAGE_TITLE} tabIndex={-1} className="text-display-md md:text-display-lg">
                         {TEXT.TITLE}
                     </h1>
                     <p className="mt-2 text-body-lg text-body">{TEXT.DESCRIPTION}</p>

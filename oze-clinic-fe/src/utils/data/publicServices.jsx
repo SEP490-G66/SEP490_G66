@@ -290,6 +290,7 @@ export const PUBLIC_SERVICES = [
         slug: "kham-tong-quat-tu-van",
         name: "Khám tổng quát & tư vấn",
         featured: false,
+        hiddenInMenu: true,
         imageUrl: null,
         summary: "Kiểm tra sức khỏe răng miệng và tư vấn phương án điều trị phù hợp.",
         intro:

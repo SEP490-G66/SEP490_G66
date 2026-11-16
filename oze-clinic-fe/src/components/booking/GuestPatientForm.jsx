@@ -15,7 +15,7 @@ const Field = ({ id, label, required, optional, error, className, children }) =>
         </label>
         {children}
         {error && (
-            <p id={errorId(id)} className="text-caption text-danger">
+            <p id={errorId(id)} className="error-text">
                 {error}
             </p>
         )}
@@ -29,13 +29,12 @@ const inputProps = (id, error) => ({
     "aria-describedby": error ? errorId(id) : undefined,
 });
 
-// Block 1 "Thông tin bệnh nhân" for a guest. values / errors are kept by the page; note is the booking note of the form.
 const GuestPatientForm = ({ values, errors, onChange, note, onNoteChange, today }) => {
     const set = (key) => (event) => onChange(key, event.target.value);
 
     return (
         <div className="flex flex-col gap-5">
-            <p className="text-body-sm text-body">
+            <p className="text-body-md text-body">
                 {TEXT.HAS_ACCOUNT}{" "}
                 <Link to={ROUTES.SIGN_IN} state={{ from: ROUTES.BOOK_APPOINTMENT }} className="font-semibold text-primary hover:underline">
                     {TEXT.SIGN_IN}
@@ -75,7 +74,7 @@ const GuestPatientForm = ({ values, errors, onChange, note, onNoteChange, today 
                         ))}
                     </div>
                     {errors.gender && (
-                        <p id={errorId(GUEST_FIELD_IDS.GENDER)} className="text-caption text-danger">
+                        <p id={errorId(GUEST_FIELD_IDS.GENDER)} className="error-text">
                             {errors.gender}
                         </p>
                     )}

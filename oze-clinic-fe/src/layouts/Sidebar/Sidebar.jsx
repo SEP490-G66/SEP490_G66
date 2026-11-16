@@ -312,7 +312,7 @@ const SidebarDrawer = ({ id, menu, onClose, returnFocusRef }) => {
     );
 };
 
-const Sidebar = ({ id, drawer = false, collapsed = false, onClose, returnFocusRef }) => {
+const Sidebar = ({ id, drawer = false, collapsed = false, underHeader = false, onClose, returnFocusRef }) => {
     const { role } = useSession();
     const menu = getSidebarMenu(role);
 
@@ -322,18 +322,21 @@ const Sidebar = ({ id, drawer = false, collapsed = false, onClose, returnFocusRe
         <div
             id={id}
             className={cx(
-                "sidebar sticky top-0 z-20 h-dvh shrink-0 gap-0 p-0",
+                "sidebar z-20 shrink-0 gap-0 p-0",
+                underHeader ? "sidebar-under-header" : "sticky top-0 h-dvh",
                 collapsed ? "w-sidebar-collapsed" : "w-sidebar",
             )}
         >
-            <div
-                className={cx(
-                    "flex h-topbar shrink-0 items-center border-b border-border",
-                    collapsed ? "justify-center" : "px-5",
-                )}
-            >
-                <Brand collapsed={collapsed} />
-            </div>
+            {!underHeader && (
+                <div
+                    className={cx(
+                        "flex h-topbar shrink-0 items-center border-b border-border",
+                        collapsed ? "justify-center" : "px-5",
+                    )}
+                >
+                    <Brand collapsed={collapsed} />
+                </div>
+            )}
             {menu.length > 0 && <SidebarNav menu={menu} collapsed={collapsed} />}
         </div>
     );

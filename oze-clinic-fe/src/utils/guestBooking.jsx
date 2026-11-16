@@ -1,7 +1,6 @@
 import { GUEST_BOOKING_TEXT as TEXT } from "./messages";
 import { isRequiredEmpty, normalizePhone, validateEmail, validatePhone } from "./validation";
 
-// Fields of the guest booking form (pages/common/GuestBookAppointment.jsx)
 export const GUEST_FIELD_IDS = {
     FULL_NAME: "guest-full-name",
     GENDER: "guest-gender-male",
@@ -13,7 +12,6 @@ export const GUEST_FIELD_IDS = {
 
 export const EMPTY_GUEST = { fullName: "", gender: "", birthdate: "", phone: "", address: "", email: "" };
 
-// Field → message. today: clinic date "yyyy-mm-dd" (a birth date after it is wrong).
 export const validateGuest = (values, today) => {
     const errors = {};
     const name = values.fullName.trim();
@@ -29,7 +27,6 @@ export const validateGuest = (values, today) => {
     return errors;
 };
 
-// The id of the first wrong field, in page order (to move the focus there)
 export const firstGuestError = (errors) =>
     [
         ["fullName", GUEST_FIELD_IDS.FULL_NAME],
@@ -39,7 +36,6 @@ export const firstGuestError = (errors) =>
         ["email", GUEST_FIELD_IDS.EMAIL],
     ].find(([key]) => errors[key])?.[1] ?? null;
 
-// The guest's details added to the booking payload (POST /api/appointments/guest-booking)
 export const guestPayload = (values) => ({
     FullName: values.fullName.trim(),
     PhoneNumber: normalizePhone(values.phone),

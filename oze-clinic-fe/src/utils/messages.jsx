@@ -198,7 +198,6 @@ export const PUBLIC_SEARCH_TEXT = {
     NO_RESULT_HINT: "Thử từ khóa khác, ví dụ: niềng răng, implant, tên bác sĩ.",
 };
 
-// Booking for a guest (no account) on /book-appointment; the schedule part reuses BOOKING_TEXT
 export const GUEST_BOOKING_TEXT = {
     HOME: "Trang chủ",
     TITLE: "Đặt lịch khám",
@@ -225,7 +224,6 @@ export const GUEST_BOOKING_TEXT = {
     ERR_BIRTHDATE: "Vui lòng nhập ngày sinh.",
     ERR_BIRTHDATE_FUTURE: "Ngày sinh không được sau ngày hôm nay.",
     SUCCESS_TEXT: "Lịch hẹn của bạn đang chờ phòng khám xác nhận. Lễ tân sẽ báo cho bạn qua SMS hoặc email khi lịch được xác nhận. Muốn đổi hoặc hủy lịch, vui lòng gọi hotline.",
-    // Shown before the hotline number
     ERROR_PHONE_HAS_ACCOUNT: "Số điện thoại này đã có tài khoản nên hệ thống chưa nhận đặt lịch không cần đăng nhập. Bạn có thể đăng nhập để đặt lịch, hoặc gọi",
     ERROR_HAS_UNFINISHED: "Số điện thoại này đang có một lịch hẹn chưa hoàn tất. Để đổi hoặc hủy lịch đó, vui lòng gọi",
     ERROR_MULTIPLE_RECORDS: "Số điện thoại này gắn với nhiều hồ sơ bệnh nhân. Để đặt lịch, vui lòng gọi",

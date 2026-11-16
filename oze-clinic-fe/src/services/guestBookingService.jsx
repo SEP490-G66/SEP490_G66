@@ -3,20 +3,15 @@ import { call } from "./receptionService";
 import { addDays, parseDateOnly, toDateOnly } from "../utils/format";
 import { BOOKING_ERROR_CODE, GUEST_BOOKING_TEXT } from "../utils/messages";
 
-// Booking for a guest (no account) on /book-appointment, with the real API. Every function returns the same
-// shape as bookingService.jsx (the patient booking), so the same form (useBookingForm) runs both pages.
 
-// The screen handles every error itself, no global error page
 const READ = { skipErrorPage: true };
 
-// Requests at the same time when checking the free slots of every day in the range
 const DAY_REQUESTS_AT_ONCE = 6;
 
 const failure = (code = BOOKING_ERROR_CODE.GENERIC, extra = {}) => ({ success: false, message: null, data: null, code, ...extra });
 
 const listOf = (data) => (Array.isArray(data) ? data : (data?.items ?? []));
 
-// The server writes errors in English; these are the booking ones the form reacts to (ErrorConstants.AppointmentMessage).
 const SERVER_ERRORS = [
     ["no longer available", BOOKING_ERROR_CODE.SLOT_NOT_AVAILABLE],
     ["cannot be in the past", BOOKING_ERROR_CODE.PAST_DATE],
@@ -25,7 +20,6 @@ const SERVER_ERRORS = [
     ["service is not available", BOOKING_ERROR_CODE.VARIANT_INACTIVE],
 ];
 
-// Errors only a guest can get: shown as a message above the button (with the hotline after it)
 const GUEST_ERRORS = [
     ["already has an account", GUEST_BOOKING_TEXT.ERROR_PHONE_HAS_ACCOUNT],
     ["not finished", GUEST_BOOKING_TEXT.ERROR_HAS_UNFINISHED],
@@ -70,7 +64,6 @@ export const getGuestBookingContext = async ({ signal } = {}) => {
     };
 };
 
-// One row per doctor comes back; the form needs each start once, in order.
 const uniqueSlots = (rows) => {
     const byStart = new Map();
     rows.forEach((row) => {
@@ -87,8 +80,6 @@ export const getGuestBookingSlots = async ({ date, doctorId, signal } = {}) => {
     return result.success ? { success: true, message: null, code: null, data: uniqueSlots(listOf(result.data)) } : failure();
 };
 
-// No "free slots per day" API yet (BE-G2), so every day of the range is asked one by one, a few at a time.
-// A day the server refuses (e.g. past its booking limit) counts as having no free slot.
 export const getGuestBookingDays = async ({ from, to, doctorId, signal } = {}) => {
     const dates = [];
     for (let date = from; date <= to; date = toDateOnly(addDays(parseDateOnly(date), 1))) dates.push(date);
@@ -112,7 +103,6 @@ export const getGuestBookingDays = async ({ from, to, doctorId, signal } = {}) =
     return broken ? failure() : { success: true, message: null, code: null, data: days };
 };
 
-// payload: the same booking payload as a patient (buildBookingPayload) plus the guest's details.
 export const createGuestBooking = async (payload) => {
     const result = await call(() => api.post("/api/appointments/guest-booking", payload, READ));
     if (!result.success) return toFailure(result);
