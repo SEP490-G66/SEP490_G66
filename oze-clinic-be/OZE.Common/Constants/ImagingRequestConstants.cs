@@ -34,7 +34,8 @@ namespace OZE.Common.Constants
         public const string WebhookSecretConfigKey = "XRaySimulator:WebhookSecret";
         public const string WebhookSignaturePrefix = "sha256=";
         // Only used on a development machine that has no secret configured; any other environment must configure its own
-        public const string DevelopmentWebhookSecret = "oze-xray-shared-secret-key-2026";
+        // It is the simulator's own development secret, so the two work together on a fresh machine
+        public const string DevelopmentWebhookSecret = "oze-sim-webhook-secret-2026";
 
     }
 }

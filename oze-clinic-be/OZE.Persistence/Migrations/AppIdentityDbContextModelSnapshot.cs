@@ -17,7 +17,7 @@ namespace OZE.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -1073,6 +1073,95 @@ namespace OZE.Persistence.Migrations
                     b.ToTable("FollowUpContacts", null, t =>
                         {
                             t.HasCheckConstraint("CK_FollowUpContacts_Outcome", "[Outcome] IN ('Booked', 'CallBack', 'Unreachable', 'Declined')");
+                        });
+                });
+
+            modelBuilder.Entity("OZE.Domain.Entities.ImagingCapture", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BodyRegion")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<double?>("ExposureSeconds")
+                        .HasColumnType("float");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("ImageCount")
+                        .HasColumnType("int");
+
+                    b.Property<long>("ImagingRequestId")
+                        .HasColumnType("bigint");
+
+                    b.Property<double?>("Kv")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("Ma")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Modality")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Progress")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SimulationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("TechnicianId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImagingRequestId")
+                        .HasDatabaseName("IX_ImagingCaptures_RequestId");
+
+                    b.HasIndex("SimulationId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ImagingCaptures_SimulationId");
+
+                    b.ToTable("ImagingCaptures", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ImagingCaptures_Progress", "[Progress] BETWEEN 0 AND 100");
+
+                            t.HasCheckConstraint("CK_ImagingCaptures_Status", "[Status] IN ('ACCEPTED', 'CAPTURING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED')");
                         });
                 });
 
@@ -3195,6 +3284,27 @@ namespace OZE.Persistence.Migrations
                         .HasConstraintName("FK_FollowUpContacts_Examinations");
 
                     b.Navigation("Examination");
+                });
+
+            modelBuilder.Entity("OZE.Domain.Entities.ImagingCapture", b =>
+                {
+                    b.HasOne("OZE.Domain.Entities.ImagingRequest", "ImagingRequest")
+                        .WithMany()
+                        .HasForeignKey("ImagingRequestId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_ImagingCaptures_Requests");
+
+                    b.HasOne("OZE.Domain.Entities.StaffProfile", "Technician")
+                        .WithMany()
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_ImagingCaptures_Technician");
+
+                    b.Navigation("ImagingRequest");
+
+                    b.Navigation("Technician");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.ImagingRequest", b =>

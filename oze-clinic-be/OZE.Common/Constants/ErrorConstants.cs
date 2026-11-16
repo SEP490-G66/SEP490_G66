@@ -463,6 +463,25 @@ namespace OZE.Common.Constants
             public const string QueueEmpty = "No Data.";
         }
 
+        // Capturing on the X-ray simulator and reading the stored pictures
+        public static class ImagingCaptureMessage
+        {
+            public const string TechnicianNotFound = "Imaging technician not found.";
+            public const string DeviceRequired = "Please select an X-ray device.";
+            public const string ImageCountInvalid = "Number of images must be between 1 and 10.";
+            public const string ImagingTypeNotSupported = "The X-ray device cannot take {0}. Please upload the images by hand.";
+            public const string RequestNotOpen = "Cannot capture because the imaging request is {0}.";
+            public const string CaptureAlreadyRunning = "A capture is already running for this imaging request.";
+            public const string CaptureNotFound = "Capture not found.";
+            public const string CaptureNotRunning = "Cannot cancel because the capture is {0}.";
+            public const string SimulatorUnavailable = "The X-ray device is not reachable. Please try again later.";
+            public const string SimulatorRejected = "The X-ray device refused the capture: {0}";
+            public const string CaptureStarted = "Capture started.";
+            public const string CaptureCancelled = "Capture cancelled.";
+            public const string ResultNotFound = "Image not found.";
+            public const string CannotViewResult = "You do not have permission to view this image.";
+        }
+
         public static class InvoiceMessage
         {
             public const string PatientRequired = "Please select a patient.";

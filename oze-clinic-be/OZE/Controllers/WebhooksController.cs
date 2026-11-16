@@ -21,18 +21,18 @@ namespace OZE.Controllers
     [Route("api/webhooks")]
     public class WebhooksController : ControllerBase
     {
-        private readonly IImagingRequestService _imagingRequestService;
+        private readonly IImagingCaptureService _captureService;
         private readonly IConfiguration _configuration;
         private readonly IHostEnvironment _environment;
         private readonly ILogger<WebhooksController> _logger;
 
         public WebhooksController(
-            IImagingRequestService imagingRequestService,
+            IImagingCaptureService captureService,
             IConfiguration configuration,
             IHostEnvironment environment,
             ILogger<WebhooksController> logger)
         {
-            _imagingRequestService = imagingRequestService;
+            _captureService = captureService;
             _configuration = configuration;
             _environment = environment;
             _logger = logger;
@@ -103,13 +103,14 @@ namespace OZE.Controllers
             _logger.LogInformation("Processing simulator webhook event {EventId} for OrderReference {OrderRef}, State {State}",
                 payload.EventId, payload.OrderReference, payload.State);
 
-            var processed = await _imagingRequestService.ProcessSimulatorWebhookAsync(payload, cancellationToken);
+            var processed = await _captureService.HandleWebhookAsync(payload, cancellationToken);
             if (!processed)
             {
-                return BadRequest(ApiResponse.FailureResult("Failed to process imaging request completion from webhook"));
+                // Not 2xx, so the simulator sends the event again
+                return BadRequest(ApiResponse.FailureResult("Failed to process the simulator event"));
             }
 
-            return Ok(ApiResponse.SuccessResult("Webhook processed successfully. Patient added to Priority Return Queue."));
+            return Ok(ApiResponse.SuccessResult("Webhook processed successfully."));
         }
 
         private static bool IsValidSignature(string data, string secret, string providedSignature)

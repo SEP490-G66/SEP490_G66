@@ -9,3 +9,5 @@
 .idea/
 .vscode/
 .env
+# Pictures captured on the X-ray simulator (stored on disk on a development machine)
+App_Data/
