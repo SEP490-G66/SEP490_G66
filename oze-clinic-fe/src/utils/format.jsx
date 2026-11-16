@@ -55,6 +55,12 @@ export const formatDate = (value) => {
     return date ? `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}` : "";
 };
 
+// "2026-10-16" -> "16-10-26"
+export const formatDateShortDash = (value) => {
+    const date = parseDateOnly(value);
+    return date ? `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${pad(date.getFullYear() % 100)}` : "";
+};
+
 // "2026-10-16" -> "16/10"
 export const formatDayMonth = (value) => {
     const date = parseDateOnly(value);

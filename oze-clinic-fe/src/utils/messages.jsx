@@ -180,6 +180,13 @@ export const PUBLIC_DOCTOR_TEXT = {
     NEXT: "Ảnh sau",
 };
 
+export const PUBLIC_ARTICLE_TEXT = {
+    HOME: "Trang chủ",
+    KNOWLEDGE: "Kiến thức nha khoa",
+    RECENT_TITLE: "Bài viết gần đây",
+    PUBLISHED_AT: "Ngày đăng:",
+};
+
 // Header search results page (landing)
 export const PUBLIC_SEARCH_TEXT = {
     HOME: "Trang chủ",

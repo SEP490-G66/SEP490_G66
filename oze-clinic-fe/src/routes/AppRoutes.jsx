@@ -10,6 +10,7 @@ import VerifyOtpPage from "../pages/common/VerifyOtpPage";
 import AboutUs from "../pages/common/homepage/AboutUs";
 import ContactPage from "../pages/common/ContactPage";
 import ServiceDetail from "../pages/common/ServiceDetail";
+import ArticleDetail from "../pages/common/ArticleDetail";
 import ServiceList from "../pages/common/ServiceList";
 import DoctorList from "../pages/common/DoctorList";
 import SearchResults from "../pages/common/SearchResults";
@@ -98,6 +99,10 @@ const routes = [
     {
         path: ROUTES.SERVICE_DETAIL,
         element: <ServiceDetail />
+    },
+    {
+        path: ROUTES.ARTICLE_DETAIL,
+        element: <ArticleDetail />
     },
     {
         path: ROUTES.FORGOT_PASSWORD,
