@@ -16,7 +16,7 @@ import {
 } from "@/services/notificationService";
 import { cx } from "@/utils/cx";
 import { CLINIC_HOTLINE, GUEST_HEADER_TEXT as TEXT, MESSAGES, USER_ROLES } from "@/utils/messages";
-import { ROUTES, getServiceDetailRoute, getServiceSearchRoute } from "@/utils/routes";
+import { ROUTES, getSearchRoute, getServiceDetailRoute } from "@/utils/routes";
 
 const HOVER_CLOSE_DELAY_MS = 150;
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), input:not([disabled])";
@@ -110,15 +110,18 @@ const useDismiss = ({ open, containerRef, returnFocusRef, onDismiss }) => {
     return { onKeyDown: handleKeyDown, onBlur: handleBlur };
 };
 
-// Searches the services for now (/services?q=); doctors are added with the doctors page.
+// Searches services and doctors (/search?q=); an empty box opens the services list.
+// On /search the box shows the keyword being searched (key resets it when the address changes).
 const SearchForm = ({ compact = false, className }) => {
     const inputId = useId();
     const navigate = useNavigate();
+    const { pathname, search } = useLocation();
+    const current = pathname === ROUTES.SEARCH ? (new URLSearchParams(search).get("q") ?? "") : "";
 
     const handleSubmit = (event) => {
         event.preventDefault();
         const keyword = String(new FormData(event.currentTarget).get("q") ?? "").trim();
-        navigate(getServiceSearchRoute(keyword));
+        navigate(keyword ? getSearchRoute(keyword) : ROUTES.SERVICES);
     };
 
     return (
@@ -127,8 +130,10 @@ const SearchForm = ({ compact = false, className }) => {
                 {TEXT.SEARCH_LABEL}
             </label>
             <input
+                key={current}
                 id={inputId}
                 name="q"
+                defaultValue={current}
                 type="search"
                 placeholder={TEXT.SEARCH_PLACEHOLDER}
                 className={cx("input min-w-0 flex-1", compact && "h-8")}

@@ -12,6 +12,7 @@ export const ROUTES = {
     SERVICES: "/services",
     SERVICE_DETAIL: "/services/:serviceSlug",
     DOCTORS: "/doctors",
+    SEARCH: "/search",
     CONTACT: "/contact",
     BOOK_APPOINTMENT: "/book-appointment",
     PROFILE: "/profile",
@@ -112,6 +113,11 @@ export const ROLE_ROUTES = [
 export const getServiceDetailRoute = (serviceSlug) => generatePath(ROUTES.SERVICE_DETAIL, { serviceSlug });
 
 export const getServiceSearchRoute = (keyword) => (keyword ? `${ROUTES.SERVICES}?q=${encodeURIComponent(keyword)}` : ROUTES.SERVICES);
+
+export const getDoctorSearchRoute = (keyword) => (keyword ? `${ROUTES.DOCTORS}?q=${encodeURIComponent(keyword)}` : ROUTES.DOCTORS);
+
+// Header search: services and doctors together
+export const getSearchRoute = (keyword) => `${ROUTES.SEARCH}?q=${encodeURIComponent(keyword)}`;
 
 export const getAppointmentDetailRoute = (appointmentId) => generatePath(ROUTES.APPOINTMENT_DETAIL, { appointmentId: String(appointmentId) });
 

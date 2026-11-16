@@ -11,6 +11,8 @@ import AboutUs from "../pages/common/homepage/AboutUs";
 import ContactPage from "../pages/common/ContactPage";
 import ServiceDetail from "../pages/common/ServiceDetail";
 import ServiceList from "../pages/common/ServiceList";
+import DoctorList from "../pages/common/DoctorList";
+import SearchResults from "../pages/common/SearchResults";
 import DashboardPage from "../pages/common/DashboardPage";
 import ProfilePage from "../pages/common/ProfilePage";
 import ChangePasswordPage from "../pages/common/ChangePasswordPage";
@@ -83,6 +85,14 @@ const routes = [
     {
         path: ROUTES.SERVICES,
         element: <ServiceList />
+    },
+    {
+        path: ROUTES.DOCTORS,
+        element: <DoctorList />
+    },
+    {
+        path: ROUTES.SEARCH,
+        element: <SearchResults />
     },
     {
         path: ROUTES.SERVICE_DETAIL,

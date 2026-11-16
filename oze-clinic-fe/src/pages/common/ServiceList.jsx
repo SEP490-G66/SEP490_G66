@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { SearchX } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import ImageCard from "@/components/ui/ImageCard";
 import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
+import usePublicList from "@/hooks/usePublicList";
 import { searchServices } from "@/services/dentalService";
 import { PUBLIC_SERVICE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES, getServiceDetailRoute } from "@/utils/routes";
@@ -16,56 +16,13 @@ const TITLE_ID = "service-list-title";
 
 const BREADCRUMB = [{ label: TEXT.HOME, href: ROUTES.HOME }, { label: TEXT.SERVICES }];
 
-// ?page= as a whole number ≥ 1, or 1.
-const pageFrom = (value) => {
-    const page = Number(value);
-    return Number.isInteger(page) && page >= 1 ? page : 1;
-};
-
 // /services?q=&page= — every public service (fixed content), searchable, 10 per page.
 const ServiceList = () => {
-    const [searchParams, setSearchParams] = useSearchParams();
     const gridRef = useRef(null);
-    const keyword = searchParams.get("q") ?? "";
-    const services = searchServices(keyword);
-    const totalPages = Math.max(1, Math.ceil(services.length / PAGE_SIZE));
-    const requestedPage = searchParams.get("page");
-    const page = Math.min(pageFrom(requestedPage), totalPages);
-    const pageItems = services.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-    // A wrong ?page= (not a number, 0, past the last page) is corrected in the address bar.
-    useEffect(() => {
-        if (requestedPage === null || requestedPage === String(page)) return;
-        setSearchParams(
-            (current) => {
-                const next = new URLSearchParams(current);
-                if (page === 1) next.delete("page");
-                else next.set("page", String(page));
-                return next;
-            },
-            { replace: true },
-        );
-    }, [requestedPage, page, setSearchParams]);
-
-    const changeKeyword = (value) =>
-        setSearchParams(
-            (current) => {
-                const next = new URLSearchParams(current);
-                if (value) next.set("q", value);
-                else next.delete("q");
-                next.delete("page");
-                return next;
-            },
-            { replace: true },
-        );
+    const { keyword, page, totalPages, items: pageItems, setKeyword: changeKeyword, setPage } = usePublicList(searchServices, PAGE_SIZE);
 
     const changePage = (target) => {
-        setSearchParams((current) => {
-            const next = new URLSearchParams(current);
-            if (target === 1) next.delete("page");
-            else next.set("page", String(target));
-            return next;
-        });
+        setPage(target);
         gridRef.current?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
     };
 

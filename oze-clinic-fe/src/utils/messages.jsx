@@ -163,6 +163,41 @@ export const PUBLIC_SERVICE_TEXT = {
     STEP: (n) => `Bước ${n}`,
 };
 
+// Public "Đội ngũ bác sĩ" page (landing)
+export const PUBLIC_DOCTOR_TEXT = {
+    HOME: "Trang chủ",
+    TITLE: "Đội ngũ bác sĩ",
+    SEARCH_LABEL: "Tìm bác sĩ",
+    SEARCH_PLACEHOLDER: "Tìm theo tên bác sĩ",
+    LIST_LABEL: "Danh sách bác sĩ",
+    PAGINATION_LABEL: "Phân trang danh sách bác sĩ",
+    NO_RESULT: (keyword) => `Không tìm thấy bác sĩ phù hợp với “${keyword}”`,
+    CLEAR_SEARCH: "Xóa tìm kiếm",
+    CERTIFICATES_OF: (name) => `Chứng chỉ của ${name}`,
+    CERTIFICATE_POSITION: (n, total) => `Ảnh ${n}/${total}`,
+    OPEN_CERTIFICATE: (n, name) => `Xem ảnh chứng chỉ ${n} của ${name}`,
+    PREVIOUS: "Ảnh trước",
+    NEXT: "Ảnh sau",
+};
+
+// Header search results page (landing)
+export const PUBLIC_SEARCH_TEXT = {
+    HOME: "Trang chủ",
+    BREADCRUMB: "Tìm kiếm",
+    TITLE: "Tìm kiếm",
+    TITLE_FOR: (keyword) => `Kết quả tìm kiếm cho “${keyword}”`,
+    SEARCH_LABEL: "Tìm dịch vụ, bác sĩ",
+    SEARCH_PLACEHOLDER: "Tìm dịch vụ, bác sĩ",
+    ENTER_KEYWORD: "Nhập tên dịch vụ hoặc bác sĩ để tìm.",
+    SERVICES: "Dịch vụ",
+    DOCTORS: "Bác sĩ",
+    SEE_ALL: "Xem tất cả",
+    NO_SERVICE: "Không có dịch vụ phù hợp.",
+    NO_DOCTOR: "Không có bác sĩ phù hợp.",
+    NO_RESULT: (keyword) => `Không tìm thấy dịch vụ hay bác sĩ phù hợp với “${keyword}”`,
+    NO_RESULT_HINT: "Thử từ khóa khác, ví dụ: niềng răng, implant, tên bác sĩ.",
+};
+
 export const GENERIC_ERROR_MESSAGE = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
 export const APPOINTMENT_STATUS = {
