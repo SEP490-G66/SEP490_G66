@@ -1,26 +1,4 @@
-import phuongAnh from "@/assets/mock/doctors/phuong-anh.webp";
-import thao from "@/assets/mock/doctors/thao.webp";
-import trang from "@/assets/mock/doctors/trang.webp";
-import trung from "@/assets/mock/doctors/trung.webp";
-import van from "@/assets/mock/doctors/van.webp";
-import phuongAnh1 from "@/assets/mock/certificates/phuong-anh/phuong-anh-1.webp";
-import phuongAnh2 from "@/assets/mock/certificates/phuong-anh/phuong-anh-2.webp";
-import phuongAnh3 from "@/assets/mock/certificates/phuong-anh/phuong-anh-3.webp";
-import phuongAnh4 from "@/assets/mock/certificates/phuong-anh/phuong-anh-4.webp";
-import thao1 from "@/assets/mock/certificates/thao/thao-1.webp";
-import thao2 from "@/assets/mock/certificates/thao/thao-2.webp";
-import thao3 from "@/assets/mock/certificates/thao/thao-3.webp";
-import thao4 from "@/assets/mock/certificates/thao/thao-4.webp";
-import trang1 from "@/assets/mock/certificates/trang/trang-1.webp";
-import trang2 from "@/assets/mock/certificates/trang/trang-2.webp";
-import trang3 from "@/assets/mock/certificates/trang/trang-3.webp";
-import trang4 from "@/assets/mock/certificates/trang/trang-4.webp";
-import trung1 from "@/assets/mock/certificates/trung/trung-1.webp";
-import trung2 from "@/assets/mock/certificates/trung/trung-2.webp";
-import trung3 from "@/assets/mock/certificates/trung/trung-3.webp";
-import trung4 from "@/assets/mock/certificates/trung/trung-4.webp";
-import van1 from "@/assets/mock/certificates/van/van-1.webp";
-import van2 from "@/assets/mock/certificates/van/van-2.webp";
+import placeholderImage from "@/assets/placeholder/placeholder.svg";
 
 const toCertificateImages = (fullName, images) =>
     images.map((imageUrl, index) => ({ imageUrl, alt: `Chứng chỉ ${index + 1} của ${fullName}` }));
@@ -39,8 +17,8 @@ export const MOCK_DOCTORS = [
             "Học vị Tiến sĩ Y học do Bộ Giáo dục và Đào tạo công nhận",
             "Chứng nhận \"Bác sĩ cao cấp\" do Bộ Quốc phòng trao tặng",
         ],
-        imageUrl: trung,
-        certificateImages: toCertificateImages("Đinh Vạn Trung", [trung1, trung2, trung3, trung4]),
+        imageUrl: placeholderImage,
+        certificateImages: toCertificateImages("Đinh Vạn Trung", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
     },
     {
         id: 2,
@@ -55,8 +33,8 @@ export const MOCK_DOCTORS = [
             "Chứng chỉ Chỉnh hình răng mặt do Viện Đào tạo Răng Hàm Mặt Đại Học Y Hà Nội",
             "Giấy phép hành nghề Khám bệnh, chữa bệnh do Sở Y tế Thành phố Hà Nội cấp",
         ],
-        imageUrl: phuongAnh,
-        certificateImages: toCertificateImages("Phạm Phương Anh", [phuongAnh1, phuongAnh2, phuongAnh3, phuongAnh4]),
+        imageUrl: placeholderImage,
+        certificateImages: toCertificateImages("Phạm Phương Anh", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
     },
     {
         id: 3,
@@ -71,8 +49,8 @@ export const MOCK_DOCTORS = [
             "Chứng chỉ Chỉnh hình răng mặt cơ bản do Trường Đại học Y dược - Đại học Thái Nguyên cấp",
             "Giấy phép hành nghề Khám bệnh, chữa bệnh do Sở Y tế Thành phố Hà Nội cấp",
         ],
-        imageUrl: thao,
-        certificateImages: toCertificateImages("Lê Thị Thảo", [thao1, thao2, thao3, thao4]),
+        imageUrl: placeholderImage,
+        certificateImages: toCertificateImages("Lê Thị Thảo", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
     },
     {
         id: 4,
@@ -87,8 +65,8 @@ export const MOCK_DOCTORS = [
             "Chứng chỉ Chỉnh Hình Răng mặt do Viện Đào tạo Răng Hàm Mặt - Trường Đại học Y Hà Nội cấp",
             "Giấy phép hành nghề Khám bệnh, chữa bệnh do Sở Y tế Thành phố Hà Nội cấp",
         ],
-        imageUrl: trang,
-        certificateImages: toCertificateImages("Nguyễn Đài Trang", [trang1, trang2, trang3, trang4]),
+        imageUrl: placeholderImage,
+        certificateImages: toCertificateImages("Nguyễn Đài Trang", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
     },
     {
         id: 5,
@@ -103,7 +81,7 @@ export const MOCK_DOCTORS = [
             "Thường xuyên tham gia các hội thảo, chương trình đào tạo chuyên ngành Răng Hàm Mặt trong nước",
             "Liên tục cập nhật kiến thức, kỹ thuật và phương pháp điều trị mới nhằm nâng cao chất lượng chuyên môn",
         ],
-        imageUrl: van,
-        certificateImages: toCertificateImages("Nguyễn Thị Cẩm Vân", [van1, van2]),
+        imageUrl: placeholderImage,
+        certificateImages: toCertificateImages("Nguyễn Thị Cẩm Vân", [placeholderImage, placeholderImage]),
     },
 ];
