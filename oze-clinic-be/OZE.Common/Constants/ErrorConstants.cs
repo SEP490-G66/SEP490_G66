@@ -480,6 +480,8 @@ namespace OZE.Common.Constants
             public const string CaptureCancelled = "Capture cancelled.";
             public const string ResultNotFound = "Image not found.";
             public const string CannotViewResult = "You do not have permission to view this image.";
+            public const string HistoryStatusInvalid = "Status must be Completed or Cancelled.";
+            public const string HistoryDateRangeInvalid = "The start date must not be after the end date.";
         }
 
         public static class InvoiceMessage

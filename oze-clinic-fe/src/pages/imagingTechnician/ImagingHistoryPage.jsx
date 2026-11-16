@@ -8,7 +8,7 @@ import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
 import useAsync from "@/hooks/useAsync";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { getImagingHistory, getImagingHistoryDetail } from "@/services/imagingTechnicianService";
+import { getImagingHistory, getImagingHistoryDetail, releaseImagingHistoryPictures } from "@/services/imagingTechnicianService";
 import { clinicToday } from "@/services/receptionService";
 import { IMAGING_REQUEST_STATUSES, IMAGING_REQUEST_STATUS_LABELS, IMAGING_TYPE_LABELS } from "@/utils/imagingRequest";
 
@@ -61,6 +61,10 @@ const ImagingHistoryPage = () => {
         setRange(DEFAULT_RANGE);
         setPage(1);
     };
+    const closeDetail = () => {
+        releaseImagingHistoryPictures(detail);
+        setDetail(null);
+    };
     const openDetail = async (row) => {
         const response = await getImagingHistoryDetail(row.id);
         if (response.success) setDetail(response.data);
@@ -112,7 +116,7 @@ const ImagingHistoryPage = () => {
                 )}
             </div>
 
-            {detail && <ImagingHistoryDetailDialog detail={detail} onClose={() => setDetail(null)} />}
+            {detail && <ImagingHistoryDetailDialog detail={detail} onClose={closeDetail} />}
         </div>
     );
 };

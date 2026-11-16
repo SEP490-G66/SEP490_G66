@@ -8,6 +8,8 @@ namespace OZE.Application.Interfaces
         // Tracked, so the capture can be updated
         Task<ImagingCapture?> GetBySimulationIdAsync(string simulationId, CancellationToken cancellationToken = default);
         Task<bool> HasRunningCaptureAsync(long imagingRequestId, CancellationToken cancellationToken = default);
+        // Completed captures of these requests, newest first
+        Task<List<ImagingCapture>> GetCompletedByRequestIdsAsync(IReadOnlyCollection<long> imagingRequestIds, CancellationToken cancellationToken = default);
         Task<List<ImagingResult>> GetResultsAsync(long imagingRequestId, CancellationToken cancellationToken = default);
         void AddResults(IEnumerable<ImagingResult> results);
         // With its request, examination and patient, to check who may see it
