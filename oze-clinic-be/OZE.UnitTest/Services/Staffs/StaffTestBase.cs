@@ -20,6 +20,7 @@ namespace OZE.UnitTest.Services.Staffs
         protected readonly StaffService _service;
 
         protected const string ValidUserId = "staff-user-1";
+        protected const string ManagerUserId = "manager-user-1";
         protected const string ValidFullName = "Nguyen Van A";
         protected const string ValidStaffEmail = "doctor@oze.vn";
         protected const string ValidLocalPhone = "0912345678";
@@ -73,6 +74,64 @@ namespace OZE.UnitTest.Services.Staffs
             _emailSenderMock
                 .Setup(e => e.SendTemporaryPasswordAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
                 .Returns(Task.CompletedTask);
+        }
+
+        protected (ApplicationUser User, StaffProfile Staff) SetupExistingStaff(
+            string userId = ValidUserId,
+            string role = RoleConstants.DoctorRole,
+            string? email = ValidStaffEmail,
+            string? phoneNumber = ValidE164Phone,
+            string fullName = ValidFullName,
+            string? specialization = "Nha khoa tong quat",
+            string? licenseNumber = "BS-001")
+        {
+            var user = CreateSampleUser(userId, email, phoneNumber);
+            user.EmailConfirmed = true;
+            user.PhoneNumberConfirmed = true;
+            var staff = CreateSampleStaffProfile(
+                userId,
+                fullName,
+                phoneNumber,
+                specialization,
+                licenseNumber);
+
+            _userManagerMock
+                .Setup(m => m.FindByIdAsync(userId))
+                .ReturnsAsync(user);
+            _staffRepositoryMock
+                .Setup(r => r.GetByUserIdAsync(userId))
+                .ReturnsAsync(staff);
+            _userManagerMock
+                .Setup(m => m.GetRolesAsync(user))
+                .ReturnsAsync(new List<string> { role });
+
+            return (user, staff);
+        }
+
+        protected void SetupUpdateUniquenessPasses(int staffId = 1)
+        {
+            _userManagerMock
+                .Setup(m => m.FindByEmailAsync(It.IsAny<string>()))
+                .ReturnsAsync((ApplicationUser?)null);
+            _registrationRepositoryMock
+                .Setup(r => r.FindUserByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>()))
+                .ReturnsAsync((ApplicationUser?)null);
+            _staffRepositoryMock
+                .Setup(r => r.IsLicenseNumberInUseAsync(It.IsAny<string>(), staffId))
+                .ReturnsAsync(false);
+        }
+
+        protected void SetupUpdateSaveSucceeds()
+        {
+            _userManagerMock
+                .Setup(m => m.UpdateAsync(It.IsAny<ApplicationUser>()))
+                .ReturnsAsync(IdentityResult.Success);
+            _userManagerMock
+                .Setup(m => m.RemoveFromRoleAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
+                .ReturnsAsync(IdentityResult.Success);
+            _userManagerMock
+                .Setup(m => m.AddToRoleAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
+                .ReturnsAsync(IdentityResult.Success);
         }
 
         protected static StaffResponse CreateSampleStaffResponse(
