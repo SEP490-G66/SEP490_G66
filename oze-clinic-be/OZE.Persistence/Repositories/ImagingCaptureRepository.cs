@@ -32,6 +32,16 @@ namespace OZE.Persistence.Repositories
                 cancellationToken);
         }
 
+        public Task<List<ImagingCapture>> GetCompletedByRequestIdsAsync(IReadOnlyCollection<long> imagingRequestIds, CancellationToken cancellationToken = default)
+        {
+            return _context.ImagingCaptures
+                .AsNoTracking()
+                .Where(x => imagingRequestIds.Contains(x.ImagingRequestId) && x.Status == ImagingCaptureConstants.Completed)
+                .OrderByDescending(x => x.CompletedAt)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
         public Task<List<ImagingResult>> GetResultsAsync(long imagingRequestId, CancellationToken cancellationToken = default)
         {
             return _context.ImagingResults

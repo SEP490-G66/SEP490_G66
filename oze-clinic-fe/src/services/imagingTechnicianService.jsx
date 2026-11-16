@@ -1,19 +1,19 @@
 import api from "./api";
 import { call } from "./receptionService";
-import { MOCK_IMAGING_HISTORY } from "@/utils/data/mockImagingHistory";
-import { IMAGING_REQUEST_STATUSES, MANUAL_UPLOAD_EXTENSIONS } from "@/utils/imagingRequest";
-import { normalizeText } from "@/utils/format";
+import { MANUAL_UPLOAD_EXTENSIONS } from "@/utils/imagingRequest";
 
 // Imaging technician ("Chụp chiếu", "Lịch sử chụp chiếu"). Every call returns the ApiResponse shape
 // ({ success, message, data, errors }).
-// Real API: the queue and "Hoàn thành" (ImagingRequestsController).
-// TODO(api): capture, manual upload and history are mocks: the backend has no endpoint for them yet
+// Real API: the queue and "Hoàn thành" (ImagingRequestsController), history (ImagingHistoryController).
+// TODO(api): capture and manual upload are still mocks here
 // (see oze-fe-docs/08-webhook-may-chup-xquang.md).
 
 const MESSAGES = [
     [/imaging request is Cancelled/i, "Bác sĩ đã huỷ chỉ định này."],
     [/imaging request is Completed/i, "Chỉ định này đã hoàn tất (máy đã gửi kết quả)."],
     [/Imaging request not found/i, "Không tìm thấy chỉ định chụp."],
+    [/Status must be Completed or Cancelled/i, "Trạng thái lọc không hợp lệ."],
+    [/start date must not be after the end date/i, "Ngày bắt đầu không được sau ngày kết thúc."],
 ];
 
 const translate = (response) => {
@@ -26,9 +26,6 @@ const success = (data, message = null) => ({ success: true, message, data, error
 const failure = (message) => ({ success: false, message, data: null, errors: null });
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// TODO(api): history rows (sample data + orders completed in this session).
-const history = MOCK_IMAGING_HISTORY.map((item) => ({ ...item }));
-
 // Orders waiting (Pending) or being imaged (InProgress), oldest first; one row per order.
 export const getImagingQueue = async () => {
     const response = await call(() => api.get("/api/imaging-requests/queue"));
@@ -36,20 +33,7 @@ export const getImagingQueue = async () => {
 };
 
 // Marks the order done: the doctor is told and the patient goes back to the top of the exam queue.
-// summary ({ patientName, ..., deviceId, images }) is kept for the history page until it has its own API.
-export const completeImagingRequest = async (id, summary = {}) => {
-    const response = translate(await call(() => api.post(`/api/imaging-requests/${id}/complete`)));
-    if (response.success) {
-        history.unshift({
-            ...summary,
-            id,
-            status: IMAGING_REQUEST_STATUSES.COMPLETED,
-            completedAt: new Date().toISOString(),
-            imageCount: summary.images?.length ?? 0,
-        });
-    }
-    return response;
-};
+export const completeImagingRequest = async (id) => translate(await call(() => api.post(`/api/imaging-requests/${id}/complete`)));
 
 // ---- TODO(api): mock capture, like oze-xray-simulator (≈3 s exposure + 3 s processing) ----
 
@@ -97,28 +81,41 @@ export const uploadManualImages = async (requestId, { files }) => {
     return success(images, `Đã tải lên ${images.length} ảnh.`);
 };
 
-// ---- TODO(api): mock history ----
-
-const inRange = (value, from, to) => {
-    const day = (value ?? "").slice(0, 10);
-    return (!from || day >= from) && (!to || day <= to);
-};
+// ---- History ("Lịch sử chụp chiếu"): done or cancelled orders ----
 
 // filters: { keyword, imagingType, status, from, to (yyyy-mm-dd), page, pageSize }.
+// data: { items, page, pageSize, totalItems, totalPages } (the table and the pager read these names).
 export const getImagingHistory = async ({ keyword = "", imagingType = "", status = "", from = "", to = "", page = 1, pageSize = 10 } = {}) => {
-    await wait(250);
-    const q = normalizeText(keyword);
-    const rows = history
-        .filter((item) => !q || [item.patientName, item.patientCode, `IR-${item.id}`].some((field) => normalizeText(field).includes(q)))
-        .filter((item) => (!imagingType || item.imagingType === imagingType) && (!status || item.status === status) && inRange(item.createdAt, from, to))
-        .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
-    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-    const current = Math.min(page, totalPages);
-    return success({ items: rows.slice((current - 1) * pageSize, current * pageSize), page: current, pageSize, totalItems: rows.length, totalPages });
+    const params = { keyword: keyword || undefined, imagingType: imagingType || undefined, status: status || undefined, from: from || undefined, to: to || undefined, page, pageSize };
+    const response = translate(await call(() => api.get("/api/imaging-history", { params })));
+    if (!response.success) return response;
+    const data = response.data ?? {};
+    return {
+        ...response,
+        data: { items: data.items ?? [], page: data.pageNumber ?? page, pageSize: data.pageSize ?? pageSize, totalItems: data.totalCount ?? 0, totalPages: Math.max(1, data.totalPages ?? 1) },
+    };
+};
+
+// A picture needs the sign-in token, so it is fetched as a blob and shown through an object URL.
+// Sample pictures (fileUrl null) have no file on the server: the viewer shows its placeholder.
+const loadPicture = async (image) => {
+    if (!image.fileUrl) return { ...image };
+    try {
+        const response = await api.get(image.fileUrl, { responseType: "blob" });
+        return { ...image, url: URL.createObjectURL(response.data) };
+    } catch {
+        return { ...image };
+    }
+};
+
+// Object URLs made by getImagingHistoryDetail; call when the detail is closed.
+export const releaseImagingHistoryPictures = (detail) => {
+    (detail?.images ?? []).forEach((image) => image.url && URL.revokeObjectURL(image.url));
 };
 
 export const getImagingHistoryDetail = async (id) => {
-    await wait(200);
-    const item = history.find((row) => row.id === id);
-    return item ? success({ ...item, images: (item.images ?? []).map((image) => ({ ...image })) }) : failure("Không tìm thấy lượt chụp.");
+    const response = translate(await call(() => api.get(`/api/imaging-history/${id}`)));
+    if (!response.success) return response;
+    const images = await Promise.all((response.data.images ?? []).map(loadPicture));
+    return { ...response, data: { ...response.data, images } };
 };
