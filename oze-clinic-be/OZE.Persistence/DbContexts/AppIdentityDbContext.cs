@@ -41,6 +41,7 @@ namespace OZE.Persistence.DbContexts
         public DbSet<ClinicalDiagnosis> ClinicalDiagnoses => Set<ClinicalDiagnosis>();
         public DbSet<ImagingRequest> ImagingRequests => Set<ImagingRequest>();
         public DbSet<ImagingResult> ImagingResults => Set<ImagingResult>();
+        public DbSet<ImagingCapture> ImagingCaptures => Set<ImagingCapture>();
         public DbSet<TreatmentPlan> TreatmentPlans => Set<TreatmentPlan>();
         public DbSet<TreatmentPlanStage> TreatmentPlanStages => Set<TreatmentPlanStage>();
         public DbSet<ClinicalRecordAddendum> ClinicalRecordAddenda => Set<ClinicalRecordAddendum>();
