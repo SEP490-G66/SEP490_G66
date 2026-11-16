@@ -67,21 +67,14 @@ const Footer = () => {
                     <h3 id="footer-services-title" className={HEADING}>
                         Dịch vụ nha khoa
                     </h3>
-<<<<<<< HEAD
                     {/* 2 columns × 3 rows, filled top-to-bottom; single column on narrow footers */}
                     <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:gap-y-2 @md:grid-flow-col @md:grid-cols-2 @md:grid-rows-3">
-                        {SERVICES.map((service) => (
-                            <li key={service}>
-                                <a href="#" className="group flex min-h-9 items-center gap-2 rounded-md py-1 pointer-coarse:min-h-11">
-=======
-                    <ul className="flex flex-col gap-1 sm:gap-2">
                         {getFooterServices().map((service) => (
                             <li key={service.slug}>
                                 <Link
                                     to={getServiceDetailRoute(service.slug)}
                                     className="group flex min-h-9 items-center gap-2 rounded-md py-1 pointer-coarse:min-h-11"
                                 >
->>>>>>> main
                                     <ChevronRight className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-1" aria-hidden="true" />
                                     <span className="text-body-md text-body transition-colors group-hover:text-primary">{service.name}</span>
                                 </Link>

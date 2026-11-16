@@ -315,4 +315,11 @@ export const PUBLIC_SERVICES = [
     },
 ];
 
-export const FOOTER_SERVICE_SLUGS = ["nieng-rang", "trong-rang-implant", "nho-rang-khon"];
+export const FOOTER_SERVICE_SLUGS = [
+    "nieng-rang",
+    "trong-rang-implant",
+    "nho-rang-khon",
+    "boc-rang-su-veneer",
+    "dieu-tri-tuy-tram-rang",
+    "tay-trang-rang",
+];
