@@ -288,11 +288,132 @@ namespace OZE.Controllers
             return result.Success ? Ok(result) : VariantFailure(result);
         }
 
-        // Not found for a missing service or variant, bad request for everything else
+        /// <summary>
+        /// Returns the picture of a service as an image file. Anyone may read it.
+        /// </summary>
+        [HttpGet("{id:int}/image")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetServiceImageAsync(
+            [FromRoute] int id,
+            CancellationToken cancellationToken)
+        {
+            var result = await _clinicService.GetServiceImageAsync(id, cancellationToken);
+            return result.Success ? ImageFile(result.Data!) : NotFound(result);
+        }
+
+        /// <summary>
+        /// Uploads or replaces the picture of a service (JPG, PNG or WebP, at most 2 MB). Requires ClinicManager role.
+        /// </summary>
+        [HttpPut("{id:int}/image")]
+        [Authorize(Roles = RoleConstants.ClinicManagerRole)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(ServiceImageConstants.MaxRequestBytes)]
+        public async Task<ActionResult<ApiResponse<ServiceDto>>> SetServiceImageAsync(
+            [FromRoute] int id,
+            IFormFile? file,
+            CancellationToken cancellationToken)
+        {
+            var data = await ReadUploadAsync(file, cancellationToken);
+            var result = await _clinicService.SetServiceImageAsync(id, data, cancellationToken);
+            return result.Success ? Ok(result) : VariantFailure(result);
+        }
+
+        /// <summary>
+        /// Removes the picture of a service. Requires ClinicManager role.
+        /// </summary>
+        [HttpDelete("{id:int}/image")]
+        [Authorize(Roles = RoleConstants.ClinicManagerRole)]
+        public async Task<ActionResult<ApiResponse<ServiceDto>>> RemoveServiceImageAsync(
+            [FromRoute] int id,
+            CancellationToken cancellationToken)
+        {
+            var result = await _clinicService.RemoveServiceImageAsync(id, cancellationToken);
+            return result.Success ? Ok(result) : VariantFailure(result);
+        }
+
+        /// <summary>
+        /// Returns the picture of a service variant as an image file. Anyone may read it.
+        /// </summary>
+        [HttpGet("{serviceId:int}/variants/{variantId:int}/image")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetVariantImageAsync(
+            [FromRoute] int serviceId,
+            [FromRoute] int variantId,
+            CancellationToken cancellationToken)
+        {
+            var result = await _clinicService.GetVariantImageAsync(serviceId, variantId, cancellationToken);
+            return result.Success ? ImageFile(result.Data!) : NotFound(result);
+        }
+
+        /// <summary>
+        /// Uploads or replaces the picture of a service variant (JPG, PNG or WebP, at most 2 MB). Requires ClinicManager role.
+        /// </summary>
+        [HttpPut("{serviceId:int}/variants/{variantId:int}/image")]
+        [Authorize(Roles = RoleConstants.ClinicManagerRole)]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(ServiceImageConstants.MaxRequestBytes)]
+        public async Task<ActionResult<ApiResponse<ServiceVariantDto>>> SetVariantImageAsync(
+            [FromRoute] int serviceId,
+            [FromRoute] int variantId,
+            IFormFile? file,
+            CancellationToken cancellationToken)
+        {
+            var data = await ReadUploadAsync(file, cancellationToken);
+            var result = await _clinicService.SetVariantImageAsync(serviceId, variantId, data, cancellationToken);
+            return result.Success ? Ok(result) : VariantFailure(result);
+        }
+
+        /// <summary>
+        /// Removes the picture of a service variant. Requires ClinicManager role.
+        /// </summary>
+        [HttpDelete("{serviceId:int}/variants/{variantId:int}/image")]
+        [Authorize(Roles = RoleConstants.ClinicManagerRole)]
+        public async Task<ActionResult<ApiResponse<ServiceVariantDto>>> RemoveVariantImageAsync(
+            [FromRoute] int serviceId,
+            [FromRoute] int variantId,
+            CancellationToken cancellationToken)
+        {
+            var result = await _clinicService.RemoveVariantImageAsync(serviceId, variantId, cancellationToken);
+            return result.Success ? Ok(result) : VariantFailure(result);
+        }
+
+        // The uploaded bytes; empty when no file came or it is over the limit, so the service answers with the right message
+        private static async Task<byte[]> ReadUploadAsync(IFormFile? file, CancellationToken cancellationToken)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return Array.Empty<byte>();
+            }
+
+            if (file.Length > ServiceImageConstants.MaxBytes)
+            {
+                // One byte over the limit is enough for the service to reject it without reading the whole file
+                return new byte[ServiceImageConstants.MaxBytes + 1];
+            }
+
+            using var stream = new MemoryStream((int)file.Length);
+            await file.CopyToAsync(stream, cancellationToken);
+            return stream.ToArray();
+        }
+
+        // The picture with caching. The imageUrl in the API carries ?v=<time of the picture>, which changes with every new picture,
+        // so that address may be kept for a year; an address without it is checked again each time.
+        // The ETag lets a browser that asks again get 304 instead of the whole file.
+        private FileContentResult ImageFile(ServiceImageFile image)
+        {
+            Response.Headers.CacheControl = Request.Query.ContainsKey("v")
+                ? "public, max-age=31536000, immutable"
+                : "no-cache";
+            var etag = new Microsoft.Net.Http.Headers.EntityTagHeaderValue($"\"{image.UpdatedAt.UtcTicks}\"");
+            return File(image.Data, image.ContentType, image.UpdatedAt, etag);
+        }
+
+        // Not found for a missing service, variant or picture, bad request for everything else
         private ObjectResult VariantFailure<T>(ApiResponse<T> result)
         {
             return result.Message == ErrorConstants.ServiceMessage.ServiceNotFound
                 || result.Message == ErrorConstants.ServiceVariantMessage.VariantNotFound
+                || result.Message == ErrorConstants.ServiceImageMessage.ImageNotFound
                 ? NotFound(result)
                 : BadRequest(result);
         }
