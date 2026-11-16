@@ -323,7 +323,7 @@ const ReceptionistDashboard = () => {
                             <td data-label={TEXT.CHECK_IN_COLUMNS[4]} className="min-w-36">
                                 {row.doctorName ?? CHECK_IN_TEXT.NO_DOCTOR}
                                 {state === "notyet" && rooms.find((r) => r.doctorId === row.doctorId)?.ended && (
-                                    <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ENDED}</small>
+                                    <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ENDED(rooms.find((r) => r.doctorId === row.doctorId)?.endAt)}</small>
                                 )}
                             </td>
                             <td data-label={TEXT.CHECK_IN_COLUMNS[5]}>{state === "notyet" ? confirmCell(row) : <span className={cx("badge", badge)}>{label}</span>}</td>
