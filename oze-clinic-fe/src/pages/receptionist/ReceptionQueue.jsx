@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { toast } from "react-toastify";
 import LabeledSelect from "@/components/ui/LabeledSelect";
 import RowMenu from "@/components/ui/RowMenu";
 import QueueLeaveDialog from "@/components/reception/QueueLeaveDialog";
@@ -13,7 +14,9 @@ import {
     getQueueEntries,
     getTodayAppointments,
     getWaitingList,
-    markNoShow,
+    keepInQueue,
+    keepQueueEntry,
+    leaveAppointment,
     moveQueueEntry,
     reassignDoctor,
     removeQueueEntry,
@@ -28,6 +31,7 @@ import {
     examRows,
     isQueueFiltered,
     matchesQueue,
+    needsDecision,
     orderRows,
     otherRooms,
     waitingCount,
@@ -40,14 +44,25 @@ const REFRESH_MS = 20_000;
 const PRIORITY_OPTIONS = [["", TEXT.ALL], ...Object.entries(PRIORITY_LABEL).reverse()];
 
 const loadQueue = async () => {
-    const [waiting, today, entries] = await Promise.all([getWaitingList(), getTodayAppointments(), getQueueEntries()]);
+    // The board shows its own error and keeps the last data, so a failed (auto) refresh never opens the global error page
+    const READ = { skipErrorPage: true };
+    const [waiting, today, entries] = await Promise.all([getWaitingList(READ), getTodayAppointments(READ), getQueueEntries(undefined, READ)]);
     const list = (r) => (Array.isArray(r.data) ? r.data : (r.data?.items ?? []));
     return {
-        ok: waiting.success && today.success,
-        waiting: waiting.success ? list(waiting) : [],
-        today: today.success ? list(today) : [],
-        entries: entries.success ? list(entries) : [],
+        ok: waiting.success && today.success && entries.success,
+        parts: { waiting: waiting.success, today: today.success, entries: entries.success },
+        waiting: list(waiting),
+        today: list(today),
+        entries: list(entries),
+        at: waiting.success && today.success && entries.success ? new Date().toISOString() : null,
     };
+};
+
+// A failed refresh keeps what was on screen (per source) instead of emptying the board while staff act on it.
+const mergeLoad = (prev, next) => {
+    if (!prev) return next;
+    const keep = (key) => (next.parts[key] ? next[key] : prev[key]);
+    return { ...next, waiting: keep("waiting"), today: keep("today"), entries: keep("entries"), at: next.ok ? next.at : prev.at };
 };
 
 const ReceptionQueue = () => {
@@ -57,15 +72,24 @@ const ReceptionQueue = () => {
     const [data, setData] = useState(null);
     const [version, setVersion] = useState(0);
     const [dialog, setDialog] = useState(null);
-    const { doctors, available } = useDoctorsOnDuty(version);
+    const [tick, setTick] = useState(0);
+    const { doctors, available } = useDoctorsOnDuty(version * 1000 + tick);
+    const requestId = useRef(0);
 
     usePageTitle(TEXT.DOC_TITLE);
 
     useEffect(() => {
         let active = true;
-        const load = () => loadQueue().then((next) => active && setData(next));
+        const load = () => {
+            const id = ++requestId.current;
+            // A slow answer never overwrites a newer one
+            loadQueue().then((next) => active && id === requestId.current && setData((prev) => mergeLoad(prev, next)));
+        };
         load();
-        const timer = setInterval(load, REFRESH_MS);
+        const timer = setInterval(() => {
+            load();
+            setTick((n) => n + 1);
+        }, REFRESH_MS);
         return () => {
             active = false;
             clearInterval(timer);
@@ -93,6 +117,27 @@ const ReceptionQueue = () => {
     const shown = tabRows.filter((row) => matchesQueue(row, filters));
     const { pageItems, footer, setPage } = usePaging(shown, 10);
     const filtered = isQueueFiltered(filters);
+    const rowsOfTab = (key) => allRows.filter((row) => roomOf.get(row.roomKey)?.tab === key);
+    const tabAlert = (key) =>
+        rowsOfTab(key).some(needsDecision) ||
+        allRooms.some((room) => room.tab === key && room.ended && allRows.some((row) => row.roomKey === room.key && row.state !== "serving"));
+
+    // A room picked on another screen that is not on this tab would leave the list empty with no matching option
+    useEffect(() => {
+        if (data && filters.room && !rooms.some((r) => r.key === filters.room)) setFilters((f) => ({ ...f, room: "" }));
+    }, [data, filters.room, rooms]);
+
+    // The board refreshes every 20 s: a dialog about a patient who has meanwhile gone in, left or been handled elsewhere closes.
+    useEffect(() => {
+        const open = dialog?.row ?? (dialog?.rows?.length === 1 ? dialog.rows[0] : null);
+        if (!open || !data) return;
+        const live = allRows.find((r) => r.key === open.key);
+        if (!live || live.state === "serving") {
+            toast.info(TEXT.STALE(open.patientName));
+            setDialog(null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [data]);
 
     const setFilter = (key) => (value) => {
         setFilters((f) => ({ ...f, [key]: value }));
@@ -117,10 +162,18 @@ const ReceptionQueue = () => {
             .filter((r) => r.tab === roomOf.get(fromKey)?.tab && r.key !== fromKey && r.active)
             .map((r) => ({ ...r, waiting: waitingCount(allRows, r.key) }));
 
-    const moveRows = async (rows, target) => {
+    // Rows still waiting in that room now (not the ones seen when the dialog opened)
+    const liveRows = (rows, fromKey) => {
+        const keys = new Set(rows.map((r) => r.key));
+        return allRows.filter((r) => r.state !== "serving" && (keys.has(r.key) || (rows.length > 1 && r.roomKey === fromKey)));
+    };
+
+    const moveRows = async (picked, fromKey, { target, reason }) => {
+        const rows = liveRows(picked, fromKey);
         const failures = [];
         for (const row of rows) {
-            const result = row.kind === "exam" ? await reassignDoctor(row.appointmentId, target.doctorId) : await moveQueueEntry(row.entryId, target.roomId);
+            const result =
+                row.kind === "exam" ? await reassignDoctor(row.appointmentId, target.doctorId, reason) : await moveQueueEntry(row.entryId, target.roomId, reason);
             if (!result.success) failures.push(`${row.patientName}: ${result.message}`);
         }
         const label = [target.name, target.staff].filter(Boolean).join(" · ");
@@ -130,6 +183,7 @@ const ReceptionQueue = () => {
     };
 
     const endedRooms = rooms.filter((r) => r.ended);
+    const keep = (r) => act(r.kind === "exam" ? keepInQueue(r.appointmentId) : keepQueueEntry(r.entryId), TEXT.KEPT(r.patientName));
     const bookedLater = (room) => (data?.today ?? []).some((a) => a.doctorId === room.doctorId && ["PENDING", "CONFIRMED"].includes(a.status));
 
     const row = dialog?.row;
@@ -137,6 +191,7 @@ const ReceptionQueue = () => {
 
     const table = () => {
         if (!data) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.LOADING}</p>;
+        if (!shown.length && !data.ok) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.LOAD_ERROR_EMPTY}</p>;
         if (!shown.length)
             return (
                 <p className="px-6 py-10 text-center text-body-sm text-muted">
@@ -162,15 +217,16 @@ const ReceptionQueue = () => {
                     <tbody>
                         {pageItems.map((r) => {
                             const room = roomOf.get(r.roomKey);
+                            const decide = needsDecision(r);
                             return (
-                                <tr key={r.key} className={r.state === "serving" ? "bg-primary-softer" : undefined}>
+                                <tr key={r.key} className={r.state === "serving" ? "bg-primary-softer" : decide ? "bg-warning-soft" : undefined}>
                                     <td data-label={columns[0]} className="num font-semibold text-ink">
                                         {r.position ? String(r.position).padStart(2, "0") : "—"}
                                     </td>
                                     <td data-primary>
                                         <span className="cell-primary block">{r.patientName}</span>
-                                        {r.allergies.length > 0 && <span className="badge badge-danger mt-1 flex w-fit whitespace-normal">{TEXT.ALLERGY(r.allergies[0])}</span>}
                                         <small className="block text-caption text-muted">{r.patientCode}</small>
+                                        {r.allergies.length > 0 && <span className="badge badge-danger mt-1 flex w-fit whitespace-normal">{TEXT.ALLERGY(r.allergies)}</span>}
                                     </td>
                                     <td data-label={columns[2]} className="whitespace-nowrap">
                                         {room?.name ?? TEXT.NO_ROOM}
@@ -184,11 +240,22 @@ const ReceptionQueue = () => {
                                             {r.state === "serving" && <span className="badge badge-info">{TEXT.SERVING[tab]}</span>}
                                             {r.state === "called" && <span className="badge badge-warning">{TEXT.CALLED}</span>}
                                             {r.state === "waiting" && <span className="badge badge-neutral">{TEXT.WAITING}</span>}
-                                            {r.absent && <span className="badge badge-danger">{TEXT.ABSENT}</span>}
+                                            {decide ? (
+                                                <span className="badge badge-danger">{TEXT.ABSENT_MANY(r.skips)}</span>
+                                            ) : (
+                                                r.absent && <span className="badge badge-danger">{TEXT.ABSENT}</span>
+                                            )}
                                         </span>
                                     </td>
                                     <td data-label={columns[5]}>
-                                        <span className={cx("badge", PRIORITY_BADGE[r.priority])}>{PRIORITY_LABEL[r.priority]}</span>
+                                        {r.priority > 0 ? (
+                                            <>
+                                                <span className={cx("badge", PRIORITY_BADGE[r.priority])}>{PRIORITY_LABEL[r.priority]}</span>
+                                                {r.priorityReason && <small className="mt-1 block text-caption text-body">{r.priorityReason}</small>}
+                                            </>
+                                        ) : (
+                                            <span className="text-body-sm text-muted">{TEXT.PRIORITY_NONE}</span>
+                                        )}
                                     </td>
                                     <td data-label={columns[6]} className="num">
                                         {clockOf(r.checkInAt)}
@@ -201,6 +268,7 @@ const ReceptionQueue = () => {
                                                     items={[
                                                         { label: TEXT.MENU_PRIORITY, onSelect: () => setDialog({ type: "priority", row: r }) },
                                                         { label: TEXT.MENU_MOVE, onSelect: () => setDialog({ type: "move", rows: [r], from: r.roomKey }) },
+                                                        ...(decide ? [{ label: TEXT.MENU_KEEP, onSelect: () => keep(r) }] : []),
                                                         null,
                                                         { label: TEXT.MENU_LEAVE, danger: true, onSelect: () => setDialog({ type: "leave", row: r }) },
                                                     ]}
@@ -224,9 +292,22 @@ const ReceptionQueue = () => {
                     <h1 className="page-title">{TEXT.TITLE}</h1>
                     <p className="page-description">{TEXT.DESCRIPTION}</p>
                 </div>
-                <button type="button" className="btn btn-primary" onClick={() => setDialog({ type: "walkIn" })} disabled={available.length === 0}>
-                    {TEXT.WALK_IN}
-                </button>
+                <div className="flex flex-col items-end gap-1">
+                    <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => available.length > 0 && setDialog({ type: "walkIn" })}
+                        aria-disabled={available.length === 0}
+                        aria-describedby={available.length === 0 ? "queue-walkin-hint" : undefined}
+                    >
+                        {TEXT.WALK_IN}
+                    </button>
+                    {available.length === 0 && (
+                        <small id="queue-walkin-hint" className="text-caption text-muted">
+                            {TEXT.NO_DOCTOR_HINT}
+                        </small>
+                    )}
+                </div>
             </div>
 
             <div role="tablist" aria-label={TEXT.TABS_LABEL} className="flex gap-1 overflow-x-auto border-b border-border" onKeyDown={onTabKey}>
@@ -246,6 +327,13 @@ const ReceptionQueue = () => {
                         )}
                     >
                         {TEXT.TABS[key]}
+                        <span className="num ml-1.5 text-caption text-muted">{rowsOfTab(key).filter((row) => row.state !== "serving").length}</span>
+                        {tabAlert(key) && (
+                            <>
+                                <span aria-hidden="true" className="ml-1 inline-block size-2 rounded-full bg-danger align-middle" />
+                                <span className="sr-only"> (có việc cần xử lý)</span>
+                            </>
+                        )}
                     </button>
                 ))}
             </div>
@@ -261,7 +349,11 @@ const ReceptionQueue = () => {
                                 <b>{TEXT.ENDED_ALERT(room.staff, room.name, room.endAt)}</b> {left.length > 0 && TEXT.ENDED_WAITING} {later && TEXT.ENDED_BOOKED}
                             </span>
                             {left.length > 0 && (
-                                <button type="button" className="btn btn-primary h-8 px-3" onClick={() => setDialog({ type: "move", rows: left, from: room.key })}>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary h-8 px-3"
+                                    onClick={() => setDialog({ type: "move", rows: left, from: room.key, reason: TEXT.MOVE_REASON_ENDED(room.staff) })}
+                                >
                                     {TEXT.MOVE_ALL}
                                 </button>
                             )}
@@ -299,6 +391,7 @@ const ReceptionQueue = () => {
                                 ["serving", TEXT.SERVING[tab]],
                                 ["called", TEXT.CALLED],
                                 ["waiting", TEXT.WAITING],
+                                ["absent", TEXT.ABSENT_FILTER],
                             ]}
                             onChange={setFilter("state")}
                         />
@@ -323,6 +416,7 @@ const ReceptionQueue = () => {
                 <Card>
                     {table()}
                     {footer}
+                    {data?.at && <p className="px-4 pb-3 text-caption text-muted">{TEXT.UPDATED_AT(clockOf(data.at))}</p>}
                 </Card>
             </div>
 
@@ -331,21 +425,29 @@ const ReceptionQueue = () => {
                     row={row}
                     roomName={roomName}
                     onClose={() => setDialog(null)}
-                    onSubmit={(priority) =>
+                    onSubmit={({ priority, reason }) =>
                         act(
-                            row.kind === "exam" ? setPriority(row.appointmentId, { priority }) : setQueuePriority(row.entryId, priority),
+                            row.kind === "exam" ? setPriority(row.appointmentId, { priority, reason }) : setQueuePriority(row.entryId, { priority, reason }),
                             TEXT.PRIORITY_CHANGED(row.patientName, PRIORITY_LABEL[priority]),
                         )
                     }
                 />
             )}
-            {dialog?.type === "move" && <QueueMoveDialog rows={dialog.rows} targets={targetsFor(dialog.from)} onClose={() => setDialog(null)} onSubmit={(target) => moveRows(dialog.rows, target)} />}
+            {dialog?.type === "move" && (
+                <QueueMoveDialog
+                    rows={dialog.rows}
+                    targets={targetsFor(dialog.from)}
+                    defaultReason={dialog.reason}
+                    onClose={() => setDialog(null)}
+                    onSubmit={(choice) => moveRows(dialog.rows, dialog.from, choice)}
+                />
+            )}
             {dialog?.type === "leave" && (
                 <QueueLeaveDialog
                     row={row}
                     roomName={roomName}
                     onClose={() => setDialog(null)}
-                    onSubmit={() => act(row.kind === "exam" ? markNoShow(row.appointmentId) : removeQueueEntry(row.entryId), TEXT.LEFT(row.patientName))}
+                    onSubmit={(reason) => act(row.kind === "exam" ? leaveAppointment(row.appointmentId, reason) : removeQueueEntry(row.entryId, reason), TEXT.LEFT(row.patientName))}
                 />
             )}
             {dialog?.type === "walkIn" && (

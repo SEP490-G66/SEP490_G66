@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Modal from "@/components/ui/Modal";
 import { PRIORITY, clinicToday, findPatientsByKeyword, getAvailableSlots } from "@/services/receptionService";
-import { PRIORITY_LABEL, ddmm, dmy, hhmm, servicesOf, slotText, useSubmit } from "./receptionUtils";
+import { PRIORITY_LABEL, dmy, hhmm, slotText, useSubmit } from "./receptionUtils";
 import { cx } from "@/utils/cx";
 import { PATIENT_RECORD_TEXT } from "@/utils/messages";
 import { genderOf, phoneDisplay, walkInName } from "@/utils/patientRecord";
@@ -147,7 +147,9 @@ export const DialogActions = ({ onClose, submitLabel, disabled, danger, busy, cl
     </div>
 );
 
-const PRIORITY_REASONS = ["Đau cấp, sưng", "Chảy máu sau nhổ răng", "Trẻ nhỏ", "Người cao tuổi", "Phụ nữ mang thai", "Người khuyết tật"];
+// Priority groups of the Law on Medical Examination and Treatment 2023 (art. 3.2); anything else is typed.
+// The reason is shown to staff only (receptionist, examining doctor), never to the patient.
+const PRIORITY_REASONS = ["Cấp cứu", "Trẻ em dưới 6 tuổi", "Phụ nữ có thai", "Người khuyết tật nặng", "Người từ 75 tuổi", "Người có công với cách mạng"];
 
 export const PriorityFields = ({ priority, setPriority, reason, setReason, idPrefix, checkedRef }) => (
     <>
@@ -197,71 +199,11 @@ export const PriorityFields = ({ priority, setPriority, reason, setReason, idPre
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="Hoặc ghi lý do khác"
                 />
+                <p className="text-caption text-muted">Lý do chỉ lễ tân và bác sĩ thấy, không hiện cho bệnh nhân.</p>
             </div>
         )}
     </>
 );
-
-export const ConfirmDialog = ({ appointment, onClose, onSubmit }) => {
-    const [busy, submit] = useSubmit(onSubmit);
-    return (
-        <Modal title={`Xác nhận lịch của ${appointment.patientName}`} description="Gọi cho khách để kiểm tra thông tin trước khi xác nhận." onClose={onClose}>
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    submit();
-                }}
-            >
-                <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-body-sm">
-                    <dt className="text-muted">Số điện thoại</dt>
-                    <dd className="num text-ink">
-                        <a className="btn-link" href={`tel:${appointment.patientPhoneNumber}`}>
-                            {appointment.patientPhoneNumber}
-                        </a>
-                    </dd>
-                    <dt className="text-muted">Mã bệnh nhân</dt>
-                    <dd className="text-ink">{appointment.patientCode}</dd>
-                    <dt className="text-muted">Giờ hẹn</dt>
-                    <dd className="text-ink">
-                        {hhmm(appointment.timeSlotStart)} · {ddmm(appointment.appointmentDate)}
-                    </dd>
-                    <dt className="text-muted">Bác sĩ</dt>
-                    <dd className="text-ink">{appointment.doctorName ?? "Chưa gán"}</dd>
-                    <dt className="text-muted">Dịch vụ</dt>
-                    <dd className="text-ink">{servicesOf(appointment)}</dd>
-                </dl>
-                <p className="mt-4 text-body-sm text-muted">
-                    Khách không nghe máy thì để lịch ở trạng thái chờ và gọi lại sau. Sai số hoặc khách báo hủy thì đóng hộp này và bấm Hủy.
-                </p>
-                <DialogActions onClose={onClose} submitLabel="Xác nhận lịch" busy={busy} />
-            </form>
-        </Modal>
-    );
-};
-
-export const CheckInDialog = ({ appointment, onClose, onSubmit }) => {
-    const [priority, setPriorityValue] = useState(PRIORITY.NORMAL);
-    const [reason, setReason] = useState("");
-    const [busy, submit] = useSubmit(onSubmit);
-    return (
-        <Modal
-            title={`Check-in ${appointment.patientName}`}
-            description={`Lịch ${hhmm(appointment.timeSlotStart)}. Sau check-in, bệnh nhân vào hàng chờ của ${appointment.doctorName ?? "bác sĩ được gán"}.`}
-            onClose={onClose}
-        >
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    submit({ priority, reason: reason.trim() });
-                }}
-                className="space-y-4"
-            >
-                <PriorityFields priority={priority} setPriority={setPriorityValue} reason={reason} setReason={setReason} idPrefix="ci" />
-                <DialogActions onClose={onClose} submitLabel="Check-in" busy={busy} disabled={priority > PRIORITY.NORMAL && !reason.trim()} />
-            </form>
-        </Modal>
-    );
-};
 
 export const CancelDialog = ({ appointment, onClose, onSubmit }) => {
     const [reason, setReason] = useState("");
@@ -291,26 +233,6 @@ export const CancelDialog = ({ appointment, onClose, onSubmit }) => {
                     />
                 </div>
                 <DialogActions onClose={onClose} submitLabel="Hủy lịch" disabled={!reason.trim()} danger busy={busy} />
-            </form>
-        </Modal>
-    );
-};
-
-export const NoShowDialog = ({ appointment, onClose, onSubmit }) => {
-    const [busy, submit] = useSubmit(onSubmit);
-    return (
-        <Modal
-            title={`${appointment.patientName} không đến khám?`}
-            description="Dùng khi bệnh nhân đã check-in nhưng rời phòng khám trước khi được khám. Lịch chuyển sang Vắng mặt."
-            onClose={onClose}
-        >
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    submit();
-                }}
-            >
-                <DialogActions onClose={onClose} submitLabel="Ghi bỏ về" danger busy={busy} />
             </form>
         </Modal>
     );
@@ -576,69 +498,6 @@ export const WalkInDialog = ({ doctors, onClose, onSubmit, patient, doctorsStatu
                     busy={busy}
                     disabled={!phone.trim() || !fullName.trim() || !doctorId || needsReason}
                 />
-            </form>
-        </Modal>
-    );
-};
-
-export const PriorityDialog = ({ entry, onClose, onSubmit }) => {
-    const [priority, setPriorityValue] = useState(entry.priority);
-    const [reason, setReason] = useState("");
-    const [busy, submit] = useSubmit(onSubmit);
-    return (
-        <Modal title={`Đổi mức ưu tiên của ${entry.patientName}`} description="Bác sĩ gọi người có mức ưu tiên cao hơn trước." onClose={onClose}>
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    submit({ priority, reason: reason.trim() });
-                }}
-                className="space-y-4"
-            >
-                <PriorityFields priority={priority} setPriority={setPriorityValue} reason={reason} setReason={setReason} idPrefix="pr" />
-                <DialogActions
-                    onClose={onClose}
-                    submitLabel="Lưu mức ưu tiên"
-                    busy={busy}
-                    disabled={priority === entry.priority || (priority > PRIORITY.NORMAL && !reason.trim())}
-                />
-            </form>
-        </Modal>
-    );
-};
-
-export const ReassignDialog = ({ item, doctors, onClose, onSubmit }) => {
-    const [doctorId, setDoctorId] = useState(doctors[0]?.id ?? "");
-    const [busy, submit] = useSubmit(onSubmit);
-    return (
-        <Modal
-            title={`Chuyển ${item.patientName} sang bác sĩ khác`}
-            description="Chỉ chuyển được sang bác sĩ đang trong ca; nếu không, hệ thống sẽ báo lỗi."
-            onClose={onClose}
-        >
-            <form
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    submit(Number(doctorId));
-                }}
-            >
-                {doctors.length === 0 ? (
-                    <p className="text-body-sm text-muted">Hôm nay không có bác sĩ nào khác có lịch.</p>
-                ) : (
-                    <div className="field">
-                        <label className="label" htmlFor="ra-doctor">
-                            Bác sĩ nhận
-                        </label>
-                        <select id="ra-doctor" className="input" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
-                            {doctors.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                    {d.name}
-                                    {d.room ? ` · ${d.room}` : ""}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-                <DialogActions onClose={onClose} submitLabel="Chuyển bác sĩ" busy={busy} disabled={!doctorId} />
             </form>
         </Modal>
     );

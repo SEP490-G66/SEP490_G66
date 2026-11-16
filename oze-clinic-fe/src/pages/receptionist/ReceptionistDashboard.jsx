@@ -204,10 +204,11 @@ const ReceptionistDashboard = () => {
 
     const moveTargets = (room) => rooms.filter((r) => r.tab === room.tab && r.key !== room.key && r.active && !r.off).map((r) => ({ ...r, waiting: waitingCount(rows, r.key) }));
 
-    const moveRows = async (moving, target) => {
+    const moveRows = async (moving, { target, reason }) => {
         const failures = [];
         for (const row of moving) {
-            const result = row.kind === "exam" ? await reassignDoctor(row.appointmentId, target.doctorId) : await moveQueueEntry(row.entryId, target.roomId);
+            const result =
+                row.kind === "exam" ? await reassignDoctor(row.appointmentId, target.doctorId, reason) : await moveQueueEntry(row.entryId, target.roomId, reason);
             if (!result.success) failures.push(`${row.patientName}: ${result.message}`);
         }
         const label = [target.name, target.staff].filter(Boolean).join(" · ");
@@ -438,7 +439,7 @@ const ReceptionistDashboard = () => {
                 <RescheduleDialog appointment={a} onClose={close} onSubmit={(v) => act(rescheduleAppointment(a.id, v), CONFIRM_TEXT.RESCHEDULED(a.patientName))} />
             )}
             {dialog?.type === "cancel" && <CancelDialog appointment={a} onClose={close} onSubmit={(reason) => act(cancelAppointment(a.id, reason), CONFIRM_TEXT.CANCELLED(a.patientName))} />}
-            {dialog?.type === "move" && <QueueMoveDialog rows={dialog.rows} targets={moveTargets(dialog.from)} onClose={close} onSubmit={(target) => moveRows(dialog.rows, target)} />}
+            {dialog?.type === "move" && <QueueMoveDialog rows={dialog.rows} targets={moveTargets(dialog.from)} onClose={close} onSubmit={(choice) => moveRows(dialog.rows, choice)} />}
             {dialog?.type === "walkIn" && (
                 <WalkInDialog doctors={available} onClose={close} onSubmit={(request) => act(createWalkIn(request), CHECK_IN_TEXT.WALKED_IN(request.fullName))} />
             )}
