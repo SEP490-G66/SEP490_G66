@@ -1,17 +1,21 @@
 import { useState } from "react";
 import Modal from "@/components/ui/Modal";
-import SegmentedControl from "@/components/ui/SegmentedControl";
-import { DialogActions } from "./shared";
-import { PRIORITY_LABEL, useSubmit } from "./receptionUtils";
+import { DialogActions, PriorityFields } from "./shared";
+import { useSubmit } from "./receptionUtils";
+import { PRIORITY } from "@/services/receptionService";
 import { QUEUE_TEXT as TEXT } from "@/utils/messages";
 
-const OPTIONS = Object.entries(PRIORITY_LABEL).map(([value, label]) => ({ value: Number(value), label }));
-
 // Changes the priority of one row in the queue; the page reorders the room afterwards.
+// Ưu tiên / Khẩn need a reason (law on medical examination): staff see it, the patient is only told they were moved up.
 const QueuePriorityDialog = ({ row, roomName, onClose, onSubmit }) => {
-    const current = row.priority ?? 0;
+    const current = row.priority ?? PRIORITY.NORMAL;
     const [priority, setPriority] = useState(current);
+    const [reason, setReason] = useState(row.priorityReason ?? "");
+    const [tried, setTried] = useState(false);
     const [busy, submit] = useSubmit(onSubmit);
+    const needsReason = priority > PRIORITY.NORMAL && !reason.trim();
+    // Back to Thường needs no reason, so a typed reason there changes nothing
+    const unchanged = priority === current && (priority === PRIORITY.NORMAL || reason.trim() === (row.priorityReason ?? ""));
 
     return (
         <Modal title={TEXT.PRIORITY_TITLE} description={[row.patientName, roomName].filter(Boolean).join(" · ")} onClose={onClose} closeDisabled={busy}>
@@ -20,15 +24,25 @@ const QueuePriorityDialog = ({ row, roomName, onClose, onSubmit }) => {
                 className="mt-5 space-y-4"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    if (!busy) submit(priority);
+                    setTried(true);
+                    if (!busy && !needsReason && !unchanged) submit({ priority, reason: priority > PRIORITY.NORMAL ? reason.trim() : null });
                 }}
             >
-                <div className="field">
-                    <span className="label">{TEXT.PRIORITY_NEW}</span>
-                    <SegmentedControl options={OPTIONS} value={priority} onChange={setPriority} label={TEXT.PRIORITY_NEW} className="self-start" />
-                </div>
+                <PriorityFields priority={priority} setPriority={setPriority} reason={reason} setReason={setReason} idPrefix="qp" />
+                {tried && needsReason && (
+                    <p role="alert" className="text-caption text-danger">
+                        {TEXT.ERR_REASON}
+                    </p>
+                )}
                 <p className="text-sm text-muted">{TEXT.PRIORITY_NOTE}</p>
-                <DialogActions onClose={onClose} closeLabel={TEXT.CLOSE} submitLabel={TEXT.PRIORITY_SUBMIT} busy={busy} closeDisabled={busy} disabled={priority === current} />
+                <DialogActions
+                    onClose={onClose}
+                    closeLabel={TEXT.CLOSE}
+                    submitLabel={TEXT.PRIORITY_SUBMIT}
+                    busy={busy}
+                    closeDisabled={busy}
+                    disabled={unchanged}
+                />
             </form>
         </Modal>
     );

@@ -44,8 +44,8 @@ export const call = async (request) => {
 };
 
 // ----- appointments (M3, M4) -----
-export const getTodayAppointments = () =>
-    call(() => api.get("/api/appointments", { params: { date: clinicToday(), pageSize: 100 } }));
+export const getTodayAppointments = (config = {}) =>
+    call(() => api.get("/api/appointments", { ...config, params: { date: clinicToday(), pageSize: 100 } }));
 
 export const confirmAppointment = (id) => call(() => api.post(`/api/appointments/${id}/confirm`));
 
@@ -63,23 +63,39 @@ export const findPatientsByKeyword = (keyword) =>
     call(() => api.get("/api/patients", { params: { searchKeyword: keyword, pageSize: 5 } }));
 
 // ----- queue (M4) -----
-export const getWaitingList = () => call(() => api.get("/api/appointments/waiting-list"));
+export const getWaitingList = (config = {}) => call(() => api.get("/api/appointments/waiting-list", config));
 
 export const setPriority = (id, { priority, reason }) =>
     call(() => api.post(`/api/appointments/${id}/priority`, { priority, reason: reason || null }));
 
 export const getNeedsAttention = () => call(() => api.get("/api/appointments/needs-attention"));
 
-export const reassignDoctor = (id, doctorId) => call(() => api.post(`/api/appointments/${id}/reassign-doctor`, { doctorId }));
+// reason is required: it goes into the notification the patient receives
+export const reassignDoctor = (id, doctorId, reason) => call(() => api.post(`/api/appointments/${id}/reassign-doctor`, { doctorId, reason }));
+
+// A checked-in patient who goes home without being seen: the appointment becomes "Bỏ về" (not no-show), data is kept
+export const leaveAppointment = (id, reason) => call(() => api.post(`/api/appointments/${id}/leave`, { reason }));
+
+// The receptionist saw the patient after repeated missed calls and keeps them in the queue
+export const keepInQueue = (id) => call(() => api.post(`/api/appointments/${id}/keep-in-queue`));
 
 // ----- cashier (M8) -----
+// Every page of /api/invoices for these filters (a page holds 100). MAX_PAGES stops a runaway loop.
+const MAX_PAGES = 20;
+const allInvoices = async (params, config = {}) => {
+    const items = [];
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+        const result = await call(() => api.get("/api/invoices", { ...config, params: { ...params, pageNumber: page, pageSize: 100, sortBy: "createdAt", sortDescending: true } }));
+        if (!result.success) return result;
+        items.push(...(result.data?.items ?? []));
+        if (page >= Number(result.data?.totalPages ?? 1)) break;
+    }
+    return { success: true, message: null, errors: null, data: { items } };
+};
+
 // Every invoice still to collect, whatever its age (one call per open status)
-export const getOpenInvoices = async () => {
-    const results = await Promise.all(
-        ["UNPAID", "PARTIALLY_PAID", "PENDING_CONFIRMATION"].map((paymentStatus) =>
-            call(() => api.get("/api/invoices", { params: { paymentStatus, pageSize: 100, sortBy: "createdAt", sortDescending: true } })),
-        ),
-    );
+export const getOpenInvoices = async (config = {}) => {
+    const results = await Promise.all(["UNPAID", "PARTIALLY_PAID", "PENDING_CONFIRMATION"].map((paymentStatus) => allInvoices({ paymentStatus }, config)));
     const failed = results.find((r) => !r.success);
     if (failed) return failed;
     return { success: true, message: null, errors: null, data: { items: results.flatMap((r) => r.data.items) } };
@@ -87,7 +103,7 @@ export const getOpenInvoices = async () => {
 
 export const getInvoices = () => call(() => api.get("/api/invoices", { params: { pageSize: 50, sortBy: "createdAt", sortDescending: true } }));
 
-export const recordPayment = (invoiceId, request) => call(() => api.post(`/api/invoices/${invoiceId}/payments`, request));
+export const recordPayment = (invoiceId, request, config = {}) => call(() => api.post(`/api/invoices/${invoiceId}/payments`, request, config));
 
 // ----- follow-up (M9, receptionist only) -----
 export const getFollowUps = () =>
@@ -137,14 +153,14 @@ export const getInvoice = (id, config = {}) => call(() => api.get(`/api/invoices
 
 export const rejectPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/reject`));
 
-export const cancelInvoice = (id) => call(() => api.post(`/api/invoices/${id}/cancel`));
+export const cancelInvoice = (id, reason) => call(() => api.post(`/api/invoices/${id}/cancel`, { reason }));
 
 export const getCashierRefunds = ({ status, page = 1, pageSize = 10 } = {}, config = {}) =>
     call(() => api.get("/api/refund-requests", { ...config, params: { status: status || undefined, pageNumber: page, pageSize } }));
 
 export const payoutRefund = (id) => call(() => api.post(`/api/refund-requests/${id}/payout`));
 
-export const rejectRefund = (id) => call(() => api.post(`/api/refund-requests/${id}/reject`));
+export const rejectRefund = (id, reason) => call(() => api.post(`/api/refund-requests/${id}/reject`, { rejectionReason: reason }));
 
 // A bank or QR payment the receptionist has seen arrive in the account
 export const confirmPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/confirm`));
@@ -162,10 +178,10 @@ export const rescheduleAppointment = (id, { date, slotStart, doctorId }) =>
     call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null }));
 
 // ----- invoices from an examination (F-PAY-01) -----
-export const createInvoice = (request) => call(() => api.post("/api/invoices", request));
+export const createInvoice = (request, config = {}) => call(() => api.post("/api/invoices", request, config));
 
-// Recent invoices of every status, to know which visits already have one
-export const getRecentInvoices = () => call(() => api.get("/api/invoices", { params: { pageSize: 100, sortBy: "createdAt", sortDescending: true } }));
+// Invoices of every status made since fromDate (all pages), to know which visits already have one
+export const getRecentInvoices = ({ fromDate } = {}, config = {}) => allInvoices({ fromDate }, config);
 
 export const getPaidInvoices = async () => {
     const results = await Promise.all(
@@ -305,13 +321,15 @@ export const getPaymentHistory = ({ keyword, method, status, fromDate, toDate, p
     );
 
 // Active entries of every room queue (Examination, Imaging, Treatment): WAITING, CALLED, IN_PROGRESS
-export const getQueueEntries = (queueType) => call(() => api.get("/api/queues", { params: { queueType: queueType || undefined } }));
+export const getQueueEntries = (queueType, config = {}) => call(() => api.get("/api/queues", { ...config, params: { queueType: queueType || undefined } }));
 
-export const setQueuePriority = (id, priority) => call(() => api.post(`/api/queues/${id}/priority`, { priority }));
+export const setQueuePriority = (id, { priority, reason }) => call(() => api.post(`/api/queues/${id}/priority`, { priority, reason: reason || null }));
 
-export const moveQueueEntry = (id, roomId) => call(() => api.post(`/api/queues/${id}/move`, { roomId }));
+export const moveQueueEntry = (id, roomId, reason) => call(() => api.post(`/api/queues/${id}/move`, { roomId, reason }));
 
-export const removeQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/remove`));
+export const removeQueueEntry = (id, reason) => call(() => api.post(`/api/queues/${id}/remove`, { reason }));
+
+export const keepQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/keep`));
 
 export const callAppointment = (id) => call(() => api.post(`/api/appointments/${id}/call`));
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import Pagination from "@/components/ui/Pagination";
 import { PRIORITY, getDoctorsOnDuty } from "@/services/receptionService";
@@ -44,7 +44,11 @@ export const isPendingSoon = (a, today, now) => {
 
 export const DUTY_LABEL = { Working: "Đang làm", NotStarted: "Chưa vào ca", Ended: "Đã kết thúc ca", OnLeave: "Nghỉ phép" };
 
-export const money = (value) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
+// VND has no fractions; anything that is not a number shows as "—" instead of "NaN ₫".
+export const money = (value) => {
+    const amount = Number(value ?? 0);
+    return Number.isFinite(amount) ? `${Math.round(amount).toLocaleString("vi-VN")} ₫` : "—";
+};
 export const hhmm = (time) => (time ? time.slice(0, 5) : null);
 export const slotText = (a) => (a.timeSlotStart ? `${hhmm(a.timeSlotStart)} – ${hhmm(a.timeSlotEnd)}` : "Vãng lai");
 export const clockOf = (dateTime) =>
@@ -71,14 +75,6 @@ export const clinicClock = () =>
 
 // Whole minutes since a moment (0 when missing or in the future)
 export const minutesSince = (moment, now = Date.now()) => (moment ? Math.max(0, Math.floor((now - new Date(moment).getTime()) / 60_000)) : 0);
-
-// How long someone has waited, as a colour: calm under 15 minutes, watch 15–30, act over 30
-export const waitTone = (minutes) => (minutes >= 30 ? "danger" : minutes >= 15 ? "warning" : "success");
-export const WAIT_TONE_CLASS = {
-    success: "bg-success-soft text-success",
-    warning: "bg-warning-soft text-warning",
-    danger: "bg-danger-soft text-danger",
-};
 
 // "0912 345 678" → "…5678" with the patient code, to tell apart two people with the same name
 export const phoneTail = (phone) => (phone ? `…${phone.replace(/\D/g, "").slice(-4)}` : "");
@@ -115,9 +111,14 @@ export const usePaging = (items, pageSize = 10) => {
 // Doctors with a shift today, one row per doctor (the shift that matters now), and the ones still able to take patients
 export const useDoctorsOnDuty = (refreshKey = 0) => {
     const [shifts, setShifts] = useState([]);
+    const [loaded, setLoaded] = useState(false);
     useEffect(() => {
         let active = true;
-        getDoctorsOnDuty().then((result) => active && result.success && setShifts(result.data));
+        getDoctorsOnDuty().then((result) => {
+            if (!active || !result.success) return;
+            setShifts(result.data);
+            setLoaded(true);
+        });
         return () => {
             active = false;
         };
@@ -144,8 +145,8 @@ export const useDoctorsOnDuty = (refreshKey = 0) => {
             });
         });
         const doctors = [...map.values()];
-        return { doctors, available: doctors.filter((d) => d.status === "Working" || d.status === "NotStarted") };
-    }, [shifts]);
+        return { doctors, loaded, available: doctors.filter((d) => d.status === "Working" || d.status === "NotStarted") };
+    }, [shifts, loaded]);
 };
 
 // A doctor counts as late after this many minutes past the shift start without pressing "start shift"
@@ -176,13 +177,18 @@ export const dutyText = (doctor, now = clinicClock()) => {
 };
 
 // Wraps a submit so the button shows progress and cannot be pressed twice
+// The ref stops a second submit (double click, Enter twice) before the busy state has re-rendered the button.
 export const useSubmit = (onSubmit) => {
     const [busy, setBusy] = useState(false);
+    const inFlight = useRef(false);
     const submit = async (...args) => {
+        if (inFlight.current) return;
+        inFlight.current = true;
         setBusy(true);
         try {
             await onSubmit(...args);
         } finally {
+            inFlight.current = false;
             setBusy(false);
         }
     };

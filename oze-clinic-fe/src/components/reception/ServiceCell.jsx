@@ -27,7 +27,7 @@ const ServiceCell = ({ names }) => {
                     aria-controls={popupId}
                     aria-label={TEXT.MORE_SERVICES(names.length)}
                     onClick={() => setOpen((v) => !v)}
-                    className="num ml-1.5 inline-flex cursor-pointer rounded-full bg-surface-muted px-2 align-middle text-caption font-semibold text-body hover:text-ink"
+                    className="num ml-1.5 inline-flex min-h-6 min-w-6 cursor-pointer items-center justify-center whitespace-nowrap rounded-full bg-surface-muted px-2 align-middle text-caption font-semibold text-body hover:text-ink pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 >
                     +{names.length - 1}
                 </button>

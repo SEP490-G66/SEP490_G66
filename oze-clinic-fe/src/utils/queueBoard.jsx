@@ -4,9 +4,24 @@ export const QUEUE_TABS = ["kham", "xq", "tp"];
 
 export const EMPTY_QUEUE_FILTERS = { keyword: "", room: "", state: "", priority: "" };
 
+// Missed calls after which the receptionist must decide: keep the patient in the queue or let them leave
+export const ABSENT_LIMIT = 3;
+
+// Key of the exam room for checked-in patients without a doctor, so they never drop out of the board
+export const NO_DOCTOR_KEY = "none";
+
+const priorityOf = (value) => {
+    const p = Number(value);
+    return [0, 1, 2].includes(p) ? p : 0;
+};
+
+const skipsOf = (x) => Math.max(Number(x.skipCount) || 0, x.absentWhenCalled ? 1 : 0);
+
 const TAB_OF_TYPE = { Imaging: "xq", Treatment: "tp" };
 
-const ENTRY_STATE = { IN_PROGRESS: "serving", CALLED: "called", WAITING: "waiting" };
+const ENTRY_STATE = { IN_PROGRESS: "serving", INPROGRESS: "serving", CALLED: "called", WAITING: "waiting" };
+
+const entryState = (status) => ENTRY_STATE[String(status ?? "").toUpperCase()] ?? "waiting";
 
 const ENDED = ["Ended", "OnLeave"];
 
@@ -25,14 +40,23 @@ export const examRooms = (doctors, waiting, serving) => {
             endAt: d.end,
             off: d.status === "NotStarted",
             startAt: d.start,
-            active: !ENDED.includes(d.status),
+            // Only a doctor working now can take patients; one whose shift has not started is not a move target
+            active: d.status === "Working",
         }),
     );
     [...waiting, ...serving].forEach((x) => {
-        if (!x.doctorId || map.has(String(x.doctorId))) return;
-        map.set(String(x.doctorId), { key: String(x.doctorId), tab: "kham", doctorId: x.doctorId, name: x.roomName, staff: x.doctorName, ended: false, active: true });
+        if (!x.doctorId) {
+            if (!map.has(NO_DOCTOR_KEY)) map.set(NO_DOCTOR_KEY, { key: NO_DOCTOR_KEY, tab: "kham", doctorId: null, name: null, staff: null, ended: false, active: false });
+            return;
+        }
+        if (map.has(String(x.doctorId))) return;
+        // A doctor missing from today's duty list: the shift is unknown, so never a move target
+        map.set(String(x.doctorId), { key: String(x.doctorId), tab: "kham", doctorId: x.doctorId, name: x.roomName, staff: x.doctorName, ended: false, active: false });
     });
-    return [...map.values()].sort((a, b) => String(a.name ?? "~").localeCompare(String(b.name ?? "~"), "vi", { numeric: true }));
+    // Patients without a doctor come last, after every named room
+    return [...map.values()].sort(
+        (a, b) => Number(a.key === NO_DOCTOR_KEY) - Number(b.key === NO_DOCTOR_KEY) || String(a.name ?? "~").localeCompare(String(b.name ?? "~"), "vi", { numeric: true }),
+    );
 };
 
 export const otherRooms = (entries) => {
@@ -41,7 +65,7 @@ export const otherRooms = (entries) => {
         const tab = TAB_OF_TYPE[e.queueType];
         if (!tab) return;
         const key = `${e.queueType}-${e.roomId ?? "none"}`;
-        if (!map.has(key)) map.set(key, { key, tab, roomId: e.roomId, name: e.roomName, staff: e.staffName, ended: false, active: true });
+        if (!map.has(key)) map.set(key, { key, tab, roomId: e.roomId, name: e.roomName, staff: e.staffName, ended: false, active: e.roomId != null });
     });
     return [...map.values()].sort((a, b) => String(a.name ?? "~").localeCompare(String(b.name ?? "~"), "vi", { numeric: true }));
 };
@@ -51,27 +75,30 @@ export const examRows = (waiting, serving) => {
         key: `s${a.id}`,
         kind: "exam",
         appointmentId: a.id,
-        roomKey: String(a.doctorId),
+        roomKey: a.doctorId ? String(a.doctorId) : NO_DOCTOR_KEY,
         patientName: a.patientName,
         patientCode: a.patientCode,
         patientPhoneNumber: a.patientPhoneNumber,
         allergies: a.patientAllergies ?? [],
         state: "serving",
-        priority: a.priority ?? 0,
+        priority: priorityOf(a.priority),
+        priorityReason: a.priorityReason ?? null,
         checkInAt: a.checkInAt,
     }));
     const queue = waiting.map((w, index) => ({
         key: `w${w.appointmentId}`,
         kind: "exam",
         appointmentId: w.appointmentId,
-        roomKey: String(w.doctorId),
+        roomKey: w.doctorId ? String(w.doctorId) : NO_DOCTOR_KEY,
         patientName: w.patientName,
         patientCode: w.patientCode,
         patientPhoneNumber: w.patientPhoneNumber,
         allergies: w.patientAllergies ?? [],
         state: isCalled(w) ? "called" : "waiting",
         absent: Boolean(w.absentWhenCalled),
-        priority: w.priority ?? 0,
+        skips: skipsOf(w),
+        priority: priorityOf(w.priority),
+        priorityReason: w.priorityReason ?? null,
         checkInAt: w.checkInAt,
         order: index,
     }));
@@ -91,11 +118,13 @@ export const entryRows = (entries) =>
             patientCode: e.patientCode,
             patientPhoneNumber: e.patientPhoneNumber,
             allergies: e.patientAllergies ?? [],
-            state: ENTRY_STATE[e.status] ?? "waiting",
+            state: entryState(e.status),
             absent: Boolean(e.absentWhenCalled),
-            priority: e.priority ?? 0,
+            skips: skipsOf(e),
+            priority: priorityOf(e.priority),
+            priorityReason: e.priorityReason ?? null,
             checkInAt: e.createdAt,
-            order: (2 - (e.priority ?? 0)) * 100000 + (e.queueNumber ?? 0),
+            order: (2 - priorityOf(e.priority)) * 100000 + (Number(e.queueNumber) || 0),
         }));
 
 const STATE_RANK = { serving: 0, called: 1, waiting: 2 };
@@ -119,12 +148,18 @@ export const orderRows = (rows, rooms) => {
 
 export const waitingCount = (rows, roomKey) => rows.filter((r) => r.roomKey === roomKey && r.state !== "serving").length;
 
+// Missed the call ABSENT_LIMIT times: the receptionist keeps them in the queue or lets them leave
+export const needsDecision = (row) => row.state !== "serving" && (row.skips ?? 0) >= ABSENT_LIMIT;
+
 export const matchesQueue = (row, filters) => {
     const q = filters.keyword.trim();
     const digits = q.replace(/\D/g, "");
+    // "84…" typed as a full number becomes "0…"; a run of digits from the middle still matches as typed
+    const local = digits.replace(/^84/, "0");
     const phone = String(row.patientPhoneNumber ?? "").replace(/\D/g, "").replace(/^84/, "0");
-    const keywordOk = !q || norm(row.patientName).includes(norm(q)) || norm(row.patientCode).includes(norm(q)) || (digits.length >= 3 && phone.includes(digits));
-    return keywordOk && (!filters.room || row.roomKey === filters.room) && (!filters.state || row.state === filters.state) && (!filters.priority || String(row.priority) === filters.priority);
+    const phoneOk = digits.length >= 3 && (phone.includes(digits) || (local.length >= 3 && phone.includes(local)));
+    const keywordOk = !q || norm(row.patientName).includes(norm(q)) || norm(row.patientCode).includes(norm(q)) || phoneOk;
+    return keywordOk && (!filters.room || row.roomKey === filters.room) && (!filters.state || (filters.state === "absent" ? row.absent || (row.skips ?? 0) > 0 : row.state === filters.state)) && (!filters.priority || String(row.priority) === filters.priority);
 };
 
 export const isQueueFiltered = (filters) => Object.keys(EMPTY_QUEUE_FILTERS).some((k) => filters[k] !== EMPTY_QUEUE_FILTERS[k]);

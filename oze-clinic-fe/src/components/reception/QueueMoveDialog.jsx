@@ -6,11 +6,15 @@ import { QUEUE_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
 // Moves one or more queue rows to another room or doctor of the same tab.
-// targets: [{ key, name, staff?, waiting }], the rooms open now without the current one.
-const QueueMoveDialog = ({ rows, targets, onClose, onSubmit }) => {
+// targets: [{ key, name, staff?, waiting }], the rooms working now without the current one.
+// The reason is required: it goes into the notification the patient receives. defaultReason pre-fills it (doctor's shift ended).
+const QueueMoveDialog = ({ rows, targets, defaultReason = "", onClose, onSubmit }) => {
     const [selected, setSelected] = useState(targets.length === 1 ? targets[0].key : null);
+    const [reason, setReason] = useState(defaultReason);
+    const [tried, setTried] = useState(false);
     const [busy, submit] = useSubmit(onSubmit);
     const target = targets.find((t) => t.key === selected);
+    const reasonMissing = !reason.trim();
 
     return (
         <Modal title={TEXT.MOVE_TITLE(rows.length)} description={rows.map((r) => r.patientName).join(", ")} onClose={onClose} closeDisabled={busy}>
@@ -19,7 +23,8 @@ const QueueMoveDialog = ({ rows, targets, onClose, onSubmit }) => {
                 className="mt-5 space-y-4"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    if (!busy && target) submit(target);
+                    setTried(true);
+                    if (!busy && target && !reasonMissing) submit({ target, reason: reason.trim() });
                 }}
             >
                 <fieldset className="field">
@@ -47,6 +52,24 @@ const QueueMoveDialog = ({ rows, targets, onClose, onSubmit }) => {
                         </div>
                     )}
                 </fieldset>
+                <div className="field">
+                    <label className="label label-required" htmlFor="queue-move-reason">
+                        {TEXT.MOVE_REASON}
+                    </label>
+                    <textarea
+                        id="queue-move-reason"
+                        className="input min-h-20"
+                        maxLength={500}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        aria-required="true"
+                        aria-invalid={tried && reasonMissing}
+                        aria-describedby="queue-move-reason-hint"
+                    />
+                    <p id="queue-move-reason-hint" className={cx("text-caption", tried && reasonMissing ? "text-danger" : "text-muted")}>
+                        {tried && reasonMissing ? TEXT.ERR_REASON : TEXT.MOVE_REASON_HINT}
+                    </p>
+                </div>
                 <p className="text-sm text-muted">{TEXT.MOVE_NOTE}</p>
                 <DialogActions onClose={onClose} closeLabel={TEXT.CLOSE} submitLabel={TEXT.MOVE_SUBMIT} busy={busy} closeDisabled={busy} disabled={!target} />
             </form>
