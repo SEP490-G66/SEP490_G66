@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Clock, MapPin, Phone } from "lucide-react";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
+import banner1 from "@/assets/banner/banner1.png";
 import placeholderImage from "@/assets/placeholder/placeholder.svg";
 import { submitConsultationRequest } from "../../services/contactService";
 import {
@@ -121,7 +122,7 @@ const ContactPage = () => {
             </div>
 
             <img
-                src={placeholderImage}
+                src={banner1}
                 alt="Nha khoa OZE"
                 className="w-full bg-surface-tint object-contain px-6"
             />
