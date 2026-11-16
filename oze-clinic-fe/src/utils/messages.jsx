@@ -145,7 +145,6 @@ export const GUEST_HEADER_TEXT = {
     DRAWER_LABEL: "Menu",
 };
 
-// Public "Dịch vụ" pages (landing)
 export const PUBLIC_SERVICE_TEXT = {
     HOME: "Trang chủ",
     SERVICES: "Dịch vụ",
@@ -163,7 +162,6 @@ export const PUBLIC_SERVICE_TEXT = {
     STEP: (n) => `Bước ${n}`,
 };
 
-// Public "Đội ngũ bác sĩ" page (landing)
 export const PUBLIC_DOCTOR_TEXT = {
     HOME: "Trang chủ",
     TITLE: "Đội ngũ bác sĩ",
@@ -187,7 +185,6 @@ export const PUBLIC_ARTICLE_TEXT = {
     PUBLISHED_AT: "Ngày đăng:",
 };
 
-// Header search results page (landing)
 export const PUBLIC_SEARCH_TEXT = {
     HOME: "Trang chủ",
     BREADCRUMB: "Tìm kiếm",

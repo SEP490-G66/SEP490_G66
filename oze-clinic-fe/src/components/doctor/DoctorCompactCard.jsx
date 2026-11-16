@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 
-// Small doctor card for search results: portrait, name, position; links to the doctor on /doctors.
 const DoctorCompactCard = ({ doctor, to }) => (
     <Link to={to} className="card-public card-hover group flex items-center gap-4 overflow-hidden p-0">
         <span className="flex w-24 shrink-0 items-end self-stretch bg-primary-soft sm:w-28">

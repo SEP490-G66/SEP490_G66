@@ -3,10 +3,6 @@ import { Link } from "react-router-dom";
 import { PUBLIC_DOCTOR_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 
-// One doctor: portrait, title and name, position, introduction, certificates and the buttons.
-// headingLevel: 3 on the home page, 2 on /doctors. showMore: the "Xem thêm" link to /doctors (hidden on that page).
-// live: announce the name when it changes (home page, where one card switches doctor).
-// onOpenCertificate(index): when given, the certificate pictures are listed and open a large view.
 const DoctorIntro = ({ doctor, ref, headingLevel = 3, showMore = true, live = true, onOpenCertificate }) => {
     const Heading = `h${headingLevel}`;
     const name = `${doctor.displayTitle} ${doctor.fullName}`;
