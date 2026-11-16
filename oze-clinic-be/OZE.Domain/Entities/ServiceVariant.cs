@@ -15,10 +15,7 @@ namespace OZE.Domain.Entities
         public bool IsActive { get; set; } = true;
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
-        // When the picture was last changed; null = no picture. The bytes live in ServiceVariantImages.
-        public DateTimeOffset? ImageUpdatedAt { get; set; }
 
         public virtual Service Service { get; set; } = null!;
-        public virtual ServiceVariantImage? Image { get; set; }
     }
 }

@@ -22,13 +22,5 @@ namespace OZE.Application.Interfaces
         Task<ApiResponse<ServiceVariantDto>> UpdateVariantAsync(int serviceId, int variantId, SaveServiceVariantRequest request, CancellationToken cancellationToken = default);
         Task<ApiResponse<ServiceVariantDto>> ToggleVariantStatusAsync(int serviceId, int variantId, bool isActive, CancellationToken cancellationToken = default);
         Task<ApiResponse<bool>> DeleteVariantAsync(int serviceId, int variantId, CancellationToken cancellationToken = default);
-
-        // Pictures of services and variants (stored in the database)
-        Task<ApiResponse<ServiceDto>> SetServiceImageAsync(int serviceId, byte[] data, CancellationToken cancellationToken = default);
-        Task<ApiResponse<ServiceDto>> RemoveServiceImageAsync(int serviceId, CancellationToken cancellationToken = default);
-        Task<ApiResponse<ServiceImageFile>> GetServiceImageAsync(int serviceId, CancellationToken cancellationToken = default);
-        Task<ApiResponse<ServiceVariantDto>> SetVariantImageAsync(int serviceId, int variantId, byte[] data, CancellationToken cancellationToken = default);
-        Task<ApiResponse<ServiceVariantDto>> RemoveVariantImageAsync(int serviceId, int variantId, CancellationToken cancellationToken = default);
-        Task<ApiResponse<ServiceImageFile>> GetVariantImageAsync(int serviceId, int variantId, CancellationToken cancellationToken = default);
     }
 }

@@ -244,38 +244,6 @@ namespace OZE.Persistence.Repositories
             return Task.CompletedTask;
         }
 
-        public async Task<ServiceImage?> GetServiceImageAsync(int serviceId, bool asNoTracking, CancellationToken cancellationToken = default)
-        {
-            var query = asNoTracking ? _context.ServiceImages.AsNoTracking() : _context.ServiceImages;
-            return await query.FirstOrDefaultAsync(i => i.ServiceId == serviceId, cancellationToken);
-        }
-
-        public async Task<ServiceVariantImage?> GetVariantImageAsync(int serviceId, int variantId, bool asNoTracking, CancellationToken cancellationToken = default)
-        {
-            var query = asNoTracking ? _context.ServiceVariantImages.AsNoTracking() : _context.ServiceVariantImages;
-            return await query.FirstOrDefaultAsync(i => i.ServiceVariantId == variantId && i.ServiceVariant.ServiceId == serviceId, cancellationToken);
-        }
-
-        public async Task AddServiceImageAsync(ServiceImage image, CancellationToken cancellationToken = default)
-        {
-            await _context.ServiceImages.AddAsync(image, cancellationToken);
-        }
-
-        public async Task AddVariantImageAsync(ServiceVariantImage image, CancellationToken cancellationToken = default)
-        {
-            await _context.ServiceVariantImages.AddAsync(image, cancellationToken);
-        }
-
-        public void RemoveServiceImage(ServiceImage image)
-        {
-            _context.ServiceImages.Remove(image);
-        }
-
-        public void RemoveVariantImage(ServiceVariantImage image)
-        {
-            _context.ServiceVariantImages.Remove(image);
-        }
-
         public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             await _context.SaveChangesAsync(cancellationToken);
