@@ -34,7 +34,7 @@ const HEADING = "font-heading text-heading-3 font-bold text-ink sm:text-heading-
 const Footer = () => {
     return (
         <footer className="@container bg-canvas px-4 py-10 sm:px-6 sm:py-16">
-            <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-[1.5fr_1fr_1.5fr] @5xl:gap-12">
+            <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-[1.25fr_1.5fr_1.25fr] @5xl:gap-12">
                 {/* Column 1: Logo & Info */}
                 <div className="flex flex-col gap-6 sm:gap-8">
                     <img
@@ -73,7 +73,8 @@ const Footer = () => {
                     <h3 id="footer-services-title" className={HEADING}>
                         Dịch vụ nha khoa
                     </h3>
-                    <ul className="flex flex-col gap-1 sm:gap-2">
+                    {/* 2 columns × 3 rows, filled top-to-bottom; single column on narrow footers */}
+                    <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:gap-y-2 @md:grid-flow-col @md:grid-cols-2 @md:grid-rows-3">
                         {SERVICES.map((service) => (
                             <li key={service}>
                                 <a href="#" className="group flex min-h-9 items-center gap-2 rounded-md py-1 pointer-coarse:min-h-11">

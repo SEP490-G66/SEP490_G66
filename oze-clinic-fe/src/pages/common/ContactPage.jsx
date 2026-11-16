@@ -3,7 +3,7 @@ import { Clock, MapPin, Phone } from "lucide-react";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import banner1 from "@/assets/banner/banner1.png";
-import placeholderImage from "@/assets/placeholder/placeholder.svg";
+import banner3 from "@/assets/banner/banner3.png";
 import { submitConsultationRequest } from "../../services/contactService";
 import {
     CLINIC_ADDRESS,
@@ -146,7 +146,7 @@ const ContactPage = () => {
             <section className="container-public grid grid-cols-1 gap-12 pb-12 md:grid-cols-2 md:pb-16">
                 <div className="flex flex-col gap-6">
                     <img
-                        src={placeholderImage}
+                        src={banner3}
                         alt="Tu van nha khoa OZE"
                         className="aspect-4/3 w-full rounded-2xl object-cover shadow-md"
                     />
