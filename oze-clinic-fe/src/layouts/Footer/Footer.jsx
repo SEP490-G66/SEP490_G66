@@ -1,7 +1,7 @@
 import { MapPin, Phone, Clock, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaTiktok, FaYoutube } from "react-icons/fa";
-import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
+import LogoOze from "@/assets/logo/Logo.png";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { getFooterServices } from "@/services/dentalService";
@@ -28,13 +28,13 @@ const HEADING = "font-heading text-heading-3 font-bold text-ink sm:text-heading-
 const Footer = () => {
     return (
         <footer className="@container bg-canvas px-4 py-10 sm:px-6 sm:py-16">
-            <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-[1.5fr_1fr_1.5fr] @5xl:gap-12">
+            <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-[1.25fr_1.5fr_1.25fr] @5xl:gap-12">
                 {/* Column 1: Logo & Info */}
                 <div className="flex flex-col gap-6 sm:gap-8">
                     <img
                         src={LogoOze}
                         alt="Nha khoa Oze"
-                        className="h-auto w-44 object-contain sm:w-56"
+                        className="h-auto w-56 object-contain sm:w-72"
                         style={{ filter: "brightness(0) saturate(100%) invert(32%) sepia(87%) saturate(3015%) hue-rotate(213deg) brightness(97%) contrast(93%)" }}
                     />
                     <ul className="flex flex-col gap-4">
@@ -67,7 +67,8 @@ const Footer = () => {
                     <h3 id="footer-services-title" className={HEADING}>
                         Dịch vụ nha khoa
                     </h3>
-                    <ul className="flex flex-col gap-1 sm:gap-2">
+                    {/* 2 columns × 3 rows, filled top-to-bottom; single column on narrow footers */}
+                    <ul className="grid grid-cols-1 gap-x-6 gap-y-1 sm:gap-y-2 @md:grid-flow-col @md:grid-cols-2 @md:grid-rows-3">
                         {getFooterServices().map((service) => (
                             <li key={service.slug}>
                                 <Link

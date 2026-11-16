@@ -8,11 +8,14 @@ const HeroSection = () => {
             <h1 id={TITLE_ID} className="sr-only">
                 {MOCK_HOME_HERO.title}
             </h1>
+            {/* Natural ratio so the whole banner shows; width/height reserve the space before it loads */}
             <img
                 src={MOCK_HOME_HERO.imageUrl}
                 alt={MOCK_HOME_HERO.alt}
+                width={MOCK_HOME_HERO.width}
+                height={MOCK_HOME_HERO.height}
                 fetchPriority="high"
-                className="hero-image aspect-4/3 w-full object-left md:aspect-8/3"
+                className="hero-image h-auto w-full"
             />
         </section>
     );

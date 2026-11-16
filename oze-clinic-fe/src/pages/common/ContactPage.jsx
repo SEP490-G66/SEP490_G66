@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Clock, MapPin, Phone } from "lucide-react";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
-import banner2 from "@/assets/banner/banner2.png";
-import contactUsImage from "@/assets/banner/contact-us.png";
+import banner1 from "@/assets/banner/banner1.png";
+import banner3 from "@/assets/banner/banner3.png";
 import { submitConsultationRequest } from "../../services/contactService";
 import {
     CLINIC_ADDRESS,
@@ -122,7 +122,7 @@ const ContactPage = () => {
             </div>
 
             <img
-                src={banner2}
+                src={banner1}
                 alt="Nha khoa OZE"
                 className="w-full bg-surface-tint object-contain px-6"
             />
@@ -146,7 +146,7 @@ const ContactPage = () => {
             <section className="container-public grid grid-cols-1 gap-12 pb-12 md:grid-cols-2 md:pb-16">
                 <div className="flex flex-col gap-6">
                     <img
-                        src={contactUsImage}
+                        src={banner3}
                         alt="Tu van nha khoa OZE"
                         className="aspect-4/3 w-full rounded-2xl object-cover shadow-md"
                     />

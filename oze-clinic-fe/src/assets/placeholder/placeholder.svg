@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#EEF1F5"/>
+  <g fill="none" stroke="#A3ADBB" stroke-width="10" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="320" y="210" width="160" height="120" rx="14"/>
+    <circle cx="362" cy="250" r="12"/>
+    <path d="M330 318l46-46 30 30 22-22 42 38"/>
+  </g>
+  <text x="400" y="380" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#8A95A5">Ảnh minh họa</text>
+</svg>

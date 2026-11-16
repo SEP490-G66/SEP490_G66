@@ -1,14 +1,15 @@
 import Carousel from "@/components/ui/Carousel";
 import ImageCard from "@/components/ui/ImageCard";
 import SectionHeading from "@/components/ui/SectionHeading";
-import { getFeaturedServices } from "@/services/dentalService";
+import { getMenuServices } from "@/services/dentalService";
 import { getServiceDetailRoute } from "@/utils/routes";
 
 const TITLE_ID = "home-services-title";
 
-// Home page: the featured services (fixed content, see utils/data/publicServices.jsx).
+// Home page: every service shown in the menu (fixed content, see utils/data/publicServices.jsx).
+// More than 4 so the carousel arrows have something to scroll on desktop.
 const ServicesSection = () => {
-    const services = getFeaturedServices();
+    const services = getMenuServices();
 
     return (
         <section aria-labelledby={TITLE_ID} className="container-public flex flex-col gap-10 py-12 md:py-16">

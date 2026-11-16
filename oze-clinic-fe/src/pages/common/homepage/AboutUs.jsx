@@ -1,7 +1,7 @@
 import { Eye, Gem, Handshake, HeartHandshake, Scale, ShieldCheck, Sparkle, Sprout, Target, TrendingUp } from "lucide-react";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import Card from "@/components/ui/Card";
-import bannerAboutUs from "@/assets/banner/banner_about_us.png";
+import banner1 from "@/assets/banner/banner1.png";
 import { ROUTES } from "@/utils/routes";
 
 const BREADCRUMB_ITEMS = [{ label: "Trang chủ", href: ROUTES.HOME }, { label: "Về chúng tôi" }];
@@ -92,7 +92,7 @@ const AboutUs = () => {
                 </div>
                 <div className="overflow-hidden rounded-2xl shadow-md">
                     <img
-                        src={bannerAboutUs}
+                        src={banner1}
                         alt="Không gian Nha khoa OZE"
                         className="hero-image w-full transition-transform duration-500 ease-out hover:scale-105"
                     />

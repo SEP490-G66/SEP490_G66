@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import LogoOze from "../../assets/logo/Logo-OZE-ngang.png";
+import LogoOze from "@/assets/logo/Logo.png";
 import useSession from "../../hooks/useSession";
 import { Exception } from "../../utils/globalException";
 import { CLINIC_EMAIL, CLINIC_HOTLINE } from "../../utils/messages";
@@ -77,7 +77,7 @@ const GlobalException = ({ code }) => {
         <div className="flex min-h-dvh items-center bg-surface-tint">
             <section className="container-public w-full py-12 md:py-16">
                 <Link to={ROUTES.HOME} className="mx-auto mb-8 block w-fit">
-                    <img src={LogoOze} alt="OZE Dental" className="h-9 w-auto" />
+                    <img src={LogoOze} alt="OZE Dental" className="h-20 w-auto" />
                 </Link>
                 {card}
             </section>
