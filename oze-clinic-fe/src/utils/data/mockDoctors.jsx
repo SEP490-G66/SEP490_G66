@@ -5,6 +5,10 @@ import doctor4 from "@/assets/mock/doctors/doctor-4.png";
 import doctor5 from "@/assets/mock/doctors/doctor-5.png";
 import placeholderImage from "@/assets/placeholder/placeholder.svg";
 
+// Short introduction at the top of the /doctors page.
+export const DOCTORS_PAGE_INTRO =
+    "Đội ngũ bác sĩ của Nha khoa Oze được đào tạo bài bản, có chứng chỉ hành nghề và nhiều năm kinh nghiệm trong các lĩnh vực chỉnh nha, cấy ghép Implant, phục hình răng sứ và nha khoa tổng quát. Mỗi khách hàng đều được bác sĩ trực tiếp thăm khám và tư vấn phương án phù hợp.";
+
 const toCertificateImages = (fullName, images) =>
     images.map((imageUrl, index) => ({ imageUrl, alt: `Chứng chỉ ${index + 1} của ${fullName}` }));
 

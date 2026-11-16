@@ -1,21 +1,26 @@
-import { MOCK_DENTAL_SERVICES } from "../utils/data/mockDentalServices";
-import { MOCK_SERVICES } from "../utils/data/mockService";
+import { FOOTER_SERVICE_SLUGS, PUBLIC_SERVICES } from "../utils/data/publicServices";
 
-const MOCK_DELAY_MS = 300;
+export const toSearchText = (value) =>
+    (value ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase()
+        .trim();
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const getPublicServices = () => PUBLIC_SERVICES;
 
-export const getDentalServices = async () => {
-    await wait(MOCK_DELAY_MS);
+export const getFeaturedServices = () => PUBLIC_SERVICES.filter((service) => service.featured);
 
-    return { success: true, message: null, data: MOCK_DENTAL_SERVICES, errors: null };
+export const getServiceBySlug = (slug) => PUBLIC_SERVICES.find((service) => service.slug === slug) ?? null;
+
+export const searchServices = (keyword) => {
+    const text = toSearchText(keyword);
+    if (!text) return PUBLIC_SERVICES;
+    return PUBLIC_SERVICES.filter((service) => toSearchText(`${service.name} ${service.summary}`).includes(text));
 };
 
-export const getServiceDetail = async (serviceId) => {
-    await wait(MOCK_DELAY_MS);
+export const getFooterServices = () => FOOTER_SERVICE_SLUGS.map((slug) => getServiceBySlug(slug)).filter(Boolean);
 
-    const service = MOCK_SERVICES.find((item) => item.id === Number(serviceId));
-    if (!service) return { success: false, message: "Không tìm thấy dịch vụ.", data: null, errors: null };
-
-    return { success: true, message: null, data: service, errors: null };
-};
+export const getMenuServices = () => PUBLIC_SERVICES.filter((service) => !service.hiddenInMenu);

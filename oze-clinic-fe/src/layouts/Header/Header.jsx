@@ -7,7 +7,7 @@ import Avatar from "@/components/ui/Avatar";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { signOut } from "@/services/authService";
-import { getDentalServices } from "@/services/dentalService";
+import { getMenuServices } from "@/services/dentalService";
 import {
     getNotifications,
     getUnreadNotificationCount,
@@ -16,7 +16,7 @@ import {
 } from "@/services/notificationService";
 import { cx } from "@/utils/cx";
 import { CLINIC_HOTLINE, GUEST_HEADER_TEXT as TEXT, MESSAGES, USER_ROLES } from "@/utils/messages";
-import { ROUTES, getServiceDetailRoute } from "@/utils/routes";
+import { ROUTES, getSearchRoute, getServiceDetailRoute } from "@/utils/routes";
 
 const HOVER_CLOSE_DELAY_MS = 150;
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), input:not([disabled])";
@@ -43,8 +43,6 @@ const ABOUT_ITEMS = [
     { key: "doctors", label: TEXT.DOCTORS, to: ROUTES.DOCTORS },
 ];
 
-const preventSubmit = (event) => event.preventDefault();
-
 const isMouse = (event) => event.pointerType === "mouse";
 
 const isCurrentPath = (to, pathname) => matchPath({ path: to, end: true }, pathname) !== null;
@@ -59,11 +57,10 @@ const focusItem = (list, target) => {
 
 const toServiceItems = (services) => [
     ...services.map((service) => ({
-        key: `service-${service.id}`,
+        key: `service-${service.slug}`,
         label: service.name,
-        to: getServiceDetailRoute(service.id),
+        to: getServiceDetailRoute(service.slug),
     })),
-    { key: "all-services", label: TEXT.ALL_SERVICES, to: ROUTES.SERVICES },
 ];
 
 const startOfDay = (time) => new Date(time).setHours(0, 0, 0, 0);
@@ -114,14 +111,26 @@ const useDismiss = ({ open, containerRef, returnFocusRef, onDismiss }) => {
 
 const SearchForm = ({ compact = false, className }) => {
     const inputId = useId();
+    const navigate = useNavigate();
+    const { pathname, search } = useLocation();
+    const current = pathname === ROUTES.SEARCH ? (new URLSearchParams(search).get("q") ?? "") : "";
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        const keyword = String(new FormData(event.currentTarget).get("q") ?? "").trim();
+        navigate(keyword ? getSearchRoute(keyword) : ROUTES.SERVICES);
+    };
 
     return (
-        <form role="search" className={cx("items-center gap-2", className)} onSubmit={preventSubmit}>
+        <form role="search" className={cx("items-center gap-2", className)} onSubmit={handleSubmit}>
             <label htmlFor={inputId} className="sr-only">
                 {TEXT.SEARCH_LABEL}
             </label>
             <input
+                key={current}
                 id={inputId}
+                name="q"
+                defaultValue={current}
                 type="search"
                 placeholder={TEXT.SEARCH_PLACEHOLDER}
                 className={cx("input min-w-0 flex-1", compact && "h-8")}
@@ -133,15 +142,16 @@ const SearchForm = ({ compact = false, className }) => {
     );
 };
 
-const NavMenu = ({ id, label, items, open, onOpenChange }) => {
+const NavMenu = ({ id, label, to, items, open, onOpenChange }) => {
     const { pathname } = useLocation();
+    const navigate = useNavigate();
     const containerRef = useRef(null);
     const buttonRef = useRef(null);
     const listRef = useRef(null);
     const focusTargetRef = useRef(null);
     const closeTimerRef = useRef(null);
     const hoveringRef = useRef(false);
-    const active = items.some((item) => isCurrentPath(item.to, pathname));
+    const active = (to && isCurrentPath(to, pathname)) || items.some((item) => isCurrentPath(item.to, pathname));
 
     const clearCloseTimer = () => {
         clearTimeout(closeTimerRef.current);
@@ -189,7 +199,14 @@ const NavMenu = ({ id, label, items, open, onOpenChange }) => {
         closeTimerRef.current = setTimeout(() => onOpenChange(false), HOVER_CLOSE_DELAY_MS);
     };
 
-    const handleButtonClick = () => onOpenChange(hoveringRef.current || !open);
+    const handleButtonClick = () => {
+        if (to) {
+            onOpenChange(false);
+            navigate(to);
+            return;
+        }
+        onOpenChange(hoveringRef.current || !open);
+    };
 
     const closeToButton = () => {
         onOpenChange(false);
@@ -199,7 +216,8 @@ const NavMenu = ({ id, label, items, open, onOpenChange }) => {
     const handleButtonKeyDown = (event) => {
         if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            if (open) onOpenChange(false);
+            if (to) handleButtonClick();
+            else if (open) onOpenChange(false);
             else openWithFocus("first");
         } else if (event.key === "ArrowDown") {
             event.preventDefault();
@@ -274,7 +292,7 @@ const NavMenu = ({ id, label, items, open, onOpenChange }) => {
                 aria-label={label}
                 onKeyDown={handleMenuKeyDown}
                 className={cx(
-                    "absolute left-0 top-full z-40 max-h-80 min-w-56 overflow-y-auto rounded-md border border-border bg-canvas py-2 shadow-sm transition-[opacity,translate,visibility] duration-200 ease-out",
+                    "absolute left-0 top-full z-40 min-w-56 rounded-md border border-border bg-canvas py-2 shadow-sm transition-[opacity,translate,visibility] duration-200 ease-out",
                     open ? "visible translate-y-0 opacity-100" : "pointer-events-none invisible -translate-y-1 opacity-0",
                 )}
             >
@@ -286,7 +304,7 @@ const NavMenu = ({ id, label, items, open, onOpenChange }) => {
                             role="menuitem"
                             tabIndex={-1}
                             onClick={() => onOpenChange(false)}
-                            className="public-nav-link flex min-h-control items-center px-4 py-2 transition-colors duration-150 hover:bg-surface-tint"
+                            className={({ isActive }) => cx("flex min-h-control items-center px-4 py-2 text-label transition-colors duration-150 hover:bg-surface-tint hover:text-primary", isActive ? "text-primary" : "text-body")}
                         >
                             {item.label}
                         </NavLink>
@@ -367,9 +385,15 @@ const Drawer = ({ id, entries, onClose, returnFocusRef, signedIn = false }) => {
                             <li key={entry.key}>
                                 {entry.items ? (
                                     <>
-                                        <p id={`${id}-${entry.key}`} className="flex min-h-11 items-center text-title text-ink">
-                                            {entry.label}
-                                        </p>
+                                        {entry.to ? (
+                                            <NavLink id={`${id}-${entry.key}`} to={entry.to} end className="flex min-h-11 items-center text-title text-ink hover:text-primary">
+                                                {entry.label}
+                                            </NavLink>
+                                        ) : (
+                                            <p id={`${id}-${entry.key}`} className="flex min-h-11 items-center text-title text-ink">
+                                                {entry.label}
+                                            </p>
+                                        )}
                                         <ul aria-labelledby={`${id}-${entry.key}`} className="flex flex-col pl-4">
                                             {entry.items.map((item) => (
                                                 <li key={item.key}>
@@ -756,18 +780,17 @@ const TopBar = ({ onToggleSidebar, ...toggleProps }) => (
 const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) => {
     const location = useLocation();
     const { token, role } = useSession();
-    const { value: servicesResult } = useAsync(getDentalServices, []);
     const [openMenu, setOpenMenu] = useState(null);
     const [drawerKey, setDrawerKey] = useState(null);
     const menuButtonRef = useRef(null);
 
-    const serviceItems = toServiceItems(servicesResult?.success ? servicesResult.data : []);
+    const serviceItems = toServiceItems(getMenuServices());
     const openMenuId = openMenu?.key === location.key ? openMenu.id : null;
     const drawerOpen = drawerKey === location.key;
 
     const navEntries = [
         { key: "home", label: TEXT.HOME, to: ROUTES.HOME, end: true },
-        { key: "services", label: TEXT.SERVICES, items: serviceItems },
+        { key: "services", label: TEXT.SERVICES, to: ROUTES.SERVICES, items: serviceItems },
         { key: "book-appointment", label: TEXT.BOOK_APPOINTMENT, to: ROUTES.BOOK_APPOINTMENT },
         { key: "about-us", label: TEXT.ABOUT_US, items: ABOUT_ITEMS },
         { key: "contact", label: TEXT.CONTACT, to: ROUTES.CONTACT },
@@ -847,6 +870,7 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
                                     <NavMenu
                                         id={`${entry.key}-menu`}
                                         label={entry.label}
+                                        to={entry.to}
                                         items={entry.items}
                                         open={openMenuId === entry.key}
                                         onOpenChange={setMenuOpen(entry.key)}

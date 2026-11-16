@@ -145,6 +145,92 @@ export const GUEST_HEADER_TEXT = {
     DRAWER_LABEL: "Menu",
 };
 
+// Public "Dịch vụ" pages (landing)
+export const PUBLIC_SERVICE_TEXT = {
+    HOME: "Trang chủ",
+    SERVICES: "Dịch vụ",
+    LIST_TITLE: "Danh sách dịch vụ",
+    SEARCH_LABEL: "Tìm dịch vụ",
+    SEARCH_PLACEHOLDER: "Tìm theo tên dịch vụ",
+    LIST_LABEL: "Danh sách dịch vụ",
+    PAGINATION_LABEL: "Phân trang danh sách dịch vụ",
+    NO_RESULT: (keyword) => `Không tìm thấy dịch vụ phù hợp với “${keyword}”`,
+    NO_RESULT_HINT: "Thử từ khóa khác, ví dụ: niềng răng, implant, răng sứ.",
+    CLEAR_SEARCH: "Xóa tìm kiếm",
+    TYPES_TITLE: "Các loại dịch vụ",
+    BENEFITS_TITLE: "Lợi ích sau điều trị",
+    STEPS_TITLE: "Quy trình điều trị",
+    STEP: (n) => `Bước ${n}`,
+};
+
+// Public "Đội ngũ bác sĩ" page (landing)
+export const PUBLIC_DOCTOR_TEXT = {
+    HOME: "Trang chủ",
+    TITLE: "Đội ngũ bác sĩ",
+    SEARCH_LABEL: "Tìm bác sĩ",
+    SEARCH_PLACEHOLDER: "Tìm theo tên bác sĩ",
+    LIST_LABEL: "Danh sách bác sĩ",
+    PAGINATION_LABEL: "Phân trang danh sách bác sĩ",
+    NO_RESULT: (keyword) => `Không tìm thấy bác sĩ phù hợp với “${keyword}”`,
+    CLEAR_SEARCH: "Xóa tìm kiếm",
+    CERTIFICATES_OF: (name) => `Chứng chỉ của ${name}`,
+    CERTIFICATE_POSITION: (n, total) => `Ảnh ${n}/${total}`,
+    OPEN_CERTIFICATE: (n, name) => `Xem ảnh chứng chỉ ${n} của ${name}`,
+    PREVIOUS: "Ảnh trước",
+    NEXT: "Ảnh sau",
+};
+
+// Header search results page (landing)
+export const PUBLIC_SEARCH_TEXT = {
+    HOME: "Trang chủ",
+    BREADCRUMB: "Tìm kiếm",
+    TITLE: "Tìm kiếm",
+    TITLE_FOR: (keyword) => `Kết quả tìm kiếm cho “${keyword}”`,
+    SEARCH_LABEL: "Tìm dịch vụ, bác sĩ",
+    SEARCH_PLACEHOLDER: "Tìm dịch vụ, bác sĩ",
+    ENTER_KEYWORD: "Nhập tên dịch vụ hoặc bác sĩ để tìm.",
+    SERVICES: "Dịch vụ",
+    DOCTORS: "Bác sĩ",
+    SEE_ALL: "Xem tất cả",
+    NO_SERVICE: "Không có dịch vụ phù hợp.",
+    NO_DOCTOR: "Không có bác sĩ phù hợp.",
+    NO_RESULT: (keyword) => `Không tìm thấy dịch vụ hay bác sĩ phù hợp với “${keyword}”`,
+    NO_RESULT_HINT: "Thử từ khóa khác, ví dụ: niềng răng, implant, tên bác sĩ.",
+};
+
+export const GUEST_BOOKING_TEXT = {
+    HOME: "Trang chủ",
+    TITLE: "Đặt lịch khám",
+    DESCRIPTION: "Chọn dịch vụ, ngày và ca khám phù hợp. Phòng khám sẽ gửi xác nhận lịch hẹn đến số điện thoại bạn cung cấp.",
+    HAS_ACCOUNT: "Đã có tài khoản?",
+    SIGN_IN: "Đăng nhập",
+    HAS_ACCOUNT_END: "để tự động điền thông tin từ hồ sơ của bạn.",
+    FULL_NAME: "Họ và tên",
+    FULL_NAME_PLACEHOLDER: "Nhập họ và tên",
+    GENDER: "Giới tính",
+    MALE: "Nam",
+    FEMALE: "Nữ",
+    BIRTHDATE: "Ngày sinh",
+    PHONE: "Số điện thoại",
+    PHONE_PLACEHOLDER: "0912 345 678",
+    ADDRESS: "Địa chỉ",
+    ADDRESS_PLACEHOLDER: "Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố",
+    EMAIL: "Email",
+    EMAIL_PLACEHOLDER: "Nhập email để nhận nhắc lịch",
+    OPTIONAL: "(không bắt buộc)",
+    ERR_FULL_NAME: "Vui lòng nhập họ và tên.",
+    ERR_FULL_NAME_LONG: "Họ và tên tối đa 100 ký tự.",
+    ERR_GENDER: "Vui lòng chọn giới tính.",
+    ERR_BIRTHDATE: "Vui lòng nhập ngày sinh.",
+    ERR_BIRTHDATE_FUTURE: "Ngày sinh không được sau ngày hôm nay.",
+    SUCCESS_TEXT: "Lịch hẹn của bạn đang chờ phòng khám xác nhận. Lễ tân sẽ báo cho bạn qua SMS hoặc email khi lịch được xác nhận. Muốn đổi hoặc hủy lịch, vui lòng gọi hotline.",
+    ERROR_PHONE_HAS_ACCOUNT: "Số điện thoại này đã có tài khoản nên hệ thống chưa nhận đặt lịch không cần đăng nhập. Bạn có thể đăng nhập để đặt lịch, hoặc gọi",
+    ERROR_HAS_UNFINISHED: "Số điện thoại này đang có một lịch hẹn chưa hoàn tất. Để đổi hoặc hủy lịch đó, vui lòng gọi",
+    ERROR_MULTIPLE_RECORDS: "Số điện thoại này gắn với nhiều hồ sơ bệnh nhân. Để đặt lịch, vui lòng gọi",
+    ERROR_PHONE: "Số điện thoại không hợp lệ. Vui lòng kiểm tra lại hoặc gọi",
+    ERROR_EMAIL: "Email không hợp lệ. Vui lòng kiểm tra lại hoặc gọi",
+};
+
 export const GENERIC_ERROR_MESSAGE = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
 export const APPOINTMENT_STATUS = {

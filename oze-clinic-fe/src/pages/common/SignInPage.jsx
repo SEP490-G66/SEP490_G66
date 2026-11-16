@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Card from "@/components/ui/Card";
 import { signIn } from "../../services/authService";
+import { USER_ROLES } from "../../utils/messages";
 import { ROUTES, getPostLoginRoute } from "../../utils/routes";
 import { isPasswordEmpty, isRequiredEmpty, normalizeIdentifier, requiredMessage, validateIdentifier } from "../../utils/validation";
 
@@ -30,6 +31,7 @@ const handleGoogleSignIn = () => { };
 
 const SignInPage = () => {
     const navigate = useNavigate();
+    const { state: locationState } = useLocation();
     const identifierRef = useRef(null);
     const passwordRef = useRef(null);
     const [values, setValues] = useState({ identifier: "", password: "" });
@@ -70,7 +72,8 @@ const SignInPage = () => {
             const result = await signIn({ identifier: normalizeIdentifier(values.identifier), password: values.password });
             if (result.success) {
                 toast.success("Đăng nhập thành công!");
-                navigate(getPostLoginRoute(result.data.role), { replace: true });
+                const backToBooking = result.data.role === USER_ROLES.PATIENT && locationState?.from === ROUTES.BOOK_APPOINTMENT;
+                navigate(backToBooking ? ROUTES.BOOK_APPOINTMENT : getPostLoginRoute(result.data.role), { replace: true });
                 return;
             }
             // TODO(spec): no system message is defined for a failure the API returns without a message.
