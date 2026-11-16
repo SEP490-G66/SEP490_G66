@@ -11,7 +11,11 @@ const failedResult = { success: false, code: null, data: null };
 
 const isUsable = (element) => element && !element.disabled && element.getAttribute("aria-disabled") !== "true";
 
-const useBookingForm = () => {
+// The patient booking by default. api: the four calls to use instead (the guest booking, see guestBookingService).
+// guest: { validate() → id of the first wrong field or null, payload() → the guest's details added to the booking }.
+const PATIENT_API = { getContext: getBookingContext, getDays: getBookingDays, getSlots: getBookingSlots, create: createBooking };
+
+const useBookingForm = ({ api = PATIENT_API, guest = null } = {}) => {
     const [state, dispatch] = useReducer(bookingReducer, null, () => createInitialState(getClinicToday()));
     const handledFocus = useRef(0);
     const interimFocus = useRef({ seq: 0, element: null });
@@ -29,11 +33,12 @@ const useBookingForm = () => {
 
     useEffect(() => {
         const controller = new AbortController();
-        getBookingContext({ signal: controller.signal }).then(
+        api.getContext({ signal: controller.signal }).then(
             (result) => dispatch({ type: "CONTEXT_LOADED", result }),
             (error) => error?.name !== ABORT && dispatch({ type: "CONTEXT_LOADED", result: failedResult })
         );
         return () => controller.abort();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- api is fixed for the page
     }, [state.contextVersion]);
 
     useEffect(() => {
@@ -41,21 +46,23 @@ const useBookingForm = () => {
         const controller = new AbortController();
         const requestedAt = Date.now();
         const { from, to } = getRange(today);
-        getBookingDays({ from, to, doctorId: state.doctorId, signal: controller.signal }).then(
+        api.getDays({ from, to, doctorId: state.doctorId, signal: controller.signal }).then(
             (result) => dispatch({ type: "RANGE_LOADED", key: rangeKey, result, requestedAt }),
             (error) => error?.name !== ABORT && dispatch({ type: "RANGE_LOADED", key: rangeKey, result: failedResult, requestedAt })
         );
         return () => controller.abort();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- api is fixed for the page
     }, [loadEnabled, rangeKey, today, state.doctorId]);
 
     useEffect(() => {
         if (!loadEnabled || !slotsKey) return undefined;
         const controller = new AbortController();
-        getBookingSlots({ date: state.day, doctorId: state.doctorId, signal: controller.signal }).then(
+        api.getSlots({ date: state.day, doctorId: state.doctorId, signal: controller.signal }).then(
             (result) => dispatch({ type: "SLOTS_LOADED", key: slotsKey, result }),
             (error) => error?.name !== ABORT && dispatch({ type: "SLOTS_LOADED", key: slotsKey, result: failedResult })
         );
         return () => controller.abort();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- api is fixed for the page
     }, [loadEnabled, slotsKey, state.day, state.doctorId]);
 
     useLayoutEffect(() => {
@@ -89,11 +96,14 @@ const useBookingForm = () => {
         const pending = getPendingSelection(services, state.items, state.pickService, state.pickVariant);
         const serviceError = pending ? BOOKING_TEXT.SERVICE_PENDING(pending) : state.items.length ? null : BOOKING_TEXT.SERVICE_REQUIRED;
         const slotError = state.slot ? null : BOOKING_TEXT.SLOT_REQUIRED;
-        if (serviceError || slotError) {
+        // The guest's details come first on the page, so a wrong one gets the focus first
+        const guestField = guest ? guest.validate() : null;
+        if (serviceError || slotError || guestField) {
             const firstSlot = state.slots.key === slotsKey ? state.slots.data?.[0] : null;
             let focus = [BOOKING_IDS.SERVICE];
             if (pending) focus = [BOOKING_IDS.ADD_SERVICE, BOOKING_IDS.VARIANT, BOOKING_IDS.SERVICE];
             else if (!serviceError) focus = [firstSlot ? slotId(firstSlot.slotStart) : BOOKING_IDS.SUBMIT, BOOKING_IDS.SUBMIT];
+            if (guestField) focus = [guestField];
             dispatch({ type: "VALIDATE", serviceError, slotError, focus });
             return;
         }
@@ -101,7 +111,7 @@ const useBookingForm = () => {
         sending.current = true;
         dispatch({ type: "SUBMIT_START" });
         const payload = buildBookingPayload({ items: state.items, services, date: state.day, slotStart: state.slot, doctorId: state.doctorId, note: state.note });
-        const result = await createBooking(payload).catch(() => failedResult);
+        const result = await api.create(guest ? { ...payload, ...guest.payload() } : payload).catch(() => failedResult);
         sending.current = false;
         dispatch({ type: "SUBMIT_DONE", result, today: getClinicToday(), snapshot });
         if (result.success) {
@@ -110,7 +120,7 @@ const useBookingForm = () => {
         }
         const servicesGone = result.code === BOOKING_ERROR_CODE.VARIANT_INACTIVE;
         if (!servicesGone && result.code !== BOOKING_ERROR_CODE.HAS_UNFINISHED) return;
-        const context = await getBookingContext().catch(() => failedResult);
+        const context = await api.getContext().catch(() => failedResult);
         if (servicesGone) {
             if (context.success) dispatch({ type: "SERVICES_RELOADED", services: context.data.services });
             return;

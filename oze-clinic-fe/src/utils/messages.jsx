@@ -198,6 +198,41 @@ export const PUBLIC_SEARCH_TEXT = {
     NO_RESULT_HINT: "Thử từ khóa khác, ví dụ: niềng răng, implant, tên bác sĩ.",
 };
 
+// Booking for a guest (no account) on /book-appointment; the schedule part reuses BOOKING_TEXT
+export const GUEST_BOOKING_TEXT = {
+    HOME: "Trang chủ",
+    TITLE: "Đặt lịch khám",
+    DESCRIPTION: "Chọn dịch vụ, ngày và ca khám phù hợp. Phòng khám sẽ gửi xác nhận lịch hẹn đến số điện thoại bạn cung cấp.",
+    HAS_ACCOUNT: "Đã có tài khoản?",
+    SIGN_IN: "Đăng nhập",
+    HAS_ACCOUNT_END: "để tự động điền thông tin từ hồ sơ của bạn.",
+    FULL_NAME: "Họ và tên",
+    FULL_NAME_PLACEHOLDER: "Nhập họ và tên",
+    GENDER: "Giới tính",
+    MALE: "Nam",
+    FEMALE: "Nữ",
+    BIRTHDATE: "Ngày sinh",
+    PHONE: "Số điện thoại",
+    PHONE_PLACEHOLDER: "0912 345 678",
+    ADDRESS: "Địa chỉ",
+    ADDRESS_PLACEHOLDER: "Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố",
+    EMAIL: "Email",
+    EMAIL_PLACEHOLDER: "Nhập email để nhận nhắc lịch",
+    OPTIONAL: "(không bắt buộc)",
+    ERR_FULL_NAME: "Vui lòng nhập họ và tên.",
+    ERR_FULL_NAME_LONG: "Họ và tên tối đa 100 ký tự.",
+    ERR_GENDER: "Vui lòng chọn giới tính.",
+    ERR_BIRTHDATE: "Vui lòng nhập ngày sinh.",
+    ERR_BIRTHDATE_FUTURE: "Ngày sinh không được sau ngày hôm nay.",
+    SUCCESS_TEXT: "Lịch hẹn của bạn đang chờ phòng khám xác nhận. Lễ tân sẽ báo cho bạn qua SMS hoặc email khi lịch được xác nhận. Muốn đổi hoặc hủy lịch, vui lòng gọi hotline.",
+    // Shown before the hotline number
+    ERROR_PHONE_HAS_ACCOUNT: "Số điện thoại này đã có tài khoản nên hệ thống chưa nhận đặt lịch không cần đăng nhập. Bạn có thể đăng nhập để đặt lịch, hoặc gọi",
+    ERROR_HAS_UNFINISHED: "Số điện thoại này đang có một lịch hẹn chưa hoàn tất. Để đổi hoặc hủy lịch đó, vui lòng gọi",
+    ERROR_MULTIPLE_RECORDS: "Số điện thoại này gắn với nhiều hồ sơ bệnh nhân. Để đặt lịch, vui lòng gọi",
+    ERROR_PHONE: "Số điện thoại không hợp lệ. Vui lòng kiểm tra lại hoặc gọi",
+    ERROR_EMAIL: "Email không hợp lệ. Vui lòng kiểm tra lại hoặc gọi",
+};
+
 export const GENERIC_ERROR_MESSAGE = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
 export const APPOINTMENT_STATUS = {

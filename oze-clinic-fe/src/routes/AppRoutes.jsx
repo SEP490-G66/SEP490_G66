@@ -13,6 +13,7 @@ import ServiceDetail from "../pages/common/ServiceDetail";
 import ServiceList from "../pages/common/ServiceList";
 import DoctorList from "../pages/common/DoctorList";
 import SearchResults from "../pages/common/SearchResults";
+import GuestBookAppointment from "../pages/common/GuestBookAppointment";
 import DashboardPage from "../pages/common/DashboardPage";
 import ProfilePage from "../pages/common/ProfilePage";
 import ChangePasswordPage from "../pages/common/ChangePasswordPage";
@@ -127,7 +128,7 @@ const errorRoutes = [
 const sessionRoutes = [
     {
         path: ROUTES.BOOK_APPOINTMENT,
-        element: NOT_FOUND
+        element: <GuestBookAppointment />
     }
 ]
 
