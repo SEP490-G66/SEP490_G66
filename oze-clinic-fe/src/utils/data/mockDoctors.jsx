@@ -1,87 +1,95 @@
+import doctor1 from "@/assets/mock/doctors/doctor-1.png";
+import doctor2 from "@/assets/mock/doctors/doctor-2.png";
+import doctor3 from "@/assets/mock/doctors/doctor-3.png";
+import doctor4 from "@/assets/mock/doctors/doctor-4.png";
+import doctor5 from "@/assets/mock/doctors/doctor-5.png";
 import placeholderImage from "@/assets/placeholder/placeholder.svg";
 
 const toCertificateImages = (fullName, images) =>
     images.map((imageUrl, index) => ({ imageUrl, alt: `Chứng chỉ ${index + 1} của ${fullName}` }));
 
+const CERTIFICATE_PLACEHOLDERS = [placeholderImage, placeholderImage, placeholderImage, placeholderImage];
+
+// Doctors from the BE sample data (SampleDataSeeder): id = staff id, name and license number match the database.
 export const MOCK_DOCTORS = [
     {
-        id: 1,
-        fullName: "Đinh Vạn Trung",
-        displayTitle: "Phó Giáo sư – Tiến sĩ",
-        position: "Giám đốc chuyên môn",
-        introduction:
-            "Trên cương vị Chủ tịch Hội đồng Chuyên môn Nha khoa Oze, PGS.TS Đinh Vạn Trung trực tiếp tham gia thăm khám, hội chẩn và định hướng phương án cho những trường hợp cần phối hợp chuyên sâu. Đồng thời, PGS.TS Đinh Vạn Trung còn dành nhiều tâm huyết cho việc xây dựng, đào tạo và hỗ trợ phát triển năng lực cho đội ngũ bác sĩ trẻ, góp phần duy trì chất lượng dịch vụ nhất quán tại Nha khoa Oze.",
-        certificateLines: [
-            "Tốt nghiệp Học viện Quân y, quân hàm Đại tá",
-            "Chức danh Phó Giáo sư ngành Y học do Bộ Giáo dục và Đào tạo công nhận",
-            "Học vị Tiến sĩ Y học do Bộ Giáo dục và Đào tạo công nhận",
-            "Chứng nhận \"Bác sĩ cao cấp\" do Bộ Quốc phòng trao tặng",
-        ],
-        imageUrl: placeholderImage,
-        certificateImages: toCertificateImages("Đinh Vạn Trung", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
-    },
-    {
-        id: 2,
-        fullName: "Phạm Phương Anh",
+        id: 12,
+        fullName: "Trần Minh Khoa",
         displayTitle: "Bác sĩ",
         position: "Bác sĩ chuyên môn",
         introduction:
-            "Với nền tảng chuyên môn được đào tạo bài bản cùng định hướng điều trị dựa trên tình trạng thực tế của từng khách hàng, BS. Phạm Phương Anh luôn hướng đến việc mang lại giải pháp phù hợp, tư vấn rõ ràng và trải nghiệm điều trị an tâm.",
+            "BS. Trần Minh Khoa là bác sĩ Răng hàm mặt tại Nha khoa Oze, phụ trách thăm khám tổng quát, điều trị nội nha và tư vấn phục hình. Bác sĩ luôn giải thích rõ tình trạng răng miệng và các phương án điều trị để khách hàng an tâm lựa chọn.",
         certificateLines: [
-            "Tốt nghiệp Đại học Y",
-            "Chứng chỉ Cấy ghép Implant Nha khoa do Viện Đào tạo Răng Hàm Mặt Đại Học Y Hà Nội",
-            "Chứng chỉ Chỉnh hình răng mặt do Viện Đào tạo Răng Hàm Mặt Đại Học Y Hà Nội",
-            "Giấy phép hành nghề Khám bệnh, chữa bệnh do Sở Y tế Thành phố Hà Nội cấp",
+            "Tốt nghiệp Bác sĩ Răng hàm mặt",
+            "Chứng chỉ Nội nha và Phục hình răng sứ",
+            "Thường xuyên tham gia các hội thảo chuyên ngành Răng hàm mặt",
+            "Giấy phép hành nghề số 001234/HNO-CCHN",
         ],
-        imageUrl: placeholderImage,
-        certificateImages: toCertificateImages("Phạm Phương Anh", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
+        imageUrl: doctor1,
+        certificateImages: toCertificateImages("Trần Minh Khoa", CERTIFICATE_PLACEHOLDERS),
     },
     {
-        id: 3,
-        fullName: "Lê Thị Thảo",
+        id: 15,
+        fullName: "Lê Thu Hà",
         displayTitle: "Bác sĩ",
         position: "Bác sĩ chuyên môn",
         introduction:
-            "Với nền tảng chuyên môn vững vàng và sự tận tâm trong từng ca điều trị, bác sĩ Lê Thị Thảo luôn chú trọng xây dựng phác đồ cá nhân hóa, phù hợp với tình trạng và nhu cầu của mỗi khách hàng, hướng đến sự hài hòa giữa sức khỏe răng miệng, chức năng ăn nhai và thẩm mỹ.",
+            "BS. Lê Thu Hà là bác sĩ Răng hàm mặt tại Nha khoa Oze, có nhiều kinh nghiệm trong điều trị nha chu, cấy ghép Implant và bọc răng sứ. Bác sĩ chú trọng xây dựng phác đồ phù hợp với tình trạng và nhu cầu của từng khách hàng.",
         certificateLines: [
-            "Tốt nghiệp Đại học Y",
-            "Chứng chỉ Implant Nha khoa cơ bản do Trường Đại học Y Dược, Đại học Quốc Gia Hà Nội cấp",
-            "Chứng chỉ Chỉnh hình răng mặt cơ bản do Trường Đại học Y dược - Đại học Thái Nguyên cấp",
-            "Giấy phép hành nghề Khám bệnh, chữa bệnh do Sở Y tế Thành phố Hà Nội cấp",
+            "Tốt nghiệp Bác sĩ Răng hàm mặt",
+            "Chứng chỉ Cấy ghép Implant nha khoa",
+            "Chứng chỉ Điều trị nha chu",
+            "Giấy phép hành nghề số 002345/HNO-CCHN",
         ],
-        imageUrl: placeholderImage,
-        certificateImages: toCertificateImages("Lê Thị Thảo", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
+        imageUrl: doctor5,
+        certificateImages: toCertificateImages("Lê Thu Hà", CERTIFICATE_PLACEHOLDERS),
     },
     {
-        id: 4,
-        fullName: "Nguyễn Đài Trang",
+        id: 18,
+        fullName: "Ngô Văn Đức",
         displayTitle: "Bác sĩ",
         position: "Bác sĩ chuyên môn",
         introduction:
-            "Với nền tảng được đào tạo chuyên sâu, BS. Nguyễn Đài Trang hiện đang là Bác sĩ chuyên môn tại Nha khoa Oze, với định hướng phát triển chuyên môn cùng sự cẩn trọng trong từng bước thăm khám và điều trị, BS. Nguyễn Đài Trang luôn chú trọng lắng nghe nhu cầu, đánh giá tình trạng thực tế và tư vấn giải pháp phù hợp cho từng khách hàng.",
+            "BS. Ngô Văn Đức là bác sĩ Răng hàm mặt tại Nha khoa Oze, tập trung vào tiểu phẫu nhổ răng khôn và điều trị các bệnh lý răng miệng thường gặp. Bác sĩ luôn cẩn trọng trong từng bước thăm khám để quá trình điều trị nhẹ nhàng và an toàn.",
         certificateLines: [
-            "Tốt nghiệp Đại học Y Hà Nội",
-            "Chứng chỉ Implant nha khoa cơ bản do Trường Đại học Y Dược, Đại học Quốc Gia Hà Nội cấp",
-            "Chứng chỉ Chỉnh Hình Răng mặt do Viện Đào tạo Răng Hàm Mặt - Trường Đại học Y Hà Nội cấp",
-            "Giấy phép hành nghề Khám bệnh, chữa bệnh do Sở Y tế Thành phố Hà Nội cấp",
+            "Tốt nghiệp Bác sĩ Răng hàm mặt",
+            "Chứng chỉ Phẫu thuật trong miệng",
+            "Liên tục cập nhật kỹ thuật và phương pháp điều trị mới",
+            "Giấy phép hành nghề số 003456/HNO-CCHN",
         ],
-        imageUrl: placeholderImage,
-        certificateImages: toCertificateImages("Nguyễn Đài Trang", [placeholderImage, placeholderImage, placeholderImage, placeholderImage]),
+        imageUrl: doctor3,
+        certificateImages: toCertificateImages("Ngô Văn Đức", CERTIFICATE_PLACEHOLDERS),
     },
     {
-        id: 5,
-        fullName: "Nguyễn Thị Cẩm Vân",
+        id: 30,
+        fullName: "Phan Ngọc Ánh",
         displayTitle: "Bác sĩ",
         position: "Bác sĩ chuyên môn",
         introduction:
-            "BS. Nguyễn Thị Cẩm Vân hiện là Bác sĩ chuyên môn tại Nha khoa Oze, luôn chú trọng nâng cao kiến thức và cập nhật những phương pháp điều trị mới để mang đến trải nghiệm chăm sóc răng miệng ngày càng chất lượng cho khách hàng.",
+            "BS. Phan Ngọc Ánh là bác sĩ Răng hàm mặt tại Nha khoa Oze, theo đuổi lĩnh vực chỉnh nha và nha khoa thẩm mỹ. Bác sĩ luôn lắng nghe mong muốn của khách hàng để mang lại nụ cười hài hòa, tự nhiên.",
         certificateLines: [
-            "Tốt nghiệp Đại học Y",
-            "Giấy phép hành nghề Khám bệnh, chữa bệnh do Sở Y tế Thành phố Hà Nội cấp",
-            "Thường xuyên tham gia các hội thảo, chương trình đào tạo chuyên ngành Răng Hàm Mặt trong nước",
-            "Liên tục cập nhật kiến thức, kỹ thuật và phương pháp điều trị mới nhằm nâng cao chất lượng chuyên môn",
+            "Tốt nghiệp Bác sĩ Răng hàm mặt",
+            "Chứng chỉ Chỉnh hình răng mặt",
+            "Chứng chỉ Nha khoa thẩm mỹ",
+            "Giấy phép hành nghề số 004567/HNO-CCHN",
         ],
-        imageUrl: placeholderImage,
-        certificateImages: toCertificateImages("Nguyễn Thị Cẩm Vân", [placeholderImage, placeholderImage]),
+        imageUrl: doctor2,
+        certificateImages: toCertificateImages("Phan Ngọc Ánh", CERTIFICATE_PLACEHOLDERS),
+    },
+    {
+        id: 39,
+        fullName: "Đặng Quốc Huy",
+        displayTitle: "Bác sĩ",
+        position: "Bác sĩ chuyên môn",
+        introduction:
+            "BS. Đặng Quốc Huy là bác sĩ Răng hàm mặt tại Nha khoa Oze, có kinh nghiệm khám và điều trị răng miệng cho cả người lớn và trẻ em. Bác sĩ đề cao sự tận tâm, giúp khách hàng thoải mái trong suốt quá trình điều trị.",
+        certificateLines: [
+            "Tốt nghiệp Bác sĩ Răng hàm mặt",
+            "Chứng chỉ Răng trẻ em",
+            "Thường xuyên tham gia các chương trình đào tạo chuyên ngành trong nước",
+            "Giấy phép hành nghề số 005678/HNO-CCHN",
+        ],
+        imageUrl: doctor4,
+        certificateImages: toCertificateImages("Đặng Quốc Huy", CERTIFICATE_PLACEHOLDERS),
     },
 ];
