@@ -1,0 +1,83 @@
+# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# More GitHub Actions for Azure: https://github.com/Azure/actions
+
+
+name: Build and deploy OZE X-Ray Simulator to Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'oze-xray-simulator/**'
+      - '.github/workflows/main_oze-xray-simulator-g66.yml'
+
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: oze-xray-simulator-g66
+  PROJECT_PATH: ./oze-xray-simulator/src/OZE.XRaySimulator/OZE.XRaySimulator.csproj
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore "${{ env.PROJECT_PATH }}"
+
+      - name: Build simulator
+        run: dotnet build "${{ env.PROJECT_PATH }}" --configuration Release --no-restore
+
+      - name: Publish simulator
+        run: dotnet publish "${{ env.PROJECT_PATH }}" --configuration Release --no-build --output "${{ github.workspace }}/publish"
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-app
+          path: ${{ github.workspace }}/publish
+          if-no-files-found: error
+
+  deploy:
+    runs-on: windows-latest
+    needs: build
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download deployment artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: simulator-app
+          path: ./publish
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_7E189BC736D046E882526EC34771E3E3 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1EA5B94088404DDBB6762C571697D4BF }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_4B8B4A82E80D4357834C820F2A977DC8 }}
+
+      - name: Deploy simulator to Azure
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          slot-name: Production
+          package: ./publish
+
+          
