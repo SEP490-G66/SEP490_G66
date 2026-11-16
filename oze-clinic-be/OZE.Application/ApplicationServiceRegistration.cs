@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using OZE.Application.Interfaces;
 using OZE.Application.Services;
+using OZE.Common.Constants;
 using OZE.Common.Models;
 
 namespace OZE.Application
@@ -63,6 +65,35 @@ namespace OZE.Application
             services.AddScoped<IDoctorScheduleService, DoctorScheduleService>();
             services.AddScoped<IMedicalRecordService, MedicalRecordService>();
             services.AddScoped<IImagingRequestService, ImagingRequestService>();
+            services.AddScoped<IImagingCaptureService, ImagingCaptureService>();
+            services.AddSingleton<IImagingFileStore, LocalImagingFileStore>();
+            // X-ray simulator: XRaySimulator:BaseUrl and XRaySimulator:ApiKey; a development machine falls back to the simulator's own defaults
+            services.AddHttpClient<ISimulatorClient, SimulatorClient>((provider, client) =>
+            {
+                var isDevelopment = provider.GetRequiredService<IHostEnvironment>().IsDevelopment();
+                var baseUrl = configuration[ImagingCaptureConstants.BaseUrlConfigKey];
+                if (string.IsNullOrWhiteSpace(baseUrl))
+                {
+                    baseUrl = ImagingCaptureConstants.DevelopmentBaseUrl;
+                }
+
+                var apiKey = configuration[ImagingCaptureConstants.ApiKeyConfigKey];
+                if (string.IsNullOrWhiteSpace(apiKey) && isDevelopment)
+                {
+                    apiKey = ImagingCaptureConstants.DevelopmentApiKey;
+                }
+
+                client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+                }
+
+                var timeout = int.TryParse(configuration[ImagingCaptureConstants.TimeoutSecondsConfigKey], out var seconds) && seconds > 0
+                    ? seconds
+                    : ImagingCaptureConstants.DefaultTimeoutSeconds;
+                client.Timeout = TimeSpan.FromSeconds(timeout);
+            });
             services.AddScoped<IExaminationService, ExaminationService>();
             services.AddScoped<IQueueService, QueueService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
