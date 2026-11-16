@@ -63,7 +63,6 @@ namespace OZE.Application.Services
                     ServiceId = s.Id,
                     ServiceName = s.ServiceName,
                     Description = s.Description,
-                    ImageUrl = ServiceImageHelper.ServiceImageUrl(s.Id, s.ImageUpdatedAt),
                     ReferencePrice = s.ReferencePrice,
                     EstimatedMinutes = s.EstimatedMinutes,
                     IsMandatory = s.ServiceCode == examServiceCode,
@@ -72,7 +71,6 @@ namespace OZE.Application.Services
                         VariantId = v.Id,
                         VariantName = v.VariantName,
                         Description = v.Description,
-                        ImageUrl = ServiceImageHelper.VariantImageUrl(s.Id, v.Id, v.ImageUpdatedAt),
                         ReferencePrice = v.ReferencePrice,
                         EstimatedMinutes = v.EstimatedMinutes
                     }).ToList()

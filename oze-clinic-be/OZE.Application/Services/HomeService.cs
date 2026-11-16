@@ -1,5 +1,4 @@
-﻿using OZE.Application.Helpers;
-using OZE.Application.Interfaces;
+﻿using OZE.Application.Interfaces;
 using OZE.Common.Models;
 using OZE.Common.Models.Base;
 using OZE.Domain.Entities;
@@ -68,7 +67,6 @@ namespace OZE.Application.Services
                 Id = service.Id,
                 ServiceName = service.ServiceName,
                 Description = service.Description,
-                ImageUrl = ServiceImageHelper.ServiceImageUrl(service.Id, service.ImageUpdatedAt),
                 ReferencePrice = service.ReferencePrice,
                 EstimatedMinutes = service.EstimatedMinutes
             };
