@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import ConfirmActionDialog from "@/components/billing/ConfirmActionDialog";
 import StepActionBar from "@/components/examination/StepActionBar";
@@ -82,6 +82,15 @@ const ImagingCapturePage = () => {
 
     // Bumped to reload the queue at once (after "Hoàn thành"); otherwise it refreshes every REFRESH_MS.
     const [version, setVersion] = useState(0);
+    // Orders with a capture running or done, read by the queue refresh
+    const heldIds = useRef(new Set());
+    useEffect(() => {
+        heldIds.current = new Set(
+            Object.entries(captures)
+                .filter(([, item]) => item.state === CAPTURE_STATES.CAPTURING || item.state === CAPTURE_STATES.COMPLETED)
+                .map(([id]) => Number(id)),
+        );
+    }, [captures]);
 
     useEffect(() => {
         let active = true;
@@ -90,7 +99,12 @@ const ImagingCapturePage = () => {
                 if (!active) return;
                 setLoading(false);
                 if (response.success) {
-                    setRows(response.data);
+                    // An order whose capture is running or done stays on screen until "Hoàn thành", even though
+                    // the backend completes it (and drops it from the queue) as soon as the device returns the pictures.
+                    setRows((current) => {
+                        const held = current.filter((row) => heldIds.current.has(row.id) && !response.data.some((item) => item.id === row.id));
+                        return [...response.data, ...held];
+                    });
                     setLoadError(null);
                 } else {
                     setLoadError(response.message || "Không tải được hàng chờ chụp.");
@@ -125,7 +139,7 @@ const ImagingCapturePage = () => {
         if (!capturingKey) return undefined;
         const timer = setInterval(async () => {
             for (const [id, item] of capturing) {
-                const response = await getCapture(item.session.id);
+                const response = await getCapture(Number(id), item.session.id);
                 setCaptures((current) => {
                     const now = current[id];
                     if (!now || now.state !== CAPTURE_STATES.CAPTURING || now.session.id !== item.session.id) return current;
@@ -166,7 +180,7 @@ const ImagingCapturePage = () => {
 
     const stop = async () => {
         setBusy(true);
-        const response = await cancelCapture(capture.session.id);
+        const response = await cancelCapture(order.id, capture.session.id);
         setBusy(false);
         if (response.success) updateCapture(order, { state: CAPTURE_STATES.READY, session: {} });
         else toast.error(response.message);
