@@ -28,8 +28,6 @@ namespace OZE.Persistence.DbContexts
         public DbSet<Room> Rooms => Set<Room>();
         public DbSet<ServiceVariant> ServiceVariants => Set<ServiceVariant>();
         public DbSet<Service> Services => Set<Service>();
-        public DbSet<ServiceImage> ServiceImages => Set<ServiceImage>();
-        public DbSet<ServiceVariantImage> ServiceVariantImages => Set<ServiceVariantImage>();
         public DbSet<SystemConfiguration> SystemConfigurations => Set<SystemConfiguration>();
 
         // Patient Journey
