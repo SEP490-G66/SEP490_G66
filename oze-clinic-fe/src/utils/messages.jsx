@@ -145,6 +145,24 @@ export const GUEST_HEADER_TEXT = {
     DRAWER_LABEL: "Menu",
 };
 
+// Public "Dịch vụ" pages (landing)
+export const PUBLIC_SERVICE_TEXT = {
+    HOME: "Trang chủ",
+    SERVICES: "Dịch vụ",
+    LIST_TITLE: "Danh sách dịch vụ",
+    SEARCH_LABEL: "Tìm dịch vụ",
+    SEARCH_PLACEHOLDER: "Tìm theo tên dịch vụ",
+    LIST_LABEL: "Danh sách dịch vụ",
+    PAGINATION_LABEL: "Phân trang danh sách dịch vụ",
+    NO_RESULT: (keyword) => `Không tìm thấy dịch vụ phù hợp với “${keyword}”`,
+    NO_RESULT_HINT: "Thử từ khóa khác, ví dụ: niềng răng, implant, răng sứ.",
+    CLEAR_SEARCH: "Xóa tìm kiếm",
+    TYPES_TITLE: "Các loại dịch vụ",
+    BENEFITS_TITLE: "Lợi ích sau điều trị",
+    STEPS_TITLE: "Quy trình điều trị",
+    STEP: (n) => `Bước ${n}`,
+};
+
 export const GENERIC_ERROR_MESSAGE = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
 export const APPOINTMENT_STATUS = {

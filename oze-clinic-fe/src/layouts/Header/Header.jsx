@@ -7,7 +7,7 @@ import Avatar from "@/components/ui/Avatar";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { signOut } from "@/services/authService";
-import { getDentalServices } from "@/services/dentalService";
+import { getPublicServices } from "@/services/dentalService";
 import {
     getNotifications,
     getUnreadNotificationCount,
@@ -16,7 +16,7 @@ import {
 } from "@/services/notificationService";
 import { cx } from "@/utils/cx";
 import { CLINIC_HOTLINE, GUEST_HEADER_TEXT as TEXT, MESSAGES, USER_ROLES } from "@/utils/messages";
-import { ROUTES, getServiceDetailRoute } from "@/utils/routes";
+import { ROUTES, getServiceDetailRoute, getServiceSearchRoute } from "@/utils/routes";
 
 const HOVER_CLOSE_DELAY_MS = 150;
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), input:not([disabled])";
@@ -43,8 +43,6 @@ const ABOUT_ITEMS = [
     { key: "doctors", label: TEXT.DOCTORS, to: ROUTES.DOCTORS },
 ];
 
-const preventSubmit = (event) => event.preventDefault();
-
 const isMouse = (event) => event.pointerType === "mouse";
 
 const isCurrentPath = (to, pathname) => matchPath({ path: to, end: true }, pathname) !== null;
@@ -59,9 +57,9 @@ const focusItem = (list, target) => {
 
 const toServiceItems = (services) => [
     ...services.map((service) => ({
-        key: `service-${service.id}`,
+        key: `service-${service.slug}`,
         label: service.name,
-        to: getServiceDetailRoute(service.id),
+        to: getServiceDetailRoute(service.slug),
     })),
     { key: "all-services", label: TEXT.ALL_SERVICES, to: ROUTES.SERVICES },
 ];
@@ -112,16 +110,25 @@ const useDismiss = ({ open, containerRef, returnFocusRef, onDismiss }) => {
     return { onKeyDown: handleKeyDown, onBlur: handleBlur };
 };
 
+// Searches the services for now (/services?q=); doctors are added with the doctors page.
 const SearchForm = ({ compact = false, className }) => {
     const inputId = useId();
+    const navigate = useNavigate();
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        const keyword = String(new FormData(event.currentTarget).get("q") ?? "").trim();
+        navigate(getServiceSearchRoute(keyword));
+    };
 
     return (
-        <form role="search" className={cx("items-center gap-2", className)} onSubmit={preventSubmit}>
+        <form role="search" className={cx("items-center gap-2", className)} onSubmit={handleSubmit}>
             <label htmlFor={inputId} className="sr-only">
                 {TEXT.SEARCH_LABEL}
             </label>
             <input
                 id={inputId}
+                name="q"
                 type="search"
                 placeholder={TEXT.SEARCH_PLACEHOLDER}
                 className={cx("input min-w-0 flex-1", compact && "h-8")}
@@ -756,12 +763,11 @@ const TopBar = ({ onToggleSidebar, ...toggleProps }) => (
 const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) => {
     const location = useLocation();
     const { token, role } = useSession();
-    const { value: servicesResult } = useAsync(getDentalServices, []);
     const [openMenu, setOpenMenu] = useState(null);
     const [drawerKey, setDrawerKey] = useState(null);
     const menuButtonRef = useRef(null);
 
-    const serviceItems = toServiceItems(servicesResult?.success ? servicesResult.data : []);
+    const serviceItems = toServiceItems(getPublicServices());
     const openMenuId = openMenu?.key === location.key ? openMenu.id : null;
     const drawerOpen = drawerKey === location.key;
 

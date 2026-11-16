@@ -1,21 +1,28 @@
-import { MOCK_DENTAL_SERVICES } from "../utils/data/mockDentalServices";
-import { MOCK_SERVICES } from "../utils/data/mockService";
+import { PUBLIC_SERVICES } from "../utils/data/publicServices";
 
-const MOCK_DELAY_MS = 300;
+// Public "Dịch vụ" pages use fixed content (landing page), so these read the data file directly, without the API.
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Lower case, no Vietnamese accents (đ → d): "Niềng" and "nieng" match.
+export const toSearchText = (value) =>
+    (value ?? "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase()
+        .trim();
 
-export const getDentalServices = async () => {
-    await wait(MOCK_DELAY_MS);
+// Every service, featured first (the data file keeps that order).
+export const getPublicServices = () => PUBLIC_SERVICES;
 
-    return { success: true, message: null, data: MOCK_DENTAL_SERVICES, errors: null };
-};
+// The ones shown on the home page.
+export const getFeaturedServices = () => PUBLIC_SERVICES.filter((service) => service.featured);
 
-export const getServiceDetail = async (serviceId) => {
-    await wait(MOCK_DELAY_MS);
+export const getServiceBySlug = (slug) => PUBLIC_SERVICES.find((service) => service.slug === slug) ?? null;
 
-    const service = MOCK_SERVICES.find((item) => item.id === Number(serviceId));
-    if (!service) return { success: false, message: "Không tìm thấy dịch vụ.", data: null, errors: null };
-
-    return { success: true, message: null, data: service, errors: null };
+// Services whose name or short description contains the keyword (blank keyword = all).
+export const searchServices = (keyword) => {
+    const text = toSearchText(keyword);
+    if (!text) return PUBLIC_SERVICES;
+    return PUBLIC_SERVICES.filter((service) => toSearchText(`${service.name} ${service.summary}`).includes(text));
 };

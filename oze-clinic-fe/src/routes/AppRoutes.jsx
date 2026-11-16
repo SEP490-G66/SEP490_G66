@@ -10,6 +10,7 @@ import VerifyOtpPage from "../pages/common/VerifyOtpPage";
 import AboutUs from "../pages/common/homepage/AboutUs";
 import ContactPage from "../pages/common/ContactPage";
 import ServiceDetail from "../pages/common/ServiceDetail";
+import ServiceList from "../pages/common/ServiceList";
 import DashboardPage from "../pages/common/DashboardPage";
 import ProfilePage from "../pages/common/ProfilePage";
 import ChangePasswordPage from "../pages/common/ChangePasswordPage";
@@ -78,6 +79,10 @@ const routes = [
     {
         path: ROUTES.CONTACT,
         element: <ContactPage />
+    },
+    {
+        path: ROUTES.SERVICES,
+        element: <ServiceList />
     },
     {
         path: ROUTES.SERVICE_DETAIL,
