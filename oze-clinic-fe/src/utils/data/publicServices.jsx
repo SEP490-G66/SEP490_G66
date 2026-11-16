@@ -24,13 +24,6 @@ import {
     Wrench,
 } from "lucide-react";
 
-// Fixed content of the public "Dịch vụ" pages (landing page, no API).
-// Order = display order everywhere (menu, footer, /services). featured services come first and fill the home page;
-// the flag is internal only, nothing on screen marks them.
-//
-// Pictures are added later by the design team: put an imported image (or a URL) in imageUrl.
-// Recommended sizes: service card 1:1 (e.g. 600 × 600), page header 4:3 (e.g. 1200 × 900), type card 4:3 (e.g. 800 × 600).
-// While imageUrl is null the pages show an empty picture frame.
 export const PUBLIC_SERVICES = [
     {
         slug: "nieng-rang",
@@ -320,3 +313,5 @@ export const PUBLIC_SERVICES = [
         ],
     },
 ];
+
+export const FOOTER_SERVICE_SLUGS = ["nieng-rang", "trong-rang-implant", "nho-rang-khon"];

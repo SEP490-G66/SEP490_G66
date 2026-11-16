@@ -4,7 +4,7 @@ import { FaFacebookF, FaTiktok, FaYoutube } from "react-icons/fa";
 import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { getPublicServices } from "@/services/dentalService";
+import { getFooterServices } from "@/services/dentalService";
 import { getServiceDetailRoute } from "@/utils/routes";
 
 const PHONE_ID = "footer-consult-phone";
@@ -68,7 +68,7 @@ const Footer = () => {
                         Dịch vụ nha khoa
                     </h3>
                     <ul className="flex flex-col gap-1 sm:gap-2">
-                        {getPublicServices().map((service) => (
+                        {getFooterServices().map((service) => (
                             <li key={service.slug}>
                                 <Link
                                     to={getServiceDetailRoute(service.slug)}
