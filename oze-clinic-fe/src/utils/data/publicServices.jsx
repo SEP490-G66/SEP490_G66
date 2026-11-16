@@ -1,3 +1,13 @@
+import niengRangImage from "@/assets/services/oze_dich_vu_nieng_rang.png";
+import implantImage from "@/assets/services/oze_dich_vu_implant.png";
+import bocSuVeneerImage from "@/assets/services/oze_dich_vu_boc_su_veneer.png";
+import nhoRangKhonImage from "@/assets/services/oze_dich_vu_nho_rang_khon.png";
+import dieuTriTuyImage from "@/assets/services/oze_dich_vu_dieu_tri_tuy_tram_rang.png";
+import nhaChuImage from "@/assets/services/oze_dich_vu_nha_chu_lay_cao_rang.png";
+import nhaKhoaTreEmImage from "@/assets/services/oze_dich_vu_nha_khoa_tre_em.png";
+import rangGiaThaoLapImage from "@/assets/services/oze_dich_vu_rang_gia_thao_lap.png";
+import khamTongQuatImage from "@/assets/services/oze_dich_vu_kham_tong_quat.png";
+import tayTrangRangImage from "@/assets/services/oze_dich_vu_tay_trang_rang.png";
 import {
     Activity,
     AlignCenter,
@@ -29,7 +39,7 @@ export const PUBLIC_SERVICES = [
         slug: "nieng-rang",
         name: "Niềng răng",
         featured: true,
-        imageUrl: null,
+        imageUrl: niengRangImage,
         summary: "Dịch chuyển răng về đúng vị trí, cải thiện răng hô, móm, thưa, khấp khểnh và lệch khớp cắn.",
         intro:
             "Niềng răng (chỉnh nha) dùng mắc cài hoặc khay trong suốt tạo lực nhẹ, liên tục để dịch chuyển răng dần về đúng vị trí. Phương pháp này cải thiện các tình trạng răng hô, móm, thưa, khấp khểnh và lệch khớp cắn. Trước khi điều trị, bác sĩ thăm khám, chụp phim và lập kế hoạch riêng cho từng khách hàng, kể cả thời gian dự kiến của liệu trình.",
@@ -59,7 +69,7 @@ export const PUBLIC_SERVICES = [
         slug: "trong-rang-implant",
         name: "Trồng răng Implant",
         featured: true,
-        imageUrl: null,
+        imageUrl: implantImage,
         summary: "Thay thế răng đã mất bằng trụ Implant và răng sứ, ăn nhai chắc chắn như răng thật.",
         intro:
             "Trồng răng Implant thay thế chân răng đã mất bằng trụ Titanium đặt vào xương hàm, sau đó gắn răng sứ phía trên. Răng Implant đứng độc lập, không cần mài răng bên cạnh và giúp hạn chế tiêu xương hàm. Bác sĩ chụp phim, đánh giá xương hàm và tình trạng sức khỏe để chọn loại trụ và phương án phù hợp.",
@@ -90,7 +100,7 @@ export const PUBLIC_SERVICES = [
         slug: "boc-rang-su-veneer",
         name: "Bọc răng sứ – Veneer",
         featured: true,
-        imageUrl: null,
+        imageUrl: bocSuVeneerImage,
         summary: "Cải thiện màu sắc, hình dáng răng và bảo vệ răng yếu bằng mão sứ hoặc mặt dán sứ.",
         intro:
             "Bọc răng sứ phủ một mão sứ lên răng thật, còn Veneer là mặt dán sứ mỏng gắn lên mặt ngoài răng. Hai phương pháp này giúp cải thiện màu sắc, hình dáng và khe thưa, đồng thời bảo vệ răng yếu hoặc vỡ lớn. Bác sĩ tư vấn chất liệu và màu sứ phù hợp, ưu tiên giữ lại tối đa mô răng thật.",
@@ -120,7 +130,7 @@ export const PUBLIC_SERVICES = [
         slug: "nho-rang-khon",
         name: "Nhổ răng khôn",
         featured: true,
-        imageUrl: null,
+        imageUrl: nhoRangKhonImage,
         summary: "Nhổ răng khôn mọc lệch, mọc kẹt hoặc ngầm trong xương, hạn chế đau nhức và biến chứng.",
         intro:
             "Răng khôn (răng số 8) thường mọc muộn và dễ mọc lệch, mọc kẹt hoặc ngầm trong xương, gây đau nhức, sưng viêm và ảnh hưởng răng bên cạnh. Bác sĩ chụp phim để đánh giá vị trí chân răng và dây thần kinh trước khi lên phương án nhổ. Các trường hợp khó được thực hiện bằng kỹ thuật phẫu thuật, có giảm đau.",
@@ -150,7 +160,7 @@ export const PUBLIC_SERVICES = [
         slug: "dieu-tri-tuy-tram-rang",
         name: "Điều trị tủy – Trám răng",
         featured: false,
-        imageUrl: null,
+        imageUrl: dieuTriTuyImage,
         summary: "Điều trị răng sâu, viêm tủy và phục hồi răng mẻ, vỡ để giữ lại răng thật.",
         intro:
             "Khi răng bị sâu, mẻ hoặc viêm tủy, điều trị sớm giúp giữ lại răng thật và tránh đau nhức kéo dài. Trám răng phục hồi phần răng bị mất bằng vật liệu cùng màu răng. Với răng viêm tủy, bác sĩ làm sạch, trám kín hệ thống ống tủy rồi phục hồi thân răng.",
@@ -180,7 +190,7 @@ export const PUBLIC_SERVICES = [
         slug: "tay-trang-rang",
         name: "Tẩy trắng răng",
         featured: false,
-        imageUrl: null,
+        imageUrl: tayTrangRangImage,
         summary: "Làm sáng màu răng bị ố vàng do thực phẩm, thuốc lá hoặc tuổi tác.",
         intro:
             "Tẩy trắng răng dùng gel chuyên dụng làm sáng màu răng bị ố vàng do thực phẩm, đồ uống, thuốc lá hoặc tuổi tác. Có thể tẩy tại phòng khám để thấy kết quả nhanh, hoặc tẩy tại nhà bằng máng riêng theo hướng dẫn của bác sĩ. Bác sĩ kiểm tra răng và nướu trước khi tẩy để hạn chế ê buốt.",
@@ -207,7 +217,7 @@ export const PUBLIC_SERVICES = [
         slug: "nha-chu-lay-cao-rang",
         name: "Nha chu – Lấy cao răng",
         featured: false,
-        imageUrl: null,
+        imageUrl: nhaChuImage,
         summary: "Làm sạch cao răng và điều trị viêm lợi, viêm nha chu để giữ nướu khỏe.",
         intro:
             "Cao răng bám lâu ngày gây hôi miệng, viêm lợi và có thể dẫn đến viêm nha chu, tụt lợi, lung lay răng. Lấy cao răng định kỳ giúp làm sạch những vùng bàn chải không tới được. Với các trường hợp viêm nha chu, bác sĩ điều trị chuyên sâu để giữ răng và nướu khỏe mạnh.",
@@ -234,7 +244,7 @@ export const PUBLIC_SERVICES = [
         slug: "nha-khoa-tre-em",
         name: "Nha khoa trẻ em",
         featured: false,
-        imageUrl: null,
+        imageUrl: nhaKhoaTreEmImage,
         summary: "Chăm sóc, điều trị răng sữa và theo dõi sự phát triển răng của trẻ.",
         intro:
             "Răng sữa khỏe giúp trẻ ăn nhai tốt và giữ chỗ cho răng vĩnh viễn mọc đúng vị trí. Bác sĩ khám, điều trị sâu răng sữa và theo dõi sự phát triển răng, hàm của trẻ. Với trẻ khó hợp tác hoặc cần điều trị nhiều răng, có thể điều trị dưới gây mê theo chỉ định.",
@@ -263,7 +273,7 @@ export const PUBLIC_SERVICES = [
         slug: "rang-gia-thao-lap",
         name: "Răng giả tháo lắp",
         featured: false,
-        imageUrl: null,
+        imageUrl: rangGiaThaoLapImage,
         summary: "Phục hồi răng đã mất bằng hàm giả tháo lắp, chi phí hợp lý, dễ vệ sinh.",
         intro:
             "Răng giả tháo lắp phục hồi một hoặc nhiều răng đã mất bằng hàm có thể tháo ra khi vệ sinh. Đây là lựa chọn có chi phí hợp lý cho người mất nhiều răng hoặc chưa đủ điều kiện cấy Implant. Bác sĩ tư vấn loại hàm và loại răng phù hợp với tình trạng và nhu cầu của từng người.",
@@ -291,7 +301,7 @@ export const PUBLIC_SERVICES = [
         name: "Khám tổng quát & tư vấn",
         featured: false,
         hiddenInMenu: true,
-        imageUrl: null,
+        imageUrl: khamTongQuatImage,
         summary: "Kiểm tra sức khỏe răng miệng và tư vấn phương án điều trị phù hợp.",
         intro:
             "Khám tổng quát giúp phát hiện sớm sâu răng, viêm lợi và các vấn đề về khớp cắn khi còn dễ điều trị. Bác sĩ kiểm tra toàn bộ răng, nướu và chỉ định chụp phim khi cần. Sau khi khám, bác sĩ tư vấn phương án điều trị, thời gian và chi phí dự kiến.",
