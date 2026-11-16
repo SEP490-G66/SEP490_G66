@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link, NavLink, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Bell, BellOff, ChevronDown, ChevronLeft, ChevronRight, Info, Menu, PanelLeft, X } from "lucide-react";
-import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
+import LogoOze from "@/assets/logo/Logo.png";
 import Avatar from "@/components/ui/Avatar";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
@@ -364,7 +364,7 @@ const Drawer = ({ id, entries, onClose, returnFocusRef, signedIn = false }) => {
             <div className="utility-bar shrink-0">
                 <div className="container-public flex items-center justify-between gap-4">
                     <Link to={ROUTES.HOME} className="shrink-0">
-                        <img src={LogoOze} alt={TEXT.LOGO_ALT} className="h-5 w-auto" />
+                        <img src={LogoOze} alt={TEXT.LOGO_ALT} className="h-14 w-auto" />
                     </Link>
                     <button
                         ref={closeButtonRef}
@@ -822,7 +822,7 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
                 <div className={ROW_CLASS}>
                     <div className={ROW_START_CLASS}>
                         <Link to={ROUTES.HOME} className="shrink-0">
-                            <img src={LogoOze} alt={TEXT.LOGO_ALT} className="h-5 w-auto md:h-9" />
+                            <img src={LogoOze} alt={TEXT.LOGO_ALT} className="h-14 w-auto md:h-16" />
                         </Link>
                     </div>
                     <div className="hidden min-w-0 flex-1 justify-center md:flex lg:w-md lg:flex-none">

@@ -1,7 +1,7 @@
 import { MapPin, Phone, Clock, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaTiktok, FaYoutube } from "react-icons/fa";
-import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
+import LogoOze from "@/assets/logo/Logo.png";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { getFooterServices } from "@/services/dentalService";
@@ -34,7 +34,7 @@ const Footer = () => {
                     <img
                         src={LogoOze}
                         alt="Nha khoa Oze"
-                        className="h-auto w-44 object-contain sm:w-56"
+                        className="h-auto w-56 object-contain sm:w-72"
                         style={{ filter: "brightness(0) saturate(100%) invert(32%) sepia(87%) saturate(3015%) hue-rotate(213deg) brightness(97%) contrast(93%)" }}
                     />
                     <ul className="flex flex-col gap-4">

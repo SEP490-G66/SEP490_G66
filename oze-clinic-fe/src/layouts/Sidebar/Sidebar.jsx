@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { NavLink, matchPath, useLocation } from "react-router-dom";
 import { ChevronDown, X } from "lucide-react";
-import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
+import LogoOze from "@/assets/logo/Logo.png";
 import LogoOzeSquare from "@/assets/logo/Logo_OZE.png";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
@@ -115,7 +115,7 @@ const Brand = ({ collapsed }) => (
     <span
         role="img"
         aria-label={GUEST_HEADER_TEXT.LOGO_ALT}
-        className={cx("block shrink-0 bg-primary", collapsed ? "size-11" : "aspect-[1024/158] h-7")}
+        className={cx("block shrink-0 bg-primary", collapsed ? "size-11" : "aspect-[2170/725] h-14")}
         style={logoMaskStyle(collapsed ? LogoOzeSquare : LogoOze)}
     />
 );

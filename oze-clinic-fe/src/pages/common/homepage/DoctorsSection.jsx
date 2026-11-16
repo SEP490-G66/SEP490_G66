@@ -54,7 +54,7 @@ const DoctorsSection = () => {
             {loading && (
                 <>
                     <div className="card-public grid overflow-hidden p-0 md:grid-cols-3" aria-hidden="true">
-                        <div className="skeleton aspect-2/3 w-full rounded-none" />
+                        <div className="skeleton aspect-4/5 w-full rounded-none md:aspect-auto" />
                         <div className="flex flex-col gap-4 p-6 md:col-span-2 md:p-8">
                             <div className="skeleton h-9 w-2/3" />
                             <div className="skeleton h-5 w-40" />
@@ -64,7 +64,7 @@ const DoctorsSection = () => {
                     </div>
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12 lg:grid-cols-4" aria-hidden="true">
                         {SKELETON_VISIBILITY.map((visibility, index) => (
-                            <div key={index} className={`skeleton aspect-2/3 rounded-xl ${visibility}`} />
+                            <div key={index} className={`skeleton aspect-3/4 rounded-xl ${visibility}`} />
                         ))}
                     </div>
                 </>
