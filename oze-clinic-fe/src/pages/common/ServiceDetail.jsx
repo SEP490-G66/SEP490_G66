@@ -13,8 +13,12 @@ const BENEFITS_TITLE_ID = "service-benefits-title";
 const STEPS_TITLE_ID = "service-steps-title";
 const TYPES_TITLE_ID = "service-types-title";
 
-// 4 types fill one row of 4; other counts use rows of 3.
-const typeColumns = (count) => (count % 4 === 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-2 lg:grid-cols-3");
+// Columns that leave no half-empty row: 4 → 2/4, 3 → 3, 6 → 2/3.
+const typeColumns = (count) => {
+    if (count % 4 === 0) return "sm:grid-cols-2 lg:grid-cols-4";
+    if (count % 2 !== 0 && count % 3 === 0) return "sm:grid-cols-3";
+    return "sm:grid-cols-2 lg:grid-cols-3";
+};
 
 const TypesSection = ({ types }) => (
     <section aria-labelledby={TYPES_TITLE_ID} className={SECTION_CLASS}>
