@@ -4,9 +4,9 @@ import { MANUAL_UPLOAD_EXTENSIONS } from "@/utils/imagingRequest";
 
 // Imaging technician ("Chụp chiếu", "Lịch sử chụp chiếu"). Every call returns the ApiResponse shape
 // ({ success, message, data, errors }).
-// Real API: the queue and "Hoàn thành" (ImagingRequestsController), history (ImagingHistoryController).
-// TODO(api): capture and manual upload are still mocks here
-// (see oze-fe-docs/08-webhook-may-chup-xquang.md).
+// Real API: the queue and "Hoàn thành" (ImagingRequestsController), capture (ImagingCapturesController),
+// history (ImagingHistoryController).
+// TODO(api): manual upload is still a mock: the backend has no endpoint for it yet.
 
 const MESSAGES = [
     [/imaging request is Cancelled/i, "Bác sĩ đã huỷ chỉ định này."],
@@ -14,6 +14,14 @@ const MESSAGES = [
     [/Imaging request not found/i, "Không tìm thấy chỉ định chụp."],
     [/Status must be Completed or Cancelled/i, "Trạng thái lọc không hợp lệ."],
     [/start date must not be after the end date/i, "Ngày bắt đầu không được sau ngày kết thúc."],
+    [/X-ray device is not reachable/i, "Không kết nối được máy chụp. Vui lòng thử lại sau."],
+    [/X-ray device refused the capture/i, "Máy chụp từ chối lệnh chụp. Kiểm tra lại máy và thông số."],
+    [/X-ray device cannot take/i, "Máy chụp không hỗ trợ loại phim này. Vui lòng tải ảnh thủ công."],
+    [/capture is already running/i, "Chỉ định này đang có một lượt chụp chạy."],
+    [/Capture not found/i, "Không tìm thấy phiên chụp."],
+    [/Cannot cancel because the capture is/i, "Lượt chụp đã kết thúc, không huỷ được nữa."],
+    [/select an X-ray device/i, "Vui lòng chọn máy chụp."],
+    [/Number of images must be between/i, "Số ảnh phải từ 1 đến 10."],
 ];
 
 const translate = (response) => {
@@ -33,41 +41,61 @@ export const getImagingQueue = async () => {
 };
 
 // Marks the order done: the doctor is told and the patient goes back to the top of the exam queue.
-export const completeImagingRequest = async (id) => translate(await call(() => api.post(`/api/imaging-requests/${id}/complete`)));
+// After a capture on the device the backend has already completed the order when the pictures arrived: that counts as done.
+export const completeImagingRequest = async (id) => {
+    const response = await call(() => api.post(`/api/imaging-requests/${id}/complete`));
+    if (!response.success && /imaging request is Completed/i.test(response.message ?? "")) return success(null);
+    return translate(response);
+};
 
-// ---- TODO(api): mock capture, like oze-xray-simulator (≈3 s exposure + 3 s processing) ----
+// ---- Capture on the X-ray device (ImagingCapturesController; the backend talks to oze-xray-simulator) ----
 
-const CAPTURE_MS = 6000;
-const sessions = new Map();
+const CAPTURE_STATUS = { COMPLETED: "COMPLETED", FAILED: "FAILED", CANCELLED: "CANCELLED" };
 
-// POST api/imaging-requests/{id}/capture in the backend proposal. setup: { deviceId, imageCount, kv, ma, seconds }.
+const toSession = (data) => ({
+    id: data.simulationId,
+    requestId: data.imagingRequestId,
+    deviceId: data.deviceId,
+    imageCount: data.imageCount,
+    progress: data.progress ?? 0,
+    sentAt: data.startedAt,
+});
+
+// setup: { deviceId, imageCount, kv, ma, seconds }. data: the session { id, requestId, deviceId, imageCount, progress, sentAt }.
 export const startCapture = async (requestId, setup) => {
-    await wait(300);
-    const imageCount = Math.max(1, Number(setup.imageCount) || 1);
-    const session = { id: `SIM-${Date.now().toString(16).toUpperCase()}`, requestId, deviceId: setup.deviceId, imageCount, sentAt: new Date().toISOString() };
-    sessions.set(session.id, session);
-    return success({ ...session });
+    const body = {
+        deviceId: setup.deviceId,
+        imageCount: Math.max(1, Number(setup.imageCount) || 1),
+        kv: setup.kv ?? null,
+        ma: setup.ma ?? null,
+        exposureSeconds: setup.seconds ?? null,
+    };
+    const response = translate(await call(() => api.post(`/api/imaging-requests/${requestId}/captures`, body)));
+    return response.success ? { ...response, data: toSession(response.data) } : response;
 };
 
-// state: "capturing" until the device returns the images, then "completed" (or "cancelled").
-export const getCapture = async (sessionId) => {
-    const session = sessions.get(sessionId);
-    if (!session) return failure("Không tìm thấy phiên chụp.");
-    if (session.cancelled) return success({ ...session, state: "cancelled", images: [] });
-    const finished = Date.now() - new Date(session.sentAt).getTime() >= CAPTURE_MS;
-    if (!finished) return success({ ...session, state: "capturing", images: [] });
-    const finishedAt = new Date(new Date(session.sentAt).getTime() + CAPTURE_MS).toISOString();
-    const images = Array.from({ length: session.imageCount }, (_, index) => ({ id: `${session.id}-${index + 1}`, takenAt: finishedAt }));
-    return success({ ...session, state: "completed", finishedAt, images });
+// state: "capturing" (with progress) until the device returns the images, then "completed" (images loaded) or "cancelled".
+// A failed capture comes back as success: false with the device's reason.
+export const getCapture = async (requestId, sessionId) => {
+    const response = await call(() => api.get(`/api/imaging-requests/${requestId}/captures/${sessionId}`));
+    // 409: the device's "done" message was being saved at the same moment; the next poll reads the result
+    if (!response.success && response.status === 409) return success({ id: sessionId, state: "capturing", images: [] });
+    if (!response.success) return translate(response);
+
+    const data = response.data;
+    const session = toSession(data);
+    if (data.status === CAPTURE_STATUS.FAILED) return failure(data.failureMessage || "Máy chụp báo lỗi, vui lòng chụp lại.");
+    if (data.status === CAPTURE_STATUS.CANCELLED) return success({ ...session, state: "cancelled", images: [] });
+    if (data.status !== CAPTURE_STATUS.COMPLETED) return success({ ...session, state: "capturing", images: [] });
+
+    const images = await Promise.all(
+        (data.images ?? []).map((image) => loadPicture({ id: image.resultId, fileName: image.fileName, fileUrl: image.fileUrl, takenAt: data.completedAt })),
+    );
+    return success({ ...session, state: "completed", finishedAt: data.completedAt, images });
 };
 
-export const cancelCapture = async (sessionId) => {
-    await wait(200);
-    const session = sessions.get(sessionId);
-    if (!session) return failure("Không tìm thấy phiên chụp.");
-    session.cancelled = true;
-    return success(null, "Đã huỷ lệnh chụp.");
-};
+export const cancelCapture = async (requestId, sessionId) =>
+    translate(await call(() => api.post(`/api/imaging-requests/${requestId}/captures/${sessionId}/cancel`)));
 
 // "Tải ảnh thủ công". .jpg / .png get a local preview; a .dcm has none until the backend reads DICOM.
 export const uploadManualImages = async (requestId, { files }) => {
