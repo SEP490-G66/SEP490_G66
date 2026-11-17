@@ -3,13 +3,11 @@ import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { PUBLIC_DOCTOR_TEXT as TEXT } from "@/utils/messages";
 
-// Large view of a doctor's certificate pictures, with previous / next. index is the picture shown.
 const CertificateViewer = ({ doctorName, images, index, onIndexChange, onClose }) => {
     const image = images[index];
     const last = images.length - 1;
     const go = (target) => onIndexChange((target + images.length) % images.length);
 
-    // ← / → change the picture wherever the focus is in the dialog (Esc is handled by Modal)
     useEffect(() => {
         const handleKeyDown = (event) => {
             if (event.key === "ArrowLeft") onIndexChange((index - 1 + images.length) % images.length);

@@ -1,7 +1,7 @@
 import { SearchX } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
-import DoctorCompactCard from "@/components/public/DoctorCompactCard";
+import DoctorCompactCard from "@/components/doctor/DoctorCompactCard";
 import ImageCard from "@/components/ui/ImageCard";
 import SearchInput from "@/components/ui/SearchInput";
 import { searchServices, toSearchText } from "@/services/dentalService";
@@ -18,7 +18,7 @@ const BREADCRUMB = [{ label: TEXT.HOME, href: ROUTES.HOME }, { label: TEXT.BREAD
 
 const SectionHead = ({ id, title, count, to }) => (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id={id} className="font-heading text-heading-1 text-ink">
+        <h2 id={id} className="font-heading text-display-md text-ink">
             {title} <span className="num text-body-lg text-muted">({count})</span>
         </h2>
         {count > 0 && (
@@ -29,7 +29,6 @@ const SectionHead = ({ id, title, count, to }) => (
     </div>
 );
 
-// /search?q= — the header search: matching services and doctors on one page (fixed content).
 const SearchResults = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const keyword = searchParams.get("q") ?? "";
@@ -57,7 +56,7 @@ const SearchResults = () => {
 
             <section aria-labelledby={TITLE_ID} className="container-public flex flex-col gap-10 pb-12 md:pb-16">
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                    <h1 id={TITLE_ID} className="font-heading text-display-section text-ink">
+                    <h1 id={TITLE_ID} className="break-words font-heading text-display-md text-ink md:text-display-lg">
                         {blank ? TEXT.TITLE : TEXT.TITLE_FOR(shown)}
                     </h1>
                     <SearchInput

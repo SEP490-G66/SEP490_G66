@@ -13,7 +13,6 @@ const BENEFITS_TITLE_ID = "service-benefits-title";
 const STEPS_TITLE_ID = "service-steps-title";
 const TYPES_TITLE_ID = "service-types-title";
 
-// Columns that leave no half-empty row: 4 → 2/4, 3 → 3, 6 → 2/3.
 const typeColumns = (count) => {
     if (count % 4 === 0) return "sm:grid-cols-2 lg:grid-cols-4";
     if (count % 2 !== 0 && count % 3 === 0) return "sm:grid-cols-3";
@@ -58,7 +57,6 @@ const StepsSection = ({ steps }) => (
         <ol className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 lg:flex lg:justify-center">
             {steps.map(({ icon: Icon, title }, index) => (
                 <li key={title} className="relative flex flex-col items-center gap-4 lg:flex-1">
-                    {/* Connector to the next step, only when the steps sit on one row. */}
                     {index < steps.length - 1 && (
                         <span
                             aria-hidden="true"
@@ -81,7 +79,6 @@ const StepsSection = ({ steps }) => (
     </section>
 );
 
-// /services/:serviceSlug — fixed content from utils/data/publicServices.jsx; an unknown slug goes to the 404 page.
 const ServiceDetail = () => {
     const { serviceSlug } = useParams();
     const service = getServiceBySlug(serviceSlug);
@@ -100,9 +97,8 @@ const ServiceDetail = () => {
                 <Breadcrumb items={breadcrumbItems} />
             </div>
 
-            {/* Service name, picture and introduction */}
             <section className="container-public flex flex-col gap-10 pb-12 md:pb-16">
-                <h1 className="text-center font-heading text-display-section text-ink">{service.name}</h1>
+                <h1 className="text-center font-heading text-display-md text-ink md:text-display-lg">{service.name}</h1>
                 <div className="grid grid-cols-1 items-center gap-8 md:grid-cols-2 md:gap-12">
                     {service.imageUrl ? (
                         <img
