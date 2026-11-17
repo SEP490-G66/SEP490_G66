@@ -1,14 +1,8 @@
 import { MapPin, Phone, Clock, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaTiktok, FaYoutube } from "react-icons/fa";
-<<<<<<< Updated upstream
 import LogoOze from "@/assets/logo/Logo.png";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
-=======
-import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
 import FooterConsultationForm from "@/components/contact/FooterConsultationForm";
->>>>>>> Stashed changes
 import { getFooterServices } from "@/services/dentalService";
 import { getServiceDetailRoute } from "@/utils/routes";
 
@@ -29,24 +23,9 @@ const HEADING = "font-heading text-heading-3 font-bold text-ink sm:text-heading-
 const Footer = () => {
     return (
         <footer className="@container bg-canvas px-4 py-10 sm:px-6 sm:py-16">
-<<<<<<< Updated upstream
-            <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-[1.25fr_1.5fr_1.25fr] @5xl:gap-12">
-                {/* Column 1: Logo & Info */}
-                <div className="flex flex-col gap-6 sm:gap-8">
-                    <img
-                        src={LogoOze}
-                        alt="Nha khoa Oze"
-                        className="h-auto w-56 object-contain sm:w-72"
-                        style={{ filter: "brightness(0) saturate(100%) invert(32%) sepia(87%) saturate(3015%) hue-rotate(213deg) brightness(97%) contrast(93%)" }}
-=======
             <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-8 @5xl:gap-12">
                 <div className="flex flex-col gap-6 sm:gap-8 @5xl:col-span-3">
-                    <img
-                        src={LogoOze}
-                        alt="Nha khoa Oze"
-                        className="logo-on-light h-auto w-44 object-contain sm:w-56"
->>>>>>> Stashed changes
-                    />
+                    <img src={LogoOze} alt="Nha khoa Oze" className="logo-on-light h-auto w-56 object-contain sm:w-72" />
                     <ul className="flex flex-col gap-4">
                         {CONTACTS.map(({ icon: Icon, text, href }) => {
                             const content = (
