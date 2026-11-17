@@ -25,7 +25,15 @@ const Footer = () => {
         <footer className="@container bg-canvas px-4 py-10 sm:px-6 sm:py-16">
             <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-8 @5xl:gap-12">
                 <div className="flex flex-col gap-6 sm:gap-8 @5xl:col-span-3">
+<<<<<<< HEAD
                     <img src={LogoOze} alt="Nha khoa Oze" className="logo-on-light h-auto w-56 object-contain sm:w-72" />
+=======
+                    <img
+                        src={LogoOze}
+                        alt="Nha khoa Oze"
+                        className="logo-on-light h-auto w-44 object-contain sm:w-56"
+                    />
+>>>>>>> main
                     <ul className="flex flex-col gap-4">
                         {CONTACTS.map(({ icon: Icon, text, href }) => {
                             const content = (

@@ -63,8 +63,16 @@ const EXAM_TABS = [
     },
     {
         step: STEP.EXAM,
-        render: ({ item, record, busy, handlers, goTo, onEnd }) => (
-            <ClinicalExamTab queueId={item.id} record={record} busy={busy} onExamChange={handlers.onExamChange} onEnd={onEnd} onComplete={() => goTo(STEP.PLAN)} />
+        render: ({ item, record, busy, handlers, goTo, onEnd, onReload }) => (
+            <ClinicalExamTab
+                queueId={item.id}
+                record={record}
+                busy={busy}
+                onExamChange={handlers.onExamChange}
+                onEnd={onEnd}
+                onComplete={() => goTo(STEP.PLAN)}
+                onXraySent={onReload}
+            />
         ),
     },
     {
@@ -129,7 +137,7 @@ const CalledView = ({ item, record }) => (
 
 // Exam in progress: the frame (back link, breadcrumb, stepper, patient card with timer, step heading) around the tab
 // being viewed (EXAM_TABS). handlers: { onHistoryChange, onExamChange, onPlanChange, onTreatmentChange, onPrescriptionChange }.
-const InExamView = ({ item, record, busy, handlers, onStep, onEnd }) => {
+const InExamView = ({ item, record, busy, handlers, onStep, onEnd, onReload }) => {
     const current = item.step ?? STEP.HISTORY;
     const [viewing, setViewing] = useState(current);
     const shown = Math.min(viewing, current);
@@ -164,7 +172,7 @@ const InExamView = ({ item, record, busy, handlers, onStep, onEnd }) => {
             />
             <StepHeading index={shown} total={EXAM_STEPS.length} title={EXAM_STEP_TITLES[shown]} nextLabel={NEXT_LABEL[shown] ?? EXAM_STEPS[shown + 1]} />
 
-            {EXAM_TABS.find((tab) => tab.step === shown)?.render({ item, record, busy, handlers, goTo, onEnd })}
+            {EXAM_TABS.find((tab) => tab.step === shown)?.render({ item, record, busy, handlers, goTo, onEnd, onReload })}
         </>
     );
 };
@@ -265,6 +273,7 @@ const ExaminationPage = () => {
                     handlers={recordHandlers}
                     onStep={(step) => runAction((id) => setExamStep(id, step), selected.id, keep)}
                     onEnd={() => setConfirm({ type: "end", item: selected })}
+                    onReload={() => setShiftVersion((v) => v + 1)}
                 />
             );
         }
@@ -300,7 +309,7 @@ const ExaminationPage = () => {
             {confirm?.type === "absent" && (
                 <ConfirmExamDialog
                     title="Báo vắng mặt"
-                    description={`Số ${confirm.item.queueNumber} · ${confirm.item.patientName} sẽ bị đưa ra khỏi hàng chờ của ca này.`}
+                    description={`Số ${confirm.item.queueNumber} · ${confirm.item.patientName} chưa vào phòng sẽ được chuyển xuống cuối hàng chờ.`}
                     confirmLabel="Báo vắng mặt"
                     danger
                     busy={busy}

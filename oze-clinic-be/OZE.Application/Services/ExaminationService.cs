@@ -117,6 +117,10 @@ namespace OZE.Application.Services
 
             examination.ChiefComplaint = complaint;
             examination.ClinicalNotes = notes;
+            if (request.Symptoms != null)
+            {
+                examination.Symptoms = SerializeSymptoms(request.Symptoms);
+            }
             examination.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
@@ -406,6 +410,7 @@ namespace OZE.Application.Services
                 DiagnosisCode = code,
                 DiagnosisName = name,
                 Description = description,
+                Teeth = JoinTeeth(request.Teeth),
                 DiagnosedByDoctorId = doctor.Id,
                 CreatedAt = DateTimeOffset.UtcNow
             };
@@ -434,6 +439,7 @@ namespace OZE.Application.Services
             diagnosis!.DiagnosisCode = code;
             diagnosis.DiagnosisName = name;
             diagnosis.Description = description;
+            diagnosis.Teeth = JoinTeeth(request.Teeth);
             if (request.IsPrimary)
             {
                 foreach (var other in examination.Diagnoses) other.IsPrimary = false;
@@ -1020,6 +1026,8 @@ namespace OZE.Application.Services
             ExaminationStatus = examination.ExaminationStatus,
             ChiefComplaint = examination.ChiefComplaint,
             ClinicalNotes = examination.ClinicalNotes,
+            Symptoms = ParseSymptoms(examination.Symptoms),
+            ToothFindings = ToToothFindingResponses(examination.ToothFindings),
             FollowUpDate = examination.FollowUpDate,
             FollowUpNotes = examination.FollowUpNotes,
             FollowUpAppointmentId = examination.FollowUpAppointmentId,
@@ -1050,7 +1058,165 @@ namespace OZE.Application.Services
                 DiagnosisCode = x.DiagnosisCode,
                 DiagnosisName = x.DiagnosisName,
                 Description = x.Description,
+                Teeth = SplitList(x.Teeth),
                 IsPrimary = x.IsPrimary
             }).ToList();
+
+        // ---- Findings per tooth ("Khám & Chẩn đoán"): several per tooth, in the doctor's words ----
+
+        public async Task<List<ToothFindingResponse>> GetToothFindingsAsync(string userId, long examinationId, CancellationToken cancellationToken = default)
+        {
+            var (_, examination) = await LoadAsync(userId, examinationId, cancellationToken);
+            return ToToothFindingResponses(examination.ToothFindings);
+        }
+
+        public async Task<List<ToothFindingResponse>> AddToothFindingAsync(string userId, long examinationId, SaveToothFindingRequest request, CancellationToken cancellationToken = default)
+        {
+            var (_, examination) = await LoadAsync(userId, examinationId, cancellationToken);
+            EnsureOpen(examination);
+            var finding = new ExaminationToothFinding
+            {
+                ExaminationId = examination.Id,
+                PatientId = examination.PatientId,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            ApplyToothFinding(finding, request);
+            examination.ToothFindings.Add(finding);
+
+            await _examinationRepository.SaveChangesAsync(cancellationToken);
+            return ToToothFindingResponses(examination.ToothFindings);
+        }
+
+        public async Task<List<ToothFindingResponse>> UpdateToothFindingAsync(string userId, long examinationId, long findingId, SaveToothFindingRequest request, CancellationToken cancellationToken = default)
+        {
+            var (_, examination) = await LoadAsync(userId, examinationId, cancellationToken);
+            EnsureOpen(examination);
+            var finding = examination.ToothFindings.FirstOrDefault(x => x.Id == findingId);
+            ConditionGuard.Ensure<NotFoundException>(finding != null, ErrorConstants.ExaminationMessage.ToothFindingNotFound);
+            ApplyToothFinding(finding!, request);
+            finding!.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _examinationRepository.SaveChangesAsync(cancellationToken);
+            return ToToothFindingResponses(examination.ToothFindings);
+        }
+
+        public async Task<List<ToothFindingResponse>> DeleteToothFindingAsync(string userId, long examinationId, long findingId, CancellationToken cancellationToken = default)
+        {
+            var (_, examination) = await LoadAsync(userId, examinationId, cancellationToken);
+            EnsureOpen(examination);
+            var finding = examination.ToothFindings.FirstOrDefault(x => x.Id == findingId);
+            ConditionGuard.Ensure<NotFoundException>(finding != null, ErrorConstants.ExaminationMessage.ToothFindingNotFound);
+
+            _examinationRepository.RemoveToothFinding(finding!);
+            var remaining = examination.ToothFindings.Where(x => x.Id != finding!.Id).ToList();
+
+            await _examinationRepository.SaveChangesAsync(cancellationToken);
+            return ToToothFindingResponses(remaining);
+        }
+
+        private static void ApplyToothFinding(ExaminationToothFinding finding, SaveToothFindingRequest request)
+        {
+            var tooth = NormalizeTooth(request.ToothNumber);
+            var condition = Clean(request.Condition);
+            ConditionGuard.Ensure(condition != null, ErrorConstants.ExaminationMessage.ToothFindingConditionRequired);
+            ConditionGuard.Ensure(condition!.Length <= ExaminationConstants.ToothFindingConditionMaxLength, ErrorConstants.ExaminationMessage.ToothFindingConditionTooLong);
+            var notes = Clean(request.Notes);
+            ConditionGuard.Ensure(notes == null || notes.Length <= DentalChartConstants.NotesMaxLength, ErrorConstants.ExaminationMessage.ToothNotesTooLong);
+
+            var surfaces = (request.Surfaces ?? new List<string>())
+                .Select(x => x?.Trim().ToUpperInvariant() ?? string.Empty)
+                .Where(x => x.Length > 0)
+                .Distinct()
+                .ToList();
+            ConditionGuard.Ensure(surfaces.All(ExaminationConstants.ToothSurfaces.Contains), ErrorConstants.ExaminationMessage.ToothFindingSurfaceInvalid);
+
+            finding.ToothNumber = tooth;
+            finding.Condition = condition;
+            // Kept in M, O, D, B, L order
+            finding.Surfaces = surfaces.Count == 0
+                ? null
+                : string.Join(',', ExaminationConstants.ToothSurfaces.Where(surfaces.Contains));
+            finding.Notes = notes;
+            finding.IsReplaced = request.IsReplaced;
+        }
+
+        private static List<ToothFindingResponse> ToToothFindingResponses(IEnumerable<ExaminationToothFinding> findings) =>
+            findings
+                .OrderBy(x => x.ToothNumber, StringComparer.Ordinal)
+                .ThenBy(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
+                .Select(x => new ToothFindingResponse
+                {
+                    Id = x.Id,
+                    ToothNumber = x.ToothNumber,
+                    Condition = x.Condition,
+                    Surfaces = SplitList(x.Surfaces),
+                    Notes = x.Notes,
+                    IsReplaced = x.IsReplaced,
+                    CreatedAt = x.CreatedAt
+                }).ToList();
+
+        // ---- Symptoms (JSON array of labels) and diagnosis teeth (comma separated FDI numbers) ----
+
+        private static readonly System.Text.Json.JsonSerializerOptions SymptomsJson = new()
+        {
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        };
+
+        private static string? SerializeSymptoms(List<string> symptoms)
+        {
+            var labels = symptoms
+                .Select(x => x?.Trim() ?? string.Empty)
+                .Where(x => x.Length > 0)
+                .Distinct()
+                .ToList();
+            ConditionGuard.Ensure(
+                labels.Count <= ExaminationConstants.MaxSymptoms && labels.All(x => x.Length <= ExaminationConstants.SymptomMaxLength),
+                ErrorConstants.ExaminationMessage.SymptomsInvalid);
+            if (labels.Count == 0)
+            {
+                return null;
+            }
+
+            // Vietnamese kept as is (not  escapes), so the 1000-character column holds what the doctor sees
+            var json = System.Text.Json.JsonSerializer.Serialize(labels, SymptomsJson);
+            ConditionGuard.Ensure(json.Length <= ExaminationConstants.SymptomsMaxLength, ErrorConstants.ExaminationMessage.SymptomsInvalid);
+            return json;
+        }
+
+        private static List<string> ParseSymptoms(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new List<string>();
+            }
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // A value written by hand: keep it as one label rather than losing it
+                return new List<string> { json };
+            }
+        }
+
+        private static string? JoinTeeth(List<string>? teeth)
+        {
+            if (teeth == null || teeth.Count == 0)
+            {
+                return null;
+            }
+
+            var numbers = teeth.Select(NormalizeTooth).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToList();
+            var joined = string.Join(',', numbers);
+            ConditionGuard.Ensure(joined.Length <= ExaminationConstants.DiagnosisTeethMaxLength, ErrorConstants.ExaminationMessage.DiagnosisTeethInvalid);
+            return joined;
+        }
+
+        private static List<string> SplitList(string? text) =>
+            string.IsNullOrWhiteSpace(text)
+                ? new List<string>()
+                : text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
     }
 }

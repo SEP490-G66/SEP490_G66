@@ -64,5 +64,7 @@ namespace OZE.Common.Constants
         public const int BodyRegionMaxLength = 200;
         public const int FailureCodeMaxLength = 100;
         public const int FailureMessageMaxLength = 1000;
+        // ImagingResults.FileName column
+        public const int FileNameMaxLength = 500;
     }
 }

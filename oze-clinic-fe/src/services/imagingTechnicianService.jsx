@@ -1,12 +1,12 @@
 import api from "./api";
 import { call } from "./receptionService";
+import { loadPicture, releasePictures } from "./imagingPictures";
 import { MANUAL_UPLOAD_EXTENSIONS } from "@/utils/imagingRequest";
 
 // Imaging technician ("Chụp chiếu", "Lịch sử chụp chiếu"). Every call returns the ApiResponse shape
 // ({ success, message, data, errors }).
-// Real API: the queue and "Hoàn thành" (ImagingRequestsController), capture (ImagingCapturesController),
+// Real API: the queue and "Hoàn thành" (ImagingRequestsController), capture and manual upload (ImagingCapturesController),
 // history (ImagingHistoryController).
-// TODO(api): manual upload is still a mock: the backend has no endpoint for it yet.
 
 const MESSAGES = [
     [/imaging request is Cancelled/i, "Bác sĩ đã huỷ chỉ định này."],
@@ -22,6 +22,11 @@ const MESSAGES = [
     [/Cannot cancel because the capture is/i, "Lượt chụp đã kết thúc, không huỷ được nữa."],
     [/select an X-ray device/i, "Vui lòng chọn máy chụp."],
     [/Number of images must be between/i, "Số ảnh phải từ 1 đến 10."],
+    [/choose at least one image/i, "Vui lòng chọn ít nhất một ảnh."],
+    [/at most 10 images/i, "Mỗi lần tải tối đa 10 ảnh."],
+    [/is not a supported image/i, "Chỉ nhận ảnh .png, .jpg, .jpeg hoặc .dcm."],
+    [/larger than 20 MB/i, "Mỗi ảnh tối đa 20 MB."],
+    [/is empty./i, "Có ảnh bị rỗng, vui lòng chọn lại."],
 ];
 
 const translate = (response) => {
@@ -32,7 +37,6 @@ const translate = (response) => {
 
 const success = (data, message = null) => ({ success: true, message, data, errors: null });
 const failure = (message) => ({ success: false, message, data: null, errors: null });
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Orders waiting (Pending) or being imaged (InProgress), oldest first; one row per order.
 export const getImagingQueue = async () => {
@@ -97,14 +101,23 @@ export const getCapture = async (requestId, sessionId) => {
 export const cancelCapture = async (requestId, sessionId) =>
     translate(await call(() => api.post(`/api/imaging-requests/${requestId}/captures/${sessionId}/cancel`)));
 
-// "Tải ảnh thủ công". .jpg / .png get a local preview; a .dcm has none until the backend reads DICOM.
-export const uploadManualImages = async (requestId, { files }) => {
-    await wait(400);
+// "Tải ảnh thủ công" (POST api/imaging-requests/{id}/results, multipart). .jpg / .png get a local preview;
+// a .dcm has none (the server keeps the file, nobody reads DICOM yet).
+export const uploadManualImages = async (requestId, { files, note }) => {
+    const form = new FormData();
+    files.forEach((file) => form.append("files", file));
+    if (note) form.append("note", note);
+    const response = translate(
+        await call(() => api.post(`/api/imaging-requests/${requestId}/results`, form, { headers: { "Content-Type": "multipart/form-data" } })),
+    );
+    if (!response.success) return response;
+
     const now = new Date().toISOString();
-    const images = files.map((file, index) => {
-        const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-        const preview = MANUAL_UPLOAD_EXTENSIONS.includes(extension) && extension !== ".dcm";
-        return { id: `manual-${requestId}-${Date.now()}-${index}`, takenAt: now, url: preview ? URL.createObjectURL(file) : undefined };
+    const images = (response.data ?? []).map((image, index) => {
+        const file = files[index];
+        const extension = file ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
+        const preview = file && MANUAL_UPLOAD_EXTENSIONS.includes(extension) && extension !== ".dcm";
+        return { id: image.resultId, fileName: image.fileName, fileUrl: image.fileUrl, takenAt: now, url: preview ? URL.createObjectURL(file) : undefined };
     });
     return success(images, `Đã tải lên ${images.length} ảnh.`);
 };
@@ -124,21 +137,9 @@ export const getImagingHistory = async ({ keyword = "", imagingType = "", status
     };
 };
 
-// A picture needs the sign-in token, so it is fetched as a blob and shown through an object URL.
-// Sample pictures (fileUrl null) have no file on the server: the viewer shows its placeholder.
-const loadPicture = async (image) => {
-    if (!image.fileUrl) return { ...image };
-    try {
-        const response = await api.get(image.fileUrl, { responseType: "blob" });
-        return { ...image, url: URL.createObjectURL(response.data) };
-    } catch {
-        return { ...image };
-    }
-};
-
 // Object URLs made by getImagingHistoryDetail; call when the detail is closed.
 export const releaseImagingHistoryPictures = (detail) => {
-    (detail?.images ?? []).forEach((image) => image.url && URL.revokeObjectURL(image.url));
+    releasePictures(detail?.images);
 };
 
 export const getImagingHistoryDetail = async (id) => {

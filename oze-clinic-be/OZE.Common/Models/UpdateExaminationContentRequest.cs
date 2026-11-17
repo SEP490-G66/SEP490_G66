@@ -7,5 +7,7 @@ namespace OZE.Common.Models
         public string? ChiefComplaint { get; set; }
 
         public string? ClinicalNotes { get; set; }
+        // Symptom labels; null keeps the saved ones, an empty list clears them
+        public List<string>? Symptoms { get; set; }
     }
 }

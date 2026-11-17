@@ -34,6 +34,7 @@ namespace OZE.Persistence.Repositories
                     .ThenInclude(x => x!.Doctor)
                 .Include(x => x.Diagnoses)
                 .Include(x => x.DentalChartEntries)
+                .Include(x => x.ToothFindings)
                 .Include(x => x.Prescriptions)
                     .ThenInclude(x => x.Items)
                 .FirstOrDefaultAsync(x => x.Id == examinationId, cancellationToken);
@@ -92,6 +93,11 @@ namespace OZE.Persistence.Repositories
         public void RemoveDiagnosis(ClinicalDiagnosis diagnosis)
         {
             _context.ClinicalDiagnoses.Remove(diagnosis);
+        }
+
+        public void RemoveToothFinding(ExaminationToothFinding finding)
+        {
+            _context.ExaminationToothFindings.Remove(finding);
         }
 
         public Task<Examination?> GetByIdWithFollowUpAsync(long examinationId, CancellationToken cancellationToken = default)

@@ -104,6 +104,31 @@ namespace OZE.Persistence.Repositories
                 .ToListAsync(cancellationToken);
         }
 
+        public Task<List<QueueEntry>> GetCompletedTodayAsync(string queueType, int assignedStaffId, CancellationToken cancellationToken = default)
+        {
+            var (today, tomorrow) = DayWindow(DateOnly.FromDateTime(ClinicClock.Today));
+            return _context.QueueEntries
+                .AsNoTracking()
+                .Include(x => x.Appointment)
+                    .ThenInclude(x => x.Patient)
+                .Where(x => x.CreatedAt >= today && x.CreatedAt < tomorrow)
+                .Where(x => x.QueueType == queueType && x.AssignedStaffId == assignedStaffId && x.Status == QueueConstants.Completed)
+                .OrderByDescending(x => x.CompletedAt)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<AppointmentServiceItem>> GetServiceItemsAsync(IReadOnlyCollection<long> appointmentIds, CancellationToken cancellationToken = default)
+        {
+            return _context.AppointmentServiceItems
+                .AsNoTracking()
+                .Include(x => x.Service)
+                .Include(x => x.Variant)
+                .Where(x => appointmentIds.Contains(x.AppointmentId))
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<bool> TryMarkCalledAsync(long id, int? roomId, DateTimeOffset calledAt, CancellationToken cancellationToken = default)
         {
             // One statement that only succeeds while the entry is still waiting, so two callers cannot both get it

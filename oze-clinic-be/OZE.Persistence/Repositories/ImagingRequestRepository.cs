@@ -133,6 +133,33 @@ namespace OZE.Persistence.Repositories
                 .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         }
 
+        public Task<List<ImagingRequest>> GetForReviewAsync(int doctorId, int limit, CancellationToken cancellationToken = default)
+        {
+            return _context.ImagingRequests
+                .AsNoTracking()
+                .Where(x => x.RequestedByDoctorId == doctorId && ImagingRequestConstants.HistoryStatuses.Contains(x.RequestStatus))
+                .Include(x => x.Examination)
+                    .ThenInclude(x => x.Patient)
+                .Include(x => x.Results)
+                    .ThenInclude(x => x.UploadedByTechnician)
+                .AsSplitQuery()
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<ImagingRequest?> GetTrackedWithResultsAsync(long id, CancellationToken cancellationToken = default)
+        {
+            return _context.ImagingRequests
+                .Include(x => x.Examination)
+                    .ThenInclude(x => x.Patient)
+                .Include(x => x.Results)
+                    .ThenInclude(x => x.UploadedByTechnician)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        }
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             return _context.SaveChangesAsync(cancellationToken);
