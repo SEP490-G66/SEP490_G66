@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { SearchX } from "lucide-react";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
-import CertificateViewer from "@/components/public/CertificateViewer";
+import CertificateViewer from "@/components/doctor/CertificateViewer";
 import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
 import usePublicList from "@/hooks/usePublicList";
@@ -10,18 +10,15 @@ import { PUBLIC_DOCTOR_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 import DoctorIntro from "./homepage/DoctorIntro.jsx";
 
-// Full doctor cards are tall, so 5 per page.
 const PAGE_SIZE = 5;
 const SEARCH_ID = "doctor-search";
 const TITLE_ID = "doctor-list-title";
 
 const BREADCRUMB = [{ label: TEXT.HOME, href: ROUTES.HOME }, { label: TEXT.TITLE }];
 
-// /doctors?q=&page= — the clinic's doctors (fixed content), searchable by name or position.
 const DoctorList = () => {
     const listRef = useRef(null);
     const { keyword, page, totalPages, items: doctors, setKeyword, setPage } = usePublicList(searchDoctors, PAGE_SIZE);
-    // { doctor, index } of the certificate picture shown large
     const [viewer, setViewer] = useState(null);
 
     const changePage = (target) => {
@@ -38,7 +35,7 @@ const DoctorList = () => {
             <section aria-labelledby={TITLE_ID} className="container-public flex flex-col gap-8 pb-12 md:pb-16">
                 <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                        <h1 id={TITLE_ID} className="font-heading text-display-section text-ink">
+                        <h1 id={TITLE_ID} className="font-heading text-display-md text-ink md:text-display-lg">
                             {TEXT.TITLE}
                         </h1>
                         <SearchInput

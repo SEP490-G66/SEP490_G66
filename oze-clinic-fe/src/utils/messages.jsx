@@ -35,6 +35,8 @@ export const PROFILE_LIMITS = { FULL_NAME_MAX: 100, ADDRESS_MAX: 500 };
 export const VALIDATION_MESSAGES = {
     PHONE_INVALID: "Số điện thoại không hợp lệ.",
     PASSWORD_LENGTH: `Mật khẩu phải có từ ${PASSWORD_LENGTH.MIN} đến ${PASSWORD_LENGTH.MAX} ký tự.`,
+    PASSWORD_LOWERCASE: "Mật khẩu phải có ít nhất một chữ cái thường.",
+    PASSWORD_DIGIT: "Mật khẩu phải có ít nhất một chữ số.",
     EMAIL_INVALID: "Email không hợp lệ.",
     FULL_NAME_TOO_LONG: `Họ và tên không được vượt quá ${PROFILE_LIMITS.FULL_NAME_MAX} ký tự.`,
     BIRTHDATE_IN_FUTURE: "Ngày sinh không được lớn hơn ngày hiện tại.",
@@ -49,6 +51,20 @@ export const PROFILE_MESSAGES = {
     UPDATE_SUCCESS: "Cập nhật thông tin cá nhân thành công!",
     OTP_SENT: "Mã xác minh đã được gửi. Vui lòng nhập mã để hoàn tất cập nhật.",
     NO_CHANGES: "Không có thông tin nào thay đổi.",
+    LOAD_FAILED: "Không tải được hồ sơ. Vui lòng thử lại.",
+    UPDATE_FAILED: "Không cập nhật được hồ sơ. Vui lòng thử lại.",
+    NOT_LINKED: "Tài khoản chưa gắn với hồ sơ bệnh nhân. Vui lòng liên hệ quầy lễ tân.",
+    MISSING_IDENTITY: "Hồ sơ của bạn còn thiếu ngày sinh hoặc giới tính. Vui lòng liên hệ quầy lễ tân để bổ sung.",
+    OTP_EXPIRED: "Mã xác minh đã hết hạn. Vui lòng đổi số điện thoại lại.",
+    CHANGED_MEANWHILE: "Hồ sơ vừa được thay đổi ở nơi khác. Vui lòng đổi số điện thoại lại.",
+    EMAIL_LINK_SENT: "Đã cập nhật. Link xác nhận đã được gửi tới email mới.",
+};
+
+export const CHANGE_PASSWORD_TEXT = {
+    INCORRECT_CURRENT: "Mật khẩu hiện tại không đúng.",
+    CONFIRM_MISMATCH: "Mật khẩu xác nhận không khớp với mật khẩu mới.",
+    FAILED: "Không đổi được mật khẩu. Vui lòng thử lại.",
+    SIGN_IN_AGAIN: "Mật khẩu đã được đổi. Vui lòng đăng nhập lại.",
 };
 
 export const GENDER_LABELS = { male: "Nam", female: "Nữ" };
@@ -152,7 +168,6 @@ export const GUEST_HEADER_TEXT = {
     DRAWER_LABEL: "Menu",
 };
 
-// Public "Dịch vụ" pages (landing)
 export const PUBLIC_SERVICE_TEXT = {
     HOME: "Trang chủ",
     SERVICES: "Dịch vụ",
@@ -170,7 +185,6 @@ export const PUBLIC_SERVICE_TEXT = {
     STEP: (n) => `Bước ${n}`,
 };
 
-// Public "Đội ngũ bác sĩ" page (landing)
 export const PUBLIC_DOCTOR_TEXT = {
     HOME: "Trang chủ",
     TITLE: "Đội ngũ bác sĩ",
@@ -194,7 +208,6 @@ export const PUBLIC_ARTICLE_TEXT = {
     PUBLISHED_AT: "Ngày đăng:",
 };
 
-// Header search results page (landing)
 export const PUBLIC_SEARCH_TEXT = {
     HOME: "Trang chủ",
     BREADCRUMB: "Tìm kiếm",

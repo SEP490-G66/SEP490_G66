@@ -2,9 +2,6 @@ import { Link } from "react-router-dom";
 import { Image as ImageIcon } from "lucide-react";
 import { cx } from "@/utils/cx";
 
-// Picture + title + short description. With `to`, the whole card is a link (e.g. to a service page).
-// imageClassName sets the picture's shape (square by default).
-// Without a picture it shows an empty frame, so the layout stays the same until the picture is added.
 const ImageCard = ({ imageUrl, imageAlt, title, description, className, to, imageClassName = "aspect-square" }) => {
     const body = (
         <>

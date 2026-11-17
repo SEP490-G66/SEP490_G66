@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import Card from "@/components/ui/Card";
 import { resetPassword } from "../../services/authService";
 import { MESSAGES, PASSWORD_LENGTH, RESET_PASSWORD_REDIRECT_MS } from "../../utils/messages";
@@ -38,6 +38,7 @@ const ResetPasswordPage = () => {
     const [fieldErrors, setFieldErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [succeeded, setSucceeded] = useState(false);
+    const [expiredMessage, setExpiredMessage] = useState();
 
     useEffect(() => {
         if (!succeeded) return undefined;
@@ -45,7 +46,7 @@ const ResetPasswordPage = () => {
         return () => clearTimeout(timeoutId);
     }, [succeeded, navigate]);
 
-    if (!state?.resetToken) {
+    if (!state?.sessionId) {
         return <Navigate to={ROUTES.FORGOT_PASSWORD} replace />;
     }
 
@@ -64,7 +65,7 @@ const ResetPasswordPage = () => {
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        if (loading || succeeded) return;
+        if (loading || succeeded || expiredMessage) return;
 
         const errors = validate(values);
         setFieldErrors(errors);
@@ -79,9 +80,17 @@ const ResetPasswordPage = () => {
 
         setLoading(true);
         try {
-            const result = await resetPassword({ token: state.resetToken, password: values.password });
+            const result = await resetPassword({
+                sessionId: state.sessionId,
+                password: values.password,
+                confirmPassword: values.confirmPassword,
+            });
             if (result.success) {
                 setSucceeded(true);
+                return;
+            }
+            if (result.data?.sessionExpired) {
+                setExpiredMessage(result.message);
                 return;
             }
             setFieldErrors({ password: result.message });
@@ -101,6 +110,11 @@ const ResetPasswordPage = () => {
                     <div role="status">
                         {succeeded && <div className="alert alert-success mb-4">{MESSAGES.MSG64}</div>}
                     </div>
+                    {expiredMessage && (
+                        <div role="alert" className="alert alert-danger mb-4">
+                            {expiredMessage}
+                        </div>
+                    )}
 
                     <div className="field">
                         <label htmlFor="password" className="label label-required">
@@ -112,7 +126,7 @@ const ResetPasswordPage = () => {
                             name="password"
                             type="password"
                             autoComplete="new-password"
-                            placeholder={`Từ ${PASSWORD_LENGTH.MIN} đến ${PASSWORD_LENGTH.MAX} ký tự`}
+                            placeholder={`${PASSWORD_LENGTH.MIN}–${PASSWORD_LENGTH.MAX} ký tự, có chữ thường và chữ số`}
                             className="input"
                             aria-required="true"
                             aria-invalid={fieldErrors.password ? true : undefined}
@@ -155,13 +169,19 @@ const ResetPasswordPage = () => {
 
                     <button
                         type="submit"
-                        disabled={loading || succeeded}
+                        disabled={loading || succeeded || Boolean(expiredMessage)}
                         aria-busy={loading || undefined}
                         className="btn btn-primary btn-lg mt-6 w-full"
                     >
                         {loading && <span className="btn-spinner" aria-hidden="true" />}
                         {loading ? "Đang lưu..." : "Đặt lại mật khẩu"}
                     </button>
+
+                    {expiredMessage && (
+                        <Link to={ROUTES.FORGOT_PASSWORD} replace className="btn btn-secondary btn-lg mt-3 w-full">
+                            Yêu cầu mã mới
+                        </Link>
+                    )}
                 </form>
             </Card>
         </section>
