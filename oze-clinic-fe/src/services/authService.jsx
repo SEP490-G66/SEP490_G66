@@ -1,12 +1,6 @@
 import api from "./api";
-<<<<<<< HEAD
-import { BACKEND_LOGIN_CODES, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
-import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
-import { call } from "./receptionService";
-=======
 import { BACKEND_LOGIN_CODES, CHANGE_PASSWORD_TEXT, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
 import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
->>>>>>> main
 import { invalidMessage } from "../utils/validation";
 import { clearSession, getSessionRefreshToken, getSessionToken, isAccessTokenExpired, saveSession, sessionFromAuthResult } from "./sessionStore";
 
@@ -177,29 +171,6 @@ const changePasswordError = (body) => {
     return { field: null, message: CHANGE_PASSWORD_TEXT.FAILED };
 };
 
-<<<<<<< HEAD
-export const resetPassword = async ({ token, password }) => mockResetPassword({ token, password });
-
-// Backend (ASP.NET Identity) messages of POST api/Auth/change-password, and the form field each one belongs to
-const CHANGE_PASSWORD_ERRORS = [
-    [/incorrect password/i, "currentPassword", "Mật khẩu hiện tại không đúng."],
-    [/cannot be the same as current password/i, "newPassword", MESSAGES.MSG25],
-    [/do not match/i, "newPassword", "Mật khẩu xác nhận không khớp."],
-    [/password/i, "newPassword", invalidMessage("Mật khẩu mới")],
-];
-
-// Change password while signed in. The backend signs out the other devices and keeps this one (its refresh token is sent).
-// On failure, data.field names the form field the message belongs to.
-export const changePassword = async ({ currentPassword, newPassword }) => {
-    const body = { currentPassword, newPassword, confirmPassword: newPassword, refreshToken: getSessionRefreshToken() };
-    const response = await call(() => api.post("/api/Auth/change-password", body));
-    if (response.success) return success(null);
-
-    const reasons = [response.message, ...(Array.isArray(response.errors) ? response.errors : [])].filter(Boolean).join(" ");
-    const match = CHANGE_PASSWORD_ERRORS.find(([pattern]) => pattern.test(reasons));
-    if (!match) return { ...failure(response.noResponse ? response.message : GENERIC_ERROR_MESSAGE), data: { field: "newPassword" } };
-    return { ...failure(match[2]), data: { field: match[1] } };
-=======
 export const changePassword = async ({ currentPassword, newPassword, confirmPassword }) => {
     const refreshToken = getSessionRefreshToken();
     try {
@@ -213,5 +184,4 @@ export const changePassword = async ({ currentPassword, newPassword, confirmPass
         const { field, message } = changePasswordError(error.response?.data);
         return { ...failure(message), data: { field } };
     }
->>>>>>> main
 };

@@ -2,18 +2,9 @@ import api from "./api";
 import { getMockCurrentUser, updateMockUser } from "../utils/data/mockData";
 import { BACKEND_ROLE_NAMES, CHANGE_PASSWORD_TEXT, PROFILE_MESSAGES, VALIDATION_MESSAGES } from "../utils/messages";
 import { invalidMessage } from "../utils/validation";
-<<<<<<< HEAD
-import api from "./api";
-import { call } from "./receptionService";
-import { getSessionRole, updateSessionUserName } from "./sessionStore";
-
-// The profile is read from GET /api/Me; PUT /api/Me and its OTP endpoints are still mocked here (SCRUM-105).
-// TODO(be): code, status, emergencyContact, health, certificates and identity requests are not in /api/Me yet.
-=======
 import { getSessionRole, updateSessionUserName } from "./sessionStore";
 
 const PROFILE_REQUEST_CONFIG = { skipErrorPage: true };
->>>>>>> main
 
 const MOCK_DELAY_MS = 500;
 
@@ -165,94 +156,9 @@ const withCurrentUser = async (fn) => {
     return user ? fn(user) : mockFailure(PROFILE_MESSAGES.LOAD_FAILED);
 };
 
-<<<<<<< HEAD
-const save = (user, changes, message) => success(toProfile(updateMockUser(user.id, changes)), message);
-
-// Changes waiting for the OTP: nothing is saved until the code is verified.
-// Kept in memory, so reloading the OTP page drops them and the user starts again from the profile.
-let pendingChanges = null;
-
-const startOtp = (user, changes, destination) => {
-    pendingChanges = { userId: user.id, values: changes };
-    return success({
-        otpRequired: true,
-        isEmail: destination.includes("@"),
-        maskedDestination: maskDestination(destination),
-    });
-};
-
-export const hasPendingProfileChanges = () => pendingChanges !== null;
-
-// GET api/Me gives name, birth date, gender, phone, email and address. The rest of the page (code, status,
-// emergency contact, health, certificates, identity request) still comes from the mock user of the role.
-// TODO(api): the changes below are still saved in the mock; the six fields above come back from the backend on reload.
-export const getMyProfile = async () => {
-    const response = await call(() => api.get("/api/Me"));
-    if (!response.success) return response;
-
-    const me = response.data ?? {};
-    const mockUser = getMockCurrentUser();
-    const base = mockUser ? toProfile(mockUser) : toProfile({ role: getSessionRole() });
-    return success({
-        ...base,
-        fullname: me.fullName ?? "",
-        birthdate: me.dateOfBirth ?? "",
-        gender: me.gender ? me.gender.toLowerCase() : "",
-        phone: me.phoneNumber ?? "",
-        email: me.email ?? "",
-        address: me.address ?? "",
-        role: getSessionRole() ?? base.role,
-    });
-};
-
-// Email, address and (patients) emergency contact. A new email is confirmed by an OTP sent to it;
-// otherwise the changes are saved straight away. Returns data.otpRequired, or the updated profile.
-export const updateContactInfo = (values) =>
-    withCurrentUser((user) => {
-        if (values.email && otherUsers(user).some((u) => u.email && sameEmail(u.email, values.email))) {
-            return failure(VALIDATION_MESSAGES.EMAIL_IN_USE, { email: VALIDATION_MESSAGES.EMAIL_IN_USE });
-        }
-
-        const emailChanged = values.email && !sameEmail(values.email, user.email ?? "");
-        if (emailChanged) return startOtp(user, values, values.email);
-
-        return save(user, values, "Cập nhật thông tin liên hệ thành công!");
-    });
-
-// The phone number signs the user in, so it changes only after an SMS OTP sent to the new number.
-export const requestPhoneChange = (phone) =>
-    withCurrentUser((user) => {
-        if (phone === user.phone) return failure("Số điện thoại mới trùng với số hiện tại.", { phone: "Số điện thoại mới trùng với số hiện tại." });
-        if (otherUsers(user).some((u) => u.phone === phone)) {
-            return failure(VALIDATION_MESSAGES.PHONE_IN_USE, { phone: VALIDATION_MESSAGES.PHONE_IN_USE });
-        }
-        return startOtp(user, { phone }, phone);
-    });
-
-export const resendProfileOtp = async () => {
-    await wait(MOCK_DELAY_MS);
-    return pendingChanges ? success(null) : failure(EXPIRED_MESSAGE);
-};
-
-export const verifyProfileOtp = async ({ code }) => {
-    await wait(MOCK_DELAY_MS);
-    if (!pendingChanges) return failure(EXPIRED_MESSAGE);
-    if (code !== MOCK_OTP_CODE) return failure(invalidMessage("Mã xác minh"));
-
-    const { userId, values } = pendingChanges;
-    pendingChanges = null;
-    const user = updateMockUser(userId, values);
-    updateSessionUserName(user.fullname);
-    return success(toProfile(user));
-};
-
-export const cancelProfileOtp = () => {
-    pendingChanges = null;
-=======
 const save = (user, changes, message) => {
     updateMockUser(user.id, changes);
     return success(null, message);
->>>>>>> main
 };
 
 // Name, birth date and gender are changed by the receptionist after checking the ID card. One request at a time.
