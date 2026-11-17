@@ -5,11 +5,12 @@ import BookingSchedule, { BookingLoadingCard, BookingSectionHeading, Hotline, Lo
 import BookingStateBox from "@/components/booking/BookingStateBox";
 import BookingSuccess from "@/components/booking/BookingSuccess";
 import useBookingForm from "@/hooks/useBookingForm";
+import { PATIENT_BOOKING_API } from "@/services/bookingService";
 import { BOOKING_IDS } from "@/utils/booking";
 import { BOOKING_TEXT } from "@/utils/messages";
 
 const BookAppointment = () => {
-    const form = useBookingForm();
+    const form = useBookingForm({ api: PATIENT_BOOKING_API });
     const { state, actions, earliest, blocked } = form;
     const { page, context, done } = state;
 

@@ -181,13 +181,20 @@ export const reconcileServices = (items, pick, oldServices, newServices) => {
     };
 };
 
-export const buildBookingPayload = ({ items, services, date, slotStart, doctorId, note }) => {
+const sortedUnique = (ids) => [...new Set(ids)].sort((a, b) => a - b);
+
+export const toServiceParams = (items, services) => {
     const mandatoryIds = new Set(services.filter((service) => service.isMandatory).map((service) => service.id));
-    const serviceIds = items.filter((item) => item.variantId === null && !mandatoryIds.has(item.serviceId)).map((item) => item.serviceId);
+    return {
+        ServiceId: sortedUnique(items.filter((item) => item.variantId === null && !mandatoryIds.has(item.serviceId)).map((item) => item.serviceId)),
+        VariantId: sortedUnique(items.filter((item) => item.variantId !== null).map((item) => item.variantId)),
+    };
+};
+
+export const buildBookingPayload = ({ items, services, date, slotStart, doctorId, note }) => {
     const trimmed = note.trim();
     return {
-        ServiceId: [...new Set(serviceIds)],
-        VariantId: items.filter((item) => item.variantId !== null).map((item) => item.variantId),
+        ...toServiceParams(items, services),
         Date: date,
         SlotStart: slotStart,
         DoctorId: doctorId,

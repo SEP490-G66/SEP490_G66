@@ -1,9 +1,8 @@
 import { useEffect, useLayoutEffect, useReducer, useRef } from "react";
-import { createBooking, getBookingContext, getBookingDays, getBookingSlots } from "@/services/bookingService";
 import { BOOKING_IDS, addDaysToDate, buildBookingPayload, dayId, getEarliest, getPendingSelection, getRange, slotId, weekBounds } from "@/utils/booking";
 import { getClinicToday } from "@/utils/format";
 import { BOOKING_ERROR_CODE, BOOKING_TEXT } from "@/utils/messages";
-import { bookingReducer, createInitialState, rangeKeyOf, slotsKeyOf } from "./bookingReducer";
+import { bookingReducer, createInitialState, rangeKeyOf, serviceKeyOf, slotsKeyOf } from "./bookingReducer";
 
 const ABORT = "AbortError";
 
@@ -11,9 +10,9 @@ const failedResult = { success: false, code: null, data: null };
 
 const isUsable = (element) => element && !element.disabled && element.getAttribute("aria-disabled") !== "true";
 
-const PATIENT_API = { getContext: getBookingContext, getDays: getBookingDays, getSlots: getBookingSlots, create: createBooking };
+const parseServices = (serviceKey) => (serviceKey ? JSON.parse(serviceKey) : null);
 
-const useBookingForm = ({ api = PATIENT_API, guest = null } = {}) => {
+const useBookingForm = ({ api, guest = null }) => {
     const [state, dispatch] = useReducer(bookingReducer, null, () => createInitialState(getClinicToday()));
     const handledFocus = useRef(0);
     const interimFocus = useRef({ seq: 0, element: null });
@@ -22,6 +21,7 @@ const useBookingForm = ({ api = PATIENT_API, guest = null } = {}) => {
 
     const rangeKey = rangeKeyOf(state);
     const slotsKey = slotsKeyOf(state);
+    const serviceKey = serviceKeyOf(state);
     const unfinished = state.context?.unfinished ?? null;
     const blocked = state.blockedByServer || Boolean(unfinished);
     const loadEnabled = state.page.status === "ready" && !blocked && !state.done;
@@ -44,22 +44,22 @@ const useBookingForm = ({ api = PATIENT_API, guest = null } = {}) => {
         const controller = new AbortController();
         const requestedAt = Date.now();
         const { from, to } = getRange(today);
-        calls.current.getDays({ from, to, doctorId: state.doctorId, signal: controller.signal }).then(
+        calls.current.getDays({ from, to, doctorId: state.doctorId, services: parseServices(serviceKey), signal: controller.signal }).then(
             (result) => dispatch({ type: "RANGE_LOADED", key: rangeKey, result, requestedAt }),
             (error) => error?.name !== ABORT && dispatch({ type: "RANGE_LOADED", key: rangeKey, result: failedResult, requestedAt })
         );
         return () => controller.abort();
-    }, [loadEnabled, rangeKey, today, state.doctorId]);
+    }, [loadEnabled, rangeKey, today, state.doctorId, serviceKey]);
 
     useEffect(() => {
         if (!loadEnabled || !slotsKey) return undefined;
         const controller = new AbortController();
-        calls.current.getSlots({ date: state.day, doctorId: state.doctorId, signal: controller.signal }).then(
+        calls.current.getSlots({ date: state.day, doctorId: state.doctorId, services: parseServices(serviceKey), signal: controller.signal }).then(
             (result) => dispatch({ type: "SLOTS_LOADED", key: slotsKey, result }),
             (error) => error?.name !== ABORT && dispatch({ type: "SLOTS_LOADED", key: slotsKey, result: failedResult })
         );
         return () => controller.abort();
-    }, [loadEnabled, slotsKey, state.day, state.doctorId]);
+    }, [loadEnabled, slotsKey, state.day, state.doctorId, serviceKey]);
 
     useLayoutEffect(() => {
         const request = state.focusRequest;
