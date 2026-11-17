@@ -7,8 +7,10 @@ import HealthInfoCard from "@/components/profile/HealthInfoCard";
 import Avatar from "@/components/ui/Avatar";
 import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
+import PasswordInput from "@/components/ui/PasswordInput";
 import useAsync from "@/hooks/useAsync";
 import {
+    PROFILE_FEATURES,
     cancelIdentityRequest,
     getMyProfile,
     requestPhoneChange,
@@ -20,6 +22,8 @@ import { ROUTES, getErrorRoute } from "@/utils/routes";
 import { isRequiredEmpty, normalizePhone, requiredMessage, validateEmail, validatePhone } from "@/utils/validation";
 
 const REASON_MAX = 300;
+
+const PHONE_UNCHANGED = "Số điện thoại mới trùng với số hiện tại.";
 
 const IDENTITY_FIELDS = [
     { value: "fullname", label: "Họ và tên" },
@@ -234,8 +238,13 @@ const IdentitySection = ({ profile, onChange }) => {
         <SectionCard
             id="identity-title"
             title="Thông tin nhận dạng"
-            description="Dùng để xác định đúng bạn khi khám. Bạn không tự sửa được; gửi yêu cầu để lễ tân kiểm tra giấy tờ."
+            description={
+                PROFILE_FEATURES.identityRequest
+                    ? "Dùng để xác định đúng bạn khi khám. Bạn không tự sửa được; gửi yêu cầu để lễ tân kiểm tra giấy tờ."
+                    : "Dùng để xác định đúng bạn khi khám. Muốn thay đổi, vui lòng liên hệ quầy lễ tân để kiểm tra giấy tờ."
+            }
             action={
+                PROFILE_FEATURES.identityRequest && (
                 <button
                     type="button"
                     className="btn btn-link shrink-0 text-label disabled:bg-transparent disabled:no-underline"
@@ -245,6 +254,7 @@ const IdentitySection = ({ profile, onChange }) => {
                 >
                     Yêu cầu thay đổi
                 </button>
+                )
             }
         >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -252,7 +262,7 @@ const IdentitySection = ({ profile, onChange }) => {
                 <ReadOnlyField label="Ngày sinh" value={formatDate(profile.birthdate)} />
                 <ReadOnlyField label="Giới tính" value={GENDER_LABELS[profile.gender]} />
             </div>
-            {pending && <PendingRequestBanner request={pending} onCancelled={onChange} />}
+            {PROFILE_FEATURES.identityRequest && pending && <PendingRequestBanner request={pending} onCancelled={onChange} />}
             {requesting && (
                 <IdentityRequestModal
                     profile={profile}
@@ -272,27 +282,37 @@ const IdentitySection = ({ profile, onChange }) => {
 const goToOtp = (navigate, data) => {
     toast.info(PROFILE_MESSAGES.OTP_SENT);
     navigate(ROUTES.PROFILE_VERIFY_OTP, {
-        state: { flow: "profile", isEmail: data.isEmail, maskedDestination: data.maskedDestination },
+        state: { flow: "profile", sessionId: data.sessionId, maskedDestination: data.maskedDestination },
     });
 };
 
-const PhoneChangeModal = ({ onClose }) => {
+const PhoneChangeModal = ({ profile, onClose }) => {
     const navigate = useNavigate();
     const [phone, setPhone] = useState("");
-    const [error, setError] = useState();
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        const nextError = validatePhone(phone);
-        setError(nextError);
-        if (nextError) return;
+        if (saving) return;
+        const nextErrors = {};
+        const phoneError = validatePhone(phone);
+        if (phoneError) nextErrors.phone = phoneError;
+        else if (normalizePhone(phone) === profile.phone) nextErrors.phone = PHONE_UNCHANGED;
+        if (currentPassword === "") nextErrors.currentPassword = requiredMessage("mật khẩu hiện tại");
+        setErrors(nextErrors);
+        if (nextErrors.phone || nextErrors.currentPassword) {
+            event.currentTarget.querySelector('[aria-invalid="true"]')?.focus();
+            return;
+        }
 
         setSaving(true);
-        const result = await requestPhoneChange(normalizePhone(phone));
+        const result = await requestPhoneChange({ phone: normalizePhone(phone), currentPassword }, profile);
         setSaving(false);
         if (!result.success) {
-            setError(result.errors?.phone ?? result.message);
+            if (result.errors?.phone || result.errors?.currentPassword) setErrors(result.errors);
+            else toast.error(result.message);
             return;
         }
         goToOtp(navigate, result.data);
@@ -302,24 +322,37 @@ const PhoneChangeModal = ({ onClose }) => {
         <Modal
             size="sm"
             title="Đổi số điện thoại"
-            description="Số mới dùng để đăng nhập và nhận thông báo. Mã OTP sẽ được gửi qua SMS tới số mới."
+            description="Số mới dùng để đăng nhập và nhận thông báo. Mã OTP sẽ được gửi qua SMS tới số mới. Thay đổi chưa lưu trên trang sẽ không được giữ."
             onClose={onClose}
             closeDisabled={saving}
         >
             <form noValidate onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-                <FormField id="new-phone" label="Số điện thoại mới" required error={error}>
+                <FormField id="new-phone" label="Số điện thoại mới" required error={errors.phone}>
                     <input
                         id="new-phone"
                         type="tel"
                         inputMode="numeric"
                         className="input"
                         placeholder="09xx xxx xxx"
-                        aria-invalid={Boolean(error)}
-                        aria-describedby={error ? "new-phone-error" : undefined}
+                        aria-invalid={Boolean(errors.phone)}
+                        aria-describedby={errors.phone ? "new-phone-error" : undefined}
                         value={phone}
                         onChange={(event) => {
                             setPhone(event.target.value);
-                            setError(undefined);
+                            setErrors((current) => ({ ...current, phone: undefined }));
+                        }}
+                    />
+                </FormField>
+                <FormField id="phone-current-password" label="Mật khẩu hiện tại" required error={errors.currentPassword}>
+                    <PasswordInput
+                        id="phone-current-password"
+                        autoComplete="current-password"
+                        aria-invalid={Boolean(errors.currentPassword)}
+                        aria-describedby={errors.currentPassword ? "phone-current-password-error" : undefined}
+                        value={currentPassword}
+                        onChange={(event) => {
+                            setCurrentPassword(event.target.value);
+                            setErrors((current) => ({ ...current, currentPassword: undefined }));
                         }}
                     />
                 </FormField>
@@ -417,12 +450,44 @@ const EmergencyContactFields = ({ person, errors, onChange, onRemove }) => {
     );
 };
 
-const ContactSection = ({ profile, isPatient, onChange }) => {
-    const navigate = useNavigate();
+const StaffContactSection = ({ profile }) => (
+    <SectionCard id="contact-title" title="Thông tin liên hệ" description="Thông tin do quản lý phòng khám cập nhật.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <ReadOnlyField label="Số điện thoại" value={profile.phone} />
+            <ReadOnlyField label="Email" value={profile.email} />
+            <div className="sm:col-span-2">
+                <ReadOnlyField label="Địa chỉ liên hệ" value={profile.address} />
+            </div>
+        </div>
+    </SectionCard>
+);
+
+const RemoveEmailModal = ({ saving, onConfirm, onClose }) => (
+    <Modal
+        size="sm"
+        title="Xóa email?"
+        description="Bạn sẽ không đăng nhập bằng email được nữa và không nhận thông báo qua email."
+        onClose={onClose}
+        closeDisabled={saving}
+    >
+        <div className="modal-actions mt-6">
+            <button type="button" className="btn btn-secondary" disabled={saving} onClick={onClose}>
+                Hủy
+            </button>
+            <button type="button" className="btn btn-danger" disabled={saving} onClick={onConfirm}>
+                {saving && <span className="btn-spinner" aria-hidden="true" />}
+                Xóa email
+            </button>
+        </div>
+    </Modal>
+);
+
+const ContactSection = ({ profile, onChange }) => {
     const [values, setValues] = useState(() => toContactValues(profile));
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
     const [changingPhone, setChangingPhone] = useState(false);
+    const [confirmingRemoval, setConfirmingRemoval] = useState(false);
 
     const request = toContactRequest(values);
     const dirty = JSON.stringify(request) !== JSON.stringify(toContactRequest(toContactValues(profile)));
@@ -437,36 +502,41 @@ const ContactSection = ({ profile, isPatient, onChange }) => {
         setErrors({});
     };
 
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-        const nextErrors = validateContact(request);
-        setErrors(nextErrors);
-        if (Object.keys(nextErrors).length > 0) {
-            event.currentTarget.querySelector('[aria-invalid="true"]')?.focus();
-            return;
-        }
-
+    const save = async () => {
         setSaving(true);
-        const result = await updateContactInfo(isPatient ? request : { email: request.email, address: request.address });
+        const result = await updateContactInfo({ email: request.email, address: request.address }, profile);
         setSaving(false);
+        setConfirmingRemoval(false);
         if (!result.success) {
             if (result.errors) setErrors(result.errors);
             toast.error(result.message);
-            return;
-        }
-        if (result.data.otpRequired) {
-            goToOtp(navigate, result.data);
             return;
         }
         toast.success(result.message);
         onChange(result.data);
     };
 
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        if (saving) return;
+        const nextErrors = validateContact(request);
+        setErrors(nextErrors);
+        if (Object.keys(nextErrors).length > 0) {
+            event.currentTarget.querySelector('[aria-invalid="true"]')?.focus();
+            return;
+        }
+        if (profile.email && !request.email) {
+            setConfirmingRemoval(true);
+            return;
+        }
+        save();
+    };
+
     return (
         <SectionCard
             id="contact-title"
             title="Thông tin liên hệ"
-            description="Bạn có thể tự cập nhật. Số điện thoại và email dùng để đăng nhập nên phải xác minh trước khi đổi."
+            description="Bạn có thể tự cập nhật. Đổi số điện thoại cần mật khẩu và mã OTP gửi tới số mới; email mới cần xác nhận qua link gửi tới email đó."
         >
             <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
                 <div className="field">
@@ -479,7 +549,7 @@ const ContactSection = ({ profile, isPatient, onChange }) => {
                     </div>
                     <p className="flex flex-wrap items-center gap-2 text-caption text-muted">
                         <span className="badge badge-success">Đã xác minh</span>
-                        Đổi số cần mã OTP gửi về số mới.
+                        Đổi số cần mật khẩu và mã OTP gửi về số mới.
                     </p>
                 </div>
 
@@ -509,7 +579,7 @@ const ContactSection = ({ profile, isPatient, onChange }) => {
                     />
                 </FormField>
 
-                {isPatient &&
+                {PROFILE_FEATURES.emergencyContact &&
                     (values.emergencyContact ? (
                         <EmergencyContactFields
                             person={values.emergencyContact}
@@ -534,10 +604,6 @@ const ContactSection = ({ profile, isPatient, onChange }) => {
                         </div>
                     ))}
 
-                {dirty && request.email && request.email !== profile.email.toLowerCase() && (
-                    <p className="help-text">Email mới cần xác minh bằng mã OTP gửi tới email đó trước khi được lưu.</p>
-                )}
-
                 <div className="flex justify-end gap-3 border-t border-border pt-5">
                     <button type="button" className="btn btn-secondary" disabled={!dirty || saving} onClick={handleCancel}>
                         Hủy
@@ -548,7 +614,8 @@ const ContactSection = ({ profile, isPatient, onChange }) => {
                     </button>
                 </div>
             </form>
-            {changingPhone && <PhoneChangeModal onClose={() => setChangingPhone(false)} />}
+            {changingPhone && <PhoneChangeModal profile={profile} onClose={() => setChangingPhone(false)} />}
+            {confirmingRemoval && <RemoveEmailModal saving={saving} onConfirm={save} onClose={() => setConfirmingRemoval(false)} />}
         </SectionCard>
     );
 };
@@ -556,7 +623,10 @@ const ContactSection = ({ profile, isPatient, onChange }) => {
 // ---------- Page ----------
 
 const ProfileSummary = ({ profile, isPatient }) => {
-    const meta = isPatient
+    const showDetails = PROFILE_FEATURES.summaryDetails;
+    const meta = !showDetails
+        ? []
+        : isPatient
         ? [
               profile.lastVisitAt && `Lần khám gần nhất: ${formatDate(profile.lastVisitAt)}`,
               profile.createdAt && `Đã đăng ký từ ${formatMonth(profile.createdAt)}`,
@@ -570,12 +640,12 @@ const ProfileSummary = ({ profile, isPatient }) => {
             <div className="min-w-0 flex-1">
                 <p className="truncate font-heading text-heading-2 text-ink">{profile.fullname}</p>
                 <div className="mt-1.5 flex flex-wrap gap-2">
-                    {isPatient && profile.code ? (
+                    {showDetails && isPatient && profile.code ? (
                         <span className="chip-queue num">Mã BN: {profile.code}</span>
                     ) : (
                         <span className="chip-queue">{ROLE_LABELS[profile.role]}</span>
                     )}
-                    {profile.status === "active" && <span className="badge badge-success">Đang hoạt động</span>}
+                    {showDetails && profile.status === "active" && <span className="badge badge-success">Đang hoạt động</span>}
                 </div>
                 {metaText && <p className="num mt-1.5 text-caption text-muted">{metaText}</p>}
             </div>
@@ -629,9 +699,13 @@ const ProfilePage = () => {
                 <ProfileSummary profile={profile} isPatient={isPatient} />
                 <IdentitySection profile={profile} onChange={setUpdated} />
                 {/* key: a saved profile resets the form to the stored values. */}
-                <ContactSection key={JSON.stringify(toContactValues(profile))} profile={profile} isPatient={isPatient} onChange={setUpdated} />
-                {isPatient && <HealthInfoCard health={profile.health} onChange={setUpdated} />}
-                {isDoctor && <CertificatesCard certificates={profile.certificates} onChange={setUpdated} />}
+                {isPatient ? (
+                    <ContactSection key={JSON.stringify(toContactValues(profile))} profile={profile} onChange={setUpdated} />
+                ) : (
+                    <StaffContactSection profile={profile} />
+                )}
+                {PROFILE_FEATURES.healthInfo && isPatient && <HealthInfoCard health={profile.health} onChange={setUpdated} />}
+                {PROFILE_FEATURES.certificates && isDoctor && <CertificatesCard certificates={profile.certificates} onChange={setUpdated} />}
             </div>
         </>
     );

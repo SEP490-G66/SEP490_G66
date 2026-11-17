@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import Card from "@/components/ui/Card";
 import { toast } from "react-toastify";
 import { requestPasswordReset, resendRegisterOtp, verifyRegisterOtp, verifyResetOtp } from "../../services/authService";
-import { cancelProfileOtp, hasPendingProfileChanges, resendProfileOtp, verifyProfileOtp } from "../../services/profileService";
+import { resendProfileOtp, verifyProfileOtp } from "../../services/profileService";
 import { OTP_LENGTH, OTP_RESEND_SECONDS, PROFILE_MESSAGES } from "../../utils/messages";
 import { ROUTES } from "../../utils/routes";
 import { invalidMessage, requiredMessage } from "../../utils/validation";
@@ -22,7 +22,7 @@ const formatCountdown = (seconds) => {
 
 const VerifyOtpPage = () => {
     const navigate = useNavigate();
-    const { state } = useLocation();
+    const { state, pathname } = useLocation();
     const inputRefs = useRef([]);
     const [digits, setDigits] = useState(EMPTY_CODE);
     const [codeError, setCodeError] = useState();
@@ -37,11 +37,11 @@ const VerifyOtpPage = () => {
     }, [secondsLeft]);
 
     // Used by Forgot Password, by Register (state.flow === "register", identified by the backend sessionId)
-    // and by Profile (state.flow === "profile", the changes wait in profileService until the code is verified).
+    // and by Profile (state.flow === "profile", the backend keeps the changes under sessionId until the code is verified).
     const isRegister = state?.flow === "register";
-    const isProfile = state?.flow === "profile";
+    const isProfile = state?.flow === "profile" || pathname === ROUTES.PROFILE_VERIFY_OTP;
     if (isProfile) {
-        if (!hasPendingProfileChanges()) return <Navigate to={ROUTES.PROFILE} replace />;
+        if (!state?.sessionId) return <Navigate to={ROUTES.PROFILE} replace />;
     } else if (isRegister ? !state.sessionId : !state?.sessionId || !state?.identifier) {
         return <Navigate to={isRegister ? ROUTES.REGISTER : ROUTES.FORGOT_PASSWORD} replace />;
     }
@@ -103,7 +103,7 @@ const VerifyOtpPage = () => {
         setResending(true);
         try {
             let result;
-            if (isProfile) result = await resendProfileOtp();
+            if (isProfile) result = await resendProfileOtp({ sessionId });
             else if (isRegister) result = await resendRegisterOtp({ sessionId });
             else result = await requestPasswordReset({ identifier });
             if (result.success) {
@@ -126,9 +126,8 @@ const VerifyOtpPage = () => {
         }
     };
 
-    // Drops the pending profile changes; nothing was saved.
+    // Nothing was saved; the backend drops the pending change when its code expires.
     const handleCancelProfile = () => {
-        cancelProfileOtp();
         navigate(ROUTES.PROFILE, { replace: true });
     };
 
@@ -151,7 +150,7 @@ const VerifyOtpPage = () => {
         setLoading(true);
         try {
             if (isProfile) {
-                const result = await verifyProfileOtp({ code });
+                const result = await verifyProfileOtp({ sessionId, code });
                 if (result.success) {
                     toast.success(PROFILE_MESSAGES.UPDATE_SUCCESS);
                     navigate(ROUTES.PROFILE, { replace: true });
@@ -192,7 +191,7 @@ const VerifyOtpPage = () => {
                 <h1 className="auth-title">Nhập mã xác minh (OTP)</h1>
                 <p className="auth-subtitle">
                     {isProfile
-                        ? `Mã xác minh gồm 6 chữ số vừa được gửi đến ${state.isEmail ? "email" : "số điện thoại"} ${maskedDestination}. Vui lòng nhập mã để xác nhận thay đổi thông tin cá nhân.`
+                        ? `Mã xác minh gồm 6 chữ số vừa được gửi đến số điện thoại ${maskedDestination}. Vui lòng nhập mã để xác nhận đổi số điện thoại.`
                         : `Mã xác minh gồm 6 chữ số vừa được gửi${maskedDestination ? ` đến ${maskedDestination}` : ""}. Vui lòng nhập mã để tiếp tục.`}
                 </p>
 

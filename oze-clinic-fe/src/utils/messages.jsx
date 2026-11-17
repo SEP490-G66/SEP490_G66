@@ -51,6 +51,13 @@ export const PROFILE_MESSAGES = {
     UPDATE_SUCCESS: "Cập nhật thông tin cá nhân thành công!",
     OTP_SENT: "Mã xác minh đã được gửi. Vui lòng nhập mã để hoàn tất cập nhật.",
     NO_CHANGES: "Không có thông tin nào thay đổi.",
+    LOAD_FAILED: "Không tải được hồ sơ. Vui lòng thử lại.",
+    UPDATE_FAILED: "Không cập nhật được hồ sơ. Vui lòng thử lại.",
+    NOT_LINKED: "Tài khoản chưa gắn với hồ sơ bệnh nhân. Vui lòng liên hệ quầy lễ tân.",
+    MISSING_IDENTITY: "Hồ sơ của bạn còn thiếu ngày sinh hoặc giới tính. Vui lòng liên hệ quầy lễ tân để bổ sung.",
+    OTP_EXPIRED: "Mã xác minh đã hết hạn. Vui lòng đổi số điện thoại lại.",
+    CHANGED_MEANWHILE: "Hồ sơ vừa được thay đổi ở nơi khác. Vui lòng đổi số điện thoại lại.",
+    EMAIL_LINK_SENT: "Đã cập nhật. Link xác nhận đã được gửi tới email mới.",
 };
 
 export const CHANGE_PASSWORD_TEXT = {
