@@ -15,10 +15,11 @@ const FieldError = ({ id, message }) =>
     ) : null;
 
 // One treatment session of a planned service ("Buổi 1"): content, service type, planned date, cost, description.
-// session: see utils/examination (newPlanSession). typeOptions: [{ id, name, price }] of the service.
-// errors: { title?, typeId? } from validatePlan. onChange receives the changed fields; picking a type fills an empty cost.
+// session: see utils/examination (newPlanSession). typeOptions: [{ id, name, price }] of the service (its variants);
+// a service without variants has no type field. errors: { title?, typeId?, date? } from validatePlan.
+// onChange receives the changed fields; picking a type fills an empty cost.
 const PlanSessionForm = ({ index, session, typeOptions = [], errors = {}, onChange, onRemove }) => {
-    const ids = { title: useId(), type: useId(), date: useId(), cost: useId(), note: useId(), titleError: useId(), typeError: useId() };
+    const ids = { title: useId(), type: useId(), date: useId(), cost: useId(), note: useId(), titleError: useId(), typeError: useId(), dateError: useId() };
 
     const changeType = (typeId) => {
         const type = typeOptions.find((option) => option.id === typeId);
@@ -53,35 +54,46 @@ const PlanSessionForm = ({ index, session, typeOptions = [], errors = {}, onChan
                 <FieldError id={ids.titleError} message={errors.title} />
             </div>
 
-            <div className="field">
-                <label htmlFor={ids.type} className="label">
-                    Loại dịch vụ
-                    <Required />
-                </label>
-                <select
-                    id={ids.type}
-                    className="input"
-                    value={session.typeId}
-                    aria-invalid={errors.typeId ? true : undefined}
-                    aria-describedby={errors.typeId ? ids.typeError : undefined}
-                    onChange={(event) => changeType(event.target.value)}
-                >
-                    <option value="">Chọn loại dịch vụ</option>
-                    {typeOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                            {option.name} · {formatNumber(option.price)} ₫
-                        </option>
-                    ))}
-                </select>
-                <FieldError id={ids.typeError} message={errors.typeId} />
-            </div>
+            {typeOptions.length > 0 && (
+                <div className="field">
+                    <label htmlFor={ids.type} className="label">
+                        Loại dịch vụ
+                        <Required />
+                    </label>
+                    <select
+                        id={ids.type}
+                        className="input"
+                        value={session.typeId}
+                        aria-invalid={errors.typeId ? true : undefined}
+                        aria-describedby={errors.typeId ? ids.typeError : undefined}
+                        onChange={(event) => changeType(event.target.value)}
+                    >
+                        <option value="">Chọn loại dịch vụ</option>
+                        {typeOptions.map((option) => (
+                            <option key={option.id} value={option.id}>
+                                {option.name} · {formatNumber(option.price)} ₫
+                            </option>
+                        ))}
+                    </select>
+                    <FieldError id={ids.typeError} message={errors.typeId} />
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="field">
                     <label htmlFor={ids.date} className="label">
                         Ngày dự kiến
                     </label>
-                    <input id={ids.date} type="date" className="input" value={session.date} onChange={(event) => onChange({ date: event.target.value })} />
+                    <input
+                        id={ids.date}
+                        type="date"
+                        className="input"
+                        value={session.date}
+                        aria-invalid={errors.date ? true : undefined}
+                        aria-describedby={errors.date ? ids.dateError : undefined}
+                        onChange={(event) => onChange({ date: event.target.value })}
+                    />
+                    <FieldError id={ids.dateError} message={errors.date} />
                 </div>
                 <div className="field">
                     <label htmlFor={ids.cost} className="label">
