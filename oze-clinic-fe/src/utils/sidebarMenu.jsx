@@ -27,8 +27,6 @@ import { ROUTES } from "./routes";
 export const SIDEBAR_BADGES = {
     PENDING_LEAVES: "pendingLeaves",
     PENDING_REFUNDS: "pendingRefunds",
-    WAITING_PATIENTS: "waitingPatients",
-    PENDING_IMAGING_REVIEWS: "pendingImagingReviews",
 };
 
 const DASHBOARD_LINK = { key: "dashboard", label: "Tổng quan", icon: LayoutDashboard, to: ROUTES.DASHBOARD };
@@ -87,8 +85,8 @@ const SIDEBAR_MENU = {
     ],
     [USER_ROLES.DOCTOR]: [
         DASHBOARD_LINK,
-        { key: "examination", label: "Khám bệnh", icon: Stethoscope, to: ROUTES.DOCTOR_EXAMINATION, badge: SIDEBAR_BADGES.WAITING_PATIENTS },
-        { key: "imaging-reviews", label: "Duyệt kết quả chụp", icon: Image, to: ROUTES.DOCTOR_IMAGING_REVIEWS, badge: SIDEBAR_BADGES.PENDING_IMAGING_REVIEWS },
+        { key: "examination", label: "Khám bệnh", icon: Stethoscope, to: ROUTES.DOCTOR_EXAMINATION },
+        { key: "imaging-reviews", label: "Duyệt kết quả chụp", icon: Image, to: ROUTES.DOCTOR_IMAGING_REVIEWS },
         { ...ACCOUNT_GROUP, children: [...WORK_GROUP.children, ...ACCOUNT_GROUP.children] },
     ],
     // No overview page: the technician works from the imaging queue (also where /dashboard leads, see DashboardPage)
