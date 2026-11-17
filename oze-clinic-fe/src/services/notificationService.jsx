@@ -14,15 +14,17 @@ const { PATIENT, DOCTOR, DENTAL_IMAGING_TECHNICIAN, RECEPTIONIST, CLINIC_MANAGER
 
 // Page to open for a notification, by the backend's ReferenceType (NotificationConstants.Reference) and the user's role.
 // A function gets the ReferenceId. Missing: the header says the content cannot be opened.
+// The doctor's pages for appointments, treatment plans and imaging orders are not built (ComingSoonPage): the doctor
+// works on them in "Khám bệnh" and reads films in "Duyệt kết quả chụp".
 const REFERENCE_PAGES = {
     Appointment: {
         [PATIENT]: (id) => generatePath(ROUTES.APPOINTMENT_DETAIL, { appointmentId: id }),
-        [DOCTOR]: ROUTES.DOCTOR_APPOINTMENTS,
+        [DOCTOR]: ROUTES.DOCTOR_EXAMINATION,
         [RECEPTIONIST]: ROUTES.RECEPTION_APPOINTMENTS,
     },
     ImagingRequest: {
         [DENTAL_IMAGING_TECHNICIAN]: ROUTES.TECHNICIAN_IMAGING_REQUESTS,
-        [DOCTOR]: ROUTES.DOCTOR_IMAGING_REQUESTS,
+        [DOCTOR]: ROUTES.DOCTOR_IMAGING_REVIEWS,
     },
     Examination: {
         [PATIENT]: (id) => generatePath(ROUTES.MEDICAL_RECORD_DETAIL, { examinationId: id }),
@@ -30,7 +32,7 @@ const REFERENCE_PAGES = {
     },
     TreatmentPlan: {
         [PATIENT]: ROUTES.MEDICAL_RECORD,
-        [DOCTOR]: ROUTES.DOCTOR_TREATMENT_PLANS,
+        [DOCTOR]: ROUTES.DOCTOR_EXAMINATION,
     },
     Invoice: {
         [PATIENT]: ROUTES.PAYMENT_DEBTS,

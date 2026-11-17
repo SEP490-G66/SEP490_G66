@@ -8,7 +8,7 @@ import Toggle from "@/components/ui/Toggle";
 import useAsync from "@/hooks/useAsync";
 import { activateServiceType, getServiceTypes } from "@/services/serviceManagementService";
 import { cx } from "@/utils/cx";
-import { roomTypeLabel } from "@/utils/room";
+import { roomTypeLabel } from "@/utils/constants/room";
 
 const SKELETON_ROW_COUNT = 3;
 const COLUMN_COUNT = 6;

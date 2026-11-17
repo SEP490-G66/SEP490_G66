@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { cx } from "@/utils/cx";
-import { RECEPTION_DESK, ROOM_TYPE_OPTIONS, ROOM_TYPES } from "@/utils/room";
-import { SHIFT_STATUSES } from "@/utils/shift";
+import { RECEPTION_DESK, ROOM_TYPE_OPTIONS, ROOM_TYPES } from "@/utils/constants/room";
+import { SHIFT_STATUSES } from "@/utils/constants/shift";
 import { ShiftStatusText } from "./ShiftStatus";
 
 // Card border per room type; the legend under the grid uses the same colours.

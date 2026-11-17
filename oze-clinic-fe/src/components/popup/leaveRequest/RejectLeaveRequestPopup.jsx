@@ -1,7 +1,7 @@
 import { useState } from "react";
 import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
-import { leaveSlotLabel } from "@/utils/shift";
+import { leaveSlotLabel } from "@/utils/constants/shift";
 import { formatDate } from "@/utils/format";
 import { isRequiredEmpty, requiredMessage } from "@/utils/validation";
 

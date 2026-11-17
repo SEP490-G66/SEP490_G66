@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { lockStaffAccount } from "@/services/staffService";
-import { staffRoleLabel } from "@/utils/staff";
+import { staffRoleLabel } from "@/utils/constants/staff";
 
 // "Khoá tài khoản" confirmation. The backend refuses while the staff member still has upcoming shifts or
 // appointments; its message is shown here so the manager knows what to move first. onSaved(message) runs after a lock.

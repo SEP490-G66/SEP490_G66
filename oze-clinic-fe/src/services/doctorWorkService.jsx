@@ -1,64 +1,101 @@
-import {
-    DOCTOR_TASK_TYPES,
-    MOCK_DOCTOR_QUEUE,
-    MOCK_DOCTOR_SHIFT,
-    MOCK_DOCTOR_TASKS,
-    MOCK_DOCTOR_TODAY,
-} from "../utils/data/mockDoctorDashboard";
+import api from "./api";
+import { callPatient, getExamWorkspace } from "./examinationService";
+import { getMyShifts } from "./myScheduleService";
+import { call } from "./receptionService";
+import { formatClock, getClinicToday } from "../utils/format";
+import { imagingTypeLabel } from "../utils/imagingRequest";
+import { GENDER_LABELS, QUEUE_STATUS } from "../utils/messages";
 
-// TODO(api): mock only, swap for the doctor's queue / review endpoints once the backend has them.
-const MOCK_DELAY_MS = 300;
+// Doctor's "Tổng quan". Every call returns the ApiResponse shape ({ success, message, data, errors }).
+// Real API: the room of the shift (GET api/doctor-room), today's shifts (GET api/schedules/my),
+// films waiting for the doctor (GET api/imaging-reviews?status=Pending).
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const DOCTOR_TASK_TYPES = {
+    IMAGING_REVIEW: "imaging_review",
+};
 
 const success = (data, message = null) => ({ success: true, message, data, errors: null });
-
 const failure = (message) => ({ success: false, message, data: null, errors: null });
 
-const queue = MOCK_DOCTOR_QUEUE.map((patient) => ({ ...patient }));
-const today = { ...MOCK_DOCTOR_TODAY, inExamination: null };
+const minutesSince = (value) => (value ? Math.max(0, Math.round((Date.now() - Date.parse(value)) / 60_000)) : 0);
 
-const countTasks = (type) => MOCK_DOCTOR_TASKS.filter((task) => task.type === type).length;
+const ageOf = (birthDate) => {
+    if (!birthDate) return null;
+    const [year, month, day] = birthDate.split("-").map(Number);
+    const [nowYear, nowMonth, nowDay] = getClinicToday().split("-").map(Number);
+    return nowYear - year - (nowMonth < month || (nowMonth === month && nowDay < day) ? 1 : 0);
+};
 
-// Everything the doctor's dashboard shows: today's shift, numbers, waiting queue and tasks to review.
+// The shift running now, else the first one of today still to come, else the last one
+const shiftOfToday = (shifts) => {
+    const now = formatClock(new Date());
+    const shift =
+        shifts.find((item) => item.actualStartTime && !item.actualEndTime) ??
+        shifts.find((item) => now < String(item.shiftEnd ?? "").slice(0, 5)) ??
+        shifts[shifts.length - 1];
+    return shift ? { start: String(shift.shiftStart ?? "").slice(0, 5), end: String(shift.shiftEnd ?? "").slice(0, 5), roomName: shift.roomName ?? null } : null;
+};
+
+// A patient still waiting in the room's queue, as the dashboard shows it
+const toWaiting = (item) => ({
+    id: item.appointmentId,
+    queueNumber: item.queueNumber,
+    patientName: item.patientName,
+    gender: GENDER_LABELS[String(item.gender ?? "").toLowerCase()] ?? null,
+    age: ageOf(item.dateOfBirth),
+    appointmentTime: item.timeSlotStart ? item.timeSlotStart.slice(0, 5) : null,
+    checkInAt: item.checkInAt ? formatClock(item.checkInAt) : "",
+    waitedMinutes: minutesSince(item.checkInAt),
+    atImaging: item.atImaging,
+    reason: item.reason || item.services?.map((service) => service.name).join(", ") || "",
+});
+
+const toTask = (review) => ({
+    id: review.id,
+    type: DOCTOR_TASK_TYPES.IMAGING_REVIEW,
+    title: "Duyệt kết quả chụp",
+    detail: [review.patient?.name, imagingTypeLabel(review.imagingType), review.capturedAt && `chụp lúc ${formatClock(review.capturedAt)}`].filter(Boolean).join(" · "),
+    status: "Chờ duyệt",
+});
+
+// Everything the doctor's dashboard shows: today's shift, numbers, waiting queue and films to review.
+// A part whose call fails is left empty; the page fails only when the room cannot be read.
 export const getDoctorDashboard = async () => {
-    await wait(MOCK_DELAY_MS);
+    const today = getClinicToday();
+    const [room, shifts, reviews] = await Promise.all([
+        call(() => api.get("/api/doctor-room")),
+        getMyShifts({ fromDate: today, toDate: today }),
+        call(() => api.get("/api/imaging-reviews", { params: { status: "Pending" } })),
+    ]);
+    if (!room.success) return room;
 
-    const inExamination = today.inExamination ? 1 : 0;
+    const queue = room.data?.queue ?? [];
+    const done = room.data?.done ?? [];
+    const waiting = queue.filter((item) => item.status === "WAITING");
+    const inExamination = queue.filter((item) => item.status === "CALLED" || item.status === "IN_PROGRESS").length;
+    const tasks = reviews.success ? (reviews.data ?? []).map(toTask) : [];
+    const todayShifts = shifts.success ? (Array.isArray(shifts.data) ? shifts.data : (shifts.data?.items ?? [])) : [];
+
     return success({
-        shift: { ...MOCK_DOCTOR_SHIFT },
+        shift: shiftOfToday(todayShifts),
         stats: {
-            totalToday: queue.length + inExamination + today.completed,
-            waiting: queue.length,
+            totalToday: queue.length + done.length,
+            waiting: waiting.length,
             inExamination,
-            completed: today.completed,
-            longestWaitMinutes: Math.max(0, ...queue.map((patient) => patient.waitedMinutes)),
-            pendingImagingResults: today.pendingImagingResults,
+            completed: done.length,
+            longestWaitMinutes: Math.max(0, ...waiting.map((item) => minutesSince(item.checkInAt))),
+            pendingImagingResults: reviews.success ? tasks.length : null,
         },
-        inExamination: today.inExamination ? { ...today.inExamination } : null,
-        queue: queue.map((patient) => ({ ...patient })),
-        tasks: MOCK_DOCTOR_TASKS.map((task) => ({ ...task })),
+        queue: waiting.map(toWaiting),
+        tasks,
     });
 };
 
-// Calls the first patient in line into the room. The one being examined before counts as done.
+// Calls the first patient in line who is not away for an X-ray, as the "Khám bệnh" page does.
 export const callNextPatient = async () => {
-    await wait(MOCK_DELAY_MS);
-
-    const next = queue.shift();
-    if (!next) return failure("Không còn bệnh nhân nào trong hàng chờ.");
-
-    if (today.inExamination) today.completed += 1;
-    today.inExamination = next;
-    return success({ ...next }, `Đã gọi số ${next.queueNumber} – ${next.patientName} vào ${MOCK_DOCTOR_SHIFT.roomName}.`);
-};
-
-// Counts for the doctor's sidebar: patients waiting and imaging results to review.
-export const getDoctorPendingCounts = async () => {
-    await wait(MOCK_DELAY_MS);
-
-    return success({
-        waitingPatients: queue.length,
-        pendingImagingReviews: countTasks(DOCTOR_TASK_TYPES.IMAGING_REVIEW),
-    });
+    const workspace = await getExamWorkspace();
+    if (!workspace.success) return workspace;
+    const next = workspace.data.queue.find((item) => item.status === QUEUE_STATUS.WAITING && !item.atImaging);
+    if (!next) return failure("Không còn bệnh nhân nào chờ gọi (có thể đang đi chụp X-quang).");
+    return callPatient(next.id);
 };

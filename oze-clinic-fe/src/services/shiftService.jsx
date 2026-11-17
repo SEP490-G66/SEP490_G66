@@ -1,7 +1,7 @@
 import { formatDate, toDateOnly } from "../utils/format";
 import { BACKEND_ROLE_NAMES, USER_ROLES } from "../utils/messages";
-import { RECEPTION_DESK, ROOM_STATUSES, ROOM_TYPES } from "../utils/room";
-import { AFTERNOON_STARTS_AT, LEAVE_REQUEST_STATUSES, SHIFT_SLOTS, SHIFT_SLOT_OPTIONS, SHIFT_STATUSES } from "../utils/shift";
+import { RECEPTION_DESK, ROOM_STATUSES, ROOM_TYPES } from "../utils/constants/room";
+import { AFTERNOON_STARTS_AT, LEAVE_REQUEST_STATUSES, SHIFT_SLOTS, SHIFT_SLOT_OPTIONS, SHIFT_STATUSES } from "../utils/constants/shift";
 import api from "./api";
 import { call } from "./receptionService";
 

@@ -1,4 +1,4 @@
-import { LEAVE_REQUEST_STATUSES, leaveMessage } from "../utils/shift";
+import { LEAVE_REQUEST_STATUSES, leaveMessage } from "../utils/constants/shift";
 import { BACKEND_ROLE_NAMES } from "../utils/messages";
 import api from "./api";
 import { call } from "./receptionService";

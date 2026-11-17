@@ -9,7 +9,7 @@ import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
 import useAsync from "@/hooks/useAsync";
 import { getAllDebts, getDebt, getDebts } from "@/services/debtService";
-import { DEBT_AGE_FILTER_LABELS, DEBT_SORTS, DEBT_SORT_LABELS, DEBT_STATUS_LABELS, DEBT_STATUS_OPTIONS, DEBT_TYPE_LABELS } from "@/utils/debt";
+import { DEBT_AGE_FILTER_LABELS, DEBT_SORTS, DEBT_SORT_LABELS, DEBT_STATUS_LABELS, DEBT_STATUS_OPTIONS, DEBT_TYPE_LABELS } from "@/utils/constants/debt";
 import { formatCurrency, formatDateTime, getClinicToday } from "@/utils/format";
 import { downloadExcel } from "@/utils/reportExport";
 

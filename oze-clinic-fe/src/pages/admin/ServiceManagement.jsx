@@ -12,7 +12,7 @@ import Toggle from "@/components/ui/Toggle";
 import useAsync from "@/hooks/useAsync";
 import { activateService, getServices } from "@/services/serviceManagementService";
 import { cx } from "@/utils/cx";
-import { ROOM_TYPE_OPTIONS, roomTypeLabel } from "@/utils/room";
+import { ROOM_TYPE_OPTIONS, roomTypeLabel } from "@/utils/constants/room";
 
 const SEARCH_DELAY_MS = 300;
 const SKELETON_ROW_COUNT = 5;

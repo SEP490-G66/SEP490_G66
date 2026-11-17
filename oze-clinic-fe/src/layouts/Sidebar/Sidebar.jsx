@@ -5,7 +5,6 @@ import LogoOze from "@/assets/logo/Logo.png";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { REQUEST_TYPES, getPendingRequests } from "@/services/adminReportService";
-import { getDoctorPendingCounts } from "@/services/doctorWorkService";
 import { LEAVE_REQUESTS_CHANGED_EVENT } from "@/services/leaveRequestService";
 import { REFUND_REQUESTS_CHANGED_EVENT } from "@/services/refundRequestService";
 import { cx } from "@/utils/cx";
@@ -45,14 +44,6 @@ const BADGE_LOADERS = {
         return {
             [SIDEBAR_BADGES.PENDING_LEAVES]: countOf(REQUEST_TYPES.LEAVE),
             [SIDEBAR_BADGES.PENDING_REFUNDS]: countOf(REQUEST_TYPES.REFUND),
-        };
-    },
-    [USER_ROLES.DOCTOR]: async () => {
-        const result = await getDoctorPendingCounts();
-        if (!result.success) return {};
-        return {
-            [SIDEBAR_BADGES.WAITING_PATIENTS]: result.data.waitingPatients,
-            [SIDEBAR_BADGES.PENDING_IMAGING_REVIEWS]: result.data.pendingImagingReviews,
         };
     },
 };

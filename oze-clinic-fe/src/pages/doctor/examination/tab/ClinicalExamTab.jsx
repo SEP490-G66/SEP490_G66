@@ -21,8 +21,8 @@ const COMPLETE_HINT = "Cần ít nhất một chẩn đoán xác định để c
 
 const newId = (prefix) => `${prefix}-${Date.now()}`;
 
-// Step 2 "Khám & Chẩn đoán": symptoms, dental chart findings, X-ray orders and final diagnoses.
-// record.exam is the saved draft ({ symptoms, note, entries, films, diagnoses }); every change is saved
+// Step 2 "Khám & Chẩn đoán": reason and symptoms, dental chart findings, X-ray orders and final diagnoses.
+// record.exam is the saved draft ({ chiefComplaint, symptoms, note, entries, films, diagnoses }); every change is saved
 // automatically and passed to onExamChange so the page keeps it when the doctor moves between steps.
 // onXraySent: the patient has left for the imaging room, the page reloads the queue.
 const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComplete, onEnd, onXraySent }) => {
@@ -104,7 +104,14 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
 
     return (
         <>
-            <SymptomSection value={exam.symptoms} note={exam.note} onChange={(symptoms) => set("symptoms", symptoms)} onNoteChange={(note) => set("note", note)} />
+            <SymptomSection
+                value={exam.symptoms}
+                note={exam.note}
+                chiefComplaint={exam.chiefComplaint ?? ""}
+                onChange={(symptoms) => set("symptoms", symptoms)}
+                onNoteChange={(note) => set("note", note)}
+                onChiefComplaintChange={(chiefComplaint) => set("chiefComplaint", chiefComplaint)}
+            />
             <ExamDentalChart
                 entries={exam.entries}
                 chartType={chartType}

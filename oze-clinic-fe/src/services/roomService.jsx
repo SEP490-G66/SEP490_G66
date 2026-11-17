@@ -47,7 +47,7 @@ const toFailure = (result) => {
 const toSaveResult = (result) =>
     result.success ? { ...result, message: FORM_MESSAGES[result.message] ?? result.message, data: toRoom(result.data) } : toFailure(result);
 
-// keyword matches the name, floor or description; type / status: "" (all) or a ROOM_TYPES / ROOM_STATUSES value of utils/room.
+// keyword matches the name, floor or description; type / status: "" (all) or a ROOM_TYPES / ROOM_STATUSES value of utils/constants/room.
 export const getRooms = async ({ keyword = "", type = "", status = "", page = 1, pageSize = ROOM_PAGE_SIZE } = {}) => {
     const result = await call(() => api.get("/api/Rooms", { params: { roomType: type || undefined, status: status || undefined } }));
     if (!result.success) return result;

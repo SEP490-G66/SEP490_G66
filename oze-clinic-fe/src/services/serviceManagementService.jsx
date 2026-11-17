@@ -80,7 +80,7 @@ const loadTypes = async (serviceId) => {
     return result.success ? { ...result, data: result.data.map(toType) } : translate(result);
 };
 
-// status: "" (all), "active" or "inactive"; roomType: "" or a ROOM_TYPES value of utils/room.
+// status: "" (all), "active" or "inactive"; roomType: "" or a ROOM_TYPES value of utils/constants/room.
 export const getServices = async ({ keyword = "", roomType = "", status = "", page = 1, pageSize = SERVICE_PAGE_SIZE } = {}) => {
     const result = await call(() =>
         api.get("/api/Services", {

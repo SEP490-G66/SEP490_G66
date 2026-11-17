@@ -233,26 +233,6 @@ export const EMPTY_TREATMENT_DRAFT = { sessionId: "", items: [], note: "", follo
 // status: "Draft" until the visit is completed, then "Finalized".
 export const EMPTY_PRESCRIPTION_DRAFT = { items: [], notes: "", status: "Draft" };
 
-export const MOCK_PLAN_SERVICE_TYPES = {
-    2: [
-        { id: "scaling-one", name: "Lấy cao răng một hàm", price: 150000 },
-        { id: "scaling-full", name: "Lấy cao răng toàn hàm", price: 300000 },
-    ],
-    3: [
-        { id: "filling-composite", name: "Trám răng composite", price: 400000 },
-        { id: "filling-gic", name: "Trám răng GIC", price: 250000 },
-        { id: "filling-inlay", name: "Trám inlay / onlay sứ", price: 2500000 },
-    ],
-    4: [
-        { id: "rct-single", name: "Điều trị tủy răng một chân", price: 800000 },
-        { id: "rct-multi", name: "Điều trị tủy răng nhiều chân", price: 1500000 },
-    ],
-    5: [
-        { id: "whitening-office", name: "Tẩy trắng tại phòng khám", price: 2500000 },
-        { id: "whitening-home", name: "Tẩy trắng tại nhà (máng)", price: 1500000 },
-    ],
-};
-
 // Registered service that is the visit itself, so it never becomes a planned treatment.
 export const GENERAL_CHECKUP_SERVICE_ID = 1;
 

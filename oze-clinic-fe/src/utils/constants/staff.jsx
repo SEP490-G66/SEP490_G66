@@ -1,4 +1,4 @@
-import { USER_ROLES } from "./messages";
+import { USER_ROLES } from "../messages";
 
 // Staff account status on the page; the Staff API sends isActive (a locked account is inactive).
 export const ACCOUNT_STATUSES = {

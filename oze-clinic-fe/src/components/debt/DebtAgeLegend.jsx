@@ -1,4 +1,4 @@
-import { DEBT_AGE_LEVELS } from "@/utils/debt";
+import { DEBT_AGE_LEVELS } from "@/utils/constants/debt";
 import { cx } from "@/utils/cx";
 
 // Explains the row colours in DebtTable, youngest level first.
