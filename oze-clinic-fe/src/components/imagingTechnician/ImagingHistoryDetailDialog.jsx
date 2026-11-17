@@ -24,7 +24,9 @@ const Field = ({ label, value, wide }) => (
 // doctorName, createdAt, deviceId, completedAt, technicianNote, cancelReason, cancelledAt, images: [{ id, url? }] }.
 const ImagingHistoryDetailDialog = ({ detail, onClose }) => {
     const cancelled = detail.status === IMAGING_REQUEST_STATUSES.CANCELLED;
-    const images = detail.images ?? [];
+    // Pictures of the sample data (fileUrl null) have no file on the server: they are counted, not drawn as empty frames
+    const images = (detail.images ?? []).filter((image) => image.fileUrl);
+    const sampleCount = (detail.images ?? []).length - images.length;
     const type = imagingTypeLabel(detail.imagingType);
 
     return (
@@ -56,11 +58,11 @@ const ImagingHistoryDetailDialog = ({ detail, onClose }) => {
                             <Field label="Hoàn tất lúc" value={formatDateTime(detail.completedAt)} />
                             <Field label="Ghi chú kỹ thuật" value={detail.technicianNote} wide />
                         </Section>
-                        {images.length > 0 ? (
-                            <ImagingResultCard title={`${type} · IR-${detail.id}`} subtitle={`${images.length} ảnh`} typeLabel={type} images={images} />
-                        ) : (
-                            <p className="alert alert-warning">Chưa có ảnh cho chỉ định này.</p>
+                        {images.length > 0 && <ImagingResultCard title={`${type} · IR-${detail.id}`} subtitle={`${images.length} ảnh`} typeLabel={type} images={images} />}
+                        {sampleCount > 0 && (
+                            <p className="alert alert-info">{sampleCount} ảnh của dữ liệu mẫu không có file trên máy chủ nên không hiển thị.</p>
                         )}
+                        {images.length === 0 && sampleCount === 0 && <p className="alert alert-warning">Chưa có ảnh cho chỉ định này.</p>}
                     </>
                 )}
             </div>
