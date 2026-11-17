@@ -2,20 +2,73 @@ import { useId } from "react";
 import { Image as ImageIcon } from "lucide-react";
 import FormField from "@/components/ui/FormField";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { cx } from "@/utils/cx";
 import { formatClock } from "@/utils/format";
-import { CAPTURE_DEVICES, CAPTURE_IMAGE_COUNT_MAX, CAPTURE_STATES, CAPTURE_STATE_LABELS, devicesForImagingType, imagingTypeLabel } from "@/utils/imagingRequest";
+import {
+    CAPTURE_IMAGE_COUNT_MAX,
+    CAPTURE_STATES,
+    CAPTURE_STATE_LABELS,
+    DEVICE_READY,
+    EXPOSURE_PRESETS,
+    deviceStateLabel,
+    imagingTypeLabel,
+    modalitiesText,
+    suggestedExposure,
+} from "@/utils/imagingRequest";
 
-const deviceText = (deviceId) => {
-    const device = CAPTURE_DEVICES.find((item) => item.id === deviceId);
+const deviceText = (devices, deviceId) => {
+    const device = devices.find((item) => item.id === deviceId);
     return [deviceId, device?.name].filter(Boolean).join(" · ");
 };
 
-// Settings before the shot: device that takes this order type, number of images, exposure.
-// setup: { deviceId, imageCount, kv, ma, seconds }; onSetupChange receives the changed fields.
-const SetupForm = ({ imagingType, setup, onSetupChange, onStart, busy }) => {
+// "XR-IO-01 · Virtual Intraoral Digital Sensor 1 · Quanh chóp, Cắn cánh · Sẵn sàng", or "… · không chụp được loại này"
+const deviceOption = (devices, device) =>
+    [deviceText(devices, device.id), modalitiesText(device.supportedModalities), device.supported ? deviceStateLabel(device.state) : "không chụp được loại này"]
+        .filter(Boolean)
+        .join(" · ");
+
+const outOfRange = (value, range) => value !== "" && value != null && range && (Number(value) < range.min || Number(value) > range.max);
+
+// One exposure value with its suggestion and usual range under it ("Gợi ý 70 · thường 60–90"); warned when outside the range.
+// range: { suggested, min, max } of EXPOSURE_PRESETS, or none for an order type without a preset.
+const ExposureField = ({ id, label, unit, value, range, onChange }) => {
+    const warn = outOfRange(value, range);
+    return (
+        <div className="field">
+            <label htmlFor={id} className="label">
+                {label}
+            </label>
+            <input
+                id={id}
+                type="number"
+                min={0}
+                step="any"
+                className={cx("input num", warn && "border-warning-solid")}
+                placeholder="Theo máy"
+                value={value ?? ""}
+                onChange={onChange}
+                aria-describedby={range ? `${id}-hint` : undefined}
+            />
+            {range && (
+                <p id={`${id}-hint`} className={cx("num text-caption", warn ? "text-warning" : "text-muted")}>
+                    {warn ? "Ngoài khoảng thường dùng " : `Gợi ý ${range.suggested} ${unit} · thường `}
+                    {range.min}–{range.max} {unit}
+                </p>
+            )}
+        </div>
+    );
+};
+
+// Settings before the shot: device, number of images, exposure (suggested for the order type, empty: the device uses
+// its own values). devices: every device (GET api/imaging-devices), each with supported = takes this order type; only a
+// supported, READY one takes the order. setup: { deviceId, imageCount, kv, ma, seconds }; onSetupChange receives the changed fields.
+const SetupForm = ({ imagingType, devices, setup, onSetupChange, onStart, busy }) => {
     const id = useId();
-    const devices = devicesForImagingType(imagingType);
+    const selected = devices.find((device) => device.id === setup.deviceId);
+    const ready = Boolean(selected?.supported && selected.state === DEVICE_READY);
     const number = (key) => (event) => onSetupChange({ [key]: event.target.value });
+    const preset = EXPOSURE_PRESETS[imagingType];
+    const anyOutOfRange = preset && ["kv", "ma", "seconds"].some((key) => outOfRange(setup[key], preset[key]));
 
     return (
         <form
@@ -23,15 +76,15 @@ const SetupForm = ({ imagingType, setup, onSetupChange, onStart, busy }) => {
             className="flex flex-col gap-4"
             onSubmit={(event) => {
                 event.preventDefault();
-                if (!busy) onStart();
+                if (!busy && ready) onStart();
             }}
         >
             <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
                 <FormField id={`${id}-device`} label="Máy chụp">
                     <select id={`${id}-device`} className="input" value={setup.deviceId ?? ""} onChange={(event) => onSetupChange({ deviceId: event.target.value })}>
                         {devices.map((device) => (
-                            <option key={device.id} value={device.id}>
-                                {deviceText(device.id)}
+                            <option key={device.id} value={device.id} disabled={!device.supported}>
+                                {deviceOption(devices, device)}
                             </option>
                         ))}
                     </select>
@@ -40,22 +93,37 @@ const SetupForm = ({ imagingType, setup, onSetupChange, onStart, busy }) => {
                     <input id={`${id}-count`} type="number" min={1} max={CAPTURE_IMAGE_COUNT_MAX} className="input num" value={setup.imageCount ?? 1} onChange={number("imageCount")} />
                 </FormField>
             </div>
-            <div className="grid items-end gap-4 sm:grid-cols-[1fr_1fr_1fr_auto]">
-                <FormField id={`${id}-kv`} label="Điện áp (kV)">
-                    <input id={`${id}-kv`} type="number" step="any" className="input num" value={setup.kv ?? ""} onChange={number("kv")} />
-                </FormField>
-                <FormField id={`${id}-ma`} label="Dòng (mA)">
-                    <input id={`${id}-ma`} type="number" step="any" className="input num" value={setup.ma ?? ""} onChange={number("ma")} />
-                </FormField>
-                <FormField id={`${id}-sec`} label="Thời gian phát tia (s)">
-                    <input id={`${id}-sec`} type="number" step="any" className="input num" value={setup.seconds ?? ""} onChange={number("seconds")} />
-                </FormField>
-                <button type="submit" className="btn btn-primary" disabled={busy || !setup.deviceId}>
+            <div className="grid items-start gap-4 sm:grid-cols-3">
+                <ExposureField id={`${id}-kv`} label="Điện áp (kV)" unit="kV" value={setup.kv} range={preset?.kv} onChange={number("kv")} />
+                <ExposureField id={`${id}-ma`} label="Dòng (mA)" unit="mA" value={setup.ma} range={preset?.ma} onChange={number("ma")} />
+                <ExposureField id={`${id}-sec`} label="Thời gian phát tia (s)" unit="s" value={setup.seconds} range={preset?.seconds} onChange={number("seconds")} />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+                <p className="min-w-0 flex-1 text-caption text-muted">
+                    {preset
+                        ? `Thông số gợi ý cho “${imagingTypeLabel(imagingType)}” ở người lớn (tham khảo, có thể sửa). Để trống thì máy dùng thông số mặc định của nó.`
+                        : "Chưa có thông số gợi ý cho loại chụp này. Để trống thì máy dùng thông số mặc định của nó."}
+                </p>
+                {preset && (
+                    <button type="button" className="btn btn-secondary" onClick={() => onSetupChange(suggestedExposure(imagingType))}>
+                        Dùng thông số gợi ý
+                    </button>
+                )}
+                <button type="submit" className="btn btn-primary" disabled={busy || !ready}>
                     {busy && <span className="btn-spinner" aria-hidden />}
                     Bắt đầu chụp
                 </button>
             </div>
-            <p className="text-caption text-muted">Thông số điền sẵn theo loại chụp “{imagingTypeLabel(imagingType)}”. Máy chỉ nhận lệnh khi đang Sẵn sàng.</p>
+            {selected && !ready && (
+                <p role="status" className="text-caption text-warning">
+                    Máy {selected.id} đang ở trạng thái “{deviceStateLabel(selected.state)}”, chưa nhận lệnh chụp. Chọn máy khác hoặc chờ máy sẵn sàng.
+                </p>
+            )}
+            {anyOutOfRange && (
+                <p role="status" className="text-caption text-warning">
+                    Có thông số ngoài khoảng thường dùng. Kiểm tra lại trước khi chụp, hoặc bấm “Dùng thông số gợi ý”.
+                </p>
+            )}
         </form>
     );
 };
@@ -96,10 +164,13 @@ const ManualUploadButton = ({ onManualUpload }) =>
 // "Máy chụp" block of the capture screen, one look per CAPTURE_STATES value:
 // ready (SetupForm) → capturing (wait, Huỷ chụp) → completed (thumbnails) or failed (Chụp lại / Tải ảnh thủ công);
 // unsupported: the order type has no device (CBCT, Cephalometric…); unavailable: the device is off or busy.
-// session: { deviceId, imageCount, sentAt, finishedAt }; message: the device error or reason.
+// devices: every device, marked supported for this order type; session: { deviceId, imageCount, sentAt, finishedAt };
+// message: the device error or reason. embedded: drawn inside the order card (a band, not a card of its own).
 const CapturePanel = ({
+    embedded = false,
     state,
     imagingType,
+    devices = [],
     setup = {},
     onSetupChange,
     session = {},
@@ -112,16 +183,18 @@ const CapturePanel = ({
     onManualUpload,
     onOpenImage,
 }) => {
-    const device = deviceText(session.deviceId ?? setup.deviceId);
+    const device = deviceText(devices, session.deviceId ?? setup.deviceId);
 
     return (
-        <section aria-label="Máy chụp" className="card-app p-0">
-            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
-                <h3 className="font-heading text-body-md font-semibold text-ink">Máy chụp</h3>
+        <section aria-label="Máy chụp" className={embedded ? "border-t border-border" : "card-app p-0"}>
+            <div className={cx("flex items-center justify-between gap-3 px-5", embedded ? "pt-4" : "border-b border-border py-3.5")}>
+                <h4 className="font-heading text-body-md font-semibold text-ink">Máy chụp</h4>
                 <StatusBadge status={state} labels={CAPTURE_STATE_LABELS} />
             </div>
             <div className="flex flex-col gap-4 px-5 py-4" aria-live="polite">
-                {state === CAPTURE_STATES.READY && <SetupForm imagingType={imagingType} setup={setup} onSetupChange={onSetupChange} onStart={onStart} busy={busy} />}
+                {state === CAPTURE_STATES.READY && (
+                    <SetupForm imagingType={imagingType} devices={devices} setup={setup} onSetupChange={onSetupChange} onStart={onStart} busy={busy} />
+                )}
 
                 {state === CAPTURE_STATES.CAPTURING && (
                     <>

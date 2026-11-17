@@ -5,8 +5,8 @@ import { MANUAL_UPLOAD_EXTENSIONS } from "@/utils/imagingRequest";
 
 // Imaging technician ("Chụp chiếu", "Lịch sử chụp chiếu"). Every call returns the ApiResponse shape
 // ({ success, message, data, errors }).
-// Real API: the queue and "Hoàn thành" (ImagingRequestsController), capture and manual upload (ImagingCapturesController),
-// history (ImagingHistoryController).
+// Real API: the queue and "Hoàn thành" (ImagingRequestsController), devices, capture and manual upload
+// (ImagingCapturesController), history (ImagingHistoryController).
 
 const MESSAGES = [
     [/imaging request is Cancelled/i, "Bác sĩ đã huỷ chỉ định này."],
@@ -54,6 +54,16 @@ export const completeImagingRequest = async (id) => {
 
 // ---- Capture on the X-ray device (ImagingCapturesController; the backend talks to oze-xray-simulator) ----
 
+// These calls answer 503 when the simulator is off: the capture block says so and keeps "Tải ảnh thủ công",
+// instead of the whole app leaving for the error page.
+const DEVICE_CALL = { skipErrorPage: true };
+
+// The X-ray devices and their state: [{ id, name, serialNumber, supportedModalities: ["PANORAMIC"…], state: "READY"… }].
+export const getImagingDevices = async () => {
+    const response = translate(await call(() => api.get("/api/imaging-devices", DEVICE_CALL)));
+    return response.success ? { ...response, data: response.data ?? [] } : response;
+};
+
 const CAPTURE_STATUS = { COMPLETED: "COMPLETED", FAILED: "FAILED", CANCELLED: "CANCELLED" };
 
 const toSession = (data) => ({
@@ -66,22 +76,25 @@ const toSession = (data) => ({
 });
 
 // setup: { deviceId, imageCount, kv, ma, seconds }. data: the session { id, requestId, deviceId, imageCount, progress, sentAt }.
+// An exposure field left empty is sent as null: the device then uses its own value.
+const optionalNumber = (value) => (value === "" || value == null || Number.isNaN(Number(value)) ? null : Number(value));
+
 export const startCapture = async (requestId, setup) => {
     const body = {
         deviceId: setup.deviceId,
         imageCount: Math.max(1, Number(setup.imageCount) || 1),
-        kv: setup.kv ?? null,
-        ma: setup.ma ?? null,
-        exposureSeconds: setup.seconds ?? null,
+        kv: optionalNumber(setup.kv),
+        ma: optionalNumber(setup.ma),
+        exposureSeconds: optionalNumber(setup.seconds),
     };
-    const response = translate(await call(() => api.post(`/api/imaging-requests/${requestId}/captures`, body)));
+    const response = translate(await call(() => api.post(`/api/imaging-requests/${requestId}/captures`, body, DEVICE_CALL)));
     return response.success ? { ...response, data: toSession(response.data) } : response;
 };
 
 // state: "capturing" (with progress) until the device returns the images, then "completed" (images loaded) or "cancelled".
 // A failed capture comes back as success: false with the device's reason.
 export const getCapture = async (requestId, sessionId) => {
-    const response = await call(() => api.get(`/api/imaging-requests/${requestId}/captures/${sessionId}`));
+    const response = await call(() => api.get(`/api/imaging-requests/${requestId}/captures/${sessionId}`, DEVICE_CALL));
     // 409: the device's "done" message was being saved at the same moment; the next poll reads the result
     if (!response.success && response.status === 409) return success({ id: sessionId, state: "capturing", images: [] });
     if (!response.success) return translate(response);
@@ -99,7 +112,7 @@ export const getCapture = async (requestId, sessionId) => {
 };
 
 export const cancelCapture = async (requestId, sessionId) =>
-    translate(await call(() => api.post(`/api/imaging-requests/${requestId}/captures/${sessionId}/cancel`)));
+    translate(await call(() => api.post(`/api/imaging-requests/${requestId}/captures/${sessionId}/cancel`, null, DEVICE_CALL)));
 
 // "Tải ảnh thủ công" (POST api/imaging-requests/{id}/results, multipart). .jpg / .png get a local preview;
 // a .dcm has none (the server keeps the file, nobody reads DICOM yet).
