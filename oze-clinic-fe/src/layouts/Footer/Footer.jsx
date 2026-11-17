@@ -1,13 +1,16 @@
 import { MapPin, Phone, Clock, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { FaFacebookF, FaTiktok, FaYoutube } from "react-icons/fa";
+<<<<<<< Updated upstream
 import LogoOze from "@/assets/logo/Logo.png";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+=======
+import LogoOze from "@/assets/logo/Logo-OZE-ngang.png";
+import FooterConsultationForm from "@/components/contact/FooterConsultationForm";
+>>>>>>> Stashed changes
 import { getFooterServices } from "@/services/dentalService";
 import { getServiceDetailRoute } from "@/utils/routes";
-
-const PHONE_ID = "footer-consult-phone";
 
 const CONTACTS = [
     { icon: MapPin, text: "Số nhà 55-59, tổ 4, quốc lộ 3, Đông Anh, Hà Nội" },
@@ -16,18 +19,17 @@ const CONTACTS = [
 ];
 
 const SOCIALS = [
-    { label: "Facebook Nha khoa Oze", href: "https://www.facebook.com/nhakhoaoze.vn", icon: FaFacebookF, tone: "text-[#1877F2]" },
-    { label: "TikTok Nha khoa Oze", href: "https://www.tiktok.com/@nhakhoaganday_", icon: FaTiktok, tone: "text-black" },
-    { label: "YouTube Nha khoa Oze", href: "https://www.youtube.com/@NhakhoaOze.official", icon: FaYoutube, tone: "text-[#FF0000]" },
+    { label: "Facebook Nha khoa Oze", href: "https://www.facebook.com/nhakhoaoze.vn", icon: FaFacebookF, tone: "text-brand-facebook" },
+    { label: "TikTok Nha khoa Oze", href: "https://www.tiktok.com/@nhakhoaganday_", icon: FaTiktok, tone: "text-ink" },
+    { label: "YouTube Nha khoa Oze", href: "https://www.youtube.com/@NhakhoaOze.official", icon: FaYoutube, tone: "text-brand-youtube" },
 ];
 
 const HEADING = "font-heading text-heading-3 font-bold text-ink sm:text-heading-2";
 
-// Site footer. Lays out by the width it gets (container query), so it also fits next to the app sidebar:
-// one column on phones, two on tablets (the consultation block spans both), three from ~1024px of footer width.
 const Footer = () => {
     return (
         <footer className="@container bg-canvas px-4 py-10 sm:px-6 sm:py-16">
+<<<<<<< Updated upstream
             <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-[1.25fr_1.5fr_1.25fr] @5xl:gap-12">
                 {/* Column 1: Logo & Info */}
                 <div className="flex flex-col gap-6 sm:gap-8">
@@ -36,6 +38,14 @@ const Footer = () => {
                         alt="Nha khoa Oze"
                         className="h-auto w-56 object-contain sm:w-72"
                         style={{ filter: "brightness(0) saturate(100%) invert(32%) sepia(87%) saturate(3015%) hue-rotate(213deg) brightness(97%) contrast(93%)" }}
+=======
+            <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 @2xl:grid-cols-2 @5xl:grid-cols-8 @5xl:gap-12">
+                <div className="flex flex-col gap-6 sm:gap-8 @5xl:col-span-3">
+                    <img
+                        src={LogoOze}
+                        alt="Nha khoa Oze"
+                        className="logo-on-light h-auto w-44 object-contain sm:w-56"
+>>>>>>> Stashed changes
                     />
                     <ul className="flex flex-col gap-4">
                         {CONTACTS.map(({ icon: Icon, text, href }) => {
@@ -44,13 +54,13 @@ const Footer = () => {
                                     <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary-soft" aria-hidden="true">
                                         <Icon className="size-5 text-primary" />
                                     </span>
-                                    <span className="min-w-0 pt-2 text-body">{text}</span>
+                                    <span className="min-w-0 pt-2 text-body group-hover:text-primary">{text}</span>
                                 </>
                             );
                             return (
                                 <li key={text}>
                                     {href ? (
-                                        <a href={href} className="group flex items-start gap-4 rounded-md pointer-coarse:min-h-11 [&>span:last-child]:group-hover:text-primary">
+                                        <a href={href} className="group flex items-start gap-4 rounded-md pointer-coarse:min-h-11">
                                             {content}
                                         </a>
                                     ) : (
@@ -62,8 +72,7 @@ const Footer = () => {
                     </ul>
                 </div>
 
-                {/* Column 2: Services */}
-                <nav aria-labelledby="footer-services-title" className="flex flex-col gap-4 sm:gap-6">
+                <nav aria-labelledby="footer-services-title" className="flex flex-col gap-4 sm:gap-6 @5xl:col-span-2">
                     <h3 id="footer-services-title" className={HEADING}>
                         Dịch vụ nha khoa
                     </h3>
@@ -83,23 +92,8 @@ const Footer = () => {
                     </ul>
                 </nav>
 
-                {/* Column 3: Consultation & Social — full row on tablets, own column on wide footers */}
-                <div className="flex flex-col gap-8 @2xl:col-span-2 @2xl:grid @2xl:grid-cols-2 @2xl:gap-10 @5xl:col-span-1 @5xl:flex @5xl:gap-10">
-                    <div className="flex flex-col gap-4 sm:gap-5">
-                        <h3 className={HEADING}>Đăng ký tư vấn</h3>
-                        <div className="flex flex-col gap-2">
-                            <label htmlFor={PHONE_ID} className="text-label text-ink">
-                                Số điện thoại
-                            </label>
-                            <div className="flex gap-3">
-                                {/* Input renders its own full-width wrapper; this one lets it shrink beside the button. */}
-                                <div className="min-w-0 flex-1">
-                                    <Input id={PHONE_ID} type="tel" inputMode="tel" autoComplete="tel" placeholder="0123456789" />
-                                </div>
-                                <Button className="shrink-0 px-6 sm:px-7">Gửi</Button>
-                            </div>
-                        </div>
-                    </div>
+                <div className="flex flex-col gap-8 @2xl:col-span-2 @2xl:grid @2xl:grid-cols-2 @2xl:gap-10 @5xl:col-span-3 @5xl:flex @5xl:gap-10">
+                    <FooterConsultationForm headingClassName={HEADING} />
 
                     <div className="flex flex-col gap-4 sm:gap-5">
                         <h3 className={HEADING}>Theo dõi chúng tôi tại</h3>

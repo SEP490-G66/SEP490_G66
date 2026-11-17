@@ -82,6 +82,13 @@ export const CLINIC_MAP_EMBED_URL = `https://www.google.com/maps?q=${encodeURICo
 
 export const CONSULTATION_NOTE_MAX_LENGTH = 500;
 
+// TODO(spec): no system message is defined for a consultation request yet.
+export const CONSULTATION_TEXT = {
+    SUCCESS: "Đăng ký tư vấn thành công! Chúng tôi sẽ liên hệ với bạn sớm.",
+    ALREADY_SENT: "Số điện thoại này vừa gửi yêu cầu cách đây ít phút. Phòng khám sẽ sớm gọi lại cho bạn.",
+    SEND_FAILED: "Không gửi được yêu cầu. Vui lòng thử lại hoặc gọi phòng khám.",
+};
+
 export const APPOINTMENT_CHANGE_DEADLINE_HOURS = 24;
 
 export const CANCEL_REASON_MAX_LENGTH = 500;

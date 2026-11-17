@@ -58,6 +58,8 @@
   --color-neutral: #334155;
   --color-neutral-soft: #EEF1F5;
   --color-rating: #F5B301;
+  --color-brand-facebook: #1877F2;
+  --color-brand-youtube: #FF0000;
 
   /* Fonts (load them in index.html, see docs/SHARED_UI.md) */
   --font-sans: Inter, "Segoe UI", Roboto, Arial, sans-serif;
@@ -127,7 +129,7 @@
   /* Layout (w-sidebar, h-topbar, max-w-public ...) */
   /* [EXT] DESIGN_oze.md says 1200px; widened so public pages do not leave wide empty margins on large screens. */
   --container-public: 1440px;
-  --breakpoint-carousel: 82.5rem;
+  --breakpoint-carousel: 100rem;
   --spacing-sidebar: 256px;
   --spacing-sidebar-collapsed: 72px;
   --spacing-topbar: 64px;
@@ -347,6 +349,7 @@
   .app-shell { @apply grid min-h-dvh grid-cols-1 lg:grid-cols-[var(--spacing-sidebar)_1fr]; }
   .sidebar { @apply hidden flex-col gap-1 border-r border-border bg-canvas p-3 text-label text-body lg:flex; }
   .sidebar-under-header { @apply sticky top-public-nav; height: calc(100dvh - var(--spacing-public-nav)); }
+  .logo-on-light { filter: brightness(0) saturate(100%) invert(32%) sepia(87%) saturate(3015%) hue-rotate(213deg) brightness(97%) contrast(93%); }
   .sidebar-item { @apply flex h-control items-center gap-3 rounded-md px-3 text-label text-body hover:bg-surface-tint; }
   .sidebar-item > svg { @apply size-5 text-muted; }
   .sidebar-item-active, .sidebar-item[aria-current="page"] { @apply bg-primary-soft text-primary hover:bg-primary-soft; }
