@@ -120,7 +120,7 @@ export const getBookingDays = async ({ from, to, doctorId, services, signal } = 
                 return;
             }
             const slots = result.success ? uniqueSlots(listOf(result.data)) : [];
-            days[index] = { date: dates[index], freeSlotCount: slots.length, isWorkingDay: slots.length > 0, firstSlotStart: slots[0]?.slotStart ?? null };
+            days[index] = { date: dates[index], freeSlotCount: slots.length, isWorkingDay: slots.length > 0, firstSlotStart: slots[0]?.slotStart ?? null, firstSlotEnd: slots[0]?.slotEnd ?? null };
         }
     };
     await Promise.all(Array.from({ length: Math.min(DAY_REQUESTS_AT_ONCE, dates.length) }, worker));

@@ -9,7 +9,7 @@ const EarliestSlotBar = ({ earliest, selected, updatedAt, busy, pickBusy, onPick
             {BOOKING_TEXT.EARLIEST}{" "}
             {earliest?.slotStart && (
                 <strong className="font-semibold text-ink">
-                    <span className="whitespace-nowrap">{dayText(earliest.date)}</span> · <span className="num whitespace-nowrap">{slotRange(earliest.slotStart)}</span>
+                    <span className="whitespace-nowrap">{dayText(earliest.date)}</span> · <span className="num whitespace-nowrap">{slotRange(earliest.slotStart, earliest.slotEnd)}</span>
                 </strong>
             )}
         </p>

@@ -50,6 +50,7 @@ export const createInitialState = (today) => ({
     weekStart: weekStartOf(today),
     day: null,
     slot: null,
+    slotEnd: null,
     autoPick: "earliest",
     formShown: false,
     calendar: { open: false, month: monthOf(weekStartOf(today)) },
@@ -111,7 +112,7 @@ const relocate = (state) => {
         } else if (cause?.kind.startsWith("submit")) {
             next = { ...base, dayInfo: BOOKING_TEXT.DAY_GONE(gone, moved) };
         } else {
-            next = state.slot ? { ...base, dayInfo: BOOKING_TEXT.DAY_GONE(gone, moved), slotWarning: BOOKING_TEXT.SLOT_GONE(slotRange(state.slot)), slotWarningLive: true } : { ...base, dayInfo: BOOKING_TEXT.DAY_GONE(gone, moved) };
+            next = state.slot ? { ...base, dayInfo: BOOKING_TEXT.DAY_GONE(gone, moved), slotWarning: BOOKING_TEXT.SLOT_GONE(slotRange(state.slot, state.slotEnd)), slotWarningLive: true } : { ...base, dayInfo: BOOKING_TEXT.DAY_GONE(gone, moved) };
         }
     }
     if (!isWeekInBounds(next.weekStart, weekBounds(today))) {
@@ -131,7 +132,7 @@ const applyRange = (state, requestedAt) => {
 
 const mergeSlotsIntoDays = (days, date, slots) => ({
     ...days,
-    [date]: { ...days[date], date, freeSlotCount: slots.length, firstSlotStart: slots[0]?.slotStart ?? null },
+    [date]: { ...days[date], date, freeSlotCount: slots.length, firstSlotStart: slots[0]?.slotStart ?? null, firstSlotEnd: slots[0]?.slotEnd ?? null },
 });
 
 const applySlots = (state) => {
@@ -144,7 +145,7 @@ const applySlots = (state) => {
     if (!next.slot || data.some((slot) => slot.slotStart === next.slot)) return done;
     if (next.cause?.kind.startsWith("submit")) return { ...done, slot: null };
     const warning = next.cause?.kind === "services" ? BOOKING_TEXT.SLOT_TOO_SHORT : BOOKING_TEXT.SLOT_GONE;
-    return { ...done, slot: null, slotWarning: warning(slotRange(next.slot)), slotWarningLive: true };
+    return { ...done, slot: null, slotWarning: warning(slotRange(next.slot, next.slotEnd)), slotWarningLive: true };
 };
 
 const loadContext = (state, result) => {
@@ -187,7 +188,7 @@ const submitFailed = (state, { result, today, snapshot }) => {
         case BOOKING_ERROR_CODE.TOO_FAR_AHEAD: {
             const slotTaken = result.code === BOOKING_ERROR_CODE.SLOT_NOT_AVAILABLE;
             const next = reload(base, { kind: slotTaken ? "submit-slot" : "submit-date", today, focus: [BOOKING_IDS.SLOTS] });
-            const slotWarning = slotTaken ? BOOKING_TEXT.SUBMIT_SLOT_TAKEN(slotRange(snapshot.slot)) : BOOKING_TEXT.SUBMIT_PAST_DATE;
+            const slotWarning = slotTaken ? BOOKING_TEXT.SUBMIT_SLOT_TAKEN(slotRange(snapshot.slot, snapshot.slotEnd)) : BOOKING_TEXT.SUBMIT_PAST_DATE;
             return { ...next, slot: matches ? null : next.slot, slotWarning };
         }
         case BOOKING_ERROR_CODE.VARIANT_INACTIVE: {
@@ -318,11 +319,11 @@ export const bookingReducer = (state, action) => {
         case "SELECT_DAY":
             return { ...state, ...CLEARED_MESSAGES, day: action.date, slot: null, cause: null };
         case "SELECT_SLOT":
-            return { ...state, ...CLEARED_MESSAGES, slot: action.slot, cause: null };
+            return { ...state, ...CLEARED_MESSAGES, slot: action.slot, slotEnd: state.slots.data?.find((slot) => slot.slotStart === action.slot)?.slotEnd ?? null, cause: null };
         case "PICK_EARLIEST": {
             const earliest = getEarliest(state.today, state.range.days);
             if (!earliest) return state;
-            const next = { ...state, ...CLEARED_MESSAGES, weekStart: weekStartOf(earliest.date), day: earliest.date, slot: earliest.slotStart, cause: null };
+            const next = { ...state, ...CLEARED_MESSAGES, weekStart: weekStartOf(earliest.date), day: earliest.date, slot: earliest.slotStart, slotEnd: earliest.slotEnd, cause: null };
             return requestFocus(next, [slotId(earliest.slotStart), BOOKING_IDS.SLOTS], "slots", BOOKING_IDS.SLOTS);
         }
         case "RELOAD":

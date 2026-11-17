@@ -86,7 +86,7 @@ export const getEarliest = (today, days) => {
     const date = Object.keys(days ?? {})
         .filter((key) => key >= range.from && key <= range.to && days[key].freeSlotCount > 0)
         .sort()[0];
-    return date ? { date, slotStart: days[date].firstSlotStart } : null;
+    return date ? { date, slotStart: days[date].firstSlotStart, slotEnd: days[date].firstSlotEnd ?? null } : null;
 };
 
 export const calendarWeeks = (month, bounds, today) => {

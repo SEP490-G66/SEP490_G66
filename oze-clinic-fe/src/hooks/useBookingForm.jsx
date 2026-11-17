@@ -102,7 +102,7 @@ const useBookingForm = ({ api, guest = null }) => {
             dispatch({ type: "VALIDATE", serviceError, slotError, focus });
             return;
         }
-        const snapshot = { day: state.day, slot: state.slot, doctorId: state.doctorId };
+        const snapshot = { day: state.day, slot: state.slot, slotEnd: state.slotEnd, doctorId: state.doctorId };
         sending.current = true;
         dispatch({ type: "SUBMIT_START" });
         const payload = buildBookingPayload({ items: state.items, services, date: state.day, slotStart: state.slot, doctorId: state.doctorId, note: state.note });
