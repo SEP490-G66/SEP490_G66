@@ -1,9 +1,11 @@
 import { getMockCurrentUser, getMockUsers, updateMockUser } from "../utils/data/mockData";
 import { VALIDATION_MESSAGES } from "../utils/messages";
 import { invalidMessage } from "../utils/validation";
-import { updateSessionUserName } from "./sessionStore";
+import api from "./api";
+import { call } from "./receptionService";
+import { getSessionRole, updateSessionUserName } from "./sessionStore";
 
-// Mock of GET/PUT /api/Me and its OTP endpoints until the screens use the real API (SCRUM-105).
+// The profile is read from GET /api/Me; PUT /api/Me and its OTP endpoints are still mocked here (SCRUM-105).
 // TODO(be): code, status, emergencyContact, health, certificates and identity requests are not in /api/Me yet.
 
 const MOCK_DELAY_MS = 500;
@@ -73,7 +75,27 @@ const startOtp = (user, changes, destination) => {
 
 export const hasPendingProfileChanges = () => pendingChanges !== null;
 
-export const getMyProfile = () => withCurrentUser((user) => success(toProfile(user)));
+// GET api/Me gives name, birth date, gender, phone, email and address. The rest of the page (code, status,
+// emergency contact, health, certificates, identity request) still comes from the mock user of the role.
+// TODO(api): the changes below are still saved in the mock; the six fields above come back from the backend on reload.
+export const getMyProfile = async () => {
+    const response = await call(() => api.get("/api/Me"));
+    if (!response.success) return response;
+
+    const me = response.data ?? {};
+    const mockUser = getMockCurrentUser();
+    const base = mockUser ? toProfile(mockUser) : toProfile({ role: getSessionRole() });
+    return success({
+        ...base,
+        fullname: me.fullName ?? "",
+        birthdate: me.dateOfBirth ?? "",
+        gender: me.gender ? me.gender.toLowerCase() : "",
+        phone: me.phoneNumber ?? "",
+        email: me.email ?? "",
+        address: me.address ?? "",
+        role: getSessionRole() ?? base.role,
+    });
+};
 
 // Email, address and (patients) emergency contact. A new email is confirmed by an OTP sent to it;
 // otherwise the changes are saved straight away. Returns data.otpRequired, or the updated profile.

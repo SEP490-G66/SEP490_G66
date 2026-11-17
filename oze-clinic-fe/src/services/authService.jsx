@@ -1,6 +1,7 @@
 import api from "./api";
 import { BACKEND_LOGIN_CODES, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
-import { getDefaultMockUserId, getMockCurrentUser, setMockCurrentUserId, updateMockUser } from "../utils/data/mockData";
+import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
+import { call } from "./receptionService";
 import { invalidMessage } from "../utils/validation";
 import { clearSession, getSessionRefreshToken, getSessionToken, isAccessTokenExpired, saveSession, sessionFromAuthResult } from "./sessionStore";
 
@@ -169,36 +170,23 @@ const mockResetPassword = async ({ password }) => {
 
 export const resetPassword = async ({ token, password }) => mockResetPassword({ token, password });
 
-const MAX_CHANGE_PASSWORD_ATTEMPTS = 5;
-const LOCK_MINUTES = 15;
+// Backend (ASP.NET Identity) messages of POST api/Auth/change-password, and the form field each one belongs to
+const CHANGE_PASSWORD_ERRORS = [
+    [/incorrect password/i, "currentPassword", "Mật khẩu hiện tại không đúng."],
+    [/cannot be the same as current password/i, "newPassword", MESSAGES.MSG25],
+    [/do not match/i, "newPassword", "Mật khẩu xác nhận không khớp."],
+    [/password/i, "newPassword", invalidMessage("Mật khẩu mới")],
+];
 
-// Wrong current-password attempts in this tab. TODO(be): the backend counts these and locks the account.
-let wrongPasswordAttempts = 0;
-
-// Change password while signed in. On a wrong current password, data.attemptsLeft says how many tries remain;
-// data.locked is true once the account is locked (the screen then signs the user out).
+// Change password while signed in. The backend signs out the other devices and keeps this one (its refresh token is sent).
+// On failure, data.field names the form field the message belongs to.
 export const changePassword = async ({ currentPassword, newPassword }) => {
-    await wait(MOCK_DELAY_MS);
+    const body = { currentPassword, newPassword, confirmPassword: newPassword, refreshToken: getSessionRefreshToken() };
+    const response = await call(() => api.post("/api/Auth/change-password", body));
+    if (response.success) return success(null);
 
-    const user = getMockCurrentUser();
-    if (!user) return failure("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
-
-    if (currentPassword !== user.password) {
-        wrongPasswordAttempts += 1;
-        const attemptsLeft = MAX_CHANGE_PASSWORD_ATTEMPTS - wrongPasswordAttempts;
-        if (attemptsLeft <= 0) {
-            wrongPasswordAttempts = 0;
-            return { ...failure(MESSAGES.MSG26), data: { locked: true } };
-        }
-        return {
-            ...failure(`Mật khẩu hiện tại không đúng. Bạn còn ${attemptsLeft} lần thử trước khi tài khoản bị tạm khoá ${LOCK_MINUTES} phút.`),
-            data: { attemptsLeft },
-        };
-    }
-
-    wrongPasswordAttempts = 0;
-    if (newPassword === user.password) return failure(MESSAGES.MSG25);
-
-    updateMockUser(user.id, { password: newPassword });
-    return success(null);
+    const reasons = [response.message, ...(Array.isArray(response.errors) ? response.errors : [])].filter(Boolean).join(" ");
+    const match = CHANGE_PASSWORD_ERRORS.find(([pattern]) => pattern.test(reasons));
+    if (!match) return { ...failure(response.noResponse ? response.message : GENERIC_ERROR_MESSAGE), data: { field: "newPassword" } };
+    return { ...failure(match[2]), data: { field: match[1] } };
 };

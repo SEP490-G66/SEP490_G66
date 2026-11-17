@@ -15,21 +15,16 @@ import {
     cancelCapture,
     completeImagingRequest,
     getCapture,
+    getImagingDevices,
     getImagingQueue,
     startCapture,
     uploadManualImages,
 } from "@/services/imagingTechnicianService";
-import { CAPTURE_STATES, IMAGING_REQUEST_STATUSES, devicesForImagingType, imagingTypeLabel } from "@/utils/imagingRequest";
+import { CAPTURE_STATES, IMAGING_REQUEST_STATUSES, devicesForImagingType, imagingTypeLabel, suggestedExposure } from "@/utils/imagingRequest";
 
 const REFRESH_MS = 20_000;
 const POLL_MS = 1_000;
 const CANCELLED_MESSAGE = "Bác sĩ đã huỷ chỉ định này.";
-
-// Exposure filled in for the order type (the technician can change it).
-const EXPOSURE = {
-    "Periapical X-ray": { kv: 70, ma: 7, seconds: 0.2 },
-    Panoramic: { kv: 70, ma: 10, seconds: 14 },
-};
 
 // The queue API returns one row per order: group them by patient, the patient being imaged first, then by order time.
 // Only one patient is being imaged (activeId): the one called in, or after a reload the first one the backend has
@@ -38,7 +33,9 @@ const groupQueue = (rows, calledId, released) => {
     const groups = new Map();
     for (const row of rows) {
         const key = String(row.patientId || `order-${row.id}`);
-        if (!groups.has(key)) groups.set(key, { id: key, patientId: row.patientId, patientName: row.patientName, doctorName: row.doctorName, createdAt: row.createdAt, orders: [] });
+        if (!groups.has(key)) {
+            groups.set(key, { id: key, patientId: row.patientId, patientName: row.patientName, doctorName: row.doctorName, createdAt: row.createdAt, orders: [] });
+        }
         groups.get(key).orders.push({
             id: row.id,
             imagingType: row.imagingType,
@@ -50,6 +47,7 @@ const groupQueue = (rows, calledId, released) => {
         });
     }
     const byTime = [...groups.values()].sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
+    for (const group of byTime) group.orders.sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id - b.id);
     const activeId =
         calledId ??
         byTime.find((group) => !released.has(group.id) && group.orders.some((order) => order.requestStatus === IMAGING_REQUEST_STATUSES.IN_PROGRESS))?.id ??
@@ -60,16 +58,16 @@ const groupQueue = (rows, calledId, released) => {
     return { items, activeId };
 };
 
-const initialCapture = (order) => {
-    const devices = devicesForImagingType(order.imagingType);
-    return {
-        state: devices.length ? CAPTURE_STATES.READY : CAPTURE_STATES.UNSUPPORTED,
-        setup: { deviceId: devices[0]?.id ?? "", imageCount: 1, ...(EXPOSURE[order.imagingType] ?? {}) },
-        session: {},
-        images: [],
-        message: null,
-    };
-};
+// Capture block of one order. The device is picked when the page renders (setup.deviceId empty = the first ready device
+// that takes the order type), because the device list comes from the backend and keeps changing state.
+// Exposure starts from the suggested values of the order type (EXPOSURE_PRESETS); the technician can change them.
+const initialCapture = (order) => ({
+    state: CAPTURE_STATES.READY,
+    setup: { deviceId: "", imageCount: 1, ...suggestedExposure(order.imagingType) },
+    session: {},
+    images: [],
+    message: null,
+});
 
 const ImagingCapturePage = () => {
     usePageTitle("Chụp chiếu – OZE");
@@ -77,7 +75,6 @@ const ImagingCapturePage = () => {
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [selectedPatientId, setSelectedPatientId] = useState(null);
-    const [selectedOrderId, setSelectedOrderId] = useState(null);
     // The patient the technician called into the room (the backend has no "start imaging" step yet).
     const [calledId, setCalledId] = useState(null);
     // Patients sent back to the queue ("Trả về hàng chờ"): their InProgress orders no longer make them the one being imaged.
@@ -86,8 +83,13 @@ const ImagingCapturePage = () => {
     const [captures, setCaptures] = useState({});
     // Orders the doctor cancelled while open here (found when "Hoàn thành" is refused).
     const [cancelled, setCancelled] = useState({});
+    // { type: "complete" | "upload" | "viewer", orderId }
     const [dialog, setDialog] = useState(null);
-    const [busy, setBusy] = useState(false);
+    // Order whose device call is on its way
+    const [busyOrderId, setBusyOrderId] = useState(null);
+    // X-ray devices with their state (null until the first answer); devicesError when the device service cannot be reached.
+    const [devices, setDevices] = useState(null);
+    const [devicesError, setDevicesError] = useState(null);
 
     // Bumped to reload the queue at once (after "Hoàn thành"); otherwise it refreshes every REFRESH_MS.
     const [version, setVersion] = useState(0);
@@ -103,8 +105,20 @@ const ImagingCapturePage = () => {
 
     useEffect(() => {
         let active = true;
-        const load = () =>
-            getImagingQueue().then((response) => {
+        const loadDevices = () =>
+            getImagingDevices().then((response) => {
+                if (!active) return;
+                if (response.success) {
+                    setDevices(response.data);
+                    setDevicesError(null);
+                } else {
+                    setDevices([]);
+                    setDevicesError(response.message || "Không lấy được danh sách máy chụp.");
+                }
+            });
+        const load = () => {
+            loadDevices();
+            return getImagingQueue().then((response) => {
                 if (!active) return;
                 setLoading(false);
                 if (response.success) {
@@ -119,6 +133,7 @@ const ImagingCapturePage = () => {
                     setLoadError(response.message || "Không tải được hàng chờ chụp.");
                 }
             });
+        };
         load();
         const timer = setInterval(load, REFRESH_MS);
         return () => {
@@ -129,13 +144,30 @@ const ImagingCapturePage = () => {
 
     const { items, activeId } = useMemo(() => groupQueue(rows, calledId, released), [rows, calledId, released]);
     const patient = items.find((item) => item.id === selectedPatientId) ?? items[0] ?? null;
-    const order = patient?.orders.find((item) => item.id === selectedOrderId) ?? patient?.orders[0] ?? null;
     const called = Boolean(patient && patient.id === activeId);
     // Another patient is being imaged: this one can be looked at but not called in.
     const lockedBy = patient && activeId && !called ? items.find((item) => item.id === activeId) : null;
-    const capture = order ? (captures[order.id] ?? initialCapture(order)) : null;
     const patientCapturing = Boolean(patient?.orders.some((item) => captures[item.id]?.state === CAPTURE_STATES.CAPTURING));
-    const cancelledOrder = order ? cancelled[order.id] : null;
+
+    // Everything the card of one order shows: its capture block, the devices (all of them, the ones that take the order
+    // type first), the device used (the technician's choice, else the first one that takes the type) and the state.
+    const viewOf = (order) => {
+        const capture = captures[order.id] ?? initialCapture(order);
+        const orderDevices = devicesForImagingType(devices, order.imagingType);
+        const chosen = orderDevices.find((device) => device.supported && device.id === capture.setup.deviceId) ?? orderDevices.find((device) => device.supported);
+        const setup = { ...capture.setup, deviceId: chosen?.id ?? "" };
+        // Before a shot, the device list decides: no device service → unavailable, no device of this type → manual upload only
+        const state =
+            capture.state !== CAPTURE_STATES.READY || devices === null
+                ? capture.state
+                : devicesError
+                  ? CAPTURE_STATES.UNAVAILABLE
+                  : chosen
+                    ? CAPTURE_STATES.READY
+                    : CAPTURE_STATES.UNSUPPORTED;
+        const message = state === CAPTURE_STATES.UNAVAILABLE && capture.state === CAPTURE_STATES.READY ? devicesError : capture.message;
+        return { capture, devices: orderDevices, setup, state, message, imageCount: capture.images.length };
+    };
 
     const updateCapture = useCallback((target, changes) => {
         setCaptures((current) => {
@@ -169,11 +201,6 @@ const ImagingCapturePage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [capturingKey]);
 
-    const selectPatient = (id) => {
-        setSelectedPatientId(id);
-        setSelectedOrderId(null);
-    };
-
     const withoutReleased = (id) =>
         setReleased((current) => {
             if (!current.has(id)) return current;
@@ -196,42 +223,45 @@ const ImagingCapturePage = () => {
         setCalledId(null);
     };
 
-    const start = async () => {
-        setBusy(true);
-        const response = await startCapture(order.id, capture.setup);
-        setBusy(false);
+    const start = async (order, setup) => {
+        setBusyOrderId(order.id);
+        const response = await startCapture(order.id, setup);
+        setBusyOrderId(null);
         if (!response.success) {
-            updateCapture(order, { state: CAPTURE_STATES.UNAVAILABLE, message: response.message });
+            // Refused (device busy or off, simulator down): the form stays, with the device states read again
+            toast.error(response.message || "Máy chụp không nhận lệnh.");
+            updateCapture(order, { state: CAPTURE_STATES.READY, session: {} });
+            setVersion((v) => v + 1);
             return;
         }
         updateCapture(order, { state: CAPTURE_STATES.CAPTURING, session: response.data, images: [], message: null });
     };
 
-    const stop = async () => {
-        setBusy(true);
+    const stop = async (order, capture) => {
+        setBusyOrderId(order.id);
         const response = await cancelCapture(order.id, capture.session.id);
-        setBusy(false);
+        setBusyOrderId(null);
         if (response.success) updateCapture(order, { state: CAPTURE_STATES.READY, session: {} });
         else toast.error(response.message);
     };
 
     // Drops the order from the list: the next refresh would anyway, once it is completed or cancelled.
+    // The last order of the patient also frees the room for the next patient.
     const leaveOrder = (target, owner) => {
         setRows((current) => current.filter((row) => row.id !== target.id));
         setCaptures((current) => Object.fromEntries(Object.entries(current).filter(([id]) => id !== String(target.id))));
-        const remaining = owner.orders.filter((item) => item.id !== target.id);
-        if (remaining.length) {
-            setSelectedOrderId(remaining[0].id);
-        } else {
+        if (owner.orders.every((item) => item.id === target.id)) {
             if (calledId === owner.id) setCalledId(null);
             withoutReleased(owner.id);
             setSelectedPatientId(null);
-            setSelectedOrderId(null);
         }
     };
 
+    const dialogOrder = dialog && patient?.orders.find((item) => item.id === dialog.orderId);
+    const dialogView = dialogOrder ? viewOf(dialogOrder) : null;
+
     const complete = async () => {
-        const target = order;
+        const target = dialogOrder;
         const owner = patient;
         const response = await completeImagingRequest(target.id);
         setDialog(null);
@@ -249,12 +279,14 @@ const ImagingCapturePage = () => {
     };
 
     const upload = async (payload) => {
-        const response = await uploadManualImages(order.id, payload);
+        const target = dialogOrder;
+        const { capture } = dialogView;
+        const response = await uploadManualImages(target.id, payload);
         if (!response.success) {
             toast.error(response.message);
             return;
         }
-        updateCapture(order, {
+        updateCapture(target, {
             state: CAPTURE_STATES.COMPLETED,
             images: [...capture.images, ...response.data],
             session: { ...capture.session, deviceId: null, finishedAt: new Date().toISOString() },
@@ -264,24 +296,84 @@ const ImagingCapturePage = () => {
         setDialog(null);
     };
 
-    const subtitle = order ? `IR-${order.id} · ${patient.patientName}` : "";
-    const imageCount = capture?.images.length ?? 0;
-    // Other orders of this patient still to be imaged after this one
-    const remainingOrders = patient ? patient.orders.length - 1 : 0;
-    // Pictures from the device: the backend already completed the order and told the doctor when they arrived.
-    // Pictures uploaded by hand (deviceId null) only reach the doctor once "Hoàn thành" is pressed.
-    const sentByDevice = capture?.state === CAPTURE_STATES.COMPLETED && Boolean(capture.session.deviceId);
-    const status = lockedBy
+    // Short line under one order: what to do next
+    const orderStatus = (view) => {
+        if (view.capture.state === CAPTURE_STATES.CAPTURING) return "Đang chờ máy trả ảnh…";
+        // Pictures from the device: the backend already completed the order and told the doctor when they arrived.
+        // Pictures uploaded by hand (deviceId null) only reach the doctor once "Hoàn thành" is pressed.
+        if (view.capture.state === CAPTURE_STATES.COMPLETED && view.capture.session.deviceId) return "Ảnh đã gửi cho bác sĩ. Kiểm tra ảnh rồi bấm Hoàn thành để đóng chỉ định.";
+        return view.imageCount ? `Đã có ${view.imageCount} ảnh.` : "Chưa có ảnh. Chụp hoặc tải ảnh thủ công để hoàn thành.";
+    };
+
+    const patientStatus = lockedBy
         ? `Đang chụp cho ${lockedBy.patientName}. Hoàn thành hoặc trả về hàng chờ trước.`
-        : !called
-          ? "Bấm Gọi vào chụp khi bệnh nhân sẵn sàng."
-          : capture.state === CAPTURE_STATES.CAPTURING
-            ? "Đang chờ máy trả ảnh…"
-            : sentByDevice
-              ? "Ảnh đã gửi cho bác sĩ. Kiểm tra ảnh rồi bấm Hoàn thành để đóng chỉ định."
-              : imageCount
-                ? `Đã có ${imageCount} ảnh.`
-                : "Chưa có ảnh. Chụp hoặc tải ảnh thủ công để hoàn thành.";
+        : called
+          ? `${patient.orders.length} chỉ định của bác sĩ. Chụp lần lượt từng chỉ định rồi bấm Hoàn thành.`
+          : "Bấm Gọi vào chụp khi bệnh nhân sẵn sàng.";
+
+    const renderOrder = (order, index) => {
+        const view = viewOf(order);
+        const cancelledOrder = cancelled[order.id];
+        const busy = busyOrderId === order.id;
+        const open = (type) => setDialog({ type, orderId: order.id });
+
+        if (cancelledOrder) {
+            return (
+                <ImagingOrderCard key={order.id} order={order} index={index} total={patient.orders.length}>
+                    <div className="border-t border-border px-5 py-4">
+                        <CancelledOrderAlert order={cancelledOrder} onNext={() => leaveOrder(order, patient)} />
+                    </div>
+                </ImagingOrderCard>
+            );
+        }
+
+        return (
+            <ImagingOrderCard key={order.id} order={order} index={index} total={patient.orders.length}>
+                {called && (
+                    <>
+                        <CapturePanel
+                            embedded
+                            state={view.state}
+                            imagingType={order.imagingType}
+                            devices={view.devices}
+                            setup={view.setup}
+                            onSetupChange={(changes) => updateCapture(order, { setup: { ...view.setup, ...changes } })}
+                            session={view.capture.session}
+                            images={view.capture.images}
+                            message={view.message}
+                            busy={busy}
+                            onStart={() => start(order, view.setup)}
+                            onCancel={() => stop(order, view.capture)}
+                            onRetry={() => start(order, view.setup)}
+                            onOpenImage={() => open("viewer")}
+                        />
+                        <div className="flex flex-wrap items-center gap-3 border-t border-border px-5 py-3.5">
+                            <p className="min-w-24 flex-1 text-caption text-muted" aria-live="polite">
+                                {orderStatus(view)}
+                            </p>
+                            <div className="ml-auto flex flex-wrap justify-end gap-3">
+                                <button type="button" className="btn btn-secondary" disabled={view.capture.state === CAPTURE_STATES.CAPTURING} onClick={() => open("upload")}>
+                                    Tải ảnh thủ công
+                                </button>
+                                {/* TODO(api): only checked here; POST imaging-requests/{id}/complete still accepts an order without pictures */}
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    disabled={view.capture.state === CAPTURE_STATES.CAPTURING || view.imageCount === 0}
+                                    onClick={() => open("complete")}
+                                >
+                                    Hoàn thành
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </ImagingOrderCard>
+        );
+    };
+
+    const subtitle = dialogOrder ? `IR-${dialogOrder.id} · ${patient.patientName}` : "";
+    const remainingOrders = patient ? patient.orders.length - 1 : 0;
 
     return (
         <div className="flex flex-col gap-5">
@@ -292,62 +384,23 @@ const ImagingCapturePage = () => {
                 </p>
             )}
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-                <ImagingQueuePanel items={items} orderCount={rows.length} selectedId={patient?.id} onSelect={selectPatient} loading={loading} />
+                <ImagingQueuePanel items={items} orderCount={rows.length} selectedId={patient?.id} onSelect={setSelectedPatientId} loading={loading} />
 
-                {patient && order ? (
+                {patient ? (
                     <div className="flex min-w-0 flex-1 flex-col gap-4">
-                        {cancelledOrder && <CancelledOrderAlert order={cancelledOrder} onNext={() => leaveOrder(order, patient)} />}
                         <ImagingPatientCard patient={{ name: patient.patientName }} />
-                        <ImagingOrderCard orders={patient.orders} selectedId={order.id} onSelect={setSelectedOrderId} />
-                        {called && !cancelledOrder && (
-                            <CapturePanel
-                                state={capture.state}
-                                imagingType={order.imagingType}
-                                setup={capture.setup}
-                                onSetupChange={(changes) => updateCapture(order, { setup: { ...capture.setup, ...changes } })}
-                                session={capture.session}
-                                images={capture.images}
-                                message={capture.message}
-                                busy={busy}
-                                onStart={start}
-                                onCancel={stop}
-                                onRetry={start}
-                                onManualUpload={() => setDialog("upload")}
-                                onOpenImage={() => setDialog("viewer")}
-                            />
-                        )}
-                        {!cancelledOrder && (
-                            <StepActionBar status={status}>
-                                {called ? (
-                                    <>
-                                        <button type="button" className="btn btn-secondary" disabled={patientCapturing} onClick={sendBack}>
-                                            Trả về hàng chờ
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn btn-secondary"
-                                            disabled={capture.state === CAPTURE_STATES.CAPTURING}
-                                            onClick={() => setDialog("upload")}
-                                        >
-                                            Tải ảnh thủ công
-                                        </button>
-                                        {/* TODO(api): only checked here; POST imaging-requests/{id}/complete still accepts an order without pictures */}
-                                        <button
-                                            type="button"
-                                            className="btn btn-primary"
-                                            disabled={capture.state === CAPTURE_STATES.CAPTURING || imageCount === 0}
-                                            onClick={() => setDialog("complete")}
-                                        >
-                                            Hoàn thành
-                                        </button>
-                                    </>
-                                ) : (
-                                    <button type="button" className="btn btn-primary" disabled={Boolean(lockedBy)} onClick={callIn}>
-                                        Gọi vào chụp
-                                    </button>
-                                )}
-                            </StepActionBar>
-                        )}
+                        {patient.orders.map(renderOrder)}
+                        <StepActionBar status={patientStatus}>
+                            {called ? (
+                                <button type="button" className="btn btn-secondary" disabled={patientCapturing} onClick={sendBack}>
+                                    Trả về hàng chờ
+                                </button>
+                            ) : (
+                                <button type="button" className="btn btn-primary" disabled={Boolean(lockedBy)} onClick={callIn}>
+                                    Gọi vào chụp
+                                </button>
+                            )}
+                        </StepActionBar>
                     </div>
                 ) : (
                     !loading && (
@@ -359,15 +412,15 @@ const ImagingCapturePage = () => {
                 )}
             </div>
 
-            {dialog === "complete" && order && (
+            {dialog?.type === "complete" && dialogOrder && (
                 <ConfirmActionDialog
                     title="Xác nhận hoàn thành chụp"
                     description={subtitle}
                     body={[
                         "Gửi ",
-                        `${imageCount} ảnh`,
+                        `${dialogView.imageCount} ảnh`,
                         " cho ",
-                        order.doctorName || "bác sĩ chỉ định",
+                        dialogOrder.doctorName || "bác sĩ chỉ định",
                         remainingOrders > 0 ? ". Bệnh nhân còn " : ". Bệnh nhân sẽ được đưa lên đầu hàng chờ khám.",
                         ...(remainingOrders > 0 ? [`${remainingOrders} chỉ định chụp`, "."] : []),
                     ]}
@@ -377,17 +430,17 @@ const ImagingCapturePage = () => {
                     onSubmit={complete}
                 />
             )}
-            {dialog === "upload" && order && (
-                <ManualUploadDialog subtitle={`${subtitle} · ${imagingTypeLabel(order.imagingType)}`} onClose={() => setDialog(null)} onSubmit={upload} />
+            {dialog?.type === "upload" && dialogOrder && (
+                <ManualUploadDialog subtitle={`${subtitle} · ${imagingTypeLabel(dialogOrder.imagingType)}`} onClose={() => setDialog(null)} onSubmit={upload} />
             )}
-            {dialog === "viewer" && order && (
+            {dialog?.type === "viewer" && dialogOrder && (
                 <Modal title="Xem ảnh" description={subtitle} size="lg" onClose={() => setDialog(null)}>
                     <div className="mt-5">
                         <ImagingResultCard
-                            title={`${imagingTypeLabel(order.imagingType)} · IR-${order.id}`}
-                            subtitle={`${imageCount} ảnh · KTV chỉ xem, không chẩn đoán`}
-                            typeLabel={imagingTypeLabel(order.imagingType)}
-                            images={capture.images}
+                            title={`${imagingTypeLabel(dialogOrder.imagingType)} · IR-${dialogOrder.id}`}
+                            subtitle={`${dialogView.imageCount} ảnh · KTV chỉ xem, không chẩn đoán`}
+                            typeLabel={imagingTypeLabel(dialogOrder.imagingType)}
+                            images={dialogView.capture.images}
                         />
                     </div>
                 </Modal>

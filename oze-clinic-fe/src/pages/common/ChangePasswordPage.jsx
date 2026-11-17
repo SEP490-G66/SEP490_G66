@@ -4,10 +4,9 @@ import { CheckCircle2, Circle, ShieldCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import FormField from "@/components/ui/FormField";
 import PasswordInput from "@/components/ui/PasswordInput";
-import { changePassword, signOut } from "@/services/authService";
+import { changePassword } from "@/services/authService";
 import { cx } from "@/utils/cx";
 import { MESSAGES, PASSWORD_LENGTH, VALIDATION_MESSAGES } from "@/utils/messages";
-import { ROUTES } from "@/utils/routes";
 import { isPasswordEmpty, requiredMessage } from "@/utils/validation";
 
 const EMPTY_VALUES = { currentPassword: "", newPassword: "", confirmPassword: "" };
@@ -94,13 +93,7 @@ const ChangePasswordPage = () => {
             setValues(EMPTY_VALUES);
             return;
         }
-        if (result.data?.locked) {
-            signOut();
-            toast.error(result.message);
-            navigate(ROUTES.SIGN_IN, { replace: true });
-            return;
-        }
-        const field = result.data?.attemptsLeft !== undefined ? "currentPassword" : "newPassword";
+        const field = result.data?.field ?? "newPassword";
         setErrors({ [field]: result.message });
         focusField(field);
     };
