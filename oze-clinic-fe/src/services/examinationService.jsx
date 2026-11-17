@@ -30,6 +30,9 @@ const MESSAGES = [
     [/Please enter clinical indication/i, "Nhập mục đích chụp."],
     [/Please enter target area/i, "Nhập vùng hoặc răng cần chụp."],
     [/Tooth surfaces must be/i, "Mặt răng chỉ gồm M, O, D, B, L."],
+    [/tooth condition must be one of/i, "Trạng thái răng không hợp lệ."],
+    [/severity is too long/i, "Mức độ tối đa 20 ký tự."],
+    [/No change was recorded for this tooth/i, "Răng này chưa có thay đổi nào trong lần khám này."],
     [/tooth condition/i, "Nhập tình trạng răng (tối đa 100 ký tự)."],
     [/tooth number|FDI/i, "Số răng không hợp lệ."],
     [/Too many symptoms/i, "Quá nhiều triệu chứng hoặc triệu chứng quá dài."],
@@ -341,6 +344,14 @@ const toEntry = (finding) => ({
     ...(finding.isReplaced ? { replaced: true } : {}),
 });
 
+// One tooth of the dental chart: its standard state (TOOTH_STATES key); current = set in this visit, else from an earlier one
+const toChartTooth = (tooth) => ({
+    tooth: Number(tooth.toothNumber),
+    condition: tooth.condition,
+    severity: tooth.severity ?? "",
+    current: Boolean(tooth.recordedInThisExamination),
+});
+
 const toDiagnosis = (diagnosis) => ({ id: diagnosis.id, code: diagnosis.diagnosisCode ?? "", teeth: diagnosis.teeth ?? [], note: diagnosis.description ?? "" });
 
 const FILM_STATUS = { Pending: "requested", InProgress: "requested", Completed: "captured", Cancelled: "cancelled" };
@@ -407,16 +418,19 @@ export const getExamRecord = async (id) => {
     }
 
     const data = work?.data;
+    // The reason for the visit starts from what the patient said when booking / checking in
     const exam = data
         ? {
+              chiefComplaint: data.chiefComplaint ?? item.reason ?? "",
               symptoms: data.symptoms ?? [],
               note: data.clinicalNotes ?? "",
               entries: (data.toothFindings ?? []).map(toEntry),
+              chart: (data.dentalChart ?? []).map(toChartTooth),
               films,
               diagnoses: (data.diagnoses ?? []).map(toDiagnosis),
           }
-        : { symptoms: [], note: "", entries: [], films, diagnoses: [] };
-    if (data) state.saved.set(item.examinationId, { ...structuredClone(exam), chiefComplaint: data.chiefComplaint ?? null });
+        : { chiefComplaint: item.reason ?? "", symptoms: [], note: "", entries: [], chart: [], films, diagnoses: [] };
+    if (data) state.saved.set(item.examinationId, { ...structuredClone(exam), chiefComplaint: data.chiefComplaint ?? "" });
 
     return success(
         structuredClone({
@@ -547,12 +561,18 @@ export const saveExamDraft = async (id, exam) => {
     const item = itemOf(id);
     if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
     const examinationId = item.examinationId;
-    const saved = state.saved.get(examinationId) ?? { symptoms: [], note: "", entries: [], diagnoses: [], chiefComplaint: null };
+    const saved = state.saved.get(examinationId) ?? { symptoms: [], note: "", entries: [], diagnoses: [], chiefComplaint: "" };
+    const chiefComplaint = exam.chiefComplaint ?? "";
 
-    if (exam.note !== saved.note || exam.symptoms.join("|") !== saved.symptoms.join("|")) {
+    // The content call replaces the reason, the notes and the symptoms together
+    if (chiefComplaint !== saved.chiefComplaint || exam.note !== saved.note || exam.symptoms.join("|") !== saved.symptoms.join("|")) {
         const response = translate(
             await call(() =>
-                api.put(`/api/examinations/${examinationId}/content`, { chiefComplaint: saved.chiefComplaint, clinicalNotes: exam.note || null, symptoms: exam.symptoms }),
+                api.put(`/api/examinations/${examinationId}/content`, {
+                    chiefComplaint: chiefComplaint.trim() || null,
+                    clinicalNotes: exam.note || null,
+                    symptoms: exam.symptoms,
+                }),
             ),
         );
         if (!response.success) return response;
@@ -587,9 +607,30 @@ export const saveExamDraft = async (id, exam) => {
         entries: exam.entries.map((entry) => ({ ...structuredClone(entry), id: serverId(entry.id) ?? entry.id })),
         diagnoses: exam.diagnoses.map((diagnosis) => ({ ...structuredClone(diagnosis), id: serverId(diagnosis.id) ?? diagnosis.id })),
         films: exam.films,
-        chiefComplaint: saved.chiefComplaint,
+        chiefComplaint,
     });
     return success({ savedAt: Date.now() });
+};
+
+// ---- Step 2 dental chart: the standard state of a tooth, saved at once (not with the draft) ----
+// The backend answers with the whole chart, so a reset shows the state the tooth had before this visit again.
+
+const chartResponse = (response) => (response.success ? success((response.data ?? []).map(toChartTooth)) : translate(response));
+
+// state: { condition (TOOTH_STATES key), severity? }. Returns the chart: [{ tooth, condition, severity, current }].
+export const setToothState = async (id, tooth, { condition, severity }) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return chartResponse(
+        await call(() => api.put(`/api/examinations/${item.examinationId}/dental-chart/${tooth}`, { condition, severity: severity?.trim() || null })),
+    );
+};
+
+// Drops the change made to this tooth in this visit.
+export const resetToothState = async (id, tooth) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return chartResponse(await call(() => api.delete(`/api/examinations/${item.examinationId}/dental-chart/${tooth}`)));
 };
 
 // Sends an X-ray order to the imaging technician: one request per selected type.

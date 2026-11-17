@@ -70,6 +70,20 @@ export const surfacesText = (surfaces) => (surfaces?.length ? surfaces.join(", "
 
 export const CHART_TYPE = { ADULT: "adult", CHILD: "child" };
 
+// Standard state of a tooth on the dental chart (DentalChartConstants.Conditions, api/examinations/{id}/dental-chart).
+// Kept across visits, unlike the free findings of one visit. mark: the letter on the chart; tone: its colour classes.
+export const TOOTH_STATES = {
+    Healthy: { label: "Lành", mark: "L", tone: "bg-success-soft text-success" },
+    Caries: { label: "Sâu răng", mark: "S", tone: "bg-danger-soft text-danger" },
+    Filled: { label: "Đã trám", mark: "T", tone: "bg-info-soft text-info" },
+    Crown: { label: "Bọc mão", mark: "M", tone: "bg-primary-soft text-primary" },
+    Missing: { label: "Mất răng", mark: "X", tone: "bg-neutral-soft text-neutral" },
+    Denture: { label: "Răng giả tháo lắp", mark: "G", tone: "bg-neutral-soft text-neutral" },
+    Implant: { label: "Implant", mark: "I", tone: "bg-success-soft text-success" },
+};
+
+export const TOOTH_STATE_SEVERITY_MAX = 20;
+
 // "K02.1" -> "Sâu ngà răng" ("" when the code is not in the dental ICD-10 list).
 export const icdName = (code) => ICD10_DENTAL.find((item) => item.code === String(code ?? "").trim().toUpperCase())?.name ?? "";
 
