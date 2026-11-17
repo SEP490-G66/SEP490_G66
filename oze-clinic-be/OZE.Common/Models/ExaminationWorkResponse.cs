@@ -12,6 +12,8 @@ namespace OZE.Common.Models
         public string ExaminationStatus { get; set; } = string.Empty;
         public string? ChiefComplaint { get; set; }
         public string? ClinicalNotes { get; set; }
+        public List<string> Symptoms { get; set; } = new();
+        public List<ToothFindingResponse> ToothFindings { get; set; } = new();
         public DateOnly? FollowUpDate { get; set; }
         public string? FollowUpNotes { get; set; }
         public long? FollowUpAppointmentId { get; set; }

@@ -10,6 +10,27 @@ namespace OZE.Common.Constants
 
         // BR-081: the technician queue shows these statuses in request-time order.
         public static readonly string[] QueueStatuses = { Pending, InProgress };
+        // Requests shown on the technician history page
+        public static readonly string[] HistoryStatuses = { Completed, Cancelled };
+        public const int HistoryDefaultPageSize = 10;
+        public const int HistoryMaxPageSize = 100;
+
+        // Doctor review of the pictures ("Duyệt kết quả chụp")
+        public const string ReviewPending = "Pending";
+        public const string ReviewApproved = "Approved";
+        public const string ReviewRetake = "Retake";
+        public const string ReviewCancelled = "Cancelled";
+        public static readonly string[] ReviewStatuses = { ReviewPending, ReviewApproved, ReviewRetake, ReviewCancelled };
+        public const int ReviewListLimit = 200;
+        public const int RetakeReasonMaxLength = 500;
+        public const string RetakeNotePrefix = "Retake of IR-{0}: {1}";
+
+        // Pictures uploaded by hand (F-IMG-05)
+        public static readonly string[] UploadExtensions = { ".png", ".jpg", ".jpeg", ".dcm" };
+        public const int UploadMaxFiles = 10;
+        public const long UploadMaxFileBytes = 20 * 1024 * 1024;
+        public const string UploadFolderPrefix = "manual";
+        public const string DicomMimeType = "application/dicom";
 
         // BR-190
         public const string PeriapicalXRay = "Periapical X-ray";

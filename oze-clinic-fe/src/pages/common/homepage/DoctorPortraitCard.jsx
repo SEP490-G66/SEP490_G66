@@ -12,7 +12,7 @@ const DoctorPortraitCard = ({ doctor, selected, onSelect }) => {
                 selected && "ring-2 ring-primary",
             )}
         >
-            <img src={doctor.imageUrl} alt="" loading="lazy" className="aspect-2/3 w-full object-contain object-top" />
+            <img src={doctor.imageUrl} alt="" loading="lazy" className="aspect-3/4 w-full object-cover object-top" />
         </button>
     );
 };

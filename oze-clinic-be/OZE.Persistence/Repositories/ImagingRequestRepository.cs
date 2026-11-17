@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OZE.Application.Interfaces;
 using OZE.Common.Constants;
+using OZE.Common.Models;
+using OZE.Common.Models.Base;
 using OZE.Domain.Entities;
 using OZE.Persistence.DbContexts;
 
@@ -60,6 +62,102 @@ namespace OZE.Persistence.Repositories
                 .OrderBy(x => x.CreatedAt)
                 .ThenBy(x => x.Id)
                 .ToListAsync(cancellationToken);
+        }
+
+        public async Task<PagedResult<ImagingRequest>> GetHistoryAsync(
+            ImagingHistoryQuery query,
+            long? requestId,
+            DateTimeOffset? from,
+            DateTimeOffset? toExclusive,
+            CancellationToken cancellationToken = default)
+        {
+            var requests = _context.ImagingRequests
+                .AsNoTracking()
+                .Where(x => ImagingRequestConstants.HistoryStatuses.Contains(x.RequestStatus));
+
+            if (!string.IsNullOrWhiteSpace(query.Status))
+            {
+                requests = requests.Where(x => x.RequestStatus == query.Status);
+            }
+            if (!string.IsNullOrWhiteSpace(query.ImagingType))
+            {
+                requests = requests.Where(x => x.ImagingType == query.ImagingType);
+            }
+            if (from.HasValue)
+            {
+                requests = requests.Where(x => x.CreatedAt >= from.Value);
+            }
+            if (toExclusive.HasValue)
+            {
+                requests = requests.Where(x => x.CreatedAt < toExclusive.Value);
+            }
+            if (!string.IsNullOrWhiteSpace(query.Keyword))
+            {
+                var keyword = query.Keyword.Trim();
+                requests = requests.Where(x => x.Examination.Patient.FullName.Contains(keyword)
+                    || x.Examination.Patient.PatientCode.Contains(keyword)
+                    || (requestId.HasValue && x.Id == requestId.Value));
+            }
+
+            var totalCount = await requests.CountAsync(cancellationToken);
+            if (totalCount == 0)
+            {
+                return new PagedResult<ImagingRequest>(new List<ImagingRequest>(), 0, query.Page, query.PageSize);
+            }
+
+            var items = await requests
+                .Include(x => x.Examination)
+                    .ThenInclude(x => x.Patient)
+                .Include(x => x.RequestedByDoctor)
+                .Include(x => x.Results)
+                .AsSplitQuery()
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<ImagingRequest>(items, totalCount, query.Page, query.PageSize);
+        }
+
+        public Task<ImagingRequest?> GetHistoryDetailAsync(long id, CancellationToken cancellationToken = default)
+        {
+            return _context.ImagingRequests
+                .AsNoTracking()
+                .Include(x => x.Examination)
+                    .ThenInclude(x => x.Patient)
+                .Include(x => x.RequestedByDoctor)
+                .Include(x => x.Results)
+                    .ThenInclude(x => x.UploadedByTechnician)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        }
+
+        public Task<List<ImagingRequest>> GetForReviewAsync(int doctorId, int limit, CancellationToken cancellationToken = default)
+        {
+            return _context.ImagingRequests
+                .AsNoTracking()
+                .Where(x => x.RequestedByDoctorId == doctorId && ImagingRequestConstants.HistoryStatuses.Contains(x.RequestStatus))
+                .Include(x => x.Examination)
+                    .ThenInclude(x => x.Patient)
+                .Include(x => x.Results)
+                    .ThenInclude(x => x.UploadedByTechnician)
+                .AsSplitQuery()
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<ImagingRequest?> GetTrackedWithResultsAsync(long id, CancellationToken cancellationToken = default)
+        {
+            return _context.ImagingRequests
+                .Include(x => x.Examination)
+                    .ThenInclude(x => x.Patient)
+                .Include(x => x.Results)
+                    .ThenInclude(x => x.UploadedByTechnician)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)

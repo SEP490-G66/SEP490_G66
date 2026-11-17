@@ -41,6 +41,10 @@ namespace OZE.Application.Interfaces
         Task<List<DiagnosisResponse>> AddDiagnosisAsync(string userId, long examinationId, SaveDiagnosisRequest request, CancellationToken cancellationToken = default);
         Task<List<DiagnosisResponse>> UpdateDiagnosisAsync(string userId, long examinationId, long diagnosisId, SaveDiagnosisRequest request, CancellationToken cancellationToken = default);
         Task<List<DiagnosisResponse>> DeleteDiagnosisAsync(string userId, long examinationId, long diagnosisId, CancellationToken cancellationToken = default);
+        Task<List<ToothFindingResponse>> GetToothFindingsAsync(string userId, long examinationId, CancellationToken cancellationToken = default);
+        Task<List<ToothFindingResponse>> AddToothFindingAsync(string userId, long examinationId, SaveToothFindingRequest request, CancellationToken cancellationToken = default);
+        Task<List<ToothFindingResponse>> UpdateToothFindingAsync(string userId, long examinationId, long findingId, SaveToothFindingRequest request, CancellationToken cancellationToken = default);
+        Task<List<ToothFindingResponse>> DeleteToothFindingAsync(string userId, long examinationId, long findingId, CancellationToken cancellationToken = default);
 
         // Follow-up (Tái khám)
         Task<ExaminationWorkResponse> SetFollowUpAsync(string doctorUserId, long examinationId, SaveFollowUpRequest request, CancellationToken cancellationToken = default);

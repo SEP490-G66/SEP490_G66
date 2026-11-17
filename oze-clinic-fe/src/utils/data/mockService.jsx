@@ -21,18 +21,13 @@ import {
     Syringe,
     Wrench,
 } from "lucide-react";
-import bocSuVeneers from "@/assets/mock/services/boc-su-veneers.webp";
-import cayGhepImplant from "@/assets/mock/services/cay-ghep-implant.webp";
-import nhoRangKhon from "@/assets/mock/services/nho-rang-khon.webp";
-import niengRang from "@/assets/mock/services/nieng-rang.webp";
-import phucHinhInlayOnlay from "@/assets/mock/services/phuc-hinh-inlay-onlay.webp";
-import tayTrangRang from "@/assets/mock/services/tay-trang-rang.webp";
+import placeholderImage from "@/assets/placeholder/placeholder.svg";
 
 export const MOCK_SERVICES = [
     {
         id: 1,
         name: "Cấy ghép Implant",
-        imageUrl: cayGhepImplant,
+        imageUrl: placeholderImage,
         description:
             "Cấy ghép Implant là giải pháp thay thế răng đã mất bằng trụ Titanium đặt vào xương hàm và mão sứ phía trên, giúp phục hồi chức năng ăn nhai và thẩm mỹ như răng thật.",
         benefits: [
@@ -52,13 +47,13 @@ export const MOCK_SERVICES = [
             { step: 6, icon: BadgeCheck, description: "Tái khám và gắn mão sứ cố định trên Implant" },
         ],
         feedbacks: [
-            { id: 1, imageUrl: cayGhepImplant, title: "Hành Trình Trồng Răng Implant Sau 20 Năm Cùng PGS.TS Đinh Vạn Trung", content: "Mất răng suốt 20 năm khiến việc ăn nhai của cô cực kỳ khổ sở, cơ mặt thì hóp lại trông già đi hẳn. Trước đây cứ sợ đau với tiêu xương không làm được, may mắn được PGS.TS Đinh Vạn Trung trực tiếp thăm khám và cấy ghép Implant. Bác sĩ tay nghề rất cao, cấy trụ nhẹ nhàng, nhanh chóng mà êm ru. Giờ cô ăn uống ngon miệng như xưa, nụ cười đầy đặn và thấy sức khỏe cải thiện rõ rệt." },
+            { id: 1, imageUrl: placeholderImage, title: "Hành Trình Trồng Răng Implant Sau 20 Năm Cùng PGS.TS Đinh Vạn Trung", content: "Mất răng suốt 20 năm khiến việc ăn nhai của cô cực kỳ khổ sở, cơ mặt thì hóp lại trông già đi hẳn. Trước đây cứ sợ đau với tiêu xương không làm được, may mắn được PGS.TS Đinh Vạn Trung trực tiếp thăm khám và cấy ghép Implant. Bác sĩ tay nghề rất cao, cấy trụ nhẹ nhàng, nhanh chóng mà êm ru. Giờ cô ăn uống ngon miệng như xưa, nụ cười đầy đặn và thấy sức khỏe cải thiện rõ rệt." },
         ],
     },
     {
         id: 2,
         name: "Niềng răng chỉnh nha",
-        imageUrl: niengRang,
+        imageUrl: placeholderImage,
         description:
             "Niềng răng giúp điều chỉnh răng mọc lệch, hô, móm, thưa bằng mắc cài hoặc khay trong suốt, mang lại khớp cắn chuẩn và nụ cười cân đối.",
         benefits: [
@@ -78,13 +73,13 @@ export const MOCK_SERVICES = [
             { step: 6, icon: BadgeCheck, description: "Tháo niềng và đeo hàm duy trì" },
         ],
         feedbacks: [
-            { id: 1, imageUrl: niengRang, title: "Hành Trình Niềng Răng Hô Sau 18 Tháng", content: "Từ nhỏ em đã bị răng hô nên rất ngại cười, lúc chụp ảnh lúc nào cũng phải mím môi. Sau khi được bác sĩ thăm khám và mô phỏng kết quả, em quyết định niềng răng mắc cài sứ. Lịch tái khám rõ ràng, mỗi lần siết răng đều được bác sĩ giải thích kỹ nên em không còn lo lắng. Sau 18 tháng, răng đều đẹp, khuôn mặt cũng thon gọn hơn và em tự tin cười thật tươi." },
+            { id: 1, imageUrl: placeholderImage, title: "Hành Trình Niềng Răng Hô Sau 18 Tháng", content: "Từ nhỏ em đã bị răng hô nên rất ngại cười, lúc chụp ảnh lúc nào cũng phải mím môi. Sau khi được bác sĩ thăm khám và mô phỏng kết quả, em quyết định niềng răng mắc cài sứ. Lịch tái khám rõ ràng, mỗi lần siết răng đều được bác sĩ giải thích kỹ nên em không còn lo lắng. Sau 18 tháng, răng đều đẹp, khuôn mặt cũng thon gọn hơn và em tự tin cười thật tươi." },
         ],
     },
     {
         id: 3,
         name: "Bọc răng sứ, dán sứ Veneers",
-        imageUrl: bocSuVeneers,
+        imageUrl: placeholderImage,
         description:
             "Bọc răng sứ và dán sứ Veneers cải thiện màu sắc, hình dáng răng bị ố, mẻ, thưa bằng mão sứ hoặc mặt dán sứ mỏng được chế tác riêng.",
         benefits: [
@@ -104,13 +99,13 @@ export const MOCK_SERVICES = [
             { step: 6, icon: CalendarCheck, description: "Tái khám và hướng dẫn chăm sóc" },
         ],
         feedbacks: [
-            { id: 1, imageUrl: bocSuVeneers, title: "Hành Trình Lấy Lại Nụ Cười Với Răng Sứ Veneers", content: "Răng cửa của chị bị ố và mẻ sau nhiều năm, đi làm hay gặp khách hàng đều ngại cười. Bác sĩ tư vấn dán sứ Veneers để giữ lại răng thật, còn cho chị xem trước thiết kế nụ cười trên máy. Chỉ sau vài buổi, hàm răng đã đều màu và rất tự nhiên, người quen còn không nhận ra chị làm răng. Giờ chị tự tin hơn hẳn mỗi khi giao tiếp." },
+            { id: 1, imageUrl: placeholderImage, title: "Hành Trình Lấy Lại Nụ Cười Với Răng Sứ Veneers", content: "Răng cửa của chị bị ố và mẻ sau nhiều năm, đi làm hay gặp khách hàng đều ngại cười. Bác sĩ tư vấn dán sứ Veneers để giữ lại răng thật, còn cho chị xem trước thiết kế nụ cười trên máy. Chỉ sau vài buổi, hàm răng đã đều màu và rất tự nhiên, người quen còn không nhận ra chị làm răng. Giờ chị tự tin hơn hẳn mỗi khi giao tiếp." },
         ],
     },
     {
         id: 4,
         name: "Phục hình sứ Inlay - Onlay",
-        imageUrl: phucHinhInlayOnlay,
+        imageUrl: placeholderImage,
         description:
             "Inlay - Onlay phục hồi phần răng bị sâu hoặc vỡ bằng miếng sứ chế tác riêng, giữ lại tối đa mô răng thật.",
         benefits: [
@@ -129,13 +124,13 @@ export const MOCK_SERVICES = [
             { step: 5, icon: BadgeCheck, description: "Gắn miếng sứ và điều chỉnh khớp cắn" },
         ],
         feedbacks: [
-            { id: 1, imageUrl: phucHinhInlayOnlay, title: "Hành Trình Phục Hồi Răng Hàm Bị Vỡ", content: "Chiếc răng hàm của anh bị vỡ một mảng lớn sau khi cắn phải đồ cứng, ăn uống rất khó chịu. Anh lo phải bọc sứ cả răng nhưng bác sĩ tư vấn làm Onlay để giữ lại phần răng còn khỏe. Miếng sứ gắn vào rất khít, màu giống hệt răng thật. Đến nay anh ăn nhai bình thường, không còn ê buốt hay giắt thức ăn nữa." },
+            { id: 1, imageUrl: placeholderImage, title: "Hành Trình Phục Hồi Răng Hàm Bị Vỡ", content: "Chiếc răng hàm của anh bị vỡ một mảng lớn sau khi cắn phải đồ cứng, ăn uống rất khó chịu. Anh lo phải bọc sứ cả răng nhưng bác sĩ tư vấn làm Onlay để giữ lại phần răng còn khỏe. Miếng sứ gắn vào rất khít, màu giống hệt răng thật. Đến nay anh ăn nhai bình thường, không còn ê buốt hay giắt thức ăn nữa." },
         ],
     },
     {
         id: 5,
         name: "Tẩy trắng răng",
-        imageUrl: tayTrangRang,
+        imageUrl: placeholderImage,
         description:
             "Tẩy trắng răng làm sáng màu răng bị ố vàng do thực phẩm, thuốc lá hoặc tuổi tác bằng công nghệ an toàn, không làm hại men răng.",
         benefits: [
@@ -154,13 +149,13 @@ export const MOCK_SERVICES = [
             { step: 5, icon: CalendarCheck, description: "Hướng dẫn chăm sóc sau tẩy trắng" },
         ],
         feedbacks: [
-            { id: 1, imageUrl: tayTrangRang, title: "Hành Trình Lấy Lại Hàm Răng Trắng Sáng", content: "Do uống cà phê nhiều năm nên răng mình bị ố vàng, cười lên trông rất thiếu sức sống. Mình đặt lịch tẩy trắng tại phòng khám và được bác sĩ kiểm tra, làm sạch răng rất kỹ trước khi tẩy. Cả quá trình chỉ hơn một tiếng, gần như không ê buốt. Răng trắng lên rõ rệt, mình còn được hướng dẫn cách ăn uống để giữ màu lâu hơn." },
+            { id: 1, imageUrl: placeholderImage, title: "Hành Trình Lấy Lại Hàm Răng Trắng Sáng", content: "Do uống cà phê nhiều năm nên răng mình bị ố vàng, cười lên trông rất thiếu sức sống. Mình đặt lịch tẩy trắng tại phòng khám và được bác sĩ kiểm tra, làm sạch răng rất kỹ trước khi tẩy. Cả quá trình chỉ hơn một tiếng, gần như không ê buốt. Răng trắng lên rõ rệt, mình còn được hướng dẫn cách ăn uống để giữ màu lâu hơn." },
         ],
     },
     {
         id: 6,
         name: "Nhổ răng khôn",
-        imageUrl: nhoRangKhon,
+        imageUrl: placeholderImage,
         description:
             "Nhổ răng khôn mọc lệch hoặc mọc ngầm theo chỉ định của bác sĩ, giảm đau nhức và ngăn biến chứng cho răng lân cận.",
         benefits: [
@@ -180,7 +175,7 @@ export const MOCK_SERVICES = [
             { step: 6, icon: CalendarCheck, description: "Hướng dẫn chăm sóc và tái khám cắt chỉ" },
         ],
         feedbacks: [
-            { id: 1, imageUrl: nhoRangKhon, title: "Hành Trình Nhổ Răng Khôn Mọc Ngầm Không Còn Đáng Sợ", content: "Chiếc răng khôn mọc ngầm làm em sưng đau mấy lần, nhưng vì nghe nhiều người kể nhổ răng khôn rất đau nên em cứ trì hoãn. Đến phòng khám, bác sĩ cho chụp phim, giải thích rõ vị trí răng và cách nhổ nên em yên tâm hơn. Cả quá trình nhẹ nhàng hơn em nghĩ, sau nhổ chỉ hơi sưng một chút. Một tuần sau tái khám cắt chỉ là em ăn uống bình thường." },
+            { id: 1, imageUrl: placeholderImage, title: "Hành Trình Nhổ Răng Khôn Mọc Ngầm Không Còn Đáng Sợ", content: "Chiếc răng khôn mọc ngầm làm em sưng đau mấy lần, nhưng vì nghe nhiều người kể nhổ răng khôn rất đau nên em cứ trì hoãn. Đến phòng khám, bác sĩ cho chụp phim, giải thích rõ vị trí răng và cách nhổ nên em yên tâm hơn. Cả quá trình nhẹ nhàng hơn em nghĩ, sau nhổ chỉ hơi sưng một chút. Một tuần sau tái khám cắt chỉ là em ăn uống bình thường." },
         ],
     },
 ];

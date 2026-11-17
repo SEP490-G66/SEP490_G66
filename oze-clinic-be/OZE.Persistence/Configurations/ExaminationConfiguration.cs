@@ -16,6 +16,7 @@ namespace OZE.Persistence.Configurations
 
             builder.Property(x => x.ExaminationStatus).HasMaxLength(20).HasDefaultValue("InProgress");
             builder.Property(x => x.FollowUpNotes).HasMaxLength(500);
+            builder.Property(x => x.Symptoms).HasMaxLength(OZE.Common.Constants.ExaminationConstants.SymptomsMaxLength);
             builder.Property(x => x.RowVersion).IsRowVersion();
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 

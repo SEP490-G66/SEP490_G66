@@ -8,6 +8,8 @@ namespace OZE.Domain.Entities
         public int DoctorId { get; set; }
         public string? ChiefComplaint { get; set; }
         public string? ClinicalNotes { get; set; }
+        // Symptoms ticked by the doctor, stored as a JSON array of labels
+        public string? Symptoms { get; set; }
         public string ExaminationStatus { get; set; } = "InProgress";
         public DateTimeOffset? LockedAt { get; set; }
         public string? LockedByUserId { get; set; }
@@ -31,6 +33,7 @@ namespace OZE.Domain.Entities
         public virtual Appointment? FollowUpAppointment { get; set; }
         public virtual ICollection<DentalChartEntry> DentalChartEntries { get; set; } = new List<DentalChartEntry>();
         public virtual ICollection<ClinicalDiagnosis> Diagnoses { get; set; } = new List<ClinicalDiagnosis>();
+        public virtual ICollection<ExaminationToothFinding> ToothFindings { get; set; } = new List<ExaminationToothFinding>();
         public virtual ICollection<ImagingRequest> ImagingRequests { get; set; } = new List<ImagingRequest>();
         public virtual ICollection<FollowUpContact> FollowUpContacts { get; set; } = new List<FollowUpContact>();
         public virtual ICollection<TreatmentPlan> TreatmentPlans { get; set; } = new List<TreatmentPlan>();

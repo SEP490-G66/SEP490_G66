@@ -5,7 +5,8 @@ import { EXAM_QUEUE_STATUS, QUEUE_STATUS } from "@/utils/messages";
 
 const SMALL_BUTTON = "h-8 px-3 text-caption";
 
-// One patient in the exam queue. item: { id, queueNumber, patientName, status (QUEUE_STATUS) }.
+// One patient in the exam queue. item: { id, queueNumber, patientName, status (QUEUE_STATUS), badge?, atImaging? }.
+// badge overrides the status label of a waiting patient (AT_IMAGING, RETURNED); a patient at the X-ray room cannot be called.
 // canCall is false while another patient is called or being examined, so only one patient is in at a time.
 // Only a called or examined patient can be opened (onSelect); a waiting one is shown as plain text.
 const QueueItem = ({ item, selected = false, canCall = true, onSelect, onCall, onMarkAbsent, onStart }) => {
@@ -26,7 +27,7 @@ const QueueItem = ({ item, selected = false, canCall = true, onSelect, onCall, o
                 {waiting ? (
                     <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="truncate font-semibold text-ink">{item.patientName}</span>
-                        <StatusBadge status={item.status} labels={EXAM_QUEUE_STATUS} />
+                        <StatusBadge status={item.badge ?? item.status} labels={EXAM_QUEUE_STATUS} />
                     </p>
                 ) : (
                     <button
@@ -36,7 +37,7 @@ const QueueItem = ({ item, selected = false, canCall = true, onSelect, onCall, o
                         onClick={() => onSelect?.(item.id)}
                     >
                         <span className="truncate font-semibold text-ink">{item.patientName}</span>
-                        <StatusBadge status={item.status} labels={EXAM_QUEUE_STATUS} />
+                        <StatusBadge status={item.badge ?? item.status} labels={EXAM_QUEUE_STATUS} />
                     </button>
                 )}
                 {called && (
@@ -53,7 +54,7 @@ const QueueItem = ({ item, selected = false, canCall = true, onSelect, onCall, o
                         </button>
                     </div>
                 )}
-                {waiting && (
+                {waiting && !item.atImaging && (
                     <div className="mt-2 flex flex-wrap gap-2">
                         <button type="button" className={cx("btn btn-secondary", SMALL_BUTTON)} disabled={!canCall} onClick={() => onCall?.(item.id)}>
                             Gọi vào khám

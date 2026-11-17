@@ -74,6 +74,31 @@ namespace OZE.Controllers
         }
 
         /// <summary>
+        /// Pictures uploaded by hand when the device cannot take them (form fields "files": .png, .jpg, .jpeg, .dcm, up to 10, 20 MB each; "note": optional technician note).
+        /// </summary>
+        [Authorize(Roles = RoleConstants.DentalImagingTechnicianRole)]
+        [HttpPost("imaging-requests/{id:long}/results")]
+        [RequestSizeLimit(ImagingRequestConstants.UploadMaxFiles * ImagingRequestConstants.UploadMaxFileBytes)]
+        [RequestFormLimits(MultipartBodyLengthLimit = ImagingRequestConstants.UploadMaxFiles * ImagingRequestConstants.UploadMaxFileBytes)]
+        public async Task<ActionResult<ApiResponse<List<ImagingCaptureImageResponse>>>> UploadAsync(
+            long id,
+            [FromForm] List<IFormFile> files,
+            [FromForm] string? note,
+            CancellationToken cancellationToken)
+        {
+            var uploaded = new List<UploadedImagingFile>();
+            foreach (var file in files ?? new List<IFormFile>())
+            {
+                using var stream = new MemoryStream();
+                await file.CopyToAsync(stream, cancellationToken);
+                uploaded.Add(new UploadedImagingFile(file.FileName, file.ContentType, stream.ToArray()));
+            }
+
+            var images = await _captureService.UploadAsync(CurrentUserId ?? string.Empty, id, uploaded, note, cancellationToken);
+            return Ok(ApiResponse<List<ImagingCaptureImageResponse>>.SuccessResult(images, ErrorConstants.ImagingCaptureMessage.ImagesUploaded));
+        }
+
+        /// <summary>
         /// Returns a stored picture. Staff who work with films may read any; a patient only the films of their own examinations.
         /// </summary>
         [Authorize(Roles = RoleConstants.DoctorRole + "," + RoleConstants.DentalImagingTechnicianRole + ","

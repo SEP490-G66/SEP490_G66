@@ -38,6 +38,7 @@ namespace OZE.Persistence.DbContexts
         // Clinical / EMR
         public DbSet<Examination> Examinations => Set<Examination>();
         public DbSet<DentalChartEntry> DentalChartEntries => Set<DentalChartEntry>();
+        public DbSet<ExaminationToothFinding> ExaminationToothFindings => Set<ExaminationToothFinding>();
         public DbSet<ClinicalDiagnosis> ClinicalDiagnoses => Set<ClinicalDiagnosis>();
         public DbSet<ImagingRequest> ImagingRequests => Set<ImagingRequest>();
         public DbSet<ImagingResult> ImagingResults => Set<ImagingResult>();

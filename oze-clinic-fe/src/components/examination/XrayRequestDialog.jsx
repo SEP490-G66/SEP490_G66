@@ -1,10 +1,13 @@
 import { useId, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { cx } from "@/utils/cx";
-import { XRAY_TYPES } from "@/utils/messages";
+import { IMAGING_TYPE_LABELS } from "@/utils/imagingRequest";
+
+// The imaging types the backend takes (ImagingRequestConstants.ImagingTypes), with their Vietnamese labels.
+const XRAY_TYPES = Object.keys(IMAGING_TYPE_LABELS);
 
 // "Phiếu chỉ định chụp X-quang". subtitle: "Nguyễn Văn A · sinh 1998 · BS. Trần Minh Khoa".
-// defaultArea: prefilled from the selected tooth ("Răng 36"). onSubmit receives { types, area, purpose, needPrint }.
+// defaultArea: prefilled from the selected tooth ("Răng 36"). onSubmit receives { types (backend imaging types), area, purpose, needPrint }.
 const XrayRequestDialog = ({ subtitle, defaultArea = "", busy = false, onSubmit, onClose }) => {
     const areaId = useId();
     const purposeId = useId();
@@ -49,7 +52,7 @@ const XrayRequestDialog = ({ subtitle, defaultArea = "", busy = false, onSubmit,
                                     )}
                                 >
                                     <input type="checkbox" className="size-4 shrink-0" checked={checked} onChange={() => toggleType(type)} />
-                                    {type}
+                                    {IMAGING_TYPE_LABELS[type]}
                                 </label>
                             );
                         })}

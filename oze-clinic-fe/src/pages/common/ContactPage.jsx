@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Clock, MapPin, Phone } from "lucide-react";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
-import banner2 from "@/assets/banner/banner2.png";
-import contactUsImage from "@/assets/banner/contact-us.png";
+import banner1 from "@/assets/banner/banner1.png";
+import banner3 from "@/assets/banner/banner3.png";
 import { submitConsultationRequest } from "../../services/contactService";
 import {
     CLINIC_ADDRESS,
@@ -11,17 +11,16 @@ import {
     CLINIC_MAP_EMBED_URL,
     CLINIC_OPENING_HOURS,
     CONSULTATION_NOTE_MAX_LENGTH,
+    CONSULTATION_TEXT,
 } from "../../utils/messages";
 import { ROUTES } from "../../utils/routes";
-import { isRequiredEmpty, normalizePhone, requiredMessage, validateEmail, validatePhone } from "../../utils/validation";
+import { normalizePhone, validateEmail, validateFullName, validatePhone } from "../../utils/validation";
 
 const BREADCRUMB_ITEMS = [{ label: "Trang chủ", href: ROUTES.HOME }, { label: "Liên hệ" }];
 
 const SECTION_CLASS = "py-12 md:py-16";
 
 const EMPTY_VALUES = { fullName: "", phone: "", email: "", note: "" };
-
-const validateFullName = (value) => (isRequiredEmpty(value) ? requiredMessage("họ và tên") : undefined);
 
 // Fields in form order; the first field with an error gets the focus on submit.
 const FIELDS = {
@@ -85,8 +84,7 @@ const ContactPage = () => {
                 note: values.note.trim(),
             });
             if (result.success) {
-                // TODO(spec): no system message is defined for a consultation request yet.
-                toast.success("Đăng ký tư vấn thành công! Chúng tôi sẽ liên hệ với bạn sớm.");
+                toast.success(CONSULTATION_TEXT.SUCCESS);
                 setValues(EMPTY_VALUES);
                 return;
             }
@@ -122,7 +120,7 @@ const ContactPage = () => {
             </div>
 
             <img
-                src={banner2}
+                src={banner1}
                 alt="Nha khoa OZE"
                 className="w-full bg-surface-tint object-contain px-6"
             />
@@ -146,7 +144,7 @@ const ContactPage = () => {
             <section className="container-public grid grid-cols-1 gap-12 pb-12 md:grid-cols-2 md:pb-16">
                 <div className="flex flex-col gap-6">
                     <img
-                        src={contactUsImage}
+                        src={banner3}
                         alt="Tu van nha khoa OZE"
                         className="aspect-4/3 w-full rounded-2xl object-cover shadow-md"
                     />

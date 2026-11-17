@@ -116,6 +116,90 @@ namespace OZE.Application.Services
             return ToResponse(capture, new List<ImagingResult>());
         }
 
+        public async Task<List<ImagingCaptureImageResponse>> UploadAsync(
+            string technicianUserId,
+            long imagingRequestId,
+            List<UploadedImagingFile> files,
+            string? note,
+            CancellationToken cancellationToken = default)
+        {
+            ConditionGuard.Ensure(files != null && files.Count > 0, ErrorConstants.ImagingCaptureMessage.UploadFilesRequired);
+            ConditionGuard.Ensure(files!.Count <= ImagingRequestConstants.UploadMaxFiles, ErrorConstants.ImagingCaptureMessage.UploadTooManyFiles);
+            foreach (var file in files)
+            {
+                var extension = Path.GetExtension(file.FileName ?? string.Empty).ToLowerInvariant();
+                ConditionGuard.Ensure(
+                    ImagingRequestConstants.UploadExtensions.Contains(extension),
+                    string.Format(ErrorConstants.ImagingCaptureMessage.UploadFileTypeInvalid, file.FileName));
+                ConditionGuard.Ensure(file.Data.Length > 0, string.Format(ErrorConstants.ImagingCaptureMessage.UploadFileEmpty, file.FileName));
+                ConditionGuard.Ensure(
+                    file.Data.LongLength <= ImagingRequestConstants.UploadMaxFileBytes,
+                    string.Format(ErrorConstants.ImagingCaptureMessage.UploadFileTooLarge, file.FileName));
+            }
+
+            var technician = await _staffRepository.GetByUserIdAsync(technicianUserId);
+            ConditionGuard.Ensure<NotFoundException>(technician != null, ErrorConstants.ImagingCaptureMessage.TechnicianNotFound);
+
+            var imagingRequest = await _imagingRequestRepository.GetTrackedByIdAsync(imagingRequestId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(imagingRequest != null, ErrorConstants.ImagingRequestMessage.RequestNotFound);
+            ConditionGuard.Ensure(
+                ImagingRequestConstants.QueueStatuses.Contains(imagingRequest!.RequestStatus),
+                string.Format(ErrorConstants.ImagingCaptureMessage.RequestNotOpen, imagingRequest.RequestStatus));
+
+            var now = DateTimeOffset.UtcNow;
+            var results = new List<ImagingResult>();
+            foreach (var file in files)
+            {
+                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                // The stored name never comes from the user: only the checked extension is kept
+                var relativePath = string.Join('/',
+                    now.ToString("yyyy", CultureInfo.InvariantCulture),
+                    now.ToString("MM", CultureInfo.InvariantCulture),
+                    ImagingCaptureConstants.OrderReferencePrefix + imagingRequestId,
+                    $"{ImagingRequestConstants.UploadFolderPrefix}_{Guid.NewGuid():N}{extension}");
+                await _fileStore.SaveAsync(relativePath, file.Data, cancellationToken);
+
+                var originalName = Path.GetFileName(file.FileName);
+                results.Add(new ImagingResult
+                {
+                    ImagingRequestId = imagingRequestId,
+                    UploadedByTechnicianId = technician!.Id,
+                    FilePath = relativePath,
+                    FileName = originalName.Length > ImagingCaptureConstants.FileNameMaxLength
+                        ? originalName[..ImagingCaptureConstants.FileNameMaxLength]
+                        : originalName,
+                    FileSize = file.Data.LongLength,
+                    MimeType = MimeTypeOf(extension),
+                    TechnicianNotes = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
+                    ReviewStatus = MedicalRecordConstants.PendingImageStatus,
+                    CreatedAt = now
+                });
+            }
+            _captureRepository.AddResults(results);
+
+            if (imagingRequest.RequestStatus == ImagingRequestConstants.Pending)
+            {
+                imagingRequest.RequestStatus = ImagingRequestConstants.InProgress;
+                imagingRequest.UpdatedAt = now;
+            }
+            await _captureRepository.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("{Count} images uploaded by hand for imaging request {RequestId}", results.Count, imagingRequestId);
+            return results.Select(r => new ImagingCaptureImageResponse
+            {
+                ResultId = r.Id,
+                FileName = r.FileName,
+                FileUrl = $"/api/imaging-results/{r.Id}/file"
+            }).ToList();
+        }
+
+        private static string MimeTypeOf(string extension) => extension switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            _ => ImagingRequestConstants.DicomMimeType
+        };
+
         public async Task<ImagingCaptureResponse> GetAsync(long imagingRequestId, string simulationId, CancellationToken cancellationToken = default)
         {
             var capture = await GetCaptureAsync(imagingRequestId, simulationId, cancellationToken);
@@ -322,17 +406,20 @@ namespace OZE.Application.Services
                 await _captureRepository.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Capture {SimulationId} completed, {Count} picture(s) stored", capture.SimulationId, results.Count);
+
+                // Complete the imaging request and send the patient back to the doctor, unless already done.
+                // Still inside the lock: the screen polling and the device's webhook both get here when a capture ends,
+                // and two completions would update the same appointment and queue rows (row version → 409).
+                // The status is read from the database, not from an entity this call may have loaded before waiting.
+                var imagingRequest = await _imagingRequestRepository.GetByIdAsync(capture.ImagingRequestId, cancellationToken);
+                if (imagingRequest != null && ImagingRequestConstants.QueueStatuses.Contains(imagingRequest.RequestStatus))
+                {
+                    await _imagingRequestService.CompleteAsync(capture.ImagingRequestId, null, null, cancellationToken);
+                }
             }
             finally
             {
                 StoreLock.Release();
-            }
-
-            // Complete the imaging request and send the patient back to the doctor (unless already done)
-            var imagingRequest = await _imagingRequestRepository.GetTrackedByIdAsync(capture.ImagingRequestId, cancellationToken);
-            if (imagingRequest != null && ImagingRequestConstants.QueueStatuses.Contains(imagingRequest.RequestStatus))
-            {
-                await _imagingRequestService.CompleteAsync(capture.ImagingRequestId, null, null, cancellationToken);
             }
 
             return true;

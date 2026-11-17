@@ -14,11 +14,12 @@ const DoctorIntro = ({ doctor, ref, headingLevel = 3, showMore = true, live = tr
 
     return (
         <div ref={ref} className="card-public grid scroll-mt-20 overflow-hidden p-0 md:grid-cols-3">
-            <div className="flex items-end bg-primary-soft">
+            {/* From md the photo fills the column, so the card is as tall as its text, not the 2:3 photo */}
+            <div className="relative bg-primary-soft">
                 <img
                     src={doctor.imageUrl}
                     alt={doctor.fullName}
-                    className="aspect-2/3 w-full object-contain object-bottom"
+                    className="aspect-4/5 w-full object-cover object-top md:absolute md:inset-0 md:aspect-auto md:size-full"
                 />
             </div>
             <div className="flex flex-col gap-5 p-6 md:col-span-2 md:p-8">

@@ -14,6 +14,14 @@ namespace OZE.Common.Constants
         public const int DiagnosisCodeMaxLength = 20;
         public const int DiagnosisNameMaxLength = 300;
         public const int DiagnosisDescriptionMaxLength = 1000;
+        // Symptoms are stored as a JSON array; findings and diagnosis teeth as text
+        public const int SymptomsMaxLength = 1000;
+        public const int SymptomMaxLength = 100;
+        public const int MaxSymptoms = 30;
+        public const int DiagnosisTeethMaxLength = 200;
+        public const int ToothFindingConditionMaxLength = 100;
+        public const int ToothFindingSurfacesMaxLength = 20;
+        public static readonly string[] ToothSurfaces = { "M", "O", "D", "B", "L" };
 
         // Addenda to a locked examination (F-EXM-08). Types must match CK_ClinicalRecordAddenda_Type
         public const string AddendumCorrection = "Correction";
