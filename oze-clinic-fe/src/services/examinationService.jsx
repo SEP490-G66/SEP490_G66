@@ -13,7 +13,8 @@ import { QUEUE_STATUS } from "../utils/messages";
 // step 2 "Khám & Chẩn đoán" (ExaminationsController: content, tooth findings, diagnoses), X-ray orders (ImagingRequestsController)
 // and step 3 "Lập kế hoạch điều trị" (TreatmentPlansController: create / update / propose / approve; types from bookable-services).
 // Step 4 "Thực hiện điều trị" works on the plan's stages (start / update / complete) and the visit's follow-up date.
-// TODO(api): step 1 medical history and step 5 prescription are still kept in the browser only.
+// Step 5 "Kê đơn thuốc" saves the visit's prescription (items, note, finalize / reopen).
+// TODO(api): step 1 medical history is still kept in the browser only.
 //
 // A queue item is identified by its appointment id (it does not change when the patient goes for an X-ray and comes back).
 
@@ -25,7 +26,14 @@ const MESSAGES = [
     [/already has an appointment in service|another .*in service/i, "Đang có bệnh nhân trong phòng. Kết thúc lượt khám trước khi gọi người tiếp theo."],
     [/off duty|not on shift|start your shift/i, "Bạn chưa bắt đầu ca làm. Bấm “Bắt đầu ca” trước khi khám."],
     [/at least one diagnosis|clinical notes/i, "Cần ít nhất một chẩn đoán hoặc ghi chú lâm sàng trước khi kết thúc lượt khám."],
-    [/draft prescription/i, "Đơn thuốc nháp còn thuốc: chốt hoặc xoá đơn trước khi kết thúc."],
+    [/draft prescription|finalize the prescription, or delete it/i, "Đơn thuốc nháp còn thuốc: chốt hoặc xoá đơn trước khi kết thúc."],
+    [/prescription is finalized/i, "Đơn thuốc đã được chốt. Mở lại đơn để sửa."],
+    [/at least one medication before finalizing/i, "Thêm ít nhất một thuốc trước khi chốt đơn."],
+    [/medication name is too long|dosage is too long|frequency is too long|duration is too long|instructions are too long/i, "Thông tin thuốc quá dài."],
+    [/Please enter the medication name/i, "Nhập tên thuốc."],
+    [/quantity must be/i, "Số lượng phải là số nguyên từ 1 đến 1000."],
+    [/prescription note is too long/i, "Lời dặn tối đa 500 ký tự."],
+    [/Medication not found in this prescription/i, "Thuốc này không còn trong đơn. Tải lại trang rồi thử lại."],
     [/only IN_SERVICE|must be in service|not in service/i, "Bệnh nhân không còn trong phòng khám (có thể đang đi chụp X-quang)."],
     [/Cannot request imaging because the examination is/i, "Lượt khám đã kết thúc, không gửi chỉ định chụp được."],
     [/Please enter clinical indication/i, "Nhập mục đích chụp."],
@@ -76,6 +84,8 @@ const state = {
     stageIds: new Map(), // plan session id (made on screen) → treatment stage id
     stageStatus: new Map(), // treatment stage id → StageStatus (Scheduled, InProgress, Completed, Cancelled)
     treatmentSaves: new Map(), // examinationId → the step 4 save on its way (one after another)
+    prescriptions: new Map(), // examinationId → the prescription as last saved ({ items with server ids, notes, status })
+    prescriptionSaves: new Map(), // examinationId → the step 5 save on its way (one after another)
     planSaves: new Map(), // examinationId → the plan save on its way (saves of one plan run one after another)
     types: new Map(), // serviceId → [{ id, name, price }]: the service's variants ("Loại dịch vụ")
 };
@@ -340,6 +350,8 @@ export const endExamination = async (id) => {
         state.plans.delete(item.examinationId);
         state.planSaves.delete(item.examinationId);
         state.treatmentSaves.delete(item.examinationId);
+        state.prescriptions.delete(item.examinationId);
+        state.prescriptionSaves.delete(item.examinationId);
         state.local.delete(id);
     }
     return response;
@@ -437,6 +449,11 @@ export const getExamRecord = async (id) => {
         if (running) local.treatment = { ...local.treatment, ...treatmentFromNotes(running.notes), sessionId: `stage-${running.id}` };
         if (data?.followUpDate) local.treatment = { ...local.treatment, followUpDate: data.followUpDate };
         local.treatmentLoaded = true;
+    }
+    // Step 5: the prescription of the visit as the backend has it (an empty draft until a medicine is added)
+    if (data?.prescription) {
+        local.prescription = toPrescription(data.prescription);
+        state.prescriptions.set(item.examinationId, structuredClone(local.prescription));
     }
     // The reason for the visit starts from what the patient said when booking / checking in
     const exam = data
@@ -904,11 +921,127 @@ export const completeTreatmentSession = async (id, treatment) => {
     });
 };
 
-// Draft save of step 5. prescription: see EMPTY_PRESCRIPTION_DRAFT.
-export const savePrescriptionDraft = async (id, prescription) => {
-    const local = localDraft(id);
-    if (!local) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
-    if (local.prescription.status === "Finalized") return failure("Đơn thuốc đã được chốt, không sửa được nữa.");
+// ---- Step 5 "Kê đơn thuốc": the prescription of the visit (ExaminationsController prescription endpoints) ----
+// Saved like step 2: each medicine added, changed or removed against what the backend has, then the note. Every call
+// answers with the whole prescription. A finalized prescription is read only until it is reopened.
+
+const toPrescriptionItem = (item) => ({
+    id: item.id,
+    medicationName: item.medicationName ?? "",
+    dosage: item.dosage ?? "",
+    frequency: item.frequency ?? "",
+    duration: item.duration ?? "",
+    quantity: item.quantity ?? null,
+    instructions: item.instructions ?? "",
+});
+
+function toPrescription(prescription) {
+    return { items: (prescription.items ?? []).map(toPrescriptionItem), notes: prescription.notes ?? "", status: prescription.status || "Draft" };
+}
+
+const prescriptionItemBody = (item) => ({
+    medicationName: item.medicationName.trim(),
+    dosage: item.dosage?.trim() || null,
+    frequency: item.frequency?.trim() || null,
+    duration: item.duration?.trim() || null,
+    quantity: Number.isFinite(item.quantity) ? item.quantity : null,
+    instructions: item.instructions?.trim() || null,
+});
+
+const sameItem = (a, b) =>
+    JSON.stringify(prescriptionItemBody({ ...a, medicationName: a.medicationName ?? "" })) === JSON.stringify(prescriptionItemBody({ ...b, medicationName: b.medicationName ?? "" }));
+
+const writePrescription = async (item, prescription) => {
+    const examinationId = item.examinationId;
+    const saved = state.prescriptions.get(examinationId) ?? { items: [], notes: "", status: "Draft" };
+    if (saved.status === "Finalized") return failure("Đơn thuốc đã được chốt. Mở lại đơn để sửa.");
+    const base = `/api/examinations/${examinationId}/prescription`;
+    const savedById = new Map(saved.items.map((entry) => [entry.id, entry]));
+    const keep = new Set();
+
+    for (const entry of prescription.items) {
+        const id = typeof entry.id === "number" ? entry.id : (state.ids.get(entry.id) ?? null);
+        if (id == null) {
+            const response = translate(await call(() => api.post(`${base}/items`, prescriptionItemBody(entry))));
+            if (!response.success) return response;
+            // A new medicine goes to the end of the list: the last one the backend sends is the one just added
+            const added = response.data.items?.[response.data.items.length - 1]?.id;
+            if (added != null) {
+                state.ids.set(entry.id, added);
+                keep.add(added);
+            }
+            continue;
+        }
+        keep.add(id);
+        const before = savedById.get(id);
+        if (before && sameItem(before, entry)) continue;
+        const response = translate(await call(() => api.put(`${base}/items/${id}`, prescriptionItemBody(entry))));
+        if (!response.success) return response;
+    }
+    for (const entry of saved.items) {
+        if (keep.has(entry.id)) continue;
+        const response = translate(await call(() => api.delete(`${base}/items/${entry.id}`)));
+        if (!response.success && response.status !== 404) return response;
+    }
+    if ((prescription.notes ?? "") !== saved.notes) {
+        const response = translate(await call(() => api.put(base, { notes: prescription.notes?.trim() ?? "" })));
+        if (!response.success) return response;
+    }
+
+    state.prescriptions.set(examinationId, {
+        items: prescription.items.map((entry) => ({ ...toPrescriptionItem(entry), id: typeof entry.id === "number" ? entry.id : state.ids.get(entry.id) })),
+        notes: prescription.notes ?? "",
+        status: "Draft",
+    });
+    const local = localOf(item);
     local.prescription = structuredClone(prescription);
     return success({ savedAt: Date.now() });
+};
+
+const queuePrescription = (item, work) => {
+    const previous = state.prescriptionSaves.get(item.examinationId) ?? Promise.resolve();
+    const next = previous.then(work);
+    state.prescriptionSaves.set(item.examinationId, next.catch(() => null));
+    return next;
+};
+
+// The prescription the backend answered with becomes the saved one and the screen's copy
+const takePrescription = (item, response, message) => {
+    if (!response.success) return response;
+    const prescription = toPrescription(response.data);
+    state.prescriptions.set(item.examinationId, structuredClone(prescription));
+    localOf(item).prescription = structuredClone(prescription);
+    return success(prescription, message);
+};
+
+// Draft save of step 5. prescription: { items: [{ id, medicationName, dosage, frequency, duration, quantity, instructions }], notes, status }.
+export const savePrescriptionDraft = async (id, prescription) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return queuePrescription(item, () => writePrescription(item, prescription));
+};
+
+// "Hoàn tất": saves, then finalizes a prescription that has medicines (the visit cannot end on a draft with medicines;
+// an empty draft is simply dropped by the backend). Returns the prescription.
+export const finalizePrescription = async (id, prescription) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return queuePrescription(item, async () => {
+        const current = state.prescriptions.get(item.examinationId);
+        if (current?.status === "Finalized") return success(structuredClone(current));
+        const saved = await writePrescription(item, prescription);
+        if (!saved.success) return saved;
+        if (!prescription.items.length) return success(structuredClone(state.prescriptions.get(item.examinationId)));
+        const response = translate(await call(() => api.post(`/api/examinations/${item.examinationId}/prescription/finalize`)));
+        return takePrescription(item, response, "Đã chốt đơn thuốc.");
+    });
+};
+
+// "Mở lại đơn": a finalized prescription goes back to draft so it can be changed.
+export const reopenPrescription = async (id) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return queuePrescription(item, async () =>
+        takePrescription(item, translate(await call(() => api.post(`/api/examinations/${item.examinationId}/prescription/reopen`))), "Đã mở lại đơn thuốc."),
+    );
 };
