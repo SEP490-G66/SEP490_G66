@@ -64,7 +64,7 @@ const toProfile = (data) => ({
     fullname: data.fullName ?? "",
     birthdate: data.dateOfBirth ?? "",
     gender: GENDER_FROM_BACKEND[data.gender] ?? "",
-    phone: data.phoneNumber ?? "",
+    phone: (data.phoneNumber ?? "").replace(/^\+84/, "0"),
     email: data.email ?? "",
     address: data.address ?? "",
     emailConfirmed: data.emailConfirmed,

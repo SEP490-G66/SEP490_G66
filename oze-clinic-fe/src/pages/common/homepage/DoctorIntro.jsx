@@ -43,7 +43,7 @@ const DoctorIntro = ({ doctor, ref, headingLevel = 3, showMore = true, live = tr
                     {pictures.length > 0 && (
                         <ul aria-label={TEXT.CERTIFICATES_OF(doctor.fullName)} className="grid grid-cols-4 gap-3">
                             {pictures.map((picture, index) => (
-                                <li key={picture.imageUrl ?? index}>
+                                <li key={index}>
                                     <button
                                         type="button"
                                         onClick={() => onOpenCertificate(index)}
