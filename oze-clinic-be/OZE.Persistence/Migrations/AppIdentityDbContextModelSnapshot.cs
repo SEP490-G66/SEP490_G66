@@ -712,6 +712,10 @@ namespace OZE.Persistence.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<string>("Teeth")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ExaminationId")
@@ -1007,6 +1011,10 @@ namespace OZE.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("Symptoms")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -1031,6 +1039,59 @@ namespace OZE.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_Examinations_Status", "[ExaminationStatus] IN ('InProgress', 'Completed', 'Locked')");
                         });
+                });
+
+            modelBuilder.Entity("OZE.Domain.Entities.ExaminationToothFinding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.Property<long>("ExaminationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsReplaced")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Surfaces")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ToothNumber")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExaminationId")
+                        .HasDatabaseName("IX_ExaminationToothFindings_ExaminationId");
+
+                    b.ToTable("ExaminationToothFindings", (string)null);
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.FollowUpContact", b =>
@@ -3267,6 +3328,27 @@ namespace OZE.Persistence.Migrations
                     b.Navigation("Patient");
                 });
 
+            modelBuilder.Entity("OZE.Domain.Entities.ExaminationToothFinding", b =>
+                {
+                    b.HasOne("OZE.Domain.Entities.Examination", "Examination")
+                        .WithMany("ToothFindings")
+                        .HasForeignKey("ExaminationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_ExaminationToothFindings_Examinations");
+
+                    b.HasOne("OZE.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_ExaminationToothFindings_Patients");
+
+                    b.Navigation("Examination");
+
+                    b.Navigation("Patient");
+                });
+
             modelBuilder.Entity("OZE.Domain.Entities.FollowUpContact", b =>
                 {
                     b.HasOne("OZE.Domain.Entities.ApplicationUser", null)
@@ -3846,6 +3928,8 @@ namespace OZE.Persistence.Migrations
                     b.Navigation("ImagingRequests");
 
                     b.Navigation("Prescriptions");
+
+                    b.Navigation("ToothFindings");
 
                     b.Navigation("TreatmentPlans");
                 });

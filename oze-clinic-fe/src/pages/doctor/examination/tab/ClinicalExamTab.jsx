@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import useAutosave from "@/hooks/useAutosave";
 import useSession from "@/hooks/useSession";
@@ -14,6 +15,7 @@ import ToothEntryDialog from "@/components/examination/ToothEntryDialog";
 import ToothPanel from "@/components/examination/ToothPanel";
 import XrayRequestDialog from "@/components/examination/XrayRequestDialog";
 import XraySection from "@/components/examination/XraySection";
+import { ROUTES } from "@/utils/routes";
 
 const COMPLETE_HINT = "Cần ít nhất một chẩn đoán xác định để chuyển sang lập kế hoạch điều trị.";
 
@@ -22,7 +24,9 @@ const newId = (prefix) => `${prefix}-${Date.now()}`;
 // Step 2 "Khám & Chẩn đoán": symptoms, dental chart findings, X-ray orders and final diagnoses.
 // record.exam is the saved draft ({ symptoms, note, entries, films, diagnoses }); every change is saved
 // automatically and passed to onExamChange so the page keeps it when the doctor moves between steps.
-const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComplete, onEnd }) => {
+// onXraySent: the patient has left for the imaging room, the page reloads the queue.
+const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComplete, onEnd, onXraySent }) => {
+    const navigate = useNavigate();
     const { userName } = useSession();
     const { value: exam, setValue: setExam, statusText, saving, saveNow } = useAutosave((draft) => saveExamDraft(queueId, draft), record.exam, onExamChange);
     const [chartType, setChartType] = useState(record.patient.age <= CHILD_CHART_MAX_AGE ? CHART_TYPE.CHILD : CHART_TYPE.ADULT);
@@ -79,6 +83,8 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
         set("films", [...response.data, ...exam.films]);
         setXrayOpen(false);
         toast.success(response.message);
+        await saveNow();
+        onXraySent?.();
     };
 
     const saveDraft = async () => {
@@ -122,7 +128,7 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
             <XraySection
                 films={exam.films}
                 onRequest={() => setXrayOpen(true)}
-                onView={(film) => toast.info(`Màn xem & duyệt ảnh ${film.code} sẽ làm ở phần "Xem & duyệt ảnh".`)}
+                onView={() => navigate(ROUTES.DOCTOR_IMAGING_REVIEWS)}
             />
             <DiagnosisSection
                 items={exam.diagnoses}

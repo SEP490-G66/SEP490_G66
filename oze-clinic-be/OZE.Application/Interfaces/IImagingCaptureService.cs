@@ -13,5 +13,7 @@ namespace OZE.Application.Interfaces
         // False asks the simulator to send the event again (for example when a picture could not be downloaded)
         Task<bool> HandleWebhookAsync(ImagingSimulatorWebhookPayload payload, CancellationToken cancellationToken = default);
         Task<ImagingFileResult> GetResultFileAsync(string userId, bool isPatient, long resultId, CancellationToken cancellationToken = default);
+        // Pictures the technician uploads by hand (.png, .jpg, .jpeg, .dcm) for an open request
+        Task<List<ImagingCaptureImageResponse>> UploadAsync(string technicianUserId, long imagingRequestId, List<UploadedImagingFile> files, string? note = null, CancellationToken cancellationToken = default);
     }
 }

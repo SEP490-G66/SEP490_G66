@@ -2,14 +2,14 @@ import RecordStatusBadge from "@/components/medicalRecord/RecordStatusBadge";
 import { XRAY_STATUS } from "@/utils/messages";
 
 const subtitle = (film) => {
-    const when = film.status === "requested" ? `Gửi lúc ${film.sentAt} · chờ KTV` : film.visitDate ? `Lần khám ${film.visitDate}` : `Gửi lúc ${film.sentAt}`;
+    const when = film.status === "cancelled" ? `Gửi lúc ${film.sentAt} · bác sĩ đã huỷ` : film.status === "requested" ? `Gửi lúc ${film.sentAt} · chờ KTV` : film.visitDate ? `Lần khám ${film.visitDate}` : `Gửi lúc ${film.sentAt}`;
     return [when, film.purpose].filter(Boolean).join(" · ");
 };
 
 // One X-ray order. film: { id, code, type, area, purpose, status (XRAY_STATUS key), sentAt?, visitDate? }.
 // Until the technician uploads the image there is no thumbnail and nothing to open.
 const XrayItem = ({ film, onView }) => {
-    const hasImage = film.status !== "requested";
+    const hasImage = ["captured", "reviewed", "retake"].includes(film.status);
 
     return (
         <li className="flex flex-wrap items-center gap-3 rounded-[10px] border border-border p-3">

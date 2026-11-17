@@ -6,6 +6,7 @@ namespace OZE.Common.Models
         public string? DiagnosisCode { get; set; }
         public string DiagnosisName { get; set; } = string.Empty;
         public string? Description { get; set; }
+        public List<string> Teeth { get; set; } = new();
         public bool IsPrimary { get; set; }
     }
 }

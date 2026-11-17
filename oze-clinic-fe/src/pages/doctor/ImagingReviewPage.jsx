@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, ImageOff, TriangleAlert } from "lucide-react";
 import ApproveResultDialog from "@/components/imagingReview/ApproveResultDialog";
 import ImagingResultCard from "@/components/imagingReview/ImagingResultCard";
@@ -7,7 +7,8 @@ import ReviewActionBar from "@/components/imagingReview/ReviewActionBar";
 import ReviewPatientStrip from "@/components/imagingReview/ReviewPatientStrip";
 import ReviewRequestList from "@/components/imagingReview/ReviewRequestList";
 import useAsync from "@/hooks/useAsync";
-import { approveImagingReview, getImagingReviews, requestImagingRetake } from "@/services/imagingReviewService";
+import { approveImagingReview, getImagingReviews, loadReviewPictures, requestImagingRetake } from "@/services/imagingReviewService";
+import { releasePictures } from "@/services/imagingPictures";
 import { IMAGING_REVIEW_STATUS } from "@/utils/messages";
 
 // Status order of the list (Chờ duyệt first), so the first result shown is one to review.
@@ -57,6 +58,24 @@ const ImagingReviewPage = () => {
     // Keep the chosen result while it is in the list, otherwise show the first one.
     const selected = visible.find((review) => review.id === selectedId) ?? visible[0] ?? null;
     const dialogSubtitle = selected ? `${selected.code} · ${selected.type} · ${selected.patient.name}` : "";
+
+    // Pictures of the selected result, fetched once per result with the sign-in token and freed when the page closes.
+    const [pictures, setPictures] = useState({});
+    // Every image list fetched so far (also read on unmount to free the object URLs).
+    const fetchedRef = useRef({});
+    useEffect(() => {
+        if (!selected || fetchedRef.current[selected.id]) return;
+        const review = selected;
+        fetchedRef.current[review.id] = [];
+        loadReviewPictures(review).then((images) => {
+            fetchedRef.current[review.id] = images;
+            setPictures((current) => ({ ...current, [review.id]: images }));
+        });
+    }, [selected]);
+    useEffect(() => {
+        const fetched = fetchedRef.current;
+        return () => Object.values(fetched).forEach(releasePictures);
+    }, []);
 
     const runAction = async (action, message) => {
         setBusy(true);
@@ -120,7 +139,7 @@ const ImagingReviewPage = () => {
                                 title={`${selected.type} · ${selected.code}`}
                                 subtitle={resultSubtitle(selected)}
                                 typeLabel={selected.type}
-                                images={selected.images}
+                                images={pictures[selected.id] ?? selected.images}
                             />
                             {selected.retakeReason && (
                                 <p className="alert alert-warning">

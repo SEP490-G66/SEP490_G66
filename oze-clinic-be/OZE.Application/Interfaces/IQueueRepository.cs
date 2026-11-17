@@ -17,6 +17,10 @@ namespace OZE.Application.Interfaces
         // The examination queue is ordered again by QueueService with the waiting-list order (WaitingOrder).
         // A room also shows the entries not yet assigned to any room.
         Task<List<QueueEntry>> GetActiveEntriesAsync(string? queueType, int? roomId, int? assignedStaffId, CancellationToken cancellationToken = default);
+        // Entries of this type finished today for one staff member, latest first
+        Task<List<QueueEntry>> GetCompletedTodayAsync(string queueType, int assignedStaffId, CancellationToken cancellationToken = default);
+        // Services booked on these appointments, with their service and variant
+        Task<List<AppointmentServiceItem>> GetServiceItemsAsync(IReadOnlyCollection<long> appointmentIds, CancellationToken cancellationToken = default);
         // Marks a waiting entry as called; false when someone else called it first
         Task<bool> TryMarkCalledAsync(long id, int? roomId, DateTimeOffset calledAt, CancellationToken cancellationToken = default);
         // A called patient who is not there goes back to waiting behind the others; false when the entry is no longer in the called state

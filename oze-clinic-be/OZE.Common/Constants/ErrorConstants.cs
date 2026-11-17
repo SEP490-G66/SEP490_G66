@@ -399,6 +399,12 @@ namespace OZE.Common.Constants
             public const string ToothSurfaceTooLong = "The tooth surface is too long";
             public const string ToothSeverityTooLong = "The severity is too long";
             public const string ToothNotesTooLong = "The tooth notes are too long";
+            public const string ToothFindingNotFound = "Tooth finding not found";
+            public const string ToothFindingConditionRequired = "Please enter the tooth condition";
+            public const string ToothFindingConditionTooLong = "The tooth condition is too long";
+            public const string ToothFindingSurfaceInvalid = "Tooth surfaces must be M, O, D, B or L";
+            public const string SymptomsInvalid = "Too many symptoms, or a symptom is too long";
+            public const string DiagnosisTeethInvalid = "Too many teeth for one diagnosis";
             public const string ToothNotRecorded = "No change was recorded for this tooth in this examination";
             public const string MedicationNameRequired = "Please enter the medication name";
             public const string MedicationNameTooLong = "The medication name is too long";
@@ -482,6 +488,20 @@ namespace OZE.Common.Constants
             public const string CannotViewResult = "You do not have permission to view this image.";
             public const string HistoryStatusInvalid = "Status must be Completed or Cancelled.";
             public const string HistoryDateRangeInvalid = "The start date must not be after the end date.";
+            public const string ReviewStatusInvalid = "Status must be Pending, Approved, Retake or Cancelled.";
+            public const string CannotReviewRequest = "You do not have permission to review this imaging request.";
+            public const string ReviewNotCompleted = "Cannot review because the imaging request is {0}.";
+            public const string NothingToReview = "There is no image waiting for review.";
+            public const string ReviewApproved = "Images approved.";
+            public const string RetakeReasonRequired = "Please enter retake reason.";
+            public const string RetakeReasonInvalid = "Retake reason is invalid. Please check again.";
+            public const string RetakeRequested = "Retake requested.";
+            public const string UploadFilesRequired = "Please choose at least one image.";
+            public const string UploadTooManyFiles = "You can upload at most 10 images at a time.";
+            public const string UploadFileTypeInvalid = "{0} is not a supported image. Use .png, .jpg, .jpeg or .dcm.";
+            public const string UploadFileTooLarge = "{0} is larger than 20 MB.";
+            public const string UploadFileEmpty = "{0} is empty.";
+            public const string ImagesUploaded = "Images uploaded.";
         }
 
         public static class InvoiceMessage
