@@ -625,13 +625,10 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(!IsOpen(appointment!), ErrorConstants.AppointmentMessage.OnlyOpenCanBeCancelled);
 
             // Staff can cancel at any time (a patient may phone just before the visit).
-            // A patient can only cancel a pending appointment, and only before the cutoff
+            // A patient can cancel a pending or confirmed appointment online, before the cutoff
             if (ownerUserId != null)
             {
-                ConditionGuard.ThrowIf(appointment!.Status == AppointmentConstants.ConfirmedStatus,
-                    ErrorConstants.AppointmentMessage.ConfirmedNeedsReceptionistToCancel);
-
-                await EnsureBeforeCutoffAsync(appointment, ErrorConstants.AppointmentMessage.CancelDeadlinePassed);
+                await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.CancelDeadlinePassed);
             }
 
             var oldStatus = appointment!.Status;
@@ -687,10 +684,8 @@ namespace OZE.Application.Services
             var isPatient = ownerUserId != null;
             if (isPatient)
             {
-                // A confirmed appointment was agreed with the receptionist, so changing it also goes through them
-                ConditionGuard.ThrowIf(appointment!.Status == AppointmentConstants.ConfirmedStatus,
-                    ErrorConstants.AppointmentMessage.ConfirmedNeedsReceptionistToReschedule);
-                await EnsureBeforeCutoffAsync(appointment, ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
+                // A pending or confirmed appointment can be moved online, before the cutoff; it goes back to pending
+                await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
             }
 
             // The services stay the same, so the new slot must fit the same total time and room type
@@ -1476,10 +1471,16 @@ namespace OZE.Application.Services
             NotifyAsync(n => n.NotifyStaffAsync(appointment.DoctorId,
                 Content(NotificationConstants.Text.NewAppointmentForDoctorTitle, NotificationConstants.Text.NewAppointmentForDoctorMessage, appointment, patientName ?? string.Empty)));
 
-        // A patient can only cancel or reschedule while the appointment is further away than the cutoff
+        // A patient can only cancel or reschedule while the appointment is further away than the cutoff.
+        // A cutoff of 0 means no limit: until check-in, even after the booked time
         private async Task EnsureBeforeCutoffAsync(Appointment appointment, string errorMessage)
         {
             var cutoffHours = await GetIntConfigAsync(ConfigKeyConstants.BookingCancelCutoffHours);
+            if (cutoffHours <= 0)
+            {
+                return;
+            }
+
             var startsAt = appointment.AppointmentDate.ToDateTime(appointment.TimeSlotStart ?? default);
             ConditionGuard.ThrowIf(startsAt - ClinicClock.Now < TimeSpan.FromHours(cutoffHours), errorMessage);
         }
