@@ -268,7 +268,8 @@ const ImagingCapturePage = () => {
     const imageCount = capture?.images.length ?? 0;
     // Other orders of this patient still to be imaged after this one
     const remainingOrders = patient ? patient.orders.length - 1 : 0;
-    // Pictures from the device were already sent to the doctor by the backend; manual ones (deviceId null) are still a mock.
+    // Pictures from the device: the backend already completed the order and told the doctor when they arrived.
+    // Pictures uploaded by hand (deviceId null) only reach the doctor once "Hoàn thành" is pressed.
     const sentByDevice = capture?.state === CAPTURE_STATES.COMPLETED && Boolean(capture.session.deviceId);
     const status = lockedBy
         ? `Đang chụp cho ${lockedBy.patientName}. Hoàn thành hoặc trả về hàng chờ trước.`
@@ -330,7 +331,7 @@ const ImagingCapturePage = () => {
                                         >
                                             Tải ảnh thủ công
                                         </button>
-                                        {/* TODO(api): the backend does not refuse an order without pictures yet (manual upload is still a mock) */}
+                                        {/* TODO(api): only checked here; POST imaging-requests/{id}/complete still accepts an order without pictures */}
                                         <button
                                             type="button"
                                             className="btn btn-primary"
