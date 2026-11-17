@@ -4,7 +4,7 @@ import { getMyShifts } from "./myScheduleService";
 import { EMPTY_PRESCRIPTION_DRAFT, EMPTY_TREATMENT_DRAFT } from "../utils/data/mockExamination";
 import { icdName, newPlanSession, validatePlan } from "../utils/examination";
 import { formatClock, getClinicDateTimeParts, getClinicToday } from "../utils/format";
-import { AFTERNOON_STARTS_AT } from "../utils/shift";
+import { AFTERNOON_STARTS_AT } from "../utils/constants/shift";
 import { imagingTypeLabel } from "../utils/imagingRequest";
 import { QUEUE_STATUS } from "../utils/messages";
 

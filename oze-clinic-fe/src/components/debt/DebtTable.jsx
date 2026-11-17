@@ -1,6 +1,6 @@
 import { ReceiptText } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { DEBT_STATUS_LABELS, getDebtAgeLevel } from "@/utils/debt";
+import { DEBT_STATUS_LABELS, getDebtAgeLevel } from "@/utils/constants/debt";
 import { cx } from "@/utils/cx";
 import { formatNumber, formatPhone } from "@/utils/format";
 

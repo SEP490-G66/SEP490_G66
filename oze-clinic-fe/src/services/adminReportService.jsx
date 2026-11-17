@@ -1,5 +1,5 @@
 import { formatDate, toDateOnly } from "../utils/format";
-import { leaveSlotLabel } from "../utils/shift";
+import { leaveSlotLabel } from "../utils/constants/shift";
 import api from "./api";
 import { pendingLeaveRequests } from "./leaveRequestService";
 import { call } from "./receptionService";

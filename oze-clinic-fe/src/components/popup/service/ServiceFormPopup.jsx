@@ -6,7 +6,7 @@ import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
 import { createService, getNextServiceCode, updateService } from "@/services/serviceManagementService";
 import { cx } from "@/utils/cx";
-import { ROOM_TYPE_OPTIONS } from "@/utils/room";
+import { ROOM_TYPE_OPTIONS } from "@/utils/constants/room";
 import { isRequiredEmpty, requiredMessage } from "@/utils/validation";
 
 // Same limits as CreateServiceRequest in the backend; the price cap keeps typing sane (999.999.999 ₫).

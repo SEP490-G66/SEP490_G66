@@ -1,6 +1,6 @@
 import { Check, Minus, X } from "lucide-react";
 import { cx } from "@/utils/cx";
-import { SHIFT_STATUSES } from "@/utils/shift";
+import { SHIFT_STATUSES } from "@/utils/constants/shift";
 
 // How each shift status reads; pending shows "Chưa điểm danh" only in the detail popup.
 const STATUS_LOOKS = {

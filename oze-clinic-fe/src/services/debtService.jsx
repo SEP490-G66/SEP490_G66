@@ -1,4 +1,4 @@
-import { DEBT_AGE_FILTERS, DEBT_SORTS, DEBT_TYPES } from "../utils/debt";
+import { DEBT_AGE_FILTERS, DEBT_SORTS, DEBT_TYPES } from "../utils/constants/debt";
 import { getClinicDateTimeParts } from "../utils/format";
 import { PAYMENT_METHOD_LABELS } from "../utils/messages";
 import api from "./api";

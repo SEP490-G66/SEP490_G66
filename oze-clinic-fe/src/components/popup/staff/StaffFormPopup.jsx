@@ -3,7 +3,7 @@ import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
 import { createStaffAccount, updateStaffAccount } from "@/services/staffService";
 import { PROFILE_LIMITS, USER_ROLES, VALIDATION_MESSAGES } from "@/utils/messages";
-import { STAFF_ROLE_OPTIONS, staffRoleLabel } from "@/utils/staff";
+import { STAFF_ROLE_OPTIONS, staffRoleLabel } from "@/utils/constants/staff";
 import { isRequiredEmpty, requiredMessage, validateEmail, validatePhone } from "@/utils/validation";
 
 // Same limits as UpdateStaffRequest on the backend.
