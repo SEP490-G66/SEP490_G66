@@ -19,5 +19,7 @@ namespace OZE.Common.Constants
         public const string RejectedImageStatus = "Rejected";
         // A new image waits for the doctor (CK_ImagingResults_ReviewStatus)
         public const string PendingImageStatus = "Pending";
+        // The doctor read the image and kept it
+        public const string ReviewedImageStatus = "Reviewed";
     }
 }

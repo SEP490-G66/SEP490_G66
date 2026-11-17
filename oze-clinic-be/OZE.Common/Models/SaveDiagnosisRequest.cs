@@ -14,6 +14,8 @@ namespace OZE.Common.Models
         public string? Description { get; set; }
 
         // An examination has one primary diagnosis, choosing this one makes the others secondary
+        // FDI numbers of the teeth concerned (optional)
+        public List<string>? Teeth { get; set; }
         public bool IsPrimary { get; set; }
     }
 }

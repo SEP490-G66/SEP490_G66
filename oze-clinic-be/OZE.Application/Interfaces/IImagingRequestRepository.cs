@@ -15,6 +15,10 @@ namespace OZE.Application.Interfaces
         Task<PagedResult<ImagingRequest>> GetHistoryAsync(ImagingHistoryQuery query, long? requestId, DateTimeOffset? from, DateTimeOffset? toExclusive, CancellationToken cancellationToken = default);
         // A request with its patient, doctor and pictures (with the technician who took them)
         Task<ImagingRequest?> GetHistoryDetailAsync(long id, CancellationToken cancellationToken = default);
+        // Done or cancelled requests a doctor ordered, with patient, pictures and technician, newest first
+        Task<List<ImagingRequest>> GetForReviewAsync(int doctorId, int limit, CancellationToken cancellationToken = default);
+        // A request with its examination and pictures, tracked for changes
+        Task<ImagingRequest?> GetTrackedWithResultsAsync(long id, CancellationToken cancellationToken = default);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
         Task AddAsync(ImagingRequest request, CancellationToken cancellationToken = default);
     }

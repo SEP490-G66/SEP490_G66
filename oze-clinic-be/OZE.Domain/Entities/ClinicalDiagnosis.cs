@@ -7,6 +7,8 @@ namespace OZE.Domain.Entities
         public string? DiagnosisCode { get; set; }
         public string DiagnosisName { get; set; } = string.Empty;
         public string? Description { get; set; }
+        // FDI numbers of the teeth the diagnosis is about, comma separated (e.g. "36,37")
+        public string? Teeth { get; set; }
         public bool IsPrimary { get; set; }
         public int DiagnosedByDoctorId { get; set; }
         public DateTimeOffset CreatedAt { get; set; }

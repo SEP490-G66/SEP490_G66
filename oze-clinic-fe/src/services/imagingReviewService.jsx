@@ -1,39 +1,84 @@
-import { MOCK_IMAGING_REVIEWS } from "../utils/data/mockImagingReviews";
+import api from "./api";
+import { call } from "./receptionService";
+import { loadPictures } from "./imagingPictures";
+import { formatClock, getClinicDateTimeParts, getClinicToday } from "@/utils/format";
+import { imagingTypeLabel } from "@/utils/imagingRequest";
 
-// TODO(api): mock only, swap for the imaging request endpoints (ImagingRequestsController) once the doctor review is there.
-const MOCK_DELAY_MS = 300;
+// "Duyệt kết quả chụp": imaging requests the signed-in doctor ordered (ImagingReviewsController).
+// Every call returns the ApiResponse shape ({ success, message, data, errors }).
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const MESSAGES = [
+    [/no image waiting for review/i, "Không còn ảnh nào chờ duyệt."],
+    [/Cannot review because the imaging request is/i, "Chỉ định này chưa có kết quả để duyệt."],
+    [/permission to review/i, "Bạn không phải bác sĩ chỉ định lần chụp này."],
+    [/retake reason/i, "Vui lòng nhập lý do chụp lại (tối đa 500 ký tự)."],
+    [/Cannot request imaging because the examination is/i, "Lượt khám đã kết thúc nên không gửi chụp lại được."],
+    [/Imaging request not found/i, "Không tìm thấy kết quả chụp."],
+];
 
-const success = (data, message = null) => ({ success: true, message, data, errors: null });
-
-const failure = (message) => ({ success: false, message, data: null, errors: null });
-
-const copy = (review) => ({ ...review, patient: { ...review.patient }, images: review.images.map((image) => ({ ...image })) });
-
-const reviews = MOCK_IMAGING_REVIEWS.map(copy);
-
-const updatePending = (id, changes) => {
-    const review = reviews.find((item) => item.id === id);
-    if (!review) return failure("Không tìm thấy kết quả chụp.");
-    if (review.status !== "pending") return failure("Kết quả này không còn chờ duyệt.");
-    Object.assign(review, changes);
-    return success(copy(review));
+const translate = (response) => {
+    if (response.success || !response.message) return response;
+    const match = MESSAGES.find(([pattern]) => pattern.test(response.message));
+    return match ? { ...response, message: match[1] } : response;
 };
+
+// "08:40" today, "01/10 08:40" another day (clinic time).
+const shortTime = (value) => {
+    if (!value) return null;
+    const { date } = getClinicDateTimeParts(value);
+    const [day, month, year] = date.split("/");
+    return `${year}-${month}-${day}` === getClinicToday() ? formatClock(value) : `${day}/${month} ${formatClock(value)}`;
+};
+
+const ageOf = (birthDate) => {
+    if (!birthDate) return null;
+    const born = new Date(birthDate);
+    const now = new Date();
+    let age = now.getFullYear() - born.getFullYear();
+    if (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())) age -= 1;
+    return age;
+};
+
+// API review → the page's review: { id, code, type, time, orderedAt, capturedAt, technician, status, retakeReason, patient, images }.
+// images keep fileUrl; loadReviewPictures adds the url.
+const toReview = (item) => ({
+    id: item.id,
+    examinationId: item.examinationId,
+    code: `IR-${item.id}`,
+    type: [imagingTypeLabel(item.imagingType), item.targetArea].filter(Boolean).join(" · "),
+    time: shortTime(item.orderedAt)?.split(" ")[0] ?? "",
+    orderedAt: shortTime(item.orderedAt),
+    capturedAt: shortTime(item.capturedAt),
+    technician: item.technicianName,
+    status: String(item.status ?? "").toLowerCase(),
+    retakeReason: item.retakeReason,
+    clinicalIndication: item.clinicalIndication,
+    patient: {
+        name: item.patient?.name ?? "",
+        code: item.patient?.code ?? "",
+        gender: item.patient?.gender ? String(item.patient.gender).toLowerCase() : null,
+        age: ageOf(item.patient?.birthDate),
+        allergies: [],
+    },
+    images: (item.images ?? []).map((image) => ({ id: image.id, fileName: image.fileName, fileUrl: image.fileUrl, reviewStatus: image.reviewStatus })),
+});
 
 // All X-ray results of the doctor, newest first.
 export const getImagingReviews = async () => {
-    await wait(MOCK_DELAY_MS);
-    return success(reviews.map(copy));
+    const response = translate(await call(() => api.get("/api/imaging-reviews")));
+    return response.success ? { ...response, data: (response.data ?? []).map(toReview) } : response;
 };
+
+// The pictures of one review, fetched with the sign-in token (see imagingPictures).
+export const loadReviewPictures = (review) => loadPictures(review.images);
 
 export const approveImagingReview = async (id) => {
-    await wait(MOCK_DELAY_MS);
-    return updatePending(id, { status: "approved" });
+    const response = translate(await call(() => api.post(`/api/imaging-requests/${id}/approve`)));
+    return response.success ? { ...response, data: toReview(response.data) } : response;
 };
 
-// The request goes back to the technician with the doctor's reason.
+// The pictures are rejected and the same order goes back to the technician with the doctor's reason.
 export const requestImagingRetake = async (id, reason) => {
-    await wait(MOCK_DELAY_MS);
-    return updatePending(id, { status: "retake", retakeReason: reason });
+    const response = translate(await call(() => api.post(`/api/imaging-requests/${id}/retake`, { reason })));
+    return response.success ? { ...response, data: toReview(response.data) } : response;
 };

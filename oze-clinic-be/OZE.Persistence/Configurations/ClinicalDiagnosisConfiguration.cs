@@ -13,6 +13,7 @@ namespace OZE.Persistence.Configurations
 
             builder.Property(x => x.DiagnosisCode).HasMaxLength(20);
             builder.Property(x => x.DiagnosisName).HasMaxLength(300).IsRequired();
+            builder.Property(x => x.Teeth).HasMaxLength(OZE.Common.Constants.ExaminationConstants.DiagnosisTeethMaxLength);
             builder.Property(x => x.IsPrimary).HasDefaultValue(false);
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 

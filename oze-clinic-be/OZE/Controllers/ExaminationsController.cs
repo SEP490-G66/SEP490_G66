@@ -192,6 +192,38 @@ namespace OZE.Controllers
             return Ok(ApiResponse<List<DiagnosisResponse>>.SuccessResult(result, "Diagnosis deleted"));
         }
 
+        // Findings per tooth in this examination: several per tooth, in the doctor's own words
+        [HttpGet("examinations/{id:long}/tooth-findings")]
+        public async Task<ActionResult<ApiResponse<List<ToothFindingResponse>>>> GetToothFindingsAsync(long id, CancellationToken cancellationToken)
+        {
+            var result = await _examinationService.GetToothFindingsAsync(DoctorUserId, id, cancellationToken);
+            return Ok(ApiResponse<List<ToothFindingResponse>>.SuccessResult(result));
+        }
+
+        [HttpPost("examinations/{id:long}/tooth-findings")]
+        public async Task<ActionResult<ApiResponse<List<ToothFindingResponse>>>> AddToothFindingAsync(
+            long id, [FromBody] SaveToothFindingRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _examinationService.AddToothFindingAsync(DoctorUserId, id, request, cancellationToken);
+            return Ok(ApiResponse<List<ToothFindingResponse>>.SuccessResult(result, "Tooth finding added"));
+        }
+
+        [HttpPut("examinations/{id:long}/tooth-findings/{findingId:long}")]
+        public async Task<ActionResult<ApiResponse<List<ToothFindingResponse>>>> UpdateToothFindingAsync(
+            long id, long findingId, [FromBody] SaveToothFindingRequest request, CancellationToken cancellationToken)
+        {
+            var result = await _examinationService.UpdateToothFindingAsync(DoctorUserId, id, findingId, request, cancellationToken);
+            return Ok(ApiResponse<List<ToothFindingResponse>>.SuccessResult(result, "Tooth finding updated"));
+        }
+
+        [HttpDelete("examinations/{id:long}/tooth-findings/{findingId:long}")]
+        public async Task<ActionResult<ApiResponse<List<ToothFindingResponse>>>> DeleteToothFindingAsync(
+            long id, long findingId, CancellationToken cancellationToken)
+        {
+            var result = await _examinationService.DeleteToothFindingAsync(DoctorUserId, id, findingId, cancellationToken);
+            return Ok(ApiResponse<List<ToothFindingResponse>>.SuccessResult(result, "Tooth finding deleted"));
+        }
+
         // The doctor sets the follow-up date; the list, reminders and booking are in FollowUpsController
         [HttpPut("examinations/{id:long}/follow-up")]
         public async Task<ActionResult<ApiResponse<ExaminationWorkResponse>>> SetFollowUpAsync(

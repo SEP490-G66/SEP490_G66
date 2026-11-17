@@ -264,6 +264,9 @@ export const EXAM_QUEUE_STATUS = {
     [QUEUE_STATUS.WAITING]: { label: "Đang chờ", badge: "badge-neutral" },
     [QUEUE_STATUS.CALLED]: { label: "Đã gọi", badge: "badge-warning" },
     [QUEUE_STATUS.IN_EXAMINATION]: { label: "Đang khám", badge: "badge-info" },
+    // Display only (still waiting): sent for an X-ray, or back from it with the visit still open
+    AT_IMAGING: { label: "Đang đi chụp", badge: "badge-warning" },
+    RETURNED: { label: "Chụp xong · khám tiếp", badge: "badge-info" },
 };
 
 // Steps of one exam visit, shown by ExamStepper once the exam has started.
@@ -366,6 +369,8 @@ export const XRAY_STATUS = {
     requested: { label: "Chờ chụp", badge: "badge-neutral" },
     captured: { label: "Chờ đọc kết quả", badge: "badge-info" },
     reviewed: { label: "Đã xem", badge: "badge-success" },
+    retake: { label: "Cần chụp lại", badge: "badge-danger" },
+    cancelled: { label: "Đã huỷ", badge: "badge-neutral" },
 };
 
 // Doctor review of an X-ray result ("Duyệt kết quả chụp").
@@ -375,20 +380,6 @@ export const IMAGING_REVIEW_STATUS = {
     approved: { label: "Đã duyệt", badge: "badge-success" },
     cancelled: { label: "Đã huỷ", badge: "badge-neutral" },
 };
-
-export const XRAY_TYPES = [
-    "Panorama",
-    "Cephalometric",
-    "Chụp ống tủy",
-    "Chụp chỉnh nha 3D",
-    "Chụp mặt thẳng (AP)",
-    "Chụp khớp thái dương hàm (TMJ)",
-    "Chụp khảo sát và giả định đặt Implant",
-    "Chụp Cone beam CT hàm trên",
-    "Chụp Cone beam CT hàm dưới",
-    "Chụp Cone beam CT hai hàm",
-    "Chụp CT xoang hàm mặt",
-];
 
 // Step 3 "Lập kế hoạch điều trị": status of a planned service and of one of its sessions.
 export const PLAN_SERVICE_STATUS = {
