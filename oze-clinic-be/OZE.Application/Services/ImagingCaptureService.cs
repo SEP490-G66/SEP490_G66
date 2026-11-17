@@ -406,17 +406,20 @@ namespace OZE.Application.Services
                 await _captureRepository.SaveChangesAsync(cancellationToken);
 
                 _logger.LogInformation("Capture {SimulationId} completed, {Count} picture(s) stored", capture.SimulationId, results.Count);
+
+                // Complete the imaging request and send the patient back to the doctor, unless already done.
+                // Still inside the lock: the screen polling and the device's webhook both get here when a capture ends,
+                // and two completions would update the same appointment and queue rows (row version → 409).
+                // The status is read from the database, not from an entity this call may have loaded before waiting.
+                var imagingRequest = await _imagingRequestRepository.GetByIdAsync(capture.ImagingRequestId, cancellationToken);
+                if (imagingRequest != null && ImagingRequestConstants.QueueStatuses.Contains(imagingRequest.RequestStatus))
+                {
+                    await _imagingRequestService.CompleteAsync(capture.ImagingRequestId, null, null, cancellationToken);
+                }
             }
             finally
             {
                 StoreLock.Release();
-            }
-
-            // Complete the imaging request and send the patient back to the doctor (unless already done)
-            var imagingRequest = await _imagingRequestRepository.GetTrackedByIdAsync(capture.ImagingRequestId, cancellationToken);
-            if (imagingRequest != null && ImagingRequestConstants.QueueStatuses.Contains(imagingRequest.RequestStatus))
-            {
-                await _imagingRequestService.CompleteAsync(capture.ImagingRequestId, null, null, cancellationToken);
             }
 
             return true;
