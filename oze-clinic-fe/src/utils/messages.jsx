@@ -105,8 +105,6 @@ export const CONSULTATION_TEXT = {
     SEND_FAILED: "Không gửi được yêu cầu. Vui lòng thử lại hoặc gọi phòng khám.",
 };
 
-export const APPOINTMENT_CHANGE_DEADLINE_HOURS = 24;
-
 export const CANCEL_REASON_MAX_LENGTH = 500;
 
 export const RESCHEDULE_REASON_MAX_LENGTH = 500;
