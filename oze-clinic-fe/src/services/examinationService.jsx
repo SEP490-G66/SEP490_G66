@@ -13,8 +13,8 @@ import { QUEUE_STATUS } from "../utils/messages";
 // step 2 "Khám & Chẩn đoán" (ExaminationsController: content, tooth findings, diagnoses), X-ray orders (ImagingRequestsController)
 // and step 3 "Lập kế hoạch điều trị" (TreatmentPlansController: create / update / propose / approve; types from bookable-services).
 // Step 4 "Thực hiện điều trị" works on the plan's stages (start / update / complete) and the visit's follow-up date.
-// Step 5 "Kê đơn thuốc" saves the visit's prescription (items, note, finalize / reopen).
-// TODO(api): step 1 medical history is still kept in the browser only.
+// Step 5 "Kê đơn thuốc" saves the visit's prescription (items, note, finalize / reopen), and step 1 adds the new history
+// items to the patient's medical profiles (PatientsController; the backend cannot remove a profile).
 //
 // A queue item is identified by its appointment id (it does not change when the patient goes for an X-ray and comes back).
 
@@ -400,13 +400,34 @@ const loadFilms = async (examinationId) => {
     return (requests.success ? requests.data : []).slice().reverse().map((request) => toFilm(request, reviewById.get(request.id)));
 };
 
+// Step 1 history groups ↔ the patient's medical profiles (PatientMedicalProfiles.RecordType). Dental history has no
+// record type of its own: it is a "History" profile marked by this description.
+const DENTAL_HISTORY_MARK = "Tiền sử nha khoa";
+const HISTORY_GROUPS = [
+    { key: "allergies", recordType: "Allergy", description: null },
+    { key: "conditions", recordType: "Condition", description: null },
+    { key: "dental", recordType: "History", description: DENTAL_HISTORY_MARK },
+];
+
+const sameTitle = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+const historyFromProfiles = (profiles) => {
+    const titles = (match) => [...new Set(profiles.filter(match).map((profile) => profile.title?.trim()).filter(Boolean))];
+    const isDental = (profile) => profile.recordType === "History" && profile.description === DENTAL_HISTORY_MARK;
+    return {
+        allergies: titles((profile) => profile.recordType === "Allergy"),
+        // Other history (not dental) is shown with the underlying conditions, as before
+        conditions: titles((profile) => profile.recordType === "Condition" || (profile.recordType === "History" && !isDental(profile))),
+        dental: titles(isDental),
+    };
+};
+
 const loadHistoryAndVisits = async (item) => {
     const response = await call(() => api.get(`/api/medical-records/patients/${item.patientId}`));
     if (!response.success) return { history: null, visits: [] };
     const profiles = response.data.medicalProfiles ?? [];
-    const titles = (type) => profiles.filter((profile) => profile.recordType === type).map((profile) => profile.title).filter(Boolean);
     return {
-        history: { allergies: titles("Allergy"), conditions: [...titles("Condition"), ...titles("History")], dental: [] },
+        history: historyFromProfiles(profiles),
         visits: (response.data.examinations ?? [])
             .filter((visit) => visit.id !== item.examinationId)
             .map((visit) => ({
@@ -436,9 +457,13 @@ export const getExamRecord = async (id) => {
     // The plan saved in this visit; until there is one, the draft made from the registered services
     if (savedPlan) local.plan = planFromApi(savedPlan, item, local.plan.doctorName);
     const planTypes = Object.fromEntries(local.plan.services.map((service) => [service.serviceId, typesOf(service.serviceId)]));
-    if (past.history && !local.historyLoaded) {
-        local.history = past.history;
-        local.historyLoaded = true;
+    if (past.history) {
+        // What the patient's record already has: shown ticked and locked (the backend can add a profile, not remove one)
+        local.historySaved = past.history;
+        if (!local.historyLoaded) {
+            local.history = structuredClone(past.history);
+            local.historyLoaded = true;
+        }
     }
 
     const data = work?.data;
@@ -489,6 +514,7 @@ export const getExamRecord = async (id) => {
                 appointmentTime: item.timeSlotStart ? item.timeSlotStart.slice(0, 5) : null,
             },
             history: local.history,
+            historySaved: local.historySaved ?? { allergies: [], conditions: [], dental: [] },
             visits: past.visits,
             exam,
             plan: local.plan,
@@ -698,19 +724,49 @@ export const requestXray = async (id, request) => {
     return success(films, `Đã gửi ${films.length} yêu cầu chụp tới kỹ thuật viên. Bệnh nhân sang phòng chụp, chụp xong sẽ quay lại đầu hàng chờ.`);
 };
 
-// ---- Steps 1, 3-5: kept in the browser until their APIs are wired ----
+// ---- Step 1 "Lập hồ sơ bệnh án": the patient's medical history ----
 
-const localDraft = (id) => {
-    const item = itemOf(id);
-    return item ? localOf(item) : null;
+// Draft save of step 1. history: { allergies, conditions, dental }. Every item the patient's record does not have yet
+// becomes a medical profile (POST patients/{id}/medical-profiles). The backend cannot remove a profile, so an item
+// already saved stays (the screen locks it). data.saved: the items now in the record, by group.
+const writeHistory = async (item, history) => {
+    const local = localOf(item);
+    local.history = structuredClone(history);
+    const saved = structuredClone(local.historySaved ?? { allergies: [], conditions: [], dental: [] });
+
+    for (const group of HISTORY_GROUPS) {
+        for (const title of history[group.key] ?? []) {
+            if (!title.trim() || saved[group.key].some((existing) => sameTitle(existing, title))) continue;
+            const response = translate(
+                await call(() =>
+                    api.post(`/api/patients/${item.patientId}/medical-profiles`, {
+                        recordType: group.recordType,
+                        title: title.trim().slice(0, 200),
+                        description: group.description,
+                        status: "Active",
+                    }),
+                ),
+            );
+            if (!response.success) {
+                local.historySaved = saved;
+                return response;
+            }
+            saved[group.key].push(title.trim());
+        }
+    }
+    local.historySaved = saved;
+    return success({ savedAt: Date.now(), saved: structuredClone(saved) });
 };
 
-// Draft save of step 1. history: { allergies, conditions, dental }.
+const historySaves = new Map(); // patientId → the step 1 save on its way (one after another)
+
 export const saveMedicalHistory = async (id, history) => {
-    const local = localDraft(id);
-    if (!local) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
-    local.history = structuredClone(history);
-    return success({ savedAt: Date.now() });
+    const item = itemOf(id);
+    if (!item?.patientId) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
+    const previous = historySaves.get(item.patientId) ?? Promise.resolve();
+    const next = previous.then(() => writeHistory(item, history));
+    historySaves.set(item.patientId, next.catch(() => null));
+    return next;
 };
 
 // Step 3 draft save. plan: { services: [...] } (see utils/examination). The plan of the visit is created on the first
