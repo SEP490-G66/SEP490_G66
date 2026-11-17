@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpDown, CalendarDays, Funnel, Search, X } from "lucide-react";
+import { ArrowUpDown, CalendarDays, CircleAlert, Funnel, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import AppointmentTable from "@/components/appointment/AppointmentTable";
+import { Hotline } from "@/components/booking/BookingSchedule";
+import BookingStateBox from "@/components/booking/BookingStateBox";
 import { FilterPopover } from "@/components/medicalRecord/ExaminationFilterPopover";
 import Pagination from "@/components/ui/Pagination";
 import useAsync from "@/hooks/useAsync";
-import { getMyAppointments } from "@/services/patientDashboardService";
-import { APPOINTMENT_STATUS, GENERIC_ERROR_MESSAGE, PATIENT_APPOINTMENT_STATUS } from "@/utils/messages";
+import { getMyAppointments } from "@/services/appointmentService";
+import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, GENERIC_ERROR_MESSAGE, PATIENT_APPOINTMENT_STATUS } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 
 const ID_PREFIX = "my-appointments";
@@ -39,6 +41,8 @@ const TEXT = {
     NO_MATCH_TITLE: "Không có lịch hẹn phù hợp",
     NO_MATCH_TEXT: "Thử bỏ bớt trạng thái đang lọc hoặc đổi từ khóa.",
     RESET_ALL: "Xóa tìm kiếm và bộ lọc",
+    UNLINKED_TEXT: "Vui lòng gọi",
+    UNLINKED_TEXT_END: "để lễ tân gắn hồ sơ.",
 };
 
 const SORT = { NEWEST: "newest", OLDEST: "oldest" };
@@ -53,8 +57,9 @@ const CHIP_CLASS = "inline-flex items-center gap-1 rounded-full bg-primary-soft 
 const statusLabel = (status) => PATIENT_APPOINTMENT_STATUS[status].label;
 
 const toResource = ({ loading, error, value }) => {
-    const failed = !loading && (Boolean(error) || value?.success === false || !Array.isArray(value?.data));
-    return { loading, failed, data: !loading && !failed ? value.data.filter((item) => item !== null && typeof item === "object") : [] };
+    const unlinked = !loading && !error && value?.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND;
+    const failed = !loading && !unlinked && (Boolean(error) || value?.success === false || !Array.isArray(value?.data));
+    return { loading, failed, unlinked, data: !loading && !failed && !unlinked ? value.data.filter((item) => item !== null && typeof item === "object") : [] };
 };
 
 const normalizeText = (value) =>
@@ -108,7 +113,7 @@ const MyAppointments = () => {
         return () => clearTimeout(timer);
     }, [searchInput, keyword]);
 
-    const ready = !resource.loading && !resource.failed;
+    const ready = !resource.loading && !resource.failed && !resource.unlinked;
     const statusCounts = Object.fromEntries(STATUS_ORDER.map((status) => [status, resource.data.filter((item) => item.status === status).length]));
     const rows = resource.data.filter((appointment) => matchesStatus(statuses, appointment) && matchesKeyword(appointment, keyword)).sort(COMPARERS[sort]);
     const total = rows.length;
@@ -183,6 +188,13 @@ const MyAppointments = () => {
                 </Link>
             </div>
             {resource.loading && <AppointmentTable loading labelledBy={TITLE_ID} />}
+            {resource.unlinked && (
+                <section className="card-app">
+                    <BookingStateBox tone="warning" icon={CircleAlert} title={BOOKING_TEXT.UNLINKED_TITLE} headingLevel={2}>
+                        {TEXT.UNLINKED_TEXT} <Hotline /> {TEXT.UNLINKED_TEXT_END}
+                    </BookingStateBox>
+                </section>
+            )}
             {resource.failed && (
                 <div role="alert" className="alert alert-danger">
                     {GENERIC_ERROR_MESSAGE}
