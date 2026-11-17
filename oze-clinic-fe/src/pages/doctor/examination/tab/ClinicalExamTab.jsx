@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import useAutosave from "@/hooks/useAutosave";
 import useSession from "@/hooks/useSession";
-import { requestXray, resetToothState, saveExamDraft, setToothState } from "@/services/examinationService";
-import { CHART_TYPE, CHILD_CHART_MAX_AGE, TOOTH_STATES, isPrimaryTooth } from "@/utils/examination";
+import { requestXray, saveExamDraft } from "@/services/examinationService";
+import { CHART_TYPE, CHILD_CHART_MAX_AGE, isPrimaryTooth } from "@/utils/examination";
 import DiagnosisDialog from "@/components/examination/DiagnosisDialog";
 import DiagnosisSection from "@/components/examination/DiagnosisSection";
 import ExamDentalChart from "@/components/examination/ExamDentalChart";
@@ -21,10 +21,9 @@ const COMPLETE_HINT = "Cần ít nhất một chẩn đoán xác định để c
 
 const newId = (prefix) => `${prefix}-${Date.now()}`;
 
-// Step 2 "Khám & Chẩn đoán": reason and symptoms, dental chart (standard state of each tooth + findings), X-ray orders
-// and final diagnoses. record.exam is the saved draft ({ chiefComplaint, symptoms, note, entries, chart, films, diagnoses });
-// every change is saved automatically and passed to onExamChange so the page keeps it when the doctor moves between steps.
-// The tooth states (chart) are saved at once instead, and the backend's answer replaces exam.chart.
+// Step 2 "Khám & Chẩn đoán": reason and symptoms, dental chart findings, X-ray orders and final diagnoses.
+// record.exam is the saved draft ({ chiefComplaint, symptoms, note, entries, films, diagnoses }); every change is saved
+// automatically and passed to onExamChange so the page keeps it when the doctor moves between steps.
 // onXraySent: the patient has left for the imaging room, the page reloads the queue.
 const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComplete, onEnd, onXraySent }) => {
     const navigate = useNavigate();
@@ -36,8 +35,6 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
     const [diagnosisDialog, setDiagnosisDialog] = useState(null); // { diagnosis } while open
     const [xrayOpen, setXrayOpen] = useState(false);
     const [sendingXray, setSendingXray] = useState(false);
-    const [savingState, setSavingState] = useState(false);
-    const chart = exam.chart ?? [];
 
     const set = (key, value) => setExam({ ...exam, [key]: value });
     const recordedTeeth = [...new Set(exam.entries.map((entry) => Number(entry.tooth)))].sort((a, b) => a - b);
@@ -62,24 +59,6 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
         set("entries", exam.entries.filter((item) => item.id !== entry.id));
         toast.success(`Đã xoá "${entry.condition}" của răng ${entry.tooth}.`);
     };
-
-    // Standard state of a tooth: saved at once, the backend answers with the whole chart
-    const changeToothState = async (request, message) => {
-        setSavingState(true);
-        const response = await request();
-        setSavingState(false);
-        if (!response.success) {
-            toast.error(response.message);
-            return;
-        }
-        set("chart", response.data);
-        toast.success(message);
-    };
-
-    const saveToothState = (tooth, state) =>
-        changeToothState(() => setToothState(queueId, tooth, state), `Đã lưu răng ${tooth}: ${TOOTH_STATES[state.condition]?.label ?? state.condition}.`);
-
-    const undoToothState = (tooth) => changeToothState(() => resetToothState(queueId, tooth), `Đã hoàn tác trạng thái răng ${tooth}.`);
 
     const selectToothFromTable = (tooth) => {
         changeChartType(isPrimaryTooth(tooth) ? CHART_TYPE.CHILD : CHART_TYPE.ADULT);
@@ -135,7 +114,6 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
             />
             <ExamDentalChart
                 entries={exam.entries}
-                states={chart}
                 chartType={chartType}
                 onChartTypeChange={changeChartType}
                 selectedTooth={selectedTooth}
@@ -146,10 +124,6 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
                         key={selectedTooth}
                         tooth={selectedTooth}
                         entries={exam.entries.filter((entry) => Number(entry.tooth) === selectedTooth)}
-                        state={chart.find((state) => state.tooth === selectedTooth)}
-                        stateBusy={savingState}
-                        onSetState={(state) => saveToothState(selectedTooth, state)}
-                        onResetState={() => undoToothState(selectedTooth)}
                         onAdd={addEntry}
                         onEdit={setEditingEntry}
                         onRemove={removeEntry}
