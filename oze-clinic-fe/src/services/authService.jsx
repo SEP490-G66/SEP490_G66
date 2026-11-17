@@ -1,14 +1,14 @@
 import api from "./api";
+<<<<<<< HEAD
 import { BACKEND_LOGIN_CODES, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
 import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
 import { call } from "./receptionService";
+=======
+import { BACKEND_LOGIN_CODES, CHANGE_PASSWORD_TEXT, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
+import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
+>>>>>>> main
 import { invalidMessage } from "../utils/validation";
 import { clearSession, getSessionRefreshToken, getSessionToken, isAccessTokenExpired, saveSession, sessionFromAuthResult } from "./sessionStore";
-
-const MOCK_PASSWORD = "12345678";
-const MOCK_DELAY_MS = 800;
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const failure = (message) => ({ success: false, message, data: null, errors: null });
 
@@ -72,8 +72,10 @@ const GENERIC_ERROR = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
 const PHONE_EXISTS_PATTERN = /^Patient with phone number .+ already exists/;
 
-// The texts of ErrorConstants.AuthMessage that Register can show. TODO(be): match stable codes once these responses have them.
-const REGISTER_MESSAGES = {
+const RESET_SESSION_INVALID = "Password reset session is invalid or expired, please request a new code";
+
+// The texts of ErrorConstants.AuthMessage that Register and Forgot Password can show. TODO(be): match stable codes once these responses have them.
+const AUTH_MESSAGES = {
     "Full name is invalid. Please check again.": invalidMessage("Họ và tên"),
     "Date of birth is invalid. Please check again.": invalidMessage("Ngày sinh"),
     "Phone number is invalid. Please check again.": VALIDATION_MESSAGES.PHONE_INVALID,
@@ -91,25 +93,31 @@ const REGISTER_MESSAGES = {
         "Bạn đã yêu cầu quá nhiều mã cho số điện thoại hoặc email này. Vui lòng thử lại sau.",
     "Too many requests. Please wait a moment and try again": "Có quá nhiều yêu cầu. Vui lòng chờ một lát rồi thử lại.",
     "Create account success!": "Tạo tài khoản thành công!",
+    [RESET_SESSION_INVALID]: "Phiên khôi phục mật khẩu đã hết hạn. Vui lòng yêu cầu mã mới.",
+    "Reset password failed": "Không đặt lại được mật khẩu. Vui lòng thử lại.",
 };
 
 const withVietnameseMessage = (body) => {
     if (PHONE_EXISTS_PATTERN.test(body.message)) return { ...body, message: VALIDATION_MESSAGES.PHONE_IN_USE };
-    return { ...body, message: REGISTER_MESSAGES[body.message] ?? (body.success ? body.message : GENERIC_ERROR) };
+    return { ...body, message: AUTH_MESSAGES[body.message] ?? (body.success ? body.message : GENERIC_ERROR) };
 };
 
 // The backend answers failures with the same ApiResponse shape, so screens only check result.success.
 // Every failure stays on the screen, also 429 and 5xx, which would otherwise leave the form for the error page.
-const postApi = async (url, body) => {
+const sendAuthRequest = async (url, body) => {
     try {
         const response = await api.post(url, body, AUTH_REQUEST_CONFIG);
-        return withVietnameseMessage(response.data);
+        return response.data;
     } catch (error) {
         // Anything that is not an ApiResponse (e.g. the HTML 404 page when VITE_API_URL is missing) gets a generic message.
         const data = error.response?.data;
-        return typeof data?.success === "boolean" ? withVietnameseMessage(data) : failure(GENERIC_ERROR);
+        return typeof data?.success === "boolean" ? data : null;
     }
 };
+
+const toResult = (body) => (body ? withVietnameseMessage(body) : failure(GENERIC_ERROR));
+
+const postApi = async (url, body) => toResult(await sendAuthRequest(url, body));
 
 // The backend expects "Male"/"Female" and "Sms"/"Email".
 const GENDER_VALUES = { male: "Male", female: "Female" };
@@ -133,41 +141,43 @@ export const verifyRegisterOtp = async ({ sessionId, code }) =>
 
 export const resendRegisterOtp = async ({ sessionId }) => postApi("/api/Auth/resend-otp", { sessionId });
 
-const MOCK_UNREGISTERED_PHONE = "0900000001";
+const RESET_ERROR_MESSAGES = new Map([
+    ["Passwords must have at least one digit ('0'-'9').", VALIDATION_MESSAGES.PASSWORD_DIGIT],
+    ["Passwords must have at least one lowercase ('a'-'z').", VALIDATION_MESSAGES.PASSWORD_LOWERCASE],
+]);
 
-const mockRequestPasswordReset = async ({ phone }) => {
-    await wait(MOCK_DELAY_MS);
+const RESET_CODE_USED = "This code has already been used. Continue with the new password";
 
-    if (phone === MOCK_UNREGISTERED_PHONE) return failure(invalidMessage("Số điện thoại"));
+export const requestPasswordReset = async ({ identifier }) => postApi("/api/Auth/forgot-password", { identifier });
 
-    return success(null);
+export const verifyResetOtp = async ({ sessionId, code }) => {
+    const body = await sendAuthRequest("/api/Auth/verify-reset-otp", { sessionId, otp: code });
+    return body?.message === RESET_CODE_USED ? success(null) : toResult(body);
 };
 
-export const requestPasswordReset = async ({ phone, method }) => mockRequestPasswordReset({ phone, method });
-
-const MOCK_OTP_CODE = "123456";
-const MOCK_EXPIRED_OTP_CODE = "000000";
-const MOCK_RESET_TOKEN = "mock-reset-token";
-
-const mockVerifyOtp = async ({ code }) => {
-    await wait(MOCK_DELAY_MS);
-
-    if (code === MOCK_EXPIRED_OTP_CODE) return failure(invalidMessage("Mã xác minh"));
-    if (code !== MOCK_OTP_CODE) return failure(invalidMessage("Mã xác minh"));
-
-    return success({ resetToken: MOCK_RESET_TOKEN });
+export const resetPassword = async ({ sessionId, password, confirmPassword }) => {
+    const body = await sendAuthRequest("/api/Auth/reset-password", { sessionId, newPassword: password, confirmPassword });
+    const known = (body?.errors ?? []).map((error) => RESET_ERROR_MESSAGES.get(error)).find(Boolean);
+    if (known) return failure(known);
+    const result = toResult(body);
+    return body?.message === RESET_SESSION_INVALID ? { ...result, data: { sessionExpired: true } } : result;
 };
 
-export const verifyOtp = async ({ phone, code }) => mockVerifyOtp({ phone, code });
+const INCORRECT_PASSWORD = "Incorrect password.";
+const SAME_PASSWORD = "New password cannot be the same as current password";
+const CONFIRM_MISMATCH = "New password and confirmation password do not match";
 
-const mockResetPassword = async ({ password }) => {
-    await wait(MOCK_DELAY_MS);
-
-    if (password === MOCK_PASSWORD) return failure(MESSAGES.MSG25);
-
-    return success(null);
+const changePasswordError = (body) => {
+    const errors = body?.errors ?? [];
+    if (errors.includes(INCORRECT_PASSWORD)) return { field: "currentPassword", message: CHANGE_PASSWORD_TEXT.INCORRECT_CURRENT };
+    if (body?.message === SAME_PASSWORD) return { field: "newPassword", message: MESSAGES.MSG25 };
+    const rule = errors.map((error) => RESET_ERROR_MESSAGES.get(error)).find(Boolean);
+    if (rule) return { field: "newPassword", message: rule };
+    if (body?.message === CONFIRM_MISMATCH) return { field: "confirmPassword", message: CHANGE_PASSWORD_TEXT.CONFIRM_MISMATCH };
+    return { field: null, message: CHANGE_PASSWORD_TEXT.FAILED };
 };
 
+<<<<<<< HEAD
 export const resetPassword = async ({ token, password }) => mockResetPassword({ token, password });
 
 // Backend (ASP.NET Identity) messages of POST api/Auth/change-password, and the form field each one belongs to
@@ -189,4 +199,19 @@ export const changePassword = async ({ currentPassword, newPassword }) => {
     const match = CHANGE_PASSWORD_ERRORS.find(([pattern]) => pattern.test(reasons));
     if (!match) return { ...failure(response.noResponse ? response.message : GENERIC_ERROR_MESSAGE), data: { field: "newPassword" } };
     return { ...failure(match[2]), data: { field: match[1] } };
+=======
+export const changePassword = async ({ currentPassword, newPassword, confirmPassword }) => {
+    const refreshToken = getSessionRefreshToken();
+    try {
+        await api.post(
+            "/api/Auth/change-password",
+            { currentPassword, newPassword, confirmPassword, refreshToken },
+            { skipErrorPage: true },
+        );
+        return success({ sessionReplaced: getSessionRefreshToken() !== refreshToken });
+    } catch (error) {
+        const { field, message } = changePasswordError(error.response?.data);
+        return { ...failure(message), data: { field } };
+    }
+>>>>>>> main
 };
