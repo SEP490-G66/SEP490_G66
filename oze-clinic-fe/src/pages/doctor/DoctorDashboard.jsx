@@ -188,7 +188,7 @@ const DoctorDashboard = () => {
                     label="Đã hoàn thành"
                     value={stats?.completed}
                     caption={stats && `${percentOf(stats.completed, stats.totalToday)}% bệnh nhân hôm nay`}
-                    to={ROUTES.DOCTOR_PATIENTS}
+                    to={ROUTES.DOCTOR_EXAMINATION}
                     loading={loading}
                 />
                 <StatCard
