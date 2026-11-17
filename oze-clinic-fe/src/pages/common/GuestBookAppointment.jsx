@@ -4,7 +4,7 @@ import BookingSchedule, { BookingLoadingCard, BookingSectionHeading, LoadErrorBo
 import BookingSuccess from "@/components/booking/BookingSuccess";
 import GuestPatientForm from "@/components/booking/GuestPatientForm";
 import useBookingForm from "@/hooks/useBookingForm";
-import { GUEST_BOOKING_API } from "@/services/guestBookingService";
+import { GUEST_BOOKING_API } from "@/services/bookingService";
 import { BOOKING_IDS } from "@/utils/booking";
 import { getClinicToday } from "@/utils/format";
 import { BOOKING_TEXT, GUEST_BOOKING_TEXT as TEXT } from "@/utils/messages";
