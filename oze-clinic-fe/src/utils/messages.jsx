@@ -53,6 +53,13 @@ export const PROFILE_MESSAGES = {
     NO_CHANGES: "Không có thông tin nào thay đổi.",
 };
 
+export const CHANGE_PASSWORD_TEXT = {
+    INCORRECT_CURRENT: "Mật khẩu hiện tại không đúng.",
+    CONFIRM_MISMATCH: "Mật khẩu xác nhận không khớp với mật khẩu mới.",
+    FAILED: "Không đổi được mật khẩu. Vui lòng thử lại.",
+    SIGN_IN_AGAIN: "Mật khẩu đã được đổi. Vui lòng đăng nhập lại.",
+};
+
 export const GENDER_LABELS = { male: "Nam", female: "Nữ" };
 
 export const VERIFICATION_METHOD = { SMS: "SMS", EMAIL: "EMAIL" };

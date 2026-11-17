@@ -1,12 +1,8 @@
 import api from "./api";
-import { BACKEND_LOGIN_CODES, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
-import { getDefaultMockUserId, getMockCurrentUser, setMockCurrentUserId, updateMockUser } from "../utils/data/mockData";
+import { BACKEND_LOGIN_CODES, CHANGE_PASSWORD_TEXT, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
+import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
 import { invalidMessage } from "../utils/validation";
 import { clearSession, getSessionRefreshToken, getSessionToken, isAccessTokenExpired, saveSession, sessionFromAuthResult } from "./sessionStore";
-
-const MOCK_DELAY_MS = 800;
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const failure = (message) => ({ success: false, message, data: null, errors: null });
 
@@ -161,36 +157,31 @@ export const resetPassword = async ({ sessionId, password, confirmPassword }) =>
     return body?.message === RESET_SESSION_INVALID ? { ...result, data: { sessionExpired: true } } : result;
 };
 
-const MAX_CHANGE_PASSWORD_ATTEMPTS = 5;
-const LOCK_MINUTES = 15;
+const INCORRECT_PASSWORD = "Incorrect password.";
+const SAME_PASSWORD = "New password cannot be the same as current password";
+const CONFIRM_MISMATCH = "New password and confirmation password do not match";
 
-// Wrong current-password attempts in this tab. TODO(be): the backend counts these and locks the account.
-let wrongPasswordAttempts = 0;
+const changePasswordError = (body) => {
+    const errors = body?.errors ?? [];
+    if (errors.includes(INCORRECT_PASSWORD)) return { field: "currentPassword", message: CHANGE_PASSWORD_TEXT.INCORRECT_CURRENT };
+    if (body?.message === SAME_PASSWORD) return { field: "newPassword", message: MESSAGES.MSG25 };
+    const rule = errors.map((error) => RESET_ERROR_MESSAGES.get(error)).find(Boolean);
+    if (rule) return { field: "newPassword", message: rule };
+    if (body?.message === CONFIRM_MISMATCH) return { field: "confirmPassword", message: CHANGE_PASSWORD_TEXT.CONFIRM_MISMATCH };
+    return { field: null, message: CHANGE_PASSWORD_TEXT.FAILED };
+};
 
-// Change password while signed in. On a wrong current password, data.attemptsLeft says how many tries remain;
-// data.locked is true once the account is locked (the screen then signs the user out).
-export const changePassword = async ({ currentPassword, newPassword }) => {
-    await wait(MOCK_DELAY_MS);
-
-    const user = getMockCurrentUser();
-    if (!user) return failure("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
-
-    if (currentPassword !== user.password) {
-        wrongPasswordAttempts += 1;
-        const attemptsLeft = MAX_CHANGE_PASSWORD_ATTEMPTS - wrongPasswordAttempts;
-        if (attemptsLeft <= 0) {
-            wrongPasswordAttempts = 0;
-            return { ...failure(MESSAGES.MSG26), data: { locked: true } };
-        }
-        return {
-            ...failure(`Mật khẩu hiện tại không đúng. Bạn còn ${attemptsLeft} lần thử trước khi tài khoản bị tạm khoá ${LOCK_MINUTES} phút.`),
-            data: { attemptsLeft },
-        };
+export const changePassword = async ({ currentPassword, newPassword, confirmPassword }) => {
+    const refreshToken = getSessionRefreshToken();
+    try {
+        await api.post(
+            "/api/Auth/change-password",
+            { currentPassword, newPassword, confirmPassword, refreshToken },
+            { skipErrorPage: true },
+        );
+        return success({ sessionReplaced: getSessionRefreshToken() !== refreshToken });
+    } catch (error) {
+        const { field, message } = changePasswordError(error.response?.data);
+        return { ...failure(message), data: { field } };
     }
-
-    wrongPasswordAttempts = 0;
-    if (newPassword === user.password) return failure(MESSAGES.MSG25);
-
-    updateMockUser(user.id, { password: newPassword });
-    return success(null);
 };
