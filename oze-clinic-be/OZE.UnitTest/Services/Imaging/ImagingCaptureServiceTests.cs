@@ -44,6 +44,8 @@ namespace OZE.UnitTest.Services.Imaging
 
             _staff.Setup(r => r.GetByUserIdAsync(TechnicianUserId)).ReturnsAsync(new StaffProfile { Id = 7, UserId = TechnicianUserId });
             _requests.Setup(r => r.GetTrackedByIdAsync(RequestId, It.IsAny<CancellationToken>())).ReturnsAsync(_request);
+            // The completion check after storing pictures reads the request without tracking
+            _requests.Setup(r => r.GetByIdAsync(RequestId, It.IsAny<CancellationToken>())).ReturnsAsync(_request);
             _captures.Setup(r => r.GetResultsAsync(RequestId, It.IsAny<CancellationToken>())).ReturnsAsync(new List<ImagingResult>());
         }
 
