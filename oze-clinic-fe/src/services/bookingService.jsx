@@ -63,16 +63,22 @@ const toService = (service) => ({
     variants: (service.variants ?? []).map((variant) => ({ id: variant.variantId, name: variant.variantName })),
 });
 
+const toDoctor = (doctor) => ({ doctorId: doctor.id, doctorName: doctor.fullName });
+
+const loadDoctors = (signal) => call(() => api.get("/api/home/doctors", { ...READ, signal, params: { PageSize: PAGE_SIZE } }));
+
+export const getBookingDoctors = async ({ signal } = {}) => {
+    const result = await loadDoctors(signal);
+    return result.success ? success(listOf(result.data).map(toDoctor)) : failure();
+};
+
 const loadSharedContext = async (signal) => {
-    const [services, doctors] = await Promise.all([
-        call(() => api.get("/api/appointments/bookable-services", { ...READ, signal })),
-        call(() => api.get("/api/home/doctors", { ...READ, signal, params: { PageSize: PAGE_SIZE } })),
-    ]);
+    const [services, doctors] = await Promise.all([call(() => api.get("/api/appointments/bookable-services", { ...READ, signal })), loadDoctors(signal)]);
     if (signal?.aborted) throw abortError();
     if (!services.success || !doctors.success) return null;
     return {
         services: listOf(services.data).map(toService),
-        doctors: listOf(doctors.data).map((doctor) => ({ doctorId: doctor.id, doctorName: doctor.fullName })),
+        doctors: listOf(doctors.data).map(toDoctor),
     };
 };
 
