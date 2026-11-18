@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react"
 import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { getMyRefundRequests, getMyRefundableInvoices } from "@/services/refundRequestService";
-import { REFUND_REQUEST_TEXT } from "@/utils/messages";
+import { BOOKING_ERROR_CODE, REFUND_REQUEST_TEXT } from "@/utils/messages";
 import {
     CODE_PATTERN,
     REFUND_CREATE_ID,
@@ -135,16 +135,16 @@ const useRefundRequestNavigation = () => {
         if (load.status !== "loading") return undefined;
         const controller = new AbortController();
         let active = true;
-        const finish = (data) => {
+        const finish = (data, failedStatus = "error") => {
             if (!active || controller.signal.aborted) return;
-            setLoad((current) => (current.id === load.id ? { ...current, status: data ? "ready" : "error", data } : current));
+            setLoad((current) => (current.id === load.id ? { ...current, status: data ? "ready" : failedStatus, data } : current));
         };
         Promise.all([
             getMyRefundRequests({ signal: controller.signal }).catch(() => null),
-            getMyRefundableInvoices({ signal: controller.signal, source: "page" }).catch(() => null),
+            getMyRefundableInvoices({ signal: controller.signal }).catch(() => null),
         ]).then(([list, refundable]) => {
             if (!list?.success || !Array.isArray(list.data?.items)) {
-                finish(null);
+                finish(null, list?.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND ? "unlinked" : "error");
                 return;
             }
             const created = createdRecordsRef.current;

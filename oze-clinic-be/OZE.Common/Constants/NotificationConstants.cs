@@ -64,7 +64,9 @@ namespace OZE.Common.Constants
             public const string ExaminationCompletedTitle = "Đã có phiếu khám";
             public const string ExaminationCompletedMessage = "Phiếu khám ngày {0} đã có trong Sổ khám bệnh.";
             public const string RefundApprovedTitle = "Yêu cầu hoàn tiền đã được duyệt";
-            public const string RefundApprovedMessage = "Yêu cầu hoàn {0} cho hóa đơn {1} đã được duyệt.";
+            public const string RefundApprovedMessage = "Yêu cầu hoàn {0} cho hóa đơn {1} đã được duyệt. Phòng khám sẽ liên hệ để hoàn tiền cho bạn.";
+            public const string RefundPaidOutTitle = "Đã hoàn tiền";
+            public const string RefundPaidOutMessage = "Phòng khám đã hoàn {0} cho hóa đơn {1}.";
             public const string RefundRejectedTitle = "Yêu cầu hoàn tiền bị từ chối";
             public const string RefundRejectedMessage = "Yêu cầu hoàn tiền cho hóa đơn {0} bị từ chối. Lý do: {1}";
 

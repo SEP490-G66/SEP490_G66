@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import DetailLink from "@/components/ui/DetailLink";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { REFUND_REQUEST_STATUS_LABELS } from "@/utils/refundRequest";
@@ -17,7 +18,11 @@ const PatientDebtRefunds = ({ item, titleId = TITLE_ID, emptyText = PATIENT_DEBT
                         <div className="min-w-0">
                             <p className="font-semibold text-ink">
                                 {PATIENT_DEBT_TEXT.REFUND_HEAD(refund.code)}
-                                <span className="num">{formatCurrency(refund.amount)}</span>
+                                {refund.status === "approved" || refund.status === "refunded" ? (
+                                    <span className="num">{formatCurrency(refund.amount)}</span>
+                                ) : (
+                                    <span className="font-normal text-muted">{refund.status === "pending" ? PATIENT_DEBT_TEXT.REFUND_PENDING : PATIENT_DEBT_TEXT.NO_VALUE}</span>
+                                )}
                             </p>
                             <p className="num mt-0.5 text-caption">{PATIENT_DEBT_TEXT.REFUND_META(refund.stage, refund.visitDate, refund.createdAt)}</p>
                         </div>
@@ -35,6 +40,10 @@ const PatientDebtRefunds = ({ item, titleId = TITLE_ID, emptyText = PATIENT_DEBT
         )}
         <p className="border-t border-border px-5 py-3 text-caption text-muted">
             {PATIENT_DEBT_TEXT.CONTACT_BEFORE}
+            <Link to={ROUTES.REFUND_REQUESTS} className="font-semibold text-primary hover:underline">
+                {PATIENT_DEBT_TEXT.CONTACT_ONLINE}
+            </Link>
+            {PATIENT_DEBT_TEXT.CONTACT_OR}
             <a href={`tel:${CLINIC_HOTLINE.TEL}`} className="whitespace-nowrap font-semibold text-primary hover:underline">
                 {CLINIC_HOTLINE.DISPLAY}
             </a>

@@ -25,6 +25,24 @@ namespace OZE.Application.Interfaces
             string approvedByUserId,
             CancellationToken cancellationToken = default);
 
+        Task<RefundRequestResponse> PayoutAsync(
+            long requestId,
+            string paidOutByUserId,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyList<MyRefundRequestResponse>> GetMyAsync(
+            string userId,
+            CancellationToken cancellationToken = default);
+
+        Task<IReadOnlyList<MyRefundableInvoiceResponse>> GetMyRefundableInvoicesAsync(
+            string userId,
+            CancellationToken cancellationToken = default);
+
+        Task<MyRefundRequestResponse> RequestMyAsync(
+            string userId,
+            CreateMyRefundRequest request,
+            CancellationToken cancellationToken = default);
+
         Task<RefundRequestResponse> RejectAsync(
             long requestId,
             string rejectedByUserId,

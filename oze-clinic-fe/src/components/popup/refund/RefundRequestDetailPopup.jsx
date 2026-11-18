@@ -50,6 +50,7 @@ const RefundRequestDetailPopup = ({ request, onClose, onConfirm, onReject }) => 
 
     const pending = request.status === REFUND_REQUEST_STATUSES.PENDING;
     const refunded = request.status === REFUND_REQUEST_STATUSES.REFUNDED;
+    const approved = request.status === REFUND_REQUEST_STATUSES.APPROVED;
     const workDoneAmount = parseAmount(workDone);
     const previewRefund = workDoneAmount !== null && workDoneAmount < request.paidAmount ? request.paidAmount - workDoneAmount : null;
 
@@ -69,10 +70,13 @@ const RefundRequestDetailPopup = ({ request, onClose, onConfirm, onReject }) => 
         { label: "Dịch vụ đăng ký", value: request.serviceNames },
         { label: "Số tiền đã thanh toán", value: money(request.paidAmount) },
     ];
-    if (refunded) {
+    if (refunded || approved) {
         invoiceRows.push(
             { label: "Phần việc đã làm", value: money(request.workDoneAmount ?? 0) },
-            { label: "Số tiền đã hoàn", value: <span className="num font-semibold text-success">{formatCurrency(request.refundAmount)}</span> },
+            {
+                label: refunded ? "Số tiền đã hoàn" : "Số tiền hoàn (chờ lễ tân chi)",
+                value: <span className={`num font-semibold ${refunded ? "text-success" : "text-ink"}`}>{formatCurrency(request.refundAmount)}</span>,
+            },
         );
         if (request.processedAt) invoiceRows.push({ label: "Hoàn lúc", value: <span className="num">{formatDateTime(request.processedAt)}</span> });
     }
@@ -129,7 +133,7 @@ const RefundRequestDetailPopup = ({ request, onClose, onConfirm, onReject }) => 
                             <span className="text-muted">Số tiền hoàn cho bệnh nhân</span>
                             <span className="num font-heading text-heading-3 text-primary">{previewRefund === null ? "—" : formatCurrency(previewRefund)}</span>
                         </div>
-                        <p className="text-caption text-muted">Số tiền hoàn = số tiền đã thanh toán − giá trị phần việc đã làm. Tiền được hoàn ngay khi xác nhận.</p>
+                        <p className="text-caption text-muted">Số tiền hoàn = số tiền đã thanh toán − giá trị phần việc đã làm. Sau khi duyệt, lễ tân chi tiền cho bệnh nhân.</p>
                     </section>
                 )}
 
