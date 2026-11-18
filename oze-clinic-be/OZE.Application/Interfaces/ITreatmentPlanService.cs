@@ -1,4 +1,5 @@
 using OZE.Common.Models;
+using OZE.Common.Models.Base;
 
 namespace OZE.Application.Interfaces
 {
