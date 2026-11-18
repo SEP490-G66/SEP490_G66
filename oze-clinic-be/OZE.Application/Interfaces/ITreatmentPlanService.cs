@@ -6,12 +6,18 @@ namespace OZE.Application.Interfaces
     {
         Task<TreatmentPlanProgressResponse> CreateAsync(long examinationId, CreateTreatmentPlanRequest request,
             string userId, CancellationToken cancellationToken = default);
+        Task<TreatmentPlanProgressResponse> CreateAsync(CreateTreatmentPlanRequest request,
+            string userId, CancellationToken cancellationToken = default);
         // canViewAll: reception sees every patient; a doctor only the patients they examine
         Task<TreatmentPlanProgressResponse> GetDetailAsync(long treatmentPlanId, string userId, bool canViewAll,
             CancellationToken cancellationToken = default);
         Task<List<TreatmentPlanSummaryResponse>> GetByPatientAsync(int patientId, bool includeClosed, string userId, bool canViewAll,
             CancellationToken cancellationToken = default);
+        Task<PagedResult<TreatmentPlanSummaryResponse>> GetAllPlansAsync(TreatmentPlanQueryParameters query,
+            string userId, bool canViewAll, CancellationToken cancellationToken = default);
         Task<TreatmentPlanProgressResponse> UpdateAsync(long treatmentPlanId, UpdateTreatmentPlanRequest request,
+            string userId, CancellationToken cancellationToken = default);
+        Task<TreatmentPlanProgressResponse> CreateNewVersionAsync(long treatmentPlanId, UpdateTreatmentPlanRequest request,
             string userId, CancellationToken cancellationToken = default);
         Task DeleteAsync(long treatmentPlanId, string userId, CancellationToken cancellationToken = default);
         Task<TreatmentPlanProgressResponse> ProposeAsync(long treatmentPlanId, string userId, CancellationToken cancellationToken = default);
@@ -27,5 +33,7 @@ namespace OZE.Application.Interfaces
         Task<TreatmentPlanProgressResponse> UpdateStageAsync(long treatmentPlanId, long stageId, UpdateTreatmentStageRequest request,
             string userId, CancellationToken cancellationToken = default);
         Task<TreatmentPlanProgressResponse> CompleteStageAsync(long treatmentPlanId, long stageId, CompleteTreatmentStageRequest? request, string userId, CancellationToken cancellationToken = default);
+        Task<TreatmentPlanProgressResponse> PerformSessionAsync(long stageId, PerformSessionRequest request,
+            string userId, CancellationToken cancellationToken = default);
     }
 }

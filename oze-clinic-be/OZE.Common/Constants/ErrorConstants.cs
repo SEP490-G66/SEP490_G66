@@ -268,6 +268,10 @@ namespace OZE.Common.Constants
             public const string PlanNotCancellable = "This treatment plan is already completed or cancelled. A draft plan is deleted instead.";
             public const string StageStillInProgress = "A treatment stage is still in progress. Please complete it before cancelling the plan.";
             public const string CancelReasonRequired = "Please enter the reason for cancelling the treatment plan.";
+            public const string ExaminationIdRequired = "Examination id is required to create a treatment plan.";
+            public const string CannotCreateNewVersion = "Only proposed, approved, or in-progress treatment plans can be updated with a new version.";
+            public const string StageAlreadyCompleted = "This treatment stage is already completed.";
+            public const string FollowUpAppointmentOrPlanRequired = "Either a previous appointment ID or a treatment plan ID is required.";
         }
         public static class AppointmentMessage
         {
