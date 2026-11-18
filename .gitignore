@@ -11,6 +11,8 @@
 
 ## Local ASP.NET config (secrets, connection strings)
 **/appsettings.Development.json
+# Per-machine overrides read by Program.cs; put real passwords and keys here, never in appsettings.json
+**/appsettings.Local.json
 
 # BMAD Method - Local AI configuration
 /_bmad/
