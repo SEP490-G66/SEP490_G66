@@ -19,6 +19,10 @@ using OZE.Domain.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Per-machine settings (real passwords, keys, a remote database) that must never be committed; the file is git-ignored
+// and optional, so servers that take their settings from environment variables run without it
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
 // 1. Add Services
 // Keep the "Async" suffix in action names, so CreatedAtAction(nameof(GetXxxAsync)) finds the action
 builder.Services.AddControllers(options => options.SuppressAsyncSuffixInActionNames = false);
