@@ -117,7 +117,7 @@ const taskStatus = (item) => {
     return Object.hasOwn(INVOICE_PAYMENT_STATUS, item.paymentStatus) ? item.paymentStatus : PAYMENT_STATUS.UNPAID;
 };
 
-const getTasks = (plans, dueItems, appointmentDates) => [
+const getTasks = (plans, dueItems) => [
     ...plans
         .filter((plan) => plan.status === PLAN_STATUS.PROPOSED)
         .sort((a, b) => (b.proposedAt ?? "").localeCompare(a.proposedAt ?? "") || b.treatmentPlanId - a.treatmentPlanId)
@@ -134,10 +134,11 @@ const getTasks = (plans, dueItems, appointmentDates) => [
     ...dueItems.map((item) => ({
         kind: "invoice",
         id: item.id,
+        debtId: item.debtId,
         status: taskStatus(item),
         invoiceNumber: item.invoiceNumber,
         remainder: item.due,
-        appointmentDate: item.appointmentId != null ? appointmentDates.get(item.appointmentId) : undefined,
+        appointmentDate: item.visitDate ?? undefined,
     })),
 ];
 
@@ -164,7 +165,6 @@ const PatientDashboard = () => {
     const activePlan = getActivePlan(plans.data);
     const progress = getStageProgress(activePlan?.stages);
     const dueItems = getDueItems(dues.data);
-    const appointmentDates = new Map(appointments.data.map((item) => [item.id, item.appointmentDate]));
     const planStat = plans.failed ? { value: EMPTY_VALUE } : getPlanStat(activePlan, progress);
     const unlinked = appointments.unlinked || dues.unlinked;
 
@@ -217,7 +217,7 @@ const PatientDashboard = () => {
                     </div>
                     <div className="mt-6 flex flex-col gap-6">
                         <TasksSection
-                            tasks={getTasks(plans.data, dueItems, appointmentDates)}
+                            tasks={getTasks(plans.data, dueItems)}
                             loading={plans.loading || dues.loading}
                             failed={plans.failed || dues.failed}
                         />
