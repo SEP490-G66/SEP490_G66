@@ -53,7 +53,10 @@ namespace OZE.Application
             services.AddScoped<IRoleService, RoleService>();
             services.AddScoped<IEmailSender, EmailSender>();
             services.AddScoped<IHomeService, HomeService>();
-            services.AddScoped<ISmsSender, SmsSender>();
+            services.AddHttpClient<ISmsSender, SmsSender>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.speedsms.vn/");
+            });
             services.AddScoped<IWorkShipService, WorkShiftService>();
             services.AddScoped<ITreatmentPlanService, TreatmentPlanService>();
             services.AddSingleton<IPendingRegistrationStore, PendingRegistrationStore>();
