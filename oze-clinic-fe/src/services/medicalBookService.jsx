@@ -45,8 +45,3 @@ export const getMyTreatmentPlans = async ({ signal } = {}) => {
     if (!book.success || !book.data) return failed(book);
     return success(toDashboardPlans(book.data));
 };
-
-export const approveMyTreatmentPlan = async (planId) => {
-    const result = await call(() => api.post(`/api/TreatmentPlans/my/${planId}/approve`, null, READ));
-    return result.success ? success(result.data) : failure(result.status === NOT_FOUND ? BOOKING_ERROR_CODE.PROFILE_NOT_FOUND : null);
-};

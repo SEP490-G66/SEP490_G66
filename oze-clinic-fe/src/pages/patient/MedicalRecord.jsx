@@ -60,7 +60,6 @@ const PANELS = {
                 onOpenDrawer={handlers.openDrawer}
                 onCloseDrawer={handlers.closeDrawer}
                 onOpenVisit={handlers.openVisitFromLog}
-                onApproved={handlers.refresh}
             />
         );
     },
@@ -120,7 +119,7 @@ const LoadingSkeleton = () => (
 );
 
 const MedicalRecord = () => {
-    const { url, load, ui, setUi, page, list, pageState, h1Ref, retryRef, navigate, goTo, retry, refresh, ownState } = useMedicalRecordNavigation();
+    const { url, load, ui, setUi, page, list, pageState, h1Ref, retryRef, navigate, goTo, retry, ownState } = useMedicalRecordNavigation();
     const compositionVersion = useRef(null);
     const data = load.data;
     const groups = pageState === PAGE_STATE.CONTENT ? getFilterGroups(data) : [];
@@ -318,7 +317,7 @@ const MedicalRecord = () => {
         if (!Object.is(effectiveTooth, ui.tooth)) setUi({ tooth: effectiveTooth });
     }
     const nextAppointment = sortByDate(data.upcoming, (appointment) => appointment.date, 1)[0] ?? null;
-    const handlers = { openVisitFromLog, openDrawer, closeDrawer, selectTooth, toggleSection, refresh };
+    const handlers = { openVisitFromLog, openDrawer, closeDrawer, selectTooth, toggleSection };
     const panelContext = { data, visit: selectedVisit, ui, urlVisitId, handlers };
 
     return (

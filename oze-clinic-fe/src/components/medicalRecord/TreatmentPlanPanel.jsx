@@ -1,12 +1,10 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CircleCheck, Clock, Info } from "lucide-react";
+import { ArrowRight, CircleCheck, Info } from "lucide-react";
 import { cx } from "@/utils/cx";
 import { formatCurrency } from "@/utils/format";
 import { RECORD_NAV_FLAG, RECORD_STATUS_BUTTON_ID, SHEET_TAB, buildRecordUrl, displayText, isPlainClick } from "@/utils/medicalRecord";
 import { CLINIC_HOTLINE, MEDICAL_RECORD_PLAN_STATUS, MEDICAL_RECORD_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
-import ApprovePlanDialog from "./ApprovePlanDialog";
 import RecordStatusBadge from "./RecordStatusBadge";
 import StatusDefinitionDrawer from "./StatusDefinitionDrawer";
 import TreatmentStepList from "./TreatmentStepList";
@@ -72,30 +70,19 @@ const CostTable = ({ plan }) => (
     </>
 );
 
-const ApproveBox = ({ plan, onApprove }) => (
-    <section className="card-app border-2 border-warning p-0">
+const ProposedCostBox = ({ plan }) => (
+    <section className="card-app p-0">
         <div className={CARD_HEADER_CLASS}>
-            <div className="flex items-center gap-2">
-                <Clock className="size-5 text-warning" aria-hidden="true" />
-                <h2 className="card-title">{TEXT.APPROVE_TITLE}</h2>
-            </div>
+            <h2 className="card-title">{TEXT.PROPOSED_COST_TITLE}</h2>
         </div>
         <CostTable plan={plan} />
-        <div className="flex flex-col gap-3 border-t border-border px-5 py-4">
-            <p className="text-body-sm">{TEXT.APPROVE_INFO}</p>
-            <div>
-                <button type="button" className="btn btn-primary" onClick={onApprove}>
-                    {TEXT.APPROVE_BUTTON}
-                </button>
-            </div>
-            <p className="text-caption text-muted">
-                {TEXT.APPROVE_CHANGE}{" "}
-                <a href={`tel:${CLINIC_HOTLINE.TEL}`} className="font-semibold text-primary hover:underline">
-                    {CLINIC_HOTLINE.DISPLAY}
-                </a>
-                .
-            </p>
-        </div>
+        <p className="border-t border-border px-5 py-4 text-caption text-muted">
+            {TEXT.PROPOSED_AT_CLINIC}{" "}
+            <a href={`tel:${CLINIC_HOTLINE.TEL}`} className="font-semibold text-primary hover:underline">
+                {CLINIC_HOTLINE.DISPLAY}
+            </a>
+            .
+        </p>
     </section>
 );
 
@@ -151,7 +138,7 @@ const LogTable = ({ plan, visitId, visitIds, onOpenVisit }) => (
     </section>
 );
 
-const PlanCard = ({ plan, first, visitId, visitIds, onOpenDrawer, onOpenVisit, onApprove }) => {
+const PlanCard = ({ plan, first, visitId, visitIds, onOpenDrawer, onOpenVisit }) => {
     const proposed = plan.status === "proposed";
     return (
         <div className="flex flex-col gap-4">
@@ -190,46 +177,26 @@ const PlanCard = ({ plan, first, visitId, visitIds, onOpenDrawer, onOpenVisit, o
                     </div>
                 )}
             </section>
-            {proposed ? <ApproveBox plan={plan} onApprove={onApprove} /> : <LogTable plan={plan} visitId={visitId} visitIds={visitIds} onOpenVisit={onOpenVisit} />}
+            {proposed ? <ProposedCostBox plan={plan} /> : <LogTable plan={plan} visitId={visitId} visitIds={visitIds} onOpenVisit={onOpenVisit} />}
         </div>
     );
 };
 
-const TreatmentPlanPanel = ({ plans, visitId, visitIds, drawerOpen, onOpenDrawer, onCloseDrawer, onOpenVisit, onApproved }) => {
-    const [approving, setApproving] = useState(null);
-
-    const closeDialog = (refresh) => {
-        setApproving(null);
-        if (refresh) onApproved();
-    };
-
-    return (
-        <div className="flex flex-col gap-6">
-            {plans.map((plan, index) => (
-                <PlanCard
-                    key={plan.id}
-                    first={index === 0}
-                    plan={plan}
-                    visitId={visitId}
-                    visitIds={visitIds}
-                    onOpenDrawer={onOpenDrawer}
-                    onOpenVisit={onOpenVisit}
-                    onApprove={() => setApproving(plan)}
-                />
-            ))}
-            {approving && (
-                <ApprovePlanDialog
-                    plan={approving}
-                    onClose={closeDialog}
-                    onApproved={() => {
-                        setApproving(null);
-                        onApproved();
-                    }}
-                />
-            )}
-            {drawerOpen && <StatusDefinitionDrawer onClose={onCloseDrawer} />}
-        </div>
-    );
-};
+const TreatmentPlanPanel = ({ plans, visitId, visitIds, drawerOpen, onOpenDrawer, onCloseDrawer, onOpenVisit }) => (
+    <div className="flex flex-col gap-6">
+        {plans.map((plan, index) => (
+            <PlanCard
+                key={plan.id}
+                first={index === 0}
+                plan={plan}
+                visitId={visitId}
+                visitIds={visitIds}
+                onOpenDrawer={onOpenDrawer}
+                onOpenVisit={onOpenVisit}
+            />
+        ))}
+        {drawerOpen && <StatusDefinitionDrawer onClose={onCloseDrawer} />}
+    </div>
+);
 
 export default TreatmentPlanPanel;
