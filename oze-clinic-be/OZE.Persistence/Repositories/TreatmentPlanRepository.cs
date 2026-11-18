@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OZE.Application.Interfaces;
 using OZE.Common.Constants;
 using OZE.Common.Models;
+using OZE.Common.Models.Base;
 using OZE.Domain.Entities;
 using OZE.Persistence.DbContexts;
 
