@@ -744,8 +744,9 @@ namespace OZE.Persistence.Seed
                     AppointmentConstants.CheckedInStatus);
 
                 // YC000318: examined, filmed, waiting for the doctor's review and back in the doctor's queue
+                // Checked in again, as ImagingRequestService leaves it when the X-ray is ordered, so the doctor can examine others meanwhile
                 var khanh = Open(new Visit { Patient = "BN000133", WalkIn = true, CheckIn = "08:08", Doctor = Khoa, Complaint = "Đau răng hàm dưới bên trái" },
-                    AppointmentConstants.InServiceStatus);
+                    AppointmentConstants.CheckedInStatus);
                 var khanhAt = At(Today, khanh.Time);
                 var technician = TechnicianAt(Today, khanh.Time.AddMinutes(25));
                 var request = AddImaging(khanh.Appointment.Examination!, khanh.Shift.StaffProfile, ImagingRequestConstants.Completed, ImagingRequestConstants.Panoramic, "Toàn hàm", khanhAt.AddMinutes(25));
@@ -757,7 +758,7 @@ namespace OZE.Persistence.Seed
 
                 // YC000314: the film was rejected, the patient waits in the X-ray room for a retake
                 var bao = Open(new Visit { Patient = "BN000117", WalkIn = true, CheckIn = "08:38", Doctor = Khoa, Complaint = "Đau vùng hàm, kiểm tra tổng quát" },
-                    AppointmentConstants.InServiceStatus);
+                    AppointmentConstants.CheckedInStatus);
                 var baoAt = At(Today, bao.Time);
                 technician = TechnicianAt(Today, bao.Time.AddMinutes(5));
                 request = AddImaging(bao.Appointment.Examination!, bao.Shift.StaffProfile, ImagingRequestConstants.InProgress, ImagingRequestConstants.Panoramic, "Toàn hàm", baoAt.AddMinutes(5));
@@ -768,6 +769,18 @@ namespace OZE.Persistence.Seed
                 Open(new Visit { Patient = "BN000152", Day = 0, Time = "10:30", Doctor = Huy, Complaint = "Tái khám" }, AppointmentConstants.ConfirmedStatus);
                 Open(new Visit { Patient = "BN000154", Day = 0, Time = "14:00", Doctor = Anh, Book = new[] { "DV001", "DV009-01" } }, AppointmentConstants.ConfirmedStatus);
                 Open(new Visit { Patient = "BN000153", Day = 0, Time = "15:00", Doctor = Anh, Book = new[] { "DV001", "DV009-01" }, Complaint = "Trám nốt răng còn lại" }, AppointmentConstants.ConfirmedStatus);
+
+                // The queue of the afternoon shift (BS. Ánh, Phòng khám): checked in, waiting for the doctor to start the shift and call them
+                Open(new Visit { Patient = "BN000151", Time = "13:00", CheckIn = "12:50", Doctor = Anh, Complaint = "Ê buốt răng khi uống nước lạnh" },
+                    AppointmentConstants.CheckedInStatus);
+                Open(new Visit { Patient = "BN000097", CheckIn = "13:05", WalkIn = true, Doctor = Anh, Complaint = "Chảy máu chân răng khi đánh răng" },
+                    AppointmentConstants.CheckedInStatus);
+                Open(new Visit { Patient = "BN000101", Time = "13:30", CheckIn = "13:10", Doctor = Anh, Complaint = "Khám định kỳ 6 tháng" },
+                    AppointmentConstants.CheckedInStatus);
+                Open(new Visit { Patient = "BN000125", CheckIn = "13:15", WalkIn = true, Doctor = Anh, Complaint = "Sưng lợi răng khôn hàm dưới" },
+                    AppointmentConstants.CheckedInStatus);
+                Open(new Visit { Patient = "BN000090", Time = "16:00", CheckIn = "13:20", Doctor = Anh, Complaint = "Đến sớm, muốn khám trước giờ hẹn" },
+                    AppointmentConstants.CheckedInStatus);
             }
 
             // Coming days: requests to confirm and the patients booked in the shifts of the leave requests (mockShifts).
