@@ -20,6 +20,7 @@ namespace OZE.Persistence.DbContexts
         public DbSet<Patient> Patients => Set<Patient>();
         public DbSet<PatientMedicalProfile> PatientMedicalProfiles => Set<PatientMedicalProfile>();
         public DbSet<PatientDocument> PatientDocuments => Set<PatientDocument>();
+        public DbSet<DocumentRequest> DocumentRequests => Set<DocumentRequest>();
 
         // Schedule
         public DbSet<StaffSchedule> StaffSchedules => Set<StaffSchedule>();

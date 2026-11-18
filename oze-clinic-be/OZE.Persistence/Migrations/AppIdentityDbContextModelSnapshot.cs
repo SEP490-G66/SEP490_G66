@@ -942,6 +942,61 @@ namespace OZE.Persistence.Migrations
                     b.ToTable("DentalChartEntries", (string)null);
                 });
 
+            modelBuilder.Entity("OZE.Domain.Entities.DocumentRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.Property<string>("DocumentName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<long>("ExaminationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RequestedByDoctorId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExaminationId")
+                        .HasDatabaseName("IX_DocumentRequests_ExaminationId");
+
+                    b.HasIndex("PatientId", "CreatedAt")
+                        .HasDatabaseName("IX_DocumentRequests_PatientId");
+
+                    b.ToTable("DocumentRequests", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DocumentRequests_Status", "[Status] IN ('Pending', 'Submitted', 'Cancelled')");
+                        });
+                });
+
             modelBuilder.Entity("OZE.Domain.Entities.Examination", b =>
                 {
                     b.Property<long>("Id")
@@ -1878,6 +1933,9 @@ namespace OZE.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<long?>("DocumentRequestId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("DocumentType")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -1906,6 +1964,9 @@ namespace OZE.Persistence.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DocumentRequestId")
+                        .HasDatabaseName("IX_PatientDocuments_DocumentRequestId");
 
                     b.HasIndex("PatientId", "DocumentType", "CreatedAt")
                         .IsDescending(false, false, true)
@@ -3284,6 +3345,36 @@ namespace OZE.Persistence.Migrations
                     b.Navigation("Patient");
                 });
 
+            modelBuilder.Entity("OZE.Domain.Entities.DocumentRequest", b =>
+                {
+                    b.HasOne("OZE.Domain.Entities.Examination", "Examination")
+                        .WithMany()
+                        .HasForeignKey("ExaminationId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_DocumentRequests_Examinations");
+
+                    b.HasOne("OZE.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_DocumentRequests_Patients");
+
+                    b.HasOne("OZE.Domain.Entities.StaffProfile", "RequestedByDoctor")
+                        .WithMany()
+                        .HasForeignKey("RequestedByDoctorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_DocumentRequests_Doctors");
+
+                    b.Navigation("Examination");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("RequestedByDoctor");
+                });
+
             modelBuilder.Entity("OZE.Domain.Entities.Examination", b =>
                 {
                     b.HasOne("OZE.Domain.Entities.Appointment", "Appointment")
@@ -3588,6 +3679,12 @@ namespace OZE.Persistence.Migrations
 
             modelBuilder.Entity("OZE.Domain.Entities.PatientDocument", b =>
                 {
+                    b.HasOne("OZE.Domain.Entities.DocumentRequest", "DocumentRequest")
+                        .WithMany("Documents")
+                        .HasForeignKey("DocumentRequestId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_PatientDocuments_DocumentRequests");
+
                     b.HasOne("OZE.Domain.Entities.Patient", "Patient")
                         .WithMany("Documents")
                         .HasForeignKey("PatientId")
@@ -3600,6 +3697,8 @@ namespace OZE.Persistence.Migrations
                         .HasForeignKey("UploadedByUserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_PatientDocuments_UploadedBy");
+
+                    b.Navigation("DocumentRequest");
 
                     b.Navigation("Patient");
                 });
@@ -3913,6 +4012,11 @@ namespace OZE.Persistence.Migrations
             modelBuilder.Entity("OZE.Domain.Entities.CashSession", b =>
                 {
                     b.Navigation("Expenses");
+                });
+
+            modelBuilder.Entity("OZE.Domain.Entities.DocumentRequest", b =>
+                {
+                    b.Navigation("Documents");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.Examination", b =>

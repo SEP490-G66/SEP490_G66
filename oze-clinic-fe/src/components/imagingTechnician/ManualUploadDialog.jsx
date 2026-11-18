@@ -10,17 +10,29 @@ const NOTE_MAX = 500;
 
 const sizeText = (bytes) => `${(bytes / 1024 / 1024).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} MB`;
 
-const problemOf = (file) => {
+const problemOf = (file, extensions, maxMb) => {
     const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-    if (!MANUAL_UPLOAD_EXTENSIONS.includes(extension)) return "Sai định dạng";
-    if (file.size > MANUAL_UPLOAD_MAX_MB * 1024 * 1024) return `Quá ${MANUAL_UPLOAD_MAX_MB} MB`;
+    if (!extensions.includes(extension)) return "Sai định dạng";
+    if (file.size > maxMb * 1024 * 1024) return `Quá ${maxMb} MB`;
     return null;
 };
 
 // "Tải ảnh thủ công": when the device failed or has no connection for the order type.
 // subtitle: "IR-1041 · Võ Thị Ngọc · Phim quanh chóp". onSubmit({ files, note }) gets only valid files;
 // an invalid file stays in the list, marked, and blocks the upload until it is removed.
-const ManualUploadDialog = ({ subtitle, onSubmit, onClose }) => {
+// Reused for other uploads: title, the accepted extensions, the size and count limits (maxFiles: none by default),
+// the word for one file in the hint ("ảnh") and whether there is a note can be changed.
+const ManualUploadDialog = ({
+    subtitle,
+    title = "Tải ảnh thủ công",
+    extensions = MANUAL_UPLOAD_EXTENSIONS,
+    maxMb = MANUAL_UPLOAD_MAX_MB,
+    maxFiles = null,
+    fileLabel = "ảnh",
+    withNote = true,
+    onSubmit,
+    onClose,
+}) => {
     const inputRef = useRef(null);
     const noteId = useId();
     const [items, setItems] = useState([]);
@@ -29,20 +41,21 @@ const ManualUploadDialog = ({ subtitle, onSubmit, onClose }) => {
     const [busy, submit] = useSubmit(onSubmit);
 
     const add = (fileList) => {
-        const next = Array.from(fileList ?? []).map((file) => ({ key: `${file.name}-${file.size}-${file.lastModified}`, file, problem: problemOf(file) }));
+        const next = Array.from(fileList ?? []).map((file) => ({ key: `${file.name}-${file.size}-${file.lastModified}`, file, problem: problemOf(file, extensions, maxMb) }));
         setItems((current) => [...current, ...next.filter((item) => !current.some((existing) => existing.key === item.key))]);
     };
     const invalid = items.some((item) => item.problem);
-    const canSubmit = items.length > 0 && !invalid;
+    const tooMany = maxFiles != null && items.length > maxFiles;
+    const canSubmit = items.length > 0 && !invalid && !tooMany;
 
     return (
-        <Modal title="Tải ảnh thủ công" description={subtitle} onClose={onClose} closeDisabled={busy}>
+        <Modal title={title} description={subtitle} onClose={onClose} closeDisabled={busy}>
             <form
                 noValidate
                 className="mt-5 flex flex-col gap-4"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    if (canSubmit && !busy) submit({ files: items.map((item) => item.file), note: note.trim() });
+                    if (canSubmit && !busy) submit({ files: items.map((item) => item.file), note: withNote ? note.trim() : "" });
                 }}
             >
                 <button
@@ -66,14 +79,15 @@ const ManualUploadDialog = ({ subtitle, onSubmit, onClose }) => {
                     <Upload className="size-5 text-muted" aria-hidden="true" />
                     <span className="font-semibold text-ink">Kéo thả file vào đây hoặc bấm để chọn</span>
                     <span className="text-caption text-muted">
-                        {MANUAL_UPLOAD_EXTENSIONS.filter((ext) => ext !== ".jpeg").join(", ")} · tối đa {MANUAL_UPLOAD_MAX_MB} MB/ảnh
+                        {extensions.filter((ext) => ext !== ".jpeg").join(", ")} · tối đa {maxMb} MB/{fileLabel}
+                        {maxFiles != null && ` · tối đa ${maxFiles} ${fileLabel}/lần`}
                     </span>
                 </button>
                 <input
                     ref={inputRef}
                     type="file"
                     multiple
-                    accept={MANUAL_UPLOAD_EXTENSIONS.join(",")}
+                    accept={extensions.join(",")}
                     className="sr-only"
                     tabIndex={-1}
                     onChange={(event) => {
@@ -106,21 +120,28 @@ const ManualUploadDialog = ({ subtitle, onSubmit, onClose }) => {
                         Xoá các file không hợp lệ trước khi tải lên.
                     </p>
                 )}
+                {tooMany && (
+                    <p role="alert" className="error-text">
+                        Mỗi lần tải tối đa {maxFiles} {fileLabel}. Xoá bớt rồi tải lên.
+                    </p>
+                )}
 
-                <div className="field">
-                    <label htmlFor={noteId} className="label">
-                        Ghi chú
-                    </label>
-                    <textarea
-                        id={noteId}
-                        rows={3}
-                        maxLength={NOTE_MAX}
-                        className="input h-auto min-h-20 py-2"
-                        placeholder="Ví dụ: chụp trên máy Cephalometric phòng 2 do máy giả lập không hỗ trợ"
-                        value={note}
-                        onChange={(event) => setNote(event.target.value)}
-                    />
-                </div>
+                {withNote && (
+                    <div className="field">
+                        <label htmlFor={noteId} className="label">
+                            Ghi chú
+                        </label>
+                        <textarea
+                            id={noteId}
+                            rows={3}
+                            maxLength={NOTE_MAX}
+                            className="input h-auto min-h-20 py-2"
+                            placeholder="Ví dụ: chụp trên máy Cephalometric phòng 2 do máy giả lập không hỗ trợ"
+                            value={note}
+                            onChange={(event) => setNote(event.target.value)}
+                        />
+                    </div>
+                )}
 
                 <DialogActions onClose={onClose} closeLabel="Huỷ" submitLabel={`Tải lên${items.length ? ` (${items.length})` : ""}`} disabled={!canSubmit} busy={busy} closeDisabled={busy} />
             </form>

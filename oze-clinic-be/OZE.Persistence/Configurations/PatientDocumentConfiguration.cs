@@ -23,12 +23,18 @@ namespace OZE.Persistence.Configurations
                    .HasForeignKey(x => x.PatientId)
                    .HasConstraintName("FK_PatientDocuments_Patients")
                    .OnDelete(DeleteBehavior.NoAction);
+            builder.HasOne(x => x.DocumentRequest)
+                   .WithMany(x => x.Documents)
+                   .HasForeignKey(x => x.DocumentRequestId)
+                   .HasConstraintName("FK_PatientDocuments_DocumentRequests")
+                   .OnDelete(DeleteBehavior.NoAction);
             builder.HasOne<ApplicationUser>()
                    .WithMany()
                    .HasForeignKey(x => x.UploadedByUserId)
                    .HasConstraintName("FK_PatientDocuments_UploadedBy")
                    .OnDelete(DeleteBehavior.NoAction);
 
+            builder.HasIndex(x => x.DocumentRequestId).HasDatabaseName("IX_PatientDocuments_DocumentRequestId");
             builder.HasIndex(x => new { x.PatientId, x.DocumentType, x.CreatedAt })
                    .HasDatabaseName("IX_PatientDocuments_PatientId_Type")
                    .IsDescending(false, false, true);
