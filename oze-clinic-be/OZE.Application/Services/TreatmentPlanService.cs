@@ -219,6 +219,26 @@ namespace OZE.Application.Services
             CancellationToken cancellationToken = default)
         {
             var plan = await LoadForStatusChangeAsync(treatmentPlanId, userId, canViewAll, cancellationToken);
+            return await ApproveLoadedAsync(plan, cancellationToken);
+        }
+
+        // The patient agrees online to a plan proposed to them (decided 18/11: to think it over at home before agreeing)
+        public async Task<TreatmentPlanProgressResponse> ApproveByPatientAsync(
+            long treatmentPlanId,
+            string userId,
+            CancellationToken cancellationToken = default)
+        {
+            var patient = await _medicalRecordRepository.GetPatientByUserIdAsync(userId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(patient != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
+
+            // Another patient's plan is reported as missing, so its existence is not revealed
+            var plan = await _treatmentPlanRepository.GetTrackedByIdWithStagesAsync(treatmentPlanId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(plan != null && plan.PatientId == patient!.Id, ErrorConstants.TreatmentPlanMessage.PlanNotFound);
+            return await ApproveLoadedAsync(plan!, cancellationToken);
+        }
+
+        private async Task<TreatmentPlanProgressResponse> ApproveLoadedAsync(TreatmentPlan plan, CancellationToken cancellationToken)
+        {
             ConditionGuard.Ensure(plan.Status == TreatmentPlanConstants.Proposed, ErrorConstants.TreatmentPlanMessage.OnlyProposedCanBeApproved);
 
             var now = DateTimeOffset.UtcNow;

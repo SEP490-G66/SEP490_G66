@@ -3,7 +3,7 @@ import api from "./api";
 import { call } from "./receptionService";
 import { getSessionRole } from "./sessionStore";
 import { USER_ROLES } from "@/utils/messages";
-import { ROUTES, getPaymentDebtDetailRoute } from "@/utils/routes";
+import { ROUTES, getPaymentDebtDetailRoute, getTreatmentPlanRoute } from "@/utils/routes";
 
 // In-app notifications of the signed-in user, every role (NotificationsController: api/notifications).
 // Every call returns the ApiResponse shape ({ success, message, data, errors }).
@@ -31,7 +31,7 @@ const REFERENCE_PAGES = {
         [DOCTOR]: ROUTES.DOCTOR_IMAGING_REVIEWS,
     },
     TreatmentPlan: {
-        [PATIENT]: ROUTES.MEDICAL_RECORD,
+        [PATIENT]: (id) => getTreatmentPlanRoute(id),
         [DOCTOR]: ROUTES.DOCTOR_EXAMINATION,
     },
     Invoice: {

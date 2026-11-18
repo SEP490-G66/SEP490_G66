@@ -12,6 +12,7 @@ import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { getMyAppointments } from "@/services/appointmentService";
 import { getMyDues } from "@/services/invoiceDueService";
+import { getMyTreatmentPlans } from "@/services/medicalBookService";
 import { formatCurrency, formatDate, formatTime, formatWeekday, getClinicToday } from "@/utils/format";
 import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, EXAMINATION_STATUS, INVOICE_PAYMENT_STATUS, PAYMENT_STATUS, PLAN_STATUS, STAGE_STATUS } from "@/utils/messages";
 import { ROUTES, getTreatmentPlanRoute } from "@/utils/routes";
@@ -27,9 +28,8 @@ const TODAY_STATUS_RANK = {
     [APPOINTMENT_STATUS.PENDING]: 2,
 };
 const RECENT_EXAMINATION_STATUSES = [EXAMINATION_STATUS.COMPLETED, EXAMINATION_STATUS.LOCKED];
-const TREATMENT_PLAN_ENABLED = false;
+const TREATMENT_PLAN_ENABLED = true;
 const OVERDUE_STATUS = "OVERDUE";
-const EMPTY_RESOURCE = { loading: false, failed: false, unlinked: false, data: [] };
 const EMPTY_DUES = { items: [], total: 0 };
 
 const TEXT = {
@@ -157,7 +157,7 @@ const PatientDashboard = () => {
     const { userName } = useSession();
     const [today] = useState(getClinicToday);
     const appointments = toResource(useAsync(getMyAppointments, []));
-    const plans = EMPTY_RESOURCE;
+    const plans = toResource(useAsync(getMyTreatmentPlans, []));
     const dues = toDueResource(useAsync(getMyDues, []));
 
     const upcoming = getUpcoming(appointments.data, today);
@@ -166,7 +166,7 @@ const PatientDashboard = () => {
     const progress = getStageProgress(activePlan?.stages);
     const dueItems = getDueItems(dues.data);
     const planStat = plans.failed ? { value: EMPTY_VALUE } : getPlanStat(activePlan, progress);
-    const unlinked = appointments.unlinked || dues.unlinked;
+    const unlinked = appointments.unlinked || dues.unlinked || plans.unlinked;
 
     return (
         <>
