@@ -5,6 +5,8 @@ namespace OZE.Common.Models
     // A draft plan made by the doctor during an examination; stages are numbered in the order they are sent
     public class CreateTreatmentPlanRequest
     {
+        public long? ExaminationId { get; set; }
+
         [Required]
         [MaxLength(200)]
         public string PlanName { get; set; } = string.Empty;
