@@ -175,13 +175,7 @@ const useMedicalRecordNavigation = () => {
 
     const retry = () => setLoad((current) => ({ id: current.id + 1, status: "loading", data: null }));
 
-    const refresh = async () => {
-        const record = normalizeRecord(await getMyMedicalBook().catch(() => null));
-        if (record) setLoad((current) => (current.status === "ready" ? { ...current, data: record } : current));
-        return Boolean(record);
-    };
-
-    return { url, load, ui, setUi, page, list, pageState, h1Ref, retryRef, navigate, goTo, retry, refresh, ownState: OWN_STATE };
+    return { url, load, ui, setUi, page, list, pageState, h1Ref, retryRef, navigate, goTo, retry, ownState: OWN_STATE };
 };
 
 export default useMedicalRecordNavigation;
