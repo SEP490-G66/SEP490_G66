@@ -5,8 +5,8 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { cx } from "@/utils/cx";
 import { formatCurrency } from "@/utils/format";
 import { REFUND_REQUEST_TEXT } from "@/utils/messages";
-import { REFUND_REQUEST_STATUS_LABELS, clinicDate, clinicDateTime, forWhatText, processSteps } from "@/utils/refundRequest";
-import { getPaymentHistoryRoute } from "@/utils/routes";
+import { REFUND_REQUEST_STATUS_LABELS, clinicDateTime, forWhatText, processSteps } from "@/utils/refundRequest";
+import { getPaymentDebtDetailRoute } from "@/utils/routes";
 
 const DOT_CLASS = {
     done: "bg-success-solid text-on-primary",
@@ -30,7 +30,7 @@ const RefundRequestDetailModal = ({ request, code, closeButtonRef, onClose }) =>
     }
 
     const forWhat = forWhatText(request);
-    const hasForWhat = forWhat !== REFUND_REQUEST_TEXT.NO_VALUE && request.visitId != null;
+    const hasForWhat = forWhat !== REFUND_REQUEST_TEXT.NO_VALUE && request.invoiceId != null;
 
     return (
         <Modal
@@ -47,19 +47,25 @@ const RefundRequestDetailModal = ({ request, code, closeButtonRef, onClose }) =>
                 <dt className="text-muted">{REFUND_REQUEST_TEXT.FOR}</dt>
                 <dd className="sm:col-span-2">
                     {hasForWhat ? (
-                        <Link to={getPaymentHistoryRoute(request.visitId)} className="inline-flex min-h-6 items-center text-primary hover:underline">
+                        <Link to={getPaymentDebtDetailRoute(`invoice-${request.invoiceId}`)} className="inline-flex min-h-6 items-center text-primary hover:underline">
                             {forWhat}
                         </Link>
                     ) : (
                         forWhat
                     )}
                 </dd>
-                <dt className="text-muted">{REFUND_REQUEST_TEXT.PAID_AT}</dt>
-                <dd className="num sm:col-span-2">{clinicDate(request.paidAt)}</dd>
                 <dt className="text-muted">{REFUND_REQUEST_TEXT.DOCTOR}</dt>
                 <dd className="sm:col-span-2">{request.doctorName ?? REFUND_REQUEST_TEXT.NO_VALUE}</dd>
-                <dt className="text-muted">{REFUND_REQUEST_TEXT.AMOUNT}</dt>
-                <dd className="num font-semibold text-ink sm:col-span-2">{formatCurrency(request.amount)}</dd>
+                <dt className="text-muted">{REFUND_REQUEST_TEXT.PAID}</dt>
+                <dd className="num sm:col-span-2">{formatCurrency(request.paidAmount)}</dd>
+                <dt className="text-muted">{REFUND_REQUEST_TEXT.REFUND_AMOUNT}</dt>
+                <dd className={cx("sm:col-span-2", request.refundAmount != null && "num font-semibold text-ink")}>
+                    {request.refundAmount != null
+                        ? formatCurrency(request.refundAmount)
+                        : request.status === "pending"
+                          ? REFUND_REQUEST_TEXT.REFUND_PENDING_TEXT
+                          : REFUND_REQUEST_TEXT.NO_VALUE}
+                </dd>
                 <dt className="text-muted">{REFUND_REQUEST_TEXT.REASON}</dt>
                 <dd className="break-words sm:col-span-2">{request.reason}</dd>
             </dl>

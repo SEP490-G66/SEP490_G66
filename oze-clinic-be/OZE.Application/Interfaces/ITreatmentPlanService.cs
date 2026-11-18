@@ -24,6 +24,9 @@ namespace OZE.Application.Interfaces
         // canViewAll: reception records the patient's consent for any patient
         Task<TreatmentPlanProgressResponse> ApproveAsync(long treatmentPlanId, string userId, bool canViewAll,
             CancellationToken cancellationToken = default);
+
+        Task<TreatmentPlanProgressResponse> ApproveByPatientAsync(long treatmentPlanId, string userId,
+            CancellationToken cancellationToken = default);
         Task<TreatmentPlanProgressResponse> CancelAsync(long treatmentPlanId, CancelTreatmentPlanRequest request, string userId, bool canViewAll,
             CancellationToken cancellationToken = default);
         Task<TreatmentPlanProgressResponse> GetProgressAsync(long treatmentPlanId,

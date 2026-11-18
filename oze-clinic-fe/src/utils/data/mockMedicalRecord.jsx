@@ -359,6 +359,3 @@ export const buildMedicalRecordData = (mode) =>
         chart: CHART.map((entry) => ({ ...entry, date: visitDate(entry.visit) })),
         history: HISTORY,
     });
-
-export const buildEmptyMedicalRecordData = () =>
-    structuredClone({ clinic: CLINIC, patient: PATIENT, profile: PROFILE, upcoming: [], visits: [], plans: [], films: [], chart: [], history: [] });

@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { AlertCircle, Inbox, Send } from "lucide-react";
 import StatusDefinitionDrawer from "@/components/medicalRecord/StatusDefinitionDrawer";
+import UnlinkedProfileCard from "@/components/patientDebt/UnlinkedProfileCard";
 import RefundRequestCreateModal from "@/components/refund/RefundRequestCreateModal";
 import RefundRequestDetailModal from "@/components/refund/RefundRequestDetailModal";
 import RefundRequestList from "@/components/refund/RefundRequestList";
@@ -171,6 +172,7 @@ const RefundRequests = () => {
                     </button>
                 </StateBox>
             )}
+            {load.status === "unlinked" && <UnlinkedProfileCard />}
             {ready && !hasData && <StateBox icon={Inbox} title={REFUND_REQUEST_TEXT.EMPTY_TITLE} text={REFUND_REQUEST_TEXT.EMPTY_TEXT} />}
             {hasData && (
                 <section className="card-app min-w-0 p-0">

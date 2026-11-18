@@ -580,6 +580,8 @@ namespace OZE.Common.Constants
             public const string WorkDoneAmountInvalid = "Work-done amount is invalid.";
             public const string WorkDoneExceedsPaid = "Work-done amount cannot exceed confirmed paid amount.";
             public const string RequestNotPending = "Only pending refund requests can be processed.";
+            public const string RequestNotApproved = "Only approved refund requests can be paid out.";
+            public const string RequestPaidOut = "Refund has been paid out.";
             public const string PendingRequestExists = "A pending refund request already exists for this invoice.";
             public const string PaymentInvalid = "Payment does not belong to this invoice or is not confirmed.";
             public const string RejectionReasonRequired = "Please enter a rejection reason.";

@@ -16,13 +16,11 @@ export const SORT_OPTIONS = [
     { value: "asc", label: "Cũ nhất trước" },
 ];
 export const EMPTY_FILTERS = { doctor: [], plan: [], month: [] };
-export const PAGE_STATE = { LOADING: "loading", ERROR: "error", NOT_FOUND: "notFound", NEW_PATIENT: "newPatient", CONTENT: "content" };
+export const PAGE_STATE = { LOADING: "loading", ERROR: "error", UNLINKED: "unlinked", NOT_FOUND: "notFound", NEW_PATIENT: "newPatient", CONTENT: "content" };
 export const HEADING_STATES = [PAGE_STATE.NOT_FOUND, PAGE_STATE.NEW_PATIENT, PAGE_STATE.CONTENT];
 
 const URL_TABS = Object.values(MEDICAL_RECORD_TABS);
 const ID_PATTERN = /^[1-9]\d*$/;
-const DOCTOR_OPTIONS = ["BS. Trần Minh Khoa", "BS. Lê Thu Hà"];
-const PLAN_FILTER_ORDER = [7101, 7102, 7103, 7100, 7104, 7105, NO_PLAN];
 
 export const norm = (value) =>
     String(value ?? "")
@@ -81,9 +79,15 @@ const uniqueVisits = (visits) => {
     });
 };
 
-const normalizePlan = (plan) => ({ ...plan, stages: objectsOf(plan.stages), log: objectsOf(plan.log), pays: objectsOf(plan.pays) });
+const normalizePlan = (plan) => ({ ...plan, stages: objectsOf(plan.stages), log: objectsOf(plan.log) });
 
-const normalizeVisit = (visit) => ({ ...visit, done: Array.isArray(visit.done) ? visit.done.filter(isDisplayValue) : [] });
+const normalizeVisit = (visit) => ({
+    ...visit,
+    done: Array.isArray(visit.done) ? visit.done.filter(isDisplayValue) : [],
+    plans: Array.isArray(visit.plans) ? visit.plans.filter(Number.isInteger) : [],
+    addenda: objectsOf(visit.addenda),
+    prescriptions: objectsOf(visit.prescriptions),
+});
 
 export const normalizeRecord = (response) => {
     const data = response?.success === true ? response.data : null;
@@ -116,7 +120,7 @@ export const resolveRecord = (url, data) => {
     if (wantsPlan) {
         const planId = parseRecordId(url.planParam);
         const planExists = planId != null && plans.some((plan) => plan.id === planId);
-        const target = planExists ? newestVisitId(visits.filter((visit) => visit.plan === planId)) : null;
+        const target = planExists ? newestVisitId(visits.filter((visit) => visit.plans.includes(planId))) : null;
         if (target == null) return { state: PAGE_STATE.NOT_FOUND, target: null, replaceTo: null };
         return { state: PAGE_STATE.CONTENT, target, replaceTo: buildRecordUrl(target, MEDICAL_RECORD_TABS.PLAN) };
     }
@@ -126,6 +130,7 @@ export const resolveRecord = (url, data) => {
 export const getPageState = (load, url) => {
     if (load.status === "loading") return { state: PAGE_STATE.LOADING, target: null, replaceTo: null };
     if (load.status === "error") return { state: PAGE_STATE.ERROR, target: null, replaceTo: null };
+    if (load.status === "unlinked") return { state: PAGE_STATE.UNLINKED, target: null, replaceTo: null };
     return resolveRecord(url, load.data);
 };
 
@@ -142,18 +147,32 @@ const monthSortKey = (label) => {
 const planLabel = (plans, value) => {
     if (value === NO_PLAN) return "Không thuộc kế hoạch";
     const plan = plans.find((item) => item.id === value);
-    return plan ? `${plan.variant} · răng ${plan.teeth}` : String(value);
+    return plan ? displayText(plan.variant) : String(value);
 };
+
+const planValues = (data) => {
+    const used = new Set(data.visits.flatMap((visit) => visit.plans));
+    const ids = data.plans.filter((plan) => used.has(plan.id)).map((plan) => plan.id);
+    return data.visits.some((visit) => !visit.plans.length) ? [...ids, NO_PLAN] : ids;
+};
+
+const hasPlan = (visit, value) => (value === NO_PLAN ? !visit.plans.length : visit.plans.includes(value));
 
 export const getFilterGroups = (data) => {
     const groups = [
-        { key: "doctor", title: "Bác sĩ", values: DOCTOR_OPTIONS, get: (visit) => visit.doctor, label: (value) => value },
-        { key: "plan", title: "Kế hoạch", values: PLAN_FILTER_ORDER, get: (visit) => visit.plan ?? NO_PLAN, label: (value) => planLabel(data.plans, value) },
+        {
+            key: "doctor",
+            title: "Bác sĩ",
+            values: [...new Set(data.visits.map((visit) => visit.doctor).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi")),
+            has: (visit, value) => visit.doctor === value,
+            label: (value) => value,
+        },
+        { key: "plan", title: "Kế hoạch", values: planValues(data), has: hasPlan, label: (value) => planLabel(data.plans, value) },
         {
             key: "month",
             title: "Tháng",
             values: [...new Set(data.visits.map((visit) => monthOf(visit.date)))].sort((a, b) => monthSortKey(b) - monthSortKey(a)),
-            get: (visit) => monthOf(visit.date),
+            has: (visit, value) => monthOf(visit.date) === value,
             label: (value) => value,
         },
     ];
@@ -162,7 +181,7 @@ export const getFilterGroups = (data) => {
         options: group.values.map((value) => ({
             value,
             label: group.label(value),
-            count: data.visits.filter((visit) => group.get(visit) === value).length,
+            count: data.visits.filter((visit) => group.has(visit, value)).length,
         })),
     }));
 };
@@ -175,7 +194,7 @@ export const filterVisits = (data, ui, groups) => {
     const rows = data.visits.filter(
         (visit) =>
             (!keyword || norm(searchText(visit)).includes(needle)) &&
-            groups.every((group) => !ui.filters[group.key].length || ui.filters[group.key].includes(group.get(visit))),
+            groups.every((group) => !ui.filters[group.key].length || ui.filters[group.key].some((value) => group.has(visit, value))),
     );
     return sortByDate(rows, (visit) => visit.date, ui.sort === "asc" ? 1 : -1);
 };
@@ -213,12 +232,6 @@ export const getShownPair = (pageState, ui, list, target, tab) => {
     return visitId == null ? { visitId: null, tab: null } : { visitId, tab };
 };
 
-export const planMoney = (plan) => {
-    const pays = plan?.pays ?? [];
-    const total = pays.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    const paid = pays.filter((item) => item.status === "paid").reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-    return { total, paid, left: total - paid };
-};
 
 export const toToothCode = (value) => {
     const code = typeof value === "string" && /^\d+$/.test(value.trim()) ? Number(value.trim()) : value;
@@ -239,6 +252,8 @@ export const surfaceText = (surface) =>
 
 export const chartOf = (data, visitId) => data.chart.filter((entry) => entry.visit === visitId);
 
+export const chartUntil = (data, visit) => data.chart.filter((entry) => dateKey(entry.date) <= dateKey(visit.date));
+
 export const resolveTooth = (entries, currentTooth) => {
     const codes = entries.map((entry) => toToothCode(entry.tooth)).filter(isPermanentTooth);
     if (!codes.length) return currentTooth;
@@ -247,21 +262,37 @@ export const resolveTooth = (entries, currentTooth) => {
 
 export const teethLinks = (teeth) => (/^\d/.test(String(teeth ?? "")) ? String(teeth).split(/,\s*/) : null);
 
+const WHOLE_TOOTH_KINDS = ["caries", "filling"];
+const WHOLE_TOOTH_SURFACES = ["O", "B", "L", "M", "D"];
+
 export const getToothState = (entries) => {
     const surfaces = {};
     let pulp = null;
     let crown = null;
     let watch = null;
+    let missing = null;
     sortByDate(entries, (entry) => entry.date, 1).forEach((entry) => {
         if (entry.surf) {
             [...String(entry.surf)].forEach((code) => {
                 if (Object.hasOwn(MEDICAL_RECORD_TOOTH_SURFACE, code)) surfaces[code] = entry;
             });
+        } else if (WHOLE_TOOTH_KINDS.includes(entry.kind)) {
+            WHOLE_TOOTH_SURFACES.forEach((code) => {
+                surfaces[code] = entry;
+            });
         }
         if (entry.kind === "rct" || entry.kind === "pulp") pulp = entry;
-        if (entry.kind === "crown") crown = entry;
+        if (entry.kind === "crown" || entry.kind === "implant" || entry.kind === "denture") crown = entry;
+        if (entry.kind === "missing") missing = entry;
+        if (entry.kind === "healthy") {
+            Object.keys(surfaces).forEach((code) => delete surfaces[code]);
+            crown = null;
+            missing = null;
+        }
         if (entry.kind === "impacted") watch = entry;
     });
-    const statuses = [...new Set([...Object.values(surfaces), pulp, crown, watch].filter(Boolean).map((entry) => entry.st))];
-    return { surfaces, pulp, crown, watch, statuses };
+    const marks = [...Object.values(surfaces), pulp, crown, watch, missing].filter(Boolean);
+    const latest = sortByDate(entries, (entry) => entry.date, -1)[0];
+    const statuses = [...new Set((marks.length ? marks : latest ? [latest] : []).map((entry) => entry.st))];
+    return { surfaces, pulp, crown, watch, missing, statuses };
 };

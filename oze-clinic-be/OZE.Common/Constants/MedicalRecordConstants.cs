@@ -21,5 +21,14 @@ namespace OZE.Common.Constants
         public const string PendingImageStatus = "Pending";
         // The doctor read the image and kept it
         public const string ReviewedImageStatus = "Reviewed";
+
+        // Plans the patient sees: a draft is not sent yet and a superseded plan was replaced by a newer version
+        public static readonly string[] PatientVisiblePlanStatuses =
+        {
+            TreatmentPlanConstants.Proposed, TreatmentPlanConstants.Approved, TreatmentPlanConstants.InProgress,
+            TreatmentPlanConstants.Completed, TreatmentPlanConstants.Cancelled
+        };
+
+        public const string FinalizedPrescriptionStatus = "Finalized";
     }
 }

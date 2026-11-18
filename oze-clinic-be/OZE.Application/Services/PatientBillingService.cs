@@ -52,9 +52,15 @@ namespace OZE.Application.Services
             return await _invoiceRepository.GetPatientBillingAsync(patient!.Id, cancellationToken);
         }
 
+        // A refunded invoice is closed: the refund settles it, nothing more is collected (as in PaymentService / debts)
+        private static decimal Remaining(Invoice invoice) =>
+            invoice.PaymentStatus == InvoiceConstants.Refunded || invoice.PaymentStatus == InvoiceConstants.PartiallyRefunded
+                ? 0m
+                : Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount);
+
         private static PatientPaymentAccountResponse ToAccount(Invoice invoice, DateOnly today)
         {
-            var remaining = Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount);
+            var remaining = Remaining(invoice);
             var periods = LatestPeriods(invoice);
             var plan = invoice.TreatmentPlan;
             var account = new PatientPaymentAccountResponse
@@ -135,7 +141,7 @@ namespace OZE.Application.Services
                 DiscountAmount = invoice.DiscountAmount,
                 FinalAmount = invoice.FinalAmount,
                 PaidAmount = invoice.PaidAmount,
-                RemainingAmount = Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount),
+                RemainingAmount = Remaining(invoice),
                 AppointmentId = invoice.AppointmentId,
                 VisitDate = invoice.Appointment?.AppointmentDate,
                 DoctorName = invoice.Appointment?.Doctor?.FullName ?? invoice.TreatmentPlan?.CreatedByDoctor?.FullName,

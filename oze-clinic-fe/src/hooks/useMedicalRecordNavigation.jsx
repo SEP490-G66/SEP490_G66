@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useLocation, useNavigate, useNavigationType, useParams, useSearchParams } from "react-router-dom";
-import { getMyMedicalRecord } from "@/services/patientDashboardService";
+import { getMyMedicalBook } from "@/services/medicalBookService";
+import { BOOKING_ERROR_CODE } from "@/utils/messages";
 import {
     EMPTY_FILTERS,
     HEADING_STATES,
@@ -129,8 +130,9 @@ const useMedicalRecordNavigation = () => {
             if (!active) return;
             setLoad((current) => (current.id === load.id ? { id: load.id, status: record ? "ready" : "error", data: record } : current));
         };
-        getMyMedicalRecord({ signal: controller.signal })
-            .then((response) => finish(normalizeRecord(response)))
+        const unlinked = () => active && setLoad((current) => (current.id === load.id ? { id: load.id, status: "unlinked", data: null } : current));
+        getMyMedicalBook({ signal: controller.signal })
+            .then((response) => (response?.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND ? unlinked() : finish(normalizeRecord(response))))
             .catch(() => finish(null));
         return () => {
             active = false;
@@ -173,7 +175,13 @@ const useMedicalRecordNavigation = () => {
 
     const retry = () => setLoad((current) => ({ id: current.id + 1, status: "loading", data: null }));
 
-    return { url, load, ui, setUi, page, list, pageState, h1Ref, retryRef, navigate, goTo, retry, ownState: OWN_STATE };
+    const refresh = async () => {
+        const record = normalizeRecord(await getMyMedicalBook().catch(() => null));
+        if (record) setLoad((current) => (current.status === "ready" ? { ...current, data: record } : current));
+        return Boolean(record);
+    };
+
+    return { url, load, ui, setUi, page, list, pageState, h1Ref, retryRef, navigate, goTo, retry, refresh, ownState: OWN_STATE };
 };
 
 export default useMedicalRecordNavigation;

@@ -73,10 +73,15 @@ const PatientDebtTable = ({ list, page, separated, linkState, onOpen, onPageChan
                                 {PATIENT_DEBT_TEXT.COL_TOTAL}
                             </th>
                             <th scope="col" className="text-right">
-                                {PATIENT_DEBT_TEXT.COL_LEFT}
+                                {PATIENT_DEBT_TEXT.COL_PAID}
+                            </th>
+                            <th scope="col" className="text-right">
+                                {PATIENT_DEBT_TEXT.COL_DUE}
+                            </th>
+                            <th scope="col" className="text-right">
+                                {PATIENT_DEBT_TEXT.COL_PLANNED}
                             </th>
                             <th scope="col">{PATIENT_DEBT_TEXT.COL_STATUS}</th>
-                            <th scope="col" className="whitespace-nowrap">{PATIENT_DEBT_TEXT.COL_DATES}</th>
                             <th scope="col">
                                 <span className="sr-only">{PATIENT_DEBT_TEXT.COL_ACTION}</span>
                             </th>
@@ -85,18 +90,20 @@ const PatientDebtTable = ({ list, page, separated, linkState, onOpen, onPageChan
                     <tbody>
                         {rows.map((item) => (
                             <tr key={item.id}>
-                                <td className="font-semibold text-ink">{item.name}</td>
+                                <td className="min-w-56 py-2">
+                                    <span className="font-semibold text-ink">{item.name}</span>
+                                    <p className="num text-caption text-muted">{item.type === "once" ? item.sub : `${item.sub} · ${PATIENT_DEBT_TEXT.STARTED_ON(item.start)}`}</p>
+                                </td>
                                 <td className="whitespace-nowrap">
                                     <StatusBadge status={item.type} labels={PATIENT_DEBT_PAY_TYPE} />
                                 </td>
                                 <td className="whitespace-nowrap text-right">{formatCurrency(item.total)}</td>
-                                <td className="whitespace-nowrap text-right font-semibold text-ink">{formatCurrency(item.left)}</td>
-                                <td className="whitespace-nowrap">
-                                    <StatusBadge status={item.status} labels={PATIENT_DEBT_STATUS} />
-                                </td>
+                                <td className="whitespace-nowrap text-right text-success">{formatCurrency(item.paid)}</td>
+                                <td className={cx("whitespace-nowrap text-right font-semibold", item.due > 0 ? "text-danger" : "text-ink")}>{formatCurrency(item.due)}</td>
+                                <td className="whitespace-nowrap text-right text-muted">{formatCurrency(item.planned)}</td>
                                 <td className="whitespace-nowrap py-2">
-                                    {item.start}
-                                    <p className="text-caption text-muted">{PATIENT_DEBT_TEXT.DUE(item.due)}</p>
+                                    <StatusBadge status={item.status} labels={PATIENT_DEBT_STATUS} />
+                                    {item.next && <p className="num text-caption text-muted">{PATIENT_DEBT_TEXT.NEXT_PERIOD(item.next.date)}</p>}
                                 </td>
                                 <td className="text-right">
                                     <OpenLink item={item} linkState={linkState} onOpen={onOpen} />
@@ -113,9 +120,13 @@ const PatientDebtTable = ({ list, page, separated, linkState, onOpen, onPageChan
                             <span className="font-semibold text-ink">{item.name}</span>
                             <StatusBadge status={item.type} labels={PATIENT_DEBT_PAY_TYPE} />
                         </div>
-                        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                        <p className="mt-0.5 text-caption text-muted">{item.sub}</p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
                             <span>
-                                {PATIENT_DEBT_TEXT.LEFT} <b className="num font-semibold text-ink">{formatCurrency(item.left)}</b>
+                                {PATIENT_DEBT_TEXT.DUE} <b className={cx("num font-semibold", item.due > 0 ? "text-danger" : "text-ink")}>{formatCurrency(item.due)}</b>
+                            </span>
+                            <span className="num text-caption text-muted">
+                                {PATIENT_DEBT_TEXT.PLANNED} {formatCurrency(item.planned)}
                             </span>
                             <span className="num text-caption text-muted">
                                 {PATIENT_DEBT_TEXT.TOTAL} {formatCurrency(item.total)}
@@ -123,7 +134,9 @@ const PatientDebtTable = ({ list, page, separated, linkState, onOpen, onPageChan
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">
                             <StatusBadge status={item.status} labels={PATIENT_DEBT_STATUS} />
-                            <span className="num text-caption text-muted">{PATIENT_DEBT_TEXT.CREATED_DUE(item.start, item.due)}</span>
+                            <span className="num text-caption text-muted">
+                                {item.next ? PATIENT_DEBT_TEXT.NEXT_PERIOD(item.next.date) : PATIENT_DEBT_TEXT.STARTED_ON(item.start)}
+                            </span>
                         </div>
                         <OpenLink item={item} linkState={linkState} onOpen={onOpen} className="mt-0.5 min-h-11" />
                     </li>

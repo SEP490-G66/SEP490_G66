@@ -12,6 +12,7 @@ import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { getMyAppointments } from "@/services/appointmentService";
 import { getMyDues } from "@/services/invoiceDueService";
+import { getMyTreatmentPlans } from "@/services/medicalBookService";
 import { formatCurrency, formatDate, formatTime, formatWeekday, getClinicToday } from "@/utils/format";
 import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, EXAMINATION_STATUS, INVOICE_PAYMENT_STATUS, PAYMENT_STATUS, PLAN_STATUS, STAGE_STATUS } from "@/utils/messages";
 import { ROUTES, getTreatmentPlanRoute } from "@/utils/routes";
@@ -27,9 +28,8 @@ const TODAY_STATUS_RANK = {
     [APPOINTMENT_STATUS.PENDING]: 2,
 };
 const RECENT_EXAMINATION_STATUSES = [EXAMINATION_STATUS.COMPLETED, EXAMINATION_STATUS.LOCKED];
-const TREATMENT_PLAN_ENABLED = false;
+const TREATMENT_PLAN_ENABLED = true;
 const OVERDUE_STATUS = "OVERDUE";
-const EMPTY_RESOURCE = { loading: false, failed: false, unlinked: false, data: [] };
 const EMPTY_DUES = { items: [], total: 0 };
 
 const TEXT = {
@@ -117,7 +117,7 @@ const taskStatus = (item) => {
     return Object.hasOwn(INVOICE_PAYMENT_STATUS, item.paymentStatus) ? item.paymentStatus : PAYMENT_STATUS.UNPAID;
 };
 
-const getTasks = (plans, dueItems, appointmentDates) => [
+const getTasks = (plans, dueItems) => [
     ...plans
         .filter((plan) => plan.status === PLAN_STATUS.PROPOSED)
         .sort((a, b) => (b.proposedAt ?? "").localeCompare(a.proposedAt ?? "") || b.treatmentPlanId - a.treatmentPlanId)
@@ -134,10 +134,11 @@ const getTasks = (plans, dueItems, appointmentDates) => [
     ...dueItems.map((item) => ({
         kind: "invoice",
         id: item.id,
+        debtId: item.debtId,
         status: taskStatus(item),
         invoiceNumber: item.invoiceNumber,
         remainder: item.due,
-        appointmentDate: item.appointmentId != null ? appointmentDates.get(item.appointmentId) : undefined,
+        appointmentDate: item.visitDate ?? undefined,
     })),
 ];
 
@@ -156,7 +157,7 @@ const PatientDashboard = () => {
     const { userName } = useSession();
     const [today] = useState(getClinicToday);
     const appointments = toResource(useAsync(getMyAppointments, []));
-    const plans = EMPTY_RESOURCE;
+    const plans = toResource(useAsync(getMyTreatmentPlans, []));
     const dues = toDueResource(useAsync(getMyDues, []));
 
     const upcoming = getUpcoming(appointments.data, today);
@@ -164,9 +165,8 @@ const PatientDashboard = () => {
     const activePlan = getActivePlan(plans.data);
     const progress = getStageProgress(activePlan?.stages);
     const dueItems = getDueItems(dues.data);
-    const appointmentDates = new Map(appointments.data.map((item) => [item.id, item.appointmentDate]));
     const planStat = plans.failed ? { value: EMPTY_VALUE } : getPlanStat(activePlan, progress);
-    const unlinked = appointments.unlinked || dues.unlinked;
+    const unlinked = appointments.unlinked || dues.unlinked || plans.unlinked;
 
     return (
         <>
@@ -217,7 +217,7 @@ const PatientDashboard = () => {
                     </div>
                     <div className="mt-6 flex flex-col gap-6">
                         <TasksSection
-                            tasks={getTasks(plans.data, dueItems, appointmentDates)}
+                            tasks={getTasks(plans.data, dueItems)}
                             loading={plans.loading || dues.loading}
                             failed={plans.failed || dues.failed}
                         />
