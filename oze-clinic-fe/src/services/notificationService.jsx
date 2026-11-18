@@ -74,12 +74,14 @@ const relatedPathOf = (referenceType, referenceId) => {
 };
 
 // The header reads { id, title, content, createdAt, isRead, relatedPath }.
-const toNotification = (item) => ({
+export const toNotification = (item) => ({
     id: item.id,
     title: item.title,
     content: item.message,
     createdAt: item.createdAt,
     isRead: item.isRead,
+    referenceType: item.referenceType ?? null,
+    referenceId: item.referenceId ?? null,
     relatedPath: relatedPathOf(item.referenceType, item.referenceId),
 });
 
