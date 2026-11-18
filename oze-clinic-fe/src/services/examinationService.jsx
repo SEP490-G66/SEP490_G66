@@ -300,6 +300,9 @@ const thenReload = async (request, message) => {
 
 const itemOf = (id) => state.room.get(id);
 
+// The examination of a queue item once it has started (null before): other services call its examination's endpoints.
+export const examinationIdOf = (id) => itemOf(id)?.examinationId ?? null;
+
 // Queue of the doctor's room for the current shift: { shift, queue, done }.
 export const getExamWorkspace = () => loadWorkspace();
 

@@ -65,6 +65,7 @@ namespace OZE.Application
             services.AddScoped<IDoctorScheduleService, DoctorScheduleService>();
             services.AddScoped<IMedicalRecordService, MedicalRecordService>();
             services.AddScoped<IImagingRequestService, ImagingRequestService>();
+            services.AddScoped<IDocumentRequestService, DocumentRequestService>();
             services.AddScoped<IImagingCaptureService, ImagingCaptureService>();
             services.AddScoped<IImagingHistoryService, ImagingHistoryService>();
             services.AddScoped<IImagingReviewService, ImagingReviewService>();

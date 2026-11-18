@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Link } from "react-router-dom";
 import AppointmentTabs from "@/components/appointment/AppointmentTabs";
 import DentalChartPanel from "@/components/medicalRecord/DentalChartPanel";
+import DocumentRequestPanel from "@/components/medicalRecord/DocumentRequestPanel";
 import ExaminationList from "@/components/medicalRecord/ExaminationList";
 import ExaminationSheet from "@/components/medicalRecord/ExaminationSheet";
 import ImagingPanel from "@/components/medicalRecord/ImagingPanel";
@@ -65,8 +66,16 @@ const PANELS = {
     },
     [MEDICAL_RECORD_TABS.FILM]: ({ data, visit }) => {
         const films = data.films.filter((film) => film.visit === visit.id && film.status === "concluded");
-        if (!films.length) return <RecordEmptyCard title="Buổi này không chụp phim" text="Phim X-quang, ảnh chụp do bác sĩ chỉ định trong buổi khám sẽ hiện ở đây." />;
-        return <ImagingPanel films={films} />;
+        return (
+            <div className="flex flex-col gap-4">
+                <DocumentRequestPanel examinationId={visit.id} />
+                {films.length ? (
+                    <ImagingPanel films={films} />
+                ) : (
+                    <RecordEmptyCard title="Buổi này không chụp phim" text="Phim X-quang, ảnh chụp do bác sĩ chỉ định trong buổi khám sẽ hiện ở đây." />
+                )}
+            </div>
+        );
     },
     [MEDICAL_RECORD_TABS.TEETH]: ({ data, visit, ui, handlers }) => {
         const allEntries = chartUntil(data, visit);
