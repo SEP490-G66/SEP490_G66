@@ -69,6 +69,34 @@ namespace OZE.Controllers
             return Ok(ApiResponse<PagedResult<InvoiceSummaryResponse>>.SuccessResult(result));
         }
 
+        /// <summary>
+        /// The signed-in patient's debt lines for the "Công nợ" page: one per treatment plan invoice or visit invoice,
+        /// with what is due now (work done, periods due) and what is planned (stages not done, periods not due).
+        /// </summary>
+        [HttpGet("my/accounts")]
+        [Authorize(Roles = RoleConstants.PatientRole)]
+        public async Task<ActionResult<ApiResponse<List<PatientPaymentAccountResponse>>>> GetMyAccountsAsync(
+            [FromServices] IPatientBillingService patientBillingService,
+            CancellationToken cancellationToken)
+        {
+            var result = await patientBillingService.GetMyAccountsAsync(CurrentUserId ?? string.Empty, cancellationToken);
+            return Ok(ApiResponse<List<PatientPaymentAccountResponse>>.SuccessResult(result));
+        }
+
+        /// <summary>
+        /// The signed-in patient's invoices with lines, payments, visit details and refund requests,
+        /// for the "Lịch sử thanh toán" page.
+        /// </summary>
+        [HttpGet("my/details")]
+        [Authorize(Roles = RoleConstants.PatientRole)]
+        public async Task<ActionResult<ApiResponse<List<PatientInvoiceDetailResponse>>>> GetMyInvoiceDetailsAsync(
+            [FromServices] IPatientBillingService patientBillingService,
+            CancellationToken cancellationToken)
+        {
+            var result = await patientBillingService.GetMyInvoiceDetailsAsync(CurrentUserId ?? string.Empty, cancellationToken);
+            return Ok(ApiResponse<List<PatientInvoiceDetailResponse>>.SuccessResult(result));
+        }
+
         [HttpGet("{id:long}")]
         [Authorize(Roles = $"{RoleConstants.ReceptionistRole},{RoleConstants.ClinicManagerRole},{RoleConstants.PatientRole}")]
         public async Task<ActionResult<ApiResponse<InvoiceResponse>>> GetByIdAsync(

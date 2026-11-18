@@ -99,13 +99,12 @@ const getQueueGuide = (appointment, state) => {
     const queue = appointment.queue;
     const room = queue?.roomName || appointment.roomName;
     switch (state) {
-        case PATIENT_QUEUE_STATE.ARRIVED:
-            return { tone: "info", title: room ? `Mời bạn ngồi chờ ở khu vực trước ${room}` : "Mời bạn ngồi chờ ở sảnh", detail: "Khi đến lượt, số của bạn sẽ hiện trên màn hình ở sảnh." };
-        case PATIENT_QUEUE_STATE.IN_SERVICE: {
-            const place = [room, appointment.doctorName].filter(Boolean).join(" · ");
-            const note = "Phiếu khám sẽ có trong Sổ khám bệnh sau buổi khám.";
-            return { tone: "info", title: "Bạn đang được khám", detail: place ? `${place}. ${note}` : note };
+        case PATIENT_QUEUE_STATE.ARRIVED: {
+            const number = formatQueueNumber(queue?.queueNumber);
+            return { tone: "success", title: "Check-in thành công", detail: number ? `Số thứ tự của bạn: ${number}` : null };
         }
+        case PATIENT_QUEUE_STATE.IN_SERVICE:
+            return null;
         case PATIENT_QUEUE_STATE.NO_QUEUE:
             return { tone: "warning", title: "Bạn đã báo có mặt nhưng chưa có số thứ tự", detail: "Vui lòng hỏi lễ tân tại quầy." };
         case PATIENT_QUEUE_STATE.IMAGING:

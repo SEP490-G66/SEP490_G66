@@ -220,7 +220,7 @@ namespace OZE.Application.Services
                     new { refundRequest.InvoiceId, refundRequest.Amount, refundRequest.ProcessedAt });
                 await NotifyAsync(n => n.NotifyPatientAsync(invoice.PatientId,
                     new NotificationContent(NotificationConstants.Text.RefundApprovedTitle, string.Format(NotificationConstants.Text.RefundApprovedMessage, NotificationFormat.Money(refundRequest.Amount), invoice.InvoiceNumber),
-                        NotificationConstants.Reference.Invoice, invoice.Id.ToString()), cancellationToken));
+                        NotificationConstants.Reference.RefundRequest, refundRequest.Id.ToString()), cancellationToken));
                 await NotifyAsync(n => n.NotifyUsersAsync(new[] { refundRequest.RequestedByUserId },
                     new NotificationContent(NotificationConstants.Text.RefundDecidedForRequesterTitle,
                         string.Format(NotificationConstants.Text.RefundDecidedForRequesterMessage, invoice.InvoiceNumber, "đã duyệt, hoàn " + NotificationFormat.Money(refundRequest.Amount)),
@@ -276,7 +276,7 @@ namespace OZE.Application.Services
                     });
                 await NotifyAsync(n => n.NotifyPatientAsync(invoice.PatientId,
                     new NotificationContent(NotificationConstants.Text.RefundRejectedTitle, string.Format(NotificationConstants.Text.RefundRejectedMessage, invoice.InvoiceNumber, rejectionReason),
-                        NotificationConstants.Reference.Invoice, invoice.Id.ToString()), cancellationToken));
+                        NotificationConstants.Reference.RefundRequest, refundRequest.Id.ToString()), cancellationToken));
                 await NotifyAsync(n => n.NotifyUsersAsync(new[] { refundRequest.RequestedByUserId },
                     new NotificationContent(NotificationConstants.Text.RefundDecidedForRequesterTitle,
                         string.Format(NotificationConstants.Text.RefundDecidedForRequesterMessage, invoice.InvoiceNumber, "bị từ chối, lý do: " + rejectionReason),

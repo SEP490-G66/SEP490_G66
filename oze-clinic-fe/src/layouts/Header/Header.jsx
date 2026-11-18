@@ -5,6 +5,7 @@ import { Bell, BellOff, ChevronDown, ChevronLeft, ChevronRight, Info, Menu, Pane
 import LogoOze from "@/assets/logo/Logo.png";
 import Avatar from "@/components/ui/Avatar";
 import useAsync from "@/hooks/useAsync";
+import useLiveNotifications from "@/hooks/useLiveNotifications";
 import useSession from "@/hooks/useSession";
 import { signOut } from "@/services/authService";
 import { getMenuServices } from "@/services/dentalService";
@@ -449,6 +450,24 @@ const Notifications = ({ open, onOpenChange }) => {
     });
 
     const unreadCount = unreadOverride ?? (countResult?.success ? countResult.data.unreadCount : 0);
+
+    useLiveNotifications({
+        onNotification: (notification) => {
+            setUnreadOverride((current) => (current ?? (countResult?.success ? countResult.data.unreadCount : 0)) + 1);
+            setList((current) => (current && page === 1 ? { ...current, items: [notification, ...current.items], now: Date.now() } : current));
+            toast.info(
+                <div>
+                    <p className="font-semibold">{notification.title}</p>
+                    <p>{notification.content}</p>
+                </div>,
+                { onClick: notification.relatedPath ? () => navigate(notification.relatedPath) : undefined },
+            );
+        },
+        onFallbackTick: async () => {
+            const result = await getUnreadNotificationCount();
+            if (result.success) setUnreadOverride(result.data.unreadCount);
+        },
+    });
     const items = list?.items ?? [];
     const totalPages = list?.totalPages ?? 1;
 

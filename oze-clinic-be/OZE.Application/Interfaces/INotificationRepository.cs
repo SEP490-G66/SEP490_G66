@@ -7,6 +7,9 @@ namespace OZE.Application.Interfaces
         // Newest first
         Task<(List<Notification> Items, int TotalCount)> GetPageAsync(string userId, bool unreadOnly, int page, int pageSize, CancellationToken cancellationToken = default);
         Task<int> CountUnreadAsync(string userId, CancellationToken cancellationToken = default);
+
+        // Whether this user already got this notification about this record (so a restarted reminder job does not send it twice)
+        Task<bool> ExistsAsync(string userId, string title, string referenceType, string referenceId, CancellationToken cancellationToken = default);
         // Only a notification of that user (tracked)
         Task<Notification?> GetOwnAsync(long id, string userId, CancellationToken cancellationToken = default);
         Task<int> MarkAllReadAsync(string userId, DateTimeOffset readAt, CancellationToken cancellationToken = default);

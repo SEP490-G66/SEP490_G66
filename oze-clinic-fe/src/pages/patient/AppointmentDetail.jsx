@@ -9,6 +9,7 @@ import DashboardSection from "@/components/dashboard/DashboardSection";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import StatusBadge from "@/components/ui/StatusBadge";
 import useAsync from "@/hooks/useAsync";
+import { LIVE_NOTIFICATION_EVENT } from "@/hooks/useLiveNotifications";
 import { getMyAppointmentDetail } from "@/services/appointmentService";
 import { cx } from "@/utils/cx";
 import { formatClock, formatDate, formatTime, formatWeekday } from "@/utils/format";
@@ -369,6 +370,16 @@ const AppointmentDetail = () => {
     };
 
     const pollNow = useEffectEvent(() => refresh(false));
+
+    const refreshOnNotification = useEffectEvent((event) => {
+        const { referenceType, referenceId } = event.detail ?? {};
+        if (referenceType === "Appointment" && String(referenceId) === appointmentId) refresh(false);
+    });
+
+    useEffect(() => {
+        window.addEventListener(LIVE_NOTIFICATION_EVENT, refreshOnNotification);
+        return () => window.removeEventListener(LIVE_NOTIFICATION_EVENT, refreshOnNotification);
+    }, []);
 
     useEffect(() => {
         if (!pollInterval) return undefined;
