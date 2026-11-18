@@ -29,6 +29,8 @@ namespace OZE.Application.Interfaces
         Task<bool> IsOffDutyAsync(int staffId, DateOnly date, CancellationToken cancellationToken = default);
         Task<int?> GetStaffProfileIdByUserIdAsync(string userId, CancellationToken cancellationToken = default);
         Task UpdateAsync(QueueEntry entry, CancellationToken cancellationToken = default);
+        // Stops tracking an entry whose row was already updated in the database, so a later save leaves it alone
+        void Detach(QueueEntry entry);
         // Value of a SystemConfigurations key, null when the key is missing
         Task<string?> GetConfigValueAsync(string configKey, CancellationToken cancellationToken = default);
     }

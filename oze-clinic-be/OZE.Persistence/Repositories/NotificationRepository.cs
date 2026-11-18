@@ -37,6 +37,12 @@ namespace OZE.Persistence.Repositories
             return _context.Notifications.CountAsync(x => x.UserId == userId && !x.IsRead, cancellationToken);
         }
 
+        public Task<bool> ExistsAsync(string userId, string title, string referenceType, string referenceId, CancellationToken cancellationToken = default)
+        {
+            return _context.Notifications.AnyAsync(x => x.UserId == userId && x.Title == title
+                && x.ReferenceType == referenceType && x.ReferenceId == referenceId, cancellationToken);
+        }
+
         public Task<Notification?> GetOwnAsync(long id, string userId, CancellationToken cancellationToken = default)
         {
             return _context.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId, cancellationToken);

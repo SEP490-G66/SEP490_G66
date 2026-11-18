@@ -39,6 +39,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Pushes new notifications to the open pages of the user at once
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, OZE.Hubs.NotificationUserIdProvider>();
+builder.Services.AddScoped<OZE.Application.Interfaces.INotificationPusher, OZE.Hubs.SignalRNotificationPusher>();
+
 // 4. Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>() ?? new JwtSettings();
 // No built-in fallback key: a missing key must stop the start, not silently sign tokens with a public value
@@ -71,6 +76,17 @@ builder.Services.AddAuthentication(options =>
     // A token is refused once the account changed under it: logout, password change or reset, role change, account locked
     options.Events = new JwtBearerEvents
     {
+        // A browser WebSocket cannot send the Authorization header, so the notification hub takes the token from the query
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments(OZE.Hubs.NotificationHub.Path))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        },
         OnTokenValidated = async context =>
         {
             var userId = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier) ?? context.Principal?.FindFirstValue("sub");
@@ -189,5 +205,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<OZE.Hubs.NotificationHub>(OZE.Hubs.NotificationHub.Path);
 
 app.Run();

@@ -12,6 +12,9 @@ namespace OZE.Application.Interfaces
 
         Task<Invoice?> GetByIdWithDetailsAsync(long id, CancellationToken cancellationToken = default);
 
+        // Read-only: the patient's invoices that are not cancelled, with everything the patient money pages show
+        Task<IReadOnlyList<Invoice>> GetPatientBillingAsync(int patientId, CancellationToken cancellationToken = default);
+
         Task<PagedResult<Invoice>> GetPagedAsync(InvoiceQueryParameters parameters, CancellationToken cancellationToken = default);
 
         Task<IReadOnlyList<Invoice>> GetByPatientAsync(int patientId, CancellationToken cancellationToken = default);
