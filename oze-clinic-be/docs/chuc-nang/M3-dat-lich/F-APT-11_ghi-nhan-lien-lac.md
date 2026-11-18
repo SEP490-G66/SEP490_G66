@@ -176,7 +176,7 @@ Index `(AppointmentId, RecordedAt)`.
 ## 9. Còn thiếu / câu hỏi mở
 
 - Toàn bộ chức năng là đề xuất; cần nhóm chốt trước khi code (bảng mới và migration ảnh hưởng FE lễ tân, đặt lịch, test).
-- Q16: có làm bước bệnh nhân tự xác nhận (OTP khi đặt lịch, link trong SMS/email) không; lịch từ tài khoản đã xác minh OTP có tự `CONFIRMED` không. Cần SMS/email thật (key Twilio/SendGrid đang trống).
+- Q16: có làm bước bệnh nhân tự xác nhận (OTP khi đặt lịch, link trong SMS/email) không; lịch từ tài khoản đã xác minh OTP có tự `CONFIRMED` không. Cần SMS/email thật (SpeedSMS AccessToken / SendGrid key đang trống).
 - Hướng phát triển, ngoài phạm vi đồ án: gọi điện trên web qua tổng đài ảo (click-to-call, ví dụ Stringee, Twilio Voice) để có bằng chứng cuộc gọi thật (thời lượng, ghi âm).
 - Giữ hay bỏ API `POST api/appointments/{id}/confirm` khi đã có `contact-attempts`.
 - Có hiện lịch sử NO_SHOW và hủy của SĐT khi lễ tân xác nhận không (ý tưởng trong phiên brainstorm).

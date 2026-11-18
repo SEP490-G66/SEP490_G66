@@ -15,7 +15,7 @@ Các thành phần dùng chung trong mọi sơ đồ:
 | PendingStore | `IPendingRegistrationStore` (OTP đăng ký, lưu trong bộ nhớ) |
 | ResetStore | `IPasswordResetStore` (OTP quên mật khẩu, lưu trong bộ nhớ) |
 | Jwt | `IJwtTokenGenerator` |
-| Sms, Email | `ISmsSender` (Twilio), `IEmailSender` (SendGrid) |
+| Sms, Email | `ISmsSender` (SpeedSMS), `IEmailSender` (SendGrid) |
 | DB | SQL Server |
 
 ## 1. Đăng ký tài khoản (Register)
