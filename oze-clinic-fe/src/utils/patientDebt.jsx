@@ -1,8 +1,9 @@
-import { norm, planMoney } from "./medicalRecord";
+import { formatCurrency, formatDate, getClinicDateTimeParts } from "./format";
+import { norm } from "./medicalRecord";
 import { PATIENT_DEBT_PAY_TYPE, PATIENT_DEBT_STATUS, PATIENT_DEBT_TEXT, PAYMENT_METHOD_LABELS } from "./messages";
 
 export const DEBT_NAV_FLAG = "paymentDebtNav";
-export const DEBT_ID_PATTERN = /^(plan|visit)-[1-9]\d*$/;
+export const DEBT_ID_PATTERN = /^invoice-[1-9]\d*$/;
 export const DEBT_PAGE_SIZE = 5;
 export const DEBT_TYPE_ALL = "all";
 export const DEBT_TYPES = Object.keys(PATIENT_DEBT_PAY_TYPE);
@@ -23,32 +24,19 @@ export const DEBT_RETRY_ID = "payment-debt-retry";
 
 export const debtOpenSelector = (id) => `[data-debt-open="${id}"]`;
 
-const NO_DATE = "—";
-const NO_DATE_KEY = "99999999";
+const NO_VALUE = "—";
 const DATE_PATTERN = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-const STATUS_RANK = { overdue: 0, open: 1, paid: 2 };
+const NO_DATE_KEY = "99999999";
+const STATUS_RANK = { overdue: 0, open: 1, upcoming: 2, paid: 3 };
 const SORT_KEYS = new Set(DEBT_SORTS.map((option) => option.value));
 const PAGE_PATTERN = /^[1-9]\d*$/;
 
-const pad = (value) => String(value).padStart(2, "0");
-
-export const toDebtDueDate = (value) => {
-    const match = DATE_PATTERN.exec(String(value ?? ""));
-    if (!match) return NO_DATE;
-    const day = Number(match[1]);
-    const month = Number(match[2]) - 1;
-    const year = Number(match[3]);
-    const utc = (y, m, d) => {
-        const date = new Date(0);
-        date.setUTCFullYear(y, m, d);
-        return date;
-    };
-    const real = utc(year, month, day);
-    if (real.getUTCFullYear() !== year || real.getUTCMonth() !== month || real.getUTCDate() !== day) return NO_DATE;
-    const lastDay = utc(year, month + 7, 0).getUTCDate();
-    const due = utc(year, month + 6, Math.min(day, lastDay));
-    return `${pad(due.getUTCDate())}/${pad(due.getUTCMonth() + 1)}/${String(due.getUTCFullYear()).padStart(4, "0")}`;
-};
+const PAY_TYPE = { ONCE: "once", STEP: "step", INSTALLMENT: "installment" };
+const PERIOD_STATUS = { Paid: "paid", Overdue: "overdue", Pending: "later" };
+const STEP_DONE = "DONE";
+const STEP_STATUS = { IN_PROGRESS: "inProgress", NOT_STARTED: "notStarted" };
+const REFUND_STATUS = { Pending: "pending", Approved: "approved", Processed: "refunded", Rejected: "rejected" };
+const REFUND_CODE_DIGITS = 6;
 
 export const dateKey = (value) => {
     const match = DATE_PATTERN.exec(String(value ?? ""));
@@ -57,113 +45,119 @@ export const dateKey = (value) => {
 
 export const byNewest = (getDate) => (a, b) => dateKey(getDate(b)).localeCompare(dateKey(getDate(a)));
 
-export const lineTotal = (line) => (Number(line.unitPrice) || 0) * (Number(line.quantity) || 0) - (Number(line.discount) || 0);
+export const methodLabel = (code) => (Object.hasOwn(PAYMENT_METHOD_LABELS, code) ? PAYMENT_METHOD_LABELS[code] : NO_VALUE);
 
-export const methodLabel = (code) => (Object.hasOwn(PAYMENT_METHOD_LABELS, code) ? PAYMENT_METHOD_LABELS[code] : NO_DATE);
+const toNumber = (value) => Number(value) || 0;
 
-export const receiptOf = (debtMock, visitId) => (Object.hasOwn(debtMock.receipts, visitId) ? debtMock.receipts[visitId] : null);
+export const clinicDate = (value) => (value ? getClinicDateTimeParts(new Date(value)).date : NO_VALUE);
 
-export const collectPayments = (debtMock, visitIds) =>
-    visitIds
-        .flatMap((visitId) =>
-            (receiptOf(debtMock, visitId)?.payments ?? []).map((item, index) => ({
-                key: `${visitId}-${index}`,
-                visitId,
-                date: item.date,
-                amount: Number(item.amount) || 0,
-                method: methodLabel(item.method),
-            })),
-        )
-        .sort(byNewest((item) => item.date));
+export const refundCode = (id) => `HT${String(id).padStart(REFUND_CODE_DIGITS, "0")}`;
 
-export const collectRefunds = (debtMock, visitIds, visitDates) =>
-    debtMock.refunds
-        .filter((refund) => visitIds.includes(refund.visitId))
-        .map((refund) => ({ ...refund, visitDate: visitDates.get(refund.visitId) ?? NO_DATE }))
-        .sort(byNewest((refund) => refund.createdAt));
+export const toPayment = (payment, receiptId) => ({
+    key: String(payment.id),
+    receiptId,
+    date: clinicDate(payment.paidAt),
+    amount: toNumber(payment.amount),
+    method: methodLabel(payment.paymentMethod),
+});
 
-const nextStage = (stages) => stages.find((item) => item.status === "overdue") ?? stages.find((item) => item.status === "due") ?? stages.find((item) => item.status === "later") ?? null;
+export const toRefund = (refund, receiptDate) => ({
+    code: refundCode(refund.id),
+    amount: toNumber(refund.amount),
+    reason: refund.reason ?? "",
+    status: REFUND_STATUS[refund.status] ?? REFUND_STATUS.Pending,
+    rejectionReason: refund.rejectionReason ?? "",
+    createdAt: clinicDate(refund.createdAt),
+    visitDate: receiptDate,
+    stage: null,
+});
 
-const debtStatus = (left, overdue) => {
-    if (overdue) return "overdue";
-    return left > 0 ? "open" : "paid";
+const debtStatus = (account) => {
+    if (account.hasOverdue) return "overdue";
+    if (toNumber(account.dueAmount) > 0) return "open";
+    return toNumber(account.plannedAmount) > 0 ? "upcoming" : "paid";
 };
 
-const withDates = (item) => ({ ...item, due: toDebtDueDate(item.start), search: norm(`${item.name} ${item.sub}`) });
+const toPeriod = (step, invoiceId) => ({
+    key: `${invoiceId}-${step.number}`,
+    label: PATIENT_DEBT_TEXT.PERIOD(step.number),
+    milestone: step.date ? PATIENT_DEBT_TEXT.PERIOD_DUE(formatDate(step.date)) : "",
+    date: formatDate(step.date) || NO_VALUE,
+    amount: toNumber(step.amount),
+    status: PERIOD_STATUS[step.status] ?? PERIOD_STATUS.Pending,
+    note: "",
+});
 
-const buildPlanItem = (plan, record, debtMock, visitDates) => {
-    const stageReceipts = Object.hasOwn(debtMock.stageReceipts, plan.id) ? debtMock.stageReceipts[plan.id] : {};
-    const visitIds = record.visits.filter((visit) => visit.plan === plan.id).map((visit) => visit.id);
-    const refunds = collectRefunds(debtMock, visitIds, visitDates);
-    const stages = plan.pays.map((item, index) => {
-        const visitId = Object.hasOwn(stageReceipts, item.label) ? stageReceipts[item.label] : null;
-        const refund = item.status === "paid" && visitId != null ? (refunds.find((entry) => entry.visitId === visitId && entry.stage === item.label) ?? null) : null;
-        return { key: `${plan.id}-${index}`, label: item.label, milestone: item.milestone, amount: Number(item.amount) || 0, status: item.status, note: item.note, visitId, refund };
+export const allocateSteps = (steps, paid, invoiceId) => {
+    let left = toNumber(paid);
+    const stages = steps.map((step) => {
+        const amount = toNumber(step.amount);
+        const base = { key: `${invoiceId}-${step.number}`, label: PATIENT_DEBT_TEXT.STEP(step.number), milestone: step.name, amount, note: "" };
+        if (step.status !== STEP_DONE) return { ...base, status: STEP_STATUS[step.status] ?? STEP_STATUS.NOT_STARTED };
+        const covered = Math.min(left, amount);
+        left -= covered;
+        if (covered >= amount) return { ...base, status: "paid" };
+        if (covered > 0) return { ...base, status: "partial", note: PATIENT_DEBT_TEXT.STEP_SHORT(formatCurrency(amount - covered)) };
+        return { ...base, status: "unpaid" };
     });
-    const money = planMoney(plan);
-    const left = Math.max(0, money.total - money.paid);
-    return withDates({
-        id: `plan-${plan.id}`,
-        type: debtMock.planPayType[plan.id],
-        planId: plan.id,
-        name: plan.variant,
-        sub: `${plan.svc} · Răng ${plan.teeth} · ${plan.doctor}`,
-        rule: plan.payRule,
-        total: money.total,
-        paid: money.paid,
-        left,
-        status: debtStatus(left, stages.some((item) => item.status === "overdue")),
-        start: plan.start,
-        stages,
-        next: nextStage(stages),
-        payments: collectPayments(debtMock, visitIds),
-        refunds,
-    });
+    return { stages, prepaid: left };
 };
 
-const buildVisitItem = (visit, receipt, debtMock, visitDates) => {
-    const lines = receipt.lines.map((item, index) => ({ key: `${visit.id}-${index}`, name: item.name, detail: item.detail, total: lineTotal(item) }));
-    const total = lines.reduce((sum, item) => sum + item.total, 0);
-    const payments = collectPayments(debtMock, [visit.id]);
-    const paid = payments.reduce((sum, item) => sum + item.amount, 0);
-    const left = Math.max(0, total - paid);
-    return withDates({
-        id: `visit-${visit.id}`,
-        type: "once",
-        visitId: visit.id,
-        name: lines.map((item) => item.name).join(", "),
-        sub: `${visit.service} · ${visit.doctor}`,
-        rule: PATIENT_DEBT_TEXT.ONCE_RULE,
-        total,
-        paid,
-        left,
-        status: debtStatus(left, false),
-        start: visit.date,
-        lines,
-        payments,
-        refunds: collectRefunds(debtMock, [visit.id], visitDates),
-    });
+const nextPeriod = (stages) => stages.find((stage) => stage.status === "overdue") ?? stages.find((stage) => stage.status === "later") ?? null;
+
+const subLine = (account, type) => {
+    const doctor = account.doctorName || null;
+    if (type === "once") return [PATIENT_DEBT_TEXT.VISIT_ON(formatDate(account.startedOn)), doctor].filter(Boolean).join(" · ");
+    const count = account.steps?.length ?? 0;
+    const unit = type === "installment" ? PATIENT_DEBT_TEXT.PERIOD_COUNT(count) : PATIENT_DEBT_TEXT.STEP_COUNT(count);
+    return [PATIENT_DEBT_TEXT.PLAN, unit, doctor].filter(Boolean).join(" · ");
 };
 
-export const buildDebtItems = (record, debtMock) => {
-    const visitDates = new Map(record.visits.map((visit) => [visit.id, visit.date]));
-    const inPayTypes = (planId) => planId != null && Object.hasOwn(debtMock.planPayType, planId);
-    const plans = record.plans.filter((plan) => plan.status === "active" && inPayTypes(plan.id)).map((plan) => buildPlanItem(plan, record, debtMock, visitDates));
-    const visits = record.visits
-        .filter((visit) => !inPayTypes(visit.plan))
-        .map((visit) => ({ visit, receipt: receiptOf(debtMock, visit.id) }))
-        .filter(({ receipt }) => receipt && receipt.lines.reduce((sum, item) => sum + lineTotal(item), 0) > 0)
-        .map(({ visit, receipt }) => buildVisitItem(visit, receipt, debtMock, visitDates));
-    return [...plans, ...visits];
+const withSearch = (item) => ({ ...item, search: norm(`${item.name} ${item.sub}`) });
+
+export const toDebtItem = (account) => {
+    const type = PAY_TYPE[account.paymentMode] ?? "once";
+    const invoiceId = account.invoiceId;
+    const start = formatDate(account.startedOn) || NO_VALUE;
+    const steps = Array.isArray(account.steps) ? account.steps : [];
+    const base = {
+        id: account.key,
+        invoiceId,
+        type,
+        name: account.name || account.invoiceNumber || NO_VALUE,
+        sub: subLine(account, type),
+        total: toNumber(account.finalAmount),
+        paid: toNumber(account.paidAmount),
+        due: toNumber(account.dueAmount),
+        planned: toNumber(account.plannedAmount),
+        status: debtStatus(account),
+        start,
+        payments: (account.payments ?? []).map((payment) => toPayment(payment, invoiceId)).sort(byNewest((payment) => payment.date)),
+        refunds: (account.refunds ?? []).map((refund) => toRefund(refund, start)).sort(byNewest((refund) => refund.createdAt)),
+        stages: [],
+        lines: [],
+        next: null,
+        prepaid: 0,
+    };
+    if (type === "installment") {
+        const stages = steps.map((step) => toPeriod(step, invoiceId));
+        return withSearch({ ...base, stages, next: nextPeriod(stages) });
+    }
+    if (type === "step") {
+        const { stages, prepaid } = allocateSteps(steps, base.paid, invoiceId);
+        return withSearch({ ...base, stages, prepaid });
+    }
+    const lines = steps.map((step) => ({ key: `${invoiceId}-${step.number}`, name: step.name, detail: "", total: toNumber(step.amount) }));
+    return withSearch({ ...base, lines });
 };
 
-const byId = (a, b) => a.id.localeCompare(b.id);
-const byDue = (a, b) => dateKey(a.due).localeCompare(dateKey(b.due));
+const byId = (a, b) => a.invoiceId - b.invoiceId;
+const byStart = (a, b) => dateKey(a.start).localeCompare(dateKey(b.start));
 
 const COMPARE = {
-    due: (a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byDue(a, b) || dateKey(a.start).localeCompare(dateKey(b.start)) || byId(a, b),
-    left: (a, b) => b.left - a.left || byDue(a, b) || byId(a, b),
-    new: (a, b) => dateKey(b.start).localeCompare(dateKey(a.start)) || byId(a, b),
+    due: (a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byStart(a, b) || byId(a, b),
+    left: (a, b) => b.due - a.due || STATUS_RANK[a.status] - STATUS_RANK[b.status] || byStart(a, b) || byId(a, b),
+    new: (a, b) => dateKey(b.start).localeCompare(dateKey(a.start)) || b.invoiceId - a.invoiceId,
 };
 
 export const inType = (items, type) => (type === DEBT_TYPE_ALL ? items : items.filter((item) => item.type === type));
@@ -212,7 +206,8 @@ export const pageCount = (total) => Math.max(1, Math.ceil(total / DEBT_PAGE_SIZE
 export const clampPage = (query, total) => ({ ...query, page: Math.min(query.page, pageCount(total)) });
 
 export const debtProgress = (item) => {
-    const percent = item.total > 0 ? Math.min(100, Math.max(0, item.left > 0 ? Math.floor((item.paid * 100) / item.total) : 100)) : 100;
+    const unpaid = item.due + item.planned;
+    const percent = item.total > 0 ? Math.min(100, Math.max(0, unpaid > 0 ? Math.floor((item.paid * 100) / item.total) : 100)) : 100;
     return { percent, cells: Math.floor(percent / 5) };
 };
 

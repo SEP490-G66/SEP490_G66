@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace OZE.Persistence.Repositories
@@ -81,6 +82,48 @@ namespace OZE.Persistence.Repositories
             return await _context.Appointments
                 .AnyAsync(x => x.PatientId == patientId && x.DoctorId == doctorId
                     && MedicalRecordConstants.AccessAppointmentStatuses.Contains(x.Status));
+        }
+
+        public async Task<Patient?> GetPatientByUserIdAsync(string userId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.UserId == userId && x.DeletedAt == null, cancellationToken);
+        }
+
+        public async Task<List<Examination>> GetFinishedExaminationsForBookAsync(int patientId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Examinations
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(x => x.Appointment).ThenInclude(a => a.ServiceItems).ThenInclude(i => i.Service)
+                .Include(x => x.Appointment).ThenInclude(a => a.ServiceItems).ThenInclude(i => i.Variant)
+                .Include(x => x.Appointment).ThenInclude(a => a.QueueEntries)
+                .Include(x => x.Doctor)
+                .Include(x => x.Diagnoses)
+                .Include(x => x.Addenda)
+                .Include(x => x.Prescriptions).ThenInclude(p => p.Items)
+                .Include(x => x.DentalChartEntries)
+                .Include(x => x.ToothFindings)
+                .Include(x => x.ImagingRequests).ThenInclude(r => r.Results).ThenInclude(i => i.ReviewedByDoctor)
+                .Where(x => x.PatientId == patientId
+                    && (x.ExaminationStatus == ExaminationConstants.Completed || x.ExaminationStatus == ExaminationConstants.Locked))
+                .OrderByDescending(x => x.Appointment.AppointmentDate)
+                .ThenByDescending(x => x.CreatedAt)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<TreatmentPlan>> GetTreatmentPlansForBookAsync(int patientId, CancellationToken cancellationToken = default)
+        {
+            return await _context.TreatmentPlans
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(x => x.Stages)
+                .Include(x => x.CreatedByDoctor)
+                .Include(x => x.Examination).ThenInclude(e => e.Diagnoses)
+                .Where(x => x.PatientId == patientId && MedicalRecordConstants.PatientVisiblePlanStatuses.Contains(x.Status))
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync(cancellationToken);
         }
     }
 }

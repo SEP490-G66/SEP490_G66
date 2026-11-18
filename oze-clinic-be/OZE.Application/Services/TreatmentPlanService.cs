@@ -102,6 +102,78 @@ namespace OZE.Application.Services
             return ToProgressResponse(created!);
         }
 
+        public async Task<TreatmentPlanProgressResponse> CreateAsync(
+            CreateTreatmentPlanRequest request,
+            string userId,
+            CancellationToken cancellationToken = default)
+        {
+            ConditionGuard.Ensure(request.ExaminationId.HasValue, ErrorConstants.TreatmentPlanMessage.ExaminationIdRequired);
+            return await CreateAsync(request.ExaminationId.Value, request, userId, cancellationToken);
+        }
+
+        public async Task<TreatmentPlanProgressResponse> CreateNewVersionAsync(
+            long treatmentPlanId,
+            UpdateTreatmentPlanRequest request,
+            string userId,
+            CancellationToken cancellationToken = default)
+        {
+            var oldPlan = await _treatmentPlanRepository.GetTrackedByIdWithStagesAsync(treatmentPlanId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(oldPlan != null, ErrorConstants.TreatmentPlanMessage.PlanNotFound);
+            var doctor = await EnsureAccessAsync(userId, oldPlan!);
+
+            // SDS 13.3 & BR-046: A proposed, approved or in-progress plan can be upgraded to a new version
+            var canCreateVersion = oldPlan.Status == TreatmentPlanConstants.Proposed
+                || oldPlan.Status == TreatmentPlanConstants.Approved
+                || oldPlan.Status == TreatmentPlanConstants.InProgress
+                || oldPlan.Status == TreatmentPlanConstants.Draft;
+            ConditionGuard.Ensure(canCreateVersion, ErrorConstants.TreatmentPlanMessage.CannotCreateNewVersion);
+
+            var validStages = await ValidateStagesAsync(request.Stages, cancellationToken);
+
+            var now = DateTimeOffset.UtcNow;
+
+            // Mark old plan as Superseded
+            oldPlan.Status = TreatmentPlanConstants.Superseded;
+            oldPlan.UpdatedAt = now;
+
+            // Create new plan version (old.PlanVersion + 1)
+            var newPlan = new TreatmentPlan
+            {
+                ExaminationId = oldPlan.ExaminationId,
+                PatientId = oldPlan.PatientId,
+                CreatedByDoctorId = doctor.Id,
+                PlanVersion = oldPlan.PlanVersion + 1,
+                PlanName = request.PlanName.Trim(),
+                Description = Clean(request.Description),
+                Status = TreatmentPlanConstants.Proposed,
+                CreatedAt = now
+            };
+
+            for (var i = 0; i < validStages.Count; i++)
+            {
+                var stage = new TreatmentPlanStage
+                {
+                    StageStatus = TreatmentPlanConstants.StageStatus.Scheduled,
+                    CreatedAt = now
+                };
+                ApplyStage(stage, validStages[i], i + 1);
+                newPlan.Stages.Add(stage);
+            }
+
+            SetTotals(newPlan);
+
+            await _treatmentPlanRepository.AddAsync(newPlan, cancellationToken);
+            await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
+
+            await NotifyAsync(n => n.NotifyPatientAsync(newPlan.PatientId,
+                new NotificationContent(NotificationConstants.Text.TreatmentPlanProposedTitle,
+                    $"A new version (v{newPlan.PlanVersion}) of treatment plan \"{newPlan.PlanName}\" has been created for you.",
+                    NotificationConstants.Reference.TreatmentPlan, newPlan.Id.ToString()), cancellationToken));
+
+            var newCreated = await _treatmentPlanRepository.GetByIdWithStagesAsync(newPlan.Id, cancellationToken);
+            return ToProgressResponse(newCreated!);
+        }
+
         public async Task<TreatmentPlanProgressResponse> UpdateAsync(
             long treatmentPlanId,
             UpdateTreatmentPlanRequest request,
@@ -219,6 +291,26 @@ namespace OZE.Application.Services
             CancellationToken cancellationToken = default)
         {
             var plan = await LoadForStatusChangeAsync(treatmentPlanId, userId, canViewAll, cancellationToken);
+            return await ApproveLoadedAsync(plan, cancellationToken);
+        }
+
+        // The patient agrees online to a plan proposed to them (decided 18/11: to think it over at home before agreeing)
+        public async Task<TreatmentPlanProgressResponse> ApproveByPatientAsync(
+            long treatmentPlanId,
+            string userId,
+            CancellationToken cancellationToken = default)
+        {
+            var patient = await _medicalRecordRepository.GetPatientByUserIdAsync(userId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(patient != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
+
+            // Another patient's plan is reported as missing, so its existence is not revealed
+            var plan = await _treatmentPlanRepository.GetTrackedByIdWithStagesAsync(treatmentPlanId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(plan != null && plan.PatientId == patient!.Id, ErrorConstants.TreatmentPlanMessage.PlanNotFound);
+            return await ApproveLoadedAsync(plan!, cancellationToken);
+        }
+
+        private async Task<TreatmentPlanProgressResponse> ApproveLoadedAsync(TreatmentPlan plan, CancellationToken cancellationToken)
+        {
             ConditionGuard.Ensure(plan.Status == TreatmentPlanConstants.Proposed, ErrorConstants.TreatmentPlanMessage.OnlyProposedCanBeApproved);
 
             var now = DateTimeOffset.UtcNow;
@@ -329,6 +421,24 @@ namespace OZE.Application.Services
             }
 
             return plans;
+        }
+
+        public async Task<PagedResult<TreatmentPlanSummaryResponse>> GetAllPlansAsync(
+            TreatmentPlanQueryParameters query,
+            string userId,
+            bool canViewAll,
+            CancellationToken cancellationToken = default)
+        {
+            if (!canViewAll)
+            {
+                var doctor = await _staffRepository.GetByUserIdAsync(userId);
+                if (doctor != null)
+                {
+                    query.DoctorId = doctor.Id;
+                }
+            }
+
+            return await _treatmentPlanRepository.GetAllAsync(query, cancellationToken);
         }
 
         public async Task<TreatmentPlanProgressResponse> GetProgressAsync(
@@ -516,6 +626,69 @@ namespace OZE.Application.Services
                 plan.Status = TreatmentPlanConstants.Completed;
                 plan.UpdatedAt = now;
             }
+
+            await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
+            return ToProgressResponse(plan);
+        }
+
+        public async Task<TreatmentPlanProgressResponse> PerformSessionAsync(
+            long stageId,
+            PerformSessionRequest request,
+            string userId,
+            CancellationToken cancellationToken = default)
+        {
+            var plan = await _treatmentPlanRepository.GetByStageIdWithStagesAsync(stageId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(plan != null, ErrorConstants.TreatmentPlanMessage.PlanNotFound);
+            var doctor = await EnsureAccessAsync(userId, plan!);
+
+            var stage = plan!.Stages.FirstOrDefault(s => s.Id == stageId);
+            ConditionGuard.Ensure<NotFoundException>(stage != null, ErrorConstants.TreatmentPlanMessage.StageNotFound);
+
+            var canPerformPlan = plan.Status == TreatmentPlanConstants.Approved
+                || plan.Status == TreatmentPlanConstants.InProgress;
+            ConditionGuard.Ensure(canPerformPlan, ErrorConstants.TreatmentPlanMessage.PlanNotApproved);
+
+            ConditionGuard.Ensure(
+                stage!.StageStatus != TreatmentPlanConstants.StageStatus.Completed,
+                ErrorConstants.TreatmentPlanMessage.StageAlreadyCompleted);
+
+            var notes = Clean(request.Notes) ?? stage.Notes;
+            var actualCost = request.ActualCost ?? stage.ActualCost ?? stage.EstimatedCost;
+
+            if (request.ActualCost.HasValue)
+            {
+                ConditionGuard.Ensure(
+                    request.ActualCost.Value >= 0,
+                    ErrorConstants.TreatmentPlanMessage.InvalidActualCost);
+            }
+
+            var costDiffers = actualCost != stage.EstimatedCost;
+            ConditionGuard.ThrowIf(
+                costDiffers && string.IsNullOrWhiteSpace(notes),
+                ErrorConstants.TreatmentPlanMessage.NotesRequiredWhenCostDiffers);
+
+            var now = DateTimeOffset.UtcNow;
+            stage.Notes = notes;
+            stage.ActualCost = actualCost;
+            stage.StageStatus = TreatmentPlanConstants.StageStatus.Completed;
+            stage.ActualDate = DateOnly.FromDateTime(ClinicClock.Now);
+            stage.CompletedAt = now;
+            stage.PerformedByDoctorId = doctor.Id;
+            stage.UpdatedAt = now;
+
+            var hasOpenStage = plan.Stages.Any(s =>
+                s.StageStatus != TreatmentPlanConstants.StageStatus.Completed
+                && s.StageStatus != TreatmentPlanConstants.StageStatus.Cancelled);
+
+            if (!hasOpenStage)
+            {
+                plan.Status = TreatmentPlanConstants.Completed;
+            }
+            else if (plan.Status == TreatmentPlanConstants.Approved)
+            {
+                plan.Status = TreatmentPlanConstants.InProgress;
+            }
+            plan.UpdatedAt = now;
 
             await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
             return ToProgressResponse(plan);

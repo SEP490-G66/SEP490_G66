@@ -34,8 +34,9 @@ const PaymentReceiptPaper = ({ receipt, profile }) => (
             </div>
         </div>
         <p className="mt-3 text-center font-bold tracking-wide text-ink">{PAYMENT_HISTORY_TEXT.PAPER_TITLE}</p>
+        {receipt.isPlan && receipt.title && <p className="text-center font-semibold text-ink">{receipt.title}</p>}
         <p className="text-center text-caption">
-            {PAYMENT_HISTORY_TEXT.PAPER_DATE}
+            {receipt.isPlan ? PAYMENT_HISTORY_TEXT.PAPER_PLAN_DATE : PAYMENT_HISTORY_TEXT.PAPER_DATE}
             <b className="num">{receipt.date}</b>
         </p>
         <dl className="mt-3 flex flex-col gap-1.5">
@@ -45,8 +46,8 @@ const PaymentReceiptPaper = ({ receipt, profile }) => (
                 {profile.phone || NO_VALUE}
             </InfoRow>
             <InfoRow label={PAYMENT_HISTORY_TEXT.ADDRESS}>{profile.addr || NO_VALUE}</InfoRow>
-            <InfoRow label={PAYMENT_HISTORY_TEXT.DIAGNOSIS}>{receipt.diag || NO_VALUE}</InfoRow>
-            <InfoRow label={PAYMENT_HISTORY_TEXT.REASON}>{receipt.reason || NO_VALUE}</InfoRow>
+            {!receipt.isPlan && <InfoRow label={PAYMENT_HISTORY_TEXT.DIAGNOSIS}>{receipt.diag || NO_VALUE}</InfoRow>}
+            {!receipt.isPlan && <InfoRow label={PAYMENT_HISTORY_TEXT.REASON}>{receipt.reason || NO_VALUE}</InfoRow>}
             <InfoRow label={PAYMENT_HISTORY_TEXT.REMAIN_ALL} valueClassName="num font-semibold">
                 {formatCurrency(receipt.remainAll)}
             </InfoRow>
@@ -69,9 +70,6 @@ const PaymentReceiptPaper = ({ receipt, profile }) => (
                             {PAYMENT_HISTORY_TEXT.COL_UNIT_PRICE}
                         </th>
                         <th scope="col" className="px-2 py-1.5 text-right font-semibold">
-                            {PAYMENT_HISTORY_TEXT.COL_DISCOUNT}
-                        </th>
-                        <th scope="col" className="px-2 py-1.5 text-right font-semibold">
                             {PAYMENT_HISTORY_TEXT.COL_LINE_TOTAL}
                         </th>
                     </tr>
@@ -83,7 +81,6 @@ const PaymentReceiptPaper = ({ receipt, profile }) => (
                             <td className="px-2 py-1.5">{line.detail}</td>
                             <td className="num px-2 py-1.5 text-right">{line.quantity}</td>
                             <td className="num whitespace-nowrap px-2 py-1.5 text-right">{formatCurrency(line.unitPrice)}</td>
-                            <td className="num whitespace-nowrap px-2 py-1.5 text-right">{formatCurrency(line.discount)}</td>
                             <td className="num whitespace-nowrap px-2 py-1.5 text-right font-semibold text-ink">{formatCurrency(line.total)}</td>
                         </tr>
                     ))}
@@ -97,16 +94,16 @@ const PaymentReceiptPaper = ({ receipt, profile }) => (
                         <b className="font-semibold text-ink">{line.name}</b>
                         <b className="num whitespace-nowrap font-semibold text-ink">{formatCurrency(line.total)}</b>
                     </div>
-                    <p className="mt-0.5">{line.detail}</p>
+                    {line.detail && <p className="mt-0.5">{line.detail}</p>}
                     <p className="num mt-0.5 text-caption text-muted">
-                        {PAYMENT_HISTORY_TEXT.LINE_META(line.quantity, formatCurrency(line.unitPrice), formatCurrency(line.discount))}
+                        {PAYMENT_HISTORY_TEXT.LINE_META(line.quantity, formatCurrency(line.unitPrice))}
                     </p>
                 </li>
             ))}
         </ul>
         <dl className="mt-3 ml-auto flex max-w-85 flex-col gap-1">
             <TotalRow label={PAYMENT_HISTORY_TEXT.GROSS} value={receipt.gross} />
-            <TotalRow label={PAYMENT_HISTORY_TEXT.DISCOUNT} value={receipt.disc} />
+            {receipt.disc > 0 && <TotalRow label={PAYMENT_HISTORY_TEXT.DISCOUNT} value={receipt.disc} />}
             <TotalRow label={PAYMENT_HISTORY_TEXT.NET} value={receipt.net} valueClassName="font-semibold text-ink" />
             <TotalRow label={PAYMENT_HISTORY_TEXT.PAID_TOTAL} value={receipt.paid} valueClassName="text-success" />
             <TotalRow label={PAYMENT_HISTORY_TEXT.LEFT_TOTAL} value={receipt.left} valueClassName={cx("font-semibold", receipt.left > 0 ? "text-danger" : "text-ink")} />
@@ -164,7 +161,7 @@ const PaymentReceiptPaper = ({ receipt, profile }) => (
         )}
         <div className="mt-4 text-right text-caption">
             <p className="font-semibold text-ink">{PAYMENT_HISTORY_TEXT.DOCTOR_SIGN}</p>
-            <p className="mt-5">{receipt.doctor}</p>
+            <p className="mt-5">{receipt.doctor || NO_VALUE}</p>
         </div>
         <div className="mt-4 border-t border-dashed border-border-strong pt-2.5 text-center text-caption text-muted">
             <p>{PAYMENT_HISTORY_TEXT.FOOT_REVISIT}</p>

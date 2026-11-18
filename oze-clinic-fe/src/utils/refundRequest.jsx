@@ -1,6 +1,6 @@
 import { formatCurrency, formatDateTime, getClinicDateTimeParts } from "./format";
 import { norm } from "./medicalRecord";
-import { GENERIC_ERROR_MESSAGE, REFUND_REQUEST_STATUS_GUIDE, REFUND_REQUEST_TEXT } from "./messages";
+import { GENERIC_ERROR_MESSAGE, PAYMENT_METHOD_LABELS, REFUND_REQUEST_STATUS_GUIDE, REFUND_REQUEST_TEXT } from "./messages";
 
 export const REFUND_REQUEST_STATUSES = {
     PENDING: "pending",
@@ -35,7 +35,6 @@ export const REFUND_STATUS_BUTTON_ID = "refund-requests-status-help";
 export const REFUND_RETRY_ID = "refund-requests-retry";
 export const REFUND_CREATE_ID = "refund-requests-create";
 export const REFUND_INVOICE_ID = "refund-requests-invoice";
-export const REFUND_AMOUNT_ID = "refund-requests-amount";
 export const REFUND_REASON_ID = "refund-requests-reason";
 export const REFUND_SUBMIT_ID = "refund-requests-submit";
 export const REFUND_REASON_MAX = 500;
@@ -52,11 +51,8 @@ const PAGE_PATTERN = /^\d+$/;
 const SORT_KEYS = new Set(REFUND_SORTS.map((option) => option.value));
 const API_STATUS = { pending: "Pending", approved: "Approved", rejected: "Rejected", refunded: "Processed" };
 const FE_STATUS = Object.fromEntries(Object.entries(API_STATUS).map(([fe, api]) => [api, fe]));
-const DEFINITE_ERRORS = new Set(["AMOUNT_EXCEEDS_MAX", "INVOICE_NOT_FOUND", "INVOICE_NOT_ELIGIBLE", "INVOICE_IS_DEPOSIT", "VALIDATION_FAILED"]);
-const INVOICE_ERRORS = new Set(["INVOICE_NOT_FOUND", "INVOICE_NOT_ELIGIBLE", "INVOICE_IS_DEPOSIT"]);
-const FIELD_KEYS = new Set(["amount", "reason"]);
-
-const fieldError = (field) => (field === "amount" ? REFUND_REQUEST_TEXT.ERR_AMOUNT : REFUND_REQUEST_TEXT.ERR_REASON);
+const INVOICE_ERRORS = new Set(["INVOICE_NOT_FOUND", "INVOICE_NOT_ELIGIBLE"]);
+const CODE_DIGITS = 6;
 
 export const randomId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
@@ -67,19 +63,12 @@ const codeDigits = (code) => {
 
 export const canonicalCode = (value) => {
     const digits = codeDigits(value);
-    return digits == null ? null : `HT${digits.padStart(4, "0")}`;
+    return digits == null ? null : `HT${digits.padStart(CODE_DIGITS, "0")}`;
 };
 
 const compareDigits = (a, b) => a.length - b.length || (a < b ? -1 : a > b ? 1 : 0);
 
 export const compareCode = (a, b) => compareDigits(codeDigits(a) ?? "", codeDigits(b) ?? "");
-
-export const nextCode = (codes) => {
-    const max = codes.map(codeDigits).filter((digits) => digits != null).reduce((top, digits) => (compareDigits(digits, top) > 0 ? digits : top), "0");
-    return `HT${String(BigInt(max) + 1n).padStart(4, "0")}`;
-};
-
-export const nextId = (ids) => Math.max(0, ...ids.filter(Number.isFinite)) + 1;
 
 export const toClinicIso = (date) => {
     const { date: day, time } = getClinicDateTimeParts(date);
@@ -119,86 +108,66 @@ export const toApiStatus = (status) => API_STATUS[status] ?? null;
 
 export const fromApiStatus = (status) => (Object.hasOwn(FE_STATUS, status) ? FE_STATUS[status] : null);
 
-export const toApiRequest = (request) => ({
-    id: request.id,
-    code: request.code,
-    createdAt: request.createdAt,
-    invoiceId: request.visitId,
-    stageLabel: request.stageLabel ?? null,
-    itemNames: request.itemNames ?? [],
-    paidAt: request.paidAt ?? null,
-    doctorName: request.doctorName ?? null,
-    amount: request.amount,
-    reason: request.reason,
-    status: toApiStatus(request.status),
-    requestType: request.requestType ?? "Refund",
-    approvedAt: request.approvedAt ?? null,
-    processedAt: request.processedAt ?? null,
-    rejectReason: request.rejectReason ?? null,
-    refundMethod: request.refundMethod ?? null,
-});
-
 const textOrNull = (value) => (typeof value === "string" && value.trim() ? value : null);
+
+const money = (value) => (Number.isFinite(Number(value)) && value !== null && value !== "" ? Number(value) : null);
 
 const uniqueBy = (list, key) => {
     const seen = new Set();
     return list.filter((item) => !seen.has(item[key]) && seen.add(item[key]));
 };
 
+export const methodText = (method) => PAYMENT_METHOD_LABELS[method] ?? null;
+
 export const fromApiRequest = (dto) => {
     if (!dto || typeof dto !== "object") return null;
     const status = fromApiStatus(dto.status);
     const code = canonicalCode(dto.code);
     const createdAt = parseApiTime(dto.createdAt);
-    if (!status || !code || !createdAt || (dto.requestType ?? "Refund") !== "Refund" || !Number.isSafeInteger(dto.amount) || dto.amount <= 0) return null;
+    if (!status || !code || !createdAt) return null;
+    const refundAmount = money(dto.refundAmount);
+    const paidAmount = money(dto.paidAmount) ?? 0;
     return {
         id: dto.id,
         code,
-        visitId: Number.isSafeInteger(dto.invoiceId) ? dto.invoiceId : null,
-        stageLabel: textOrNull(dto.stageLabel),
-        itemNames: Array.isArray(dto.itemNames) ? dto.itemNames.filter((name) => typeof name === "string" && name.trim()) : [],
-        paidAt: parseApiTime(dto.paidAt),
+        invoiceId: Number.isSafeInteger(dto.invoiceId) ? dto.invoiceId : null,
+        accountName: textOrNull(dto.accountName),
+        invoiceDate: parseApiTime(dto.invoiceDate),
         doctorName: textOrNull(dto.doctorName),
-        amount: dto.amount,
+        paidAmount,
+        refundAmount,
+        workDoneAmount: money(dto.workDoneAmount),
+        amount: refundAmount ?? paidAmount,
         reason: typeof dto.reason === "string" ? dto.reason : "",
         status,
         createdAt,
         approvedAt: parseApiTime(dto.approvedAt),
         processedAt: parseApiTime(dto.processedAt),
-        rejectReason: textOrNull(dto.rejectReason),
-        refundMethod: textOrNull(dto.refundMethod),
+        rejectReason: textOrNull(dto.rejectionReason),
+        refundMethod: methodText(dto.refundMethod),
     };
 };
 
-export const normalizeRefundList = (raw) => {
-    if (!raw || !Array.isArray(raw.items)) return null;
-    const total = Number(raw.totalItems);
-    if (Number.isFinite(total) && total > raw.items.length) return null;
-    return uniqueBy(raw.items.map(fromApiRequest).filter(Boolean), "code");
-};
-
-const toDisplayDate = (invoiceDate) => `${invoiceDate.slice(8, 10)}/${invoiceDate.slice(5, 7)}/${invoiceDate.slice(0, 4)}`;
+export const normalizeRefundList = (items) => (Array.isArray(items) ? uniqueBy(items.map(fromApiRequest).filter(Boolean), "code") : null);
 
 export const fromApiInvoice = (dto) => {
-    if (!dto || typeof dto !== "object" || !DATE_ONLY.test(String(dto.invoiceDate ?? "")) || !parseApiTime(dto.invoiceDate)) return null;
-    if (![dto.invoiceId, dto.paidAmount, dto.maxRefundable].every(Number.isSafeInteger) || dto.paidAmount <= 0 || dto.maxRefundable <= 0) return null;
+    const invoiceDate = parseApiTime(dto?.invoiceDate);
+    const paidAmount = money(dto?.paidAmount);
+    if (!invoiceDate || !Number.isSafeInteger(dto.invoiceId) || !paidAmount || paidAmount <= 0) return null;
     return {
         invoiceId: dto.invoiceId,
-        invoiceDate: dto.invoiceDate,
-        date: toDisplayDate(dto.invoiceDate),
-        stageLabel: textOrNull(dto.stageLabel),
-        itemNames: Array.isArray(dto.itemNames) ? dto.itemNames.filter((name) => typeof name === "string" && name.trim()) : [],
+        invoiceDate,
+        date: clinicDate(invoiceDate),
+        accountName: textOrNull(dto.accountName) ?? textOrNull(dto.invoiceNumber) ?? REFUND_REQUEST_TEXT.NO_VALUE,
         doctorName: textOrNull(dto.doctorName),
-        paidAt: parseApiTime(dto.paidAt),
-        paidAmount: dto.paidAmount,
-        maxRefundable: Math.min(dto.maxRefundable, dto.paidAmount),
+        paidAmount,
     };
 };
 
-export const normalizeInvoiceList = (raw) => {
-    if (!raw || !Array.isArray(raw.items)) return null;
-    return uniqueBy(raw.items.map(fromApiInvoice).filter(Boolean), "invoiceId").sort((a, b) => (a.invoiceDate < b.invoiceDate ? 1 : a.invoiceDate > b.invoiceDate ? -1 : b.invoiceId - a.invoiceId));
-};
+export const normalizeInvoiceList = (items) =>
+    Array.isArray(items)
+        ? uniqueBy(items.map(fromApiInvoice).filter(Boolean), "invoiceId").sort((a, b) => (a.invoiceDate < b.invoiceDate ? 1 : a.invoiceDate > b.invoiceDate ? -1 : b.invoiceId - a.invoiceId))
+        : null;
 
 export const readRefundQuery = (searchParams) => {
     const sort = searchParams.get("sort");
@@ -229,9 +198,9 @@ const byNewest = (a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.crea
 const byOldest = (a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : compareCode(a.code, b.code));
 const COMPARE = { new: byNewest, old: byOldest, amount: (a, b) => b.amount - a.amount || byNewest(a, b) };
 
-export const forWhatText = (request) => [request.stageLabel, request.itemNames.join(", ")].filter(Boolean).join(" · ") || REFUND_REQUEST_TEXT.NO_VALUE;
+export const forWhatText = (request) => request.accountName ?? REFUND_REQUEST_TEXT.NO_VALUE;
 
-const searchText = (request) => norm([request.code, request.reason, request.stageLabel, request.itemNames.join(", "), clinicDate(request.createdAt), clinicDate(request.paidAt)].join(" "));
+const searchText = (request) => norm([request.code, request.reason, request.accountName ?? "", clinicDate(request.createdAt)].join(" "));
 
 export const filterRefunds = (items, query) => {
     const keyword = norm(query.q);
@@ -272,14 +241,18 @@ export const nextRefundQuery = (view, patch) => {
 };
 
 export const processSteps = (request) => {
-    const amount = formatCurrency(request.amount);
+    const amount = formatCurrency(request.refundAmount ?? 0);
     const { status } = request;
+    const approvedText =
+        request.workDoneAmount > 0
+            ? REFUND_REQUEST_TEXT.APPROVED_DETAIL(amount, formatCurrency(request.paidAmount), formatCurrency(request.workDoneAmount))
+            : REFUND_REQUEST_TEXT.APPROVED_TEXT(amount);
     const review =
         status === "pending"
             ? { time: REFUND_REQUEST_TEXT.REVIEWING, state: "current", text: REFUND_REQUEST_TEXT.REVIEWING_TEXT }
             : status === "rejected"
               ? { time: clinicDateTime(request.approvedAt), state: "error", text: REFUND_REQUEST_TEXT.REJECTED_TEXT(request.rejectReason ?? REFUND_REQUEST_TEXT.NO_VALUE) }
-              : { time: clinicDateTime(request.approvedAt), state: "done", text: REFUND_REQUEST_TEXT.APPROVED_TEXT(amount) };
+              : { time: clinicDateTime(request.approvedAt), state: "done", text: approvedText };
     const refund =
         status === "refunded"
             ? { time: clinicDateTime(request.processedAt), state: "done", text: REFUND_REQUEST_TEXT.REFUNDED_TEXT(amount, request.refundMethod) }
@@ -293,65 +266,22 @@ export const processSteps = (request) => {
     ];
 };
 
-export const amountDigits = (value, { pasted = true } = {}) => {
-    const text = String(value ?? "").normalize("NFKC");
-    const trimmed = pasted ? text.replace(/\D+$/, "").replace(/[.,]\d{1,2}$/, "") : text;
-    return trimmed.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-};
-
-export const validateRefundForm = (form, invoice) => {
+export const validateRefundForm = (form) => {
     const errors = {};
     if (!form.invoiceId) errors.invoiceId = REFUND_REQUEST_TEXT.ERR_INVOICE;
-    const amount = Number(form.amount);
-    const huge = form.amount.length > 15 || (Boolean(form.amount) && !Number.isSafeInteger(amount));
-    if (!form.amount || (!huge && amount <= 0)) errors.amount = REFUND_REQUEST_TEXT.ERR_AMOUNT;
-    else if (invoice && (huge || amount > invoice.maxRefundable)) errors.amount = REFUND_REQUEST_TEXT.ERR_AMOUNT_MAX(formatCurrency(invoice.maxRefundable));
     if (!form.reason.trim()) errors.reason = REFUND_REQUEST_TEXT.ERR_REASON;
     return errors;
 };
 
-export const resolveMaxError = (result, invoice, amount) => {
-    const reported = result?.data?.maxRefundable;
-    const fromServer = Number.isSafeInteger(reported);
-    const max = fromServer ? Math.min(reported, invoice?.paidAmount ?? reported) : invoice?.maxRefundable;
-    if (!Number.isFinite(max)) return { kind: "generic", max: null };
-    if (max <= 0) return { kind: "reloadInvoices", max };
-    if (max >= amount) return { kind: "generic", max };
-    return { kind: "field", max };
-};
-
-export const isDefiniteRefundError = (code) => DEFINITE_ERRORS.has(code);
-
-export const classifySubmitError = (result, invoice, amount) => {
+export const classifySubmitError = (result) => {
     const code = result?.code;
-    if (code === "AMOUNT_EXCEEDS_MAX") {
-        const { kind, max } = resolveMaxError(result, invoice, amount);
-        if (kind === "field") return { kind, fields: { amount: REFUND_REQUEST_TEXT.ERR_AMOUNT_MAX(formatCurrency(max)) }, max, uncertain: false };
-        if (kind === "reloadInvoices") return { kind, form: REFUND_REQUEST_TEXT.ERR_NOT_ELIGIBLE, uncertain: false };
-        return { kind, form: GENERIC_ERROR_MESSAGE, uncertain: false };
-    }
-    if (code === "VALIDATION_FAILED") {
-        const errors = Array.isArray(result.errors) ? result.errors : [];
-        const fields = errors.map((entry) => entry?.field);
-        if (fields.includes("invoiceId")) return { kind: "reloadInvoices", form: REFUND_REQUEST_TEXT.ERR_NOT_ELIGIBLE, uncertain: false };
-        if (fields.length && fields.every((field) => FIELD_KEYS.has(field))) {
-            const messages = Object.fromEntries(errors.map((entry) => [entry.field, typeof entry.message === "string" && entry.message.trim() ? entry.message : fieldError(entry.field)]));
-            return { kind: "field", fields: messages, uncertain: false };
-        }
-        return { kind: "generic", form: GENERIC_ERROR_MESSAGE, uncertain: false };
-    }
+    if (code === "REASON_REQUIRED") return { kind: "field", fields: { reason: REFUND_REQUEST_TEXT.ERR_REASON }, uncertain: false };
     if (code === "OPEN_REQUEST_EXISTS") return { kind: "reloadInvoices", form: REFUND_REQUEST_TEXT.ERR_OPEN_REQUEST, uncertain: true };
     if (INVOICE_ERRORS.has(code)) return { kind: "reloadInvoices", form: REFUND_REQUEST_TEXT.ERR_NOT_ELIGIBLE, uncertain: false };
     return { kind: "generic", form: GENERIC_ERROR_MESSAGE, uncertain: true };
 };
 
-export const invoiceOptionLabel = (invoice) =>
-    REFUND_REQUEST_TEXT.INVOICE_OPTION(invoice.date, invoice.stageLabel, invoice.itemNames.join(", "), formatCurrency(invoice.maxRefundable));
-
-export const invoiceHint = (invoice) => {
-    const held = invoice.paidAmount - invoice.maxRefundable;
-    return REFUND_REQUEST_TEXT.AMOUNT_HINT(formatCurrency(invoice.maxRefundable), formatCurrency(invoice.paidAmount), held > 0 ? formatCurrency(held) : null);
-};
+export const invoiceOptionLabel = (invoice) => REFUND_REQUEST_TEXT.INVOICE_OPTION(invoice.date, invoice.accountName, formatCurrency(invoice.paidAmount));
 
 export const refundLiveText = ({ view, hasData, live }) => {
     if (live) return live;

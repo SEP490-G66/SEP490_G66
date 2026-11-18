@@ -27,6 +27,8 @@ namespace OZE.Persistence.Repositories
                     .ThenInclude(i => i.Payments)
                 .Include(x => x.Invoice)
                     .ThenInclude(i => i.RefundAdjustmentRequests)
+                .Include(x => x.Invoice)
+                    .ThenInclude(i => i.Patient)
                 .AsSplitQuery()
                 .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         }
@@ -54,6 +56,31 @@ namespace OZE.Persistence.Repositories
             }
 
             return await query
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<int?> GetPatientIdByUserIdAsync(string userId, CancellationToken cancellationToken = default)
+        {
+            return _context.Patients
+                .AsNoTracking()
+                .Where(x => x.UserId == userId && x.DeletedAt == null)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<Invoice>> GetPatientInvoicesForRefundAsync(int patientId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Invoices
+                .AsNoTracking()
+                .Where(x => x.PatientId == patientId && x.PaymentStatus != InvoiceConstants.Cancelled)
+                .Include(x => x.Items)
+                .Include(x => x.Payments)
+                .Include(x => x.RefundAdjustmentRequests)
+                .Include(x => x.Appointment).ThenInclude(x => x!.Doctor)
+                .Include(x => x.TreatmentPlan).ThenInclude(x => x!.CreatedByDoctor)
+                .AsSplitQuery()
                 .OrderByDescending(x => x.CreatedAt)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync(cancellationToken);

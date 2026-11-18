@@ -2,7 +2,7 @@ import { displayText } from "@/utils/medicalRecord";
 import { Link } from "react-router-dom";
 import { ChevronDown, Lock } from "lucide-react";
 import { cx } from "@/utils/cx";
-import { CLINIC_HOTLINE, CLINIC_HOTLINES_TEXT } from "@/utils/messages";
+import { CLINIC_HOTLINE, CLINIC_HOTLINES_TEXT, MEDICAL_RECORD_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 
 const HistorySection = ({ item, collapsed, onToggle }) => (
@@ -14,13 +14,26 @@ const HistorySection = ({ item, collapsed, onToggle }) => (
             onClick={onToggle}
         >
             <span className="flex-1 text-caption font-bold uppercase tracking-wide text-body">{displayText(item.title)}</span>
-            {typeof item.badge === "string" && item.badge && <span className="badge badge-success">{item.badge}</span>}
+            <span className="num badge badge-neutral">{item.items.length}</span>
             <ChevronDown className={cx("size-4 text-muted transition-transform", !collapsed && "rotate-180")} aria-hidden="true" />
         </button>
         {!collapsed && (
             <div className="border-t border-border px-3.5 py-3">
-                <p className="font-semibold text-ink">{displayText(item.text)}</p>
-                <p className="mb-1 text-caption text-muted">{displayText(item.by)}</p>
+                {item.items.length ? (
+                    <ul className="flex flex-col gap-2.5">
+                        {item.items.map((entry, index) => (
+                            <li key={index}>
+                                <p className="font-semibold text-ink">{entry.title || "—"}</p>
+                                {entry.text && <p className="text-body-sm">{entry.text}</p>}
+                                <p className="num text-caption text-muted">
+                                    {[entry.severity && TEXT.HISTORY_SEVERITY(entry.severity), entry.date && TEXT.HISTORY_UPDATED(entry.date)].filter(Boolean).join(" · ")}
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-body-sm text-muted">{TEXT.HISTORY_EMPTY}</p>
+                )}
             </div>
         )}
     </div>

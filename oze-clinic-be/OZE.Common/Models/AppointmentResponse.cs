@@ -27,6 +27,8 @@ namespace OZE.Common.Models
         // Filled when the patient checks in: the room of the doctor's shift, where the patient goes
         public int? RoomId { get; set; }
         public string? RoomName { get; set; }
+        // Number of the open examination queue entry (checked in, not yet done); given at check-in and kept for the day
+        public int? QueueNumber { get; set; }
         public string? CancellationReason { get; set; }
         public string? Notes { get; set; }
         public DateTimeOffset CreatedAt { get; set; }

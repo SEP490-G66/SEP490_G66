@@ -268,6 +268,10 @@ namespace OZE.Common.Constants
             public const string PlanNotCancellable = "This treatment plan is already completed or cancelled. A draft plan is deleted instead.";
             public const string StageStillInProgress = "A treatment stage is still in progress. Please complete it before cancelling the plan.";
             public const string CancelReasonRequired = "Please enter the reason for cancelling the treatment plan.";
+            public const string ExaminationIdRequired = "Examination id is required to create a treatment plan.";
+            public const string CannotCreateNewVersion = "Only proposed, approved, or in-progress treatment plans can be updated with a new version.";
+            public const string StageAlreadyCompleted = "This treatment stage is already completed.";
+            public const string FollowUpAppointmentOrPlanRequired = "Either a previous appointment ID or a treatment plan ID is required.";
         }
         public static class AppointmentMessage
         {
@@ -576,6 +580,8 @@ namespace OZE.Common.Constants
             public const string WorkDoneAmountInvalid = "Work-done amount is invalid.";
             public const string WorkDoneExceedsPaid = "Work-done amount cannot exceed confirmed paid amount.";
             public const string RequestNotPending = "Only pending refund requests can be processed.";
+            public const string RequestNotApproved = "Only approved refund requests can be paid out.";
+            public const string RequestPaidOut = "Refund has been paid out.";
             public const string PendingRequestExists = "A pending refund request already exists for this invoice.";
             public const string PaymentInvalid = "Payment does not belong to this invoice or is not confirmed.";
             public const string RejectionReasonRequired = "Please enter a rejection reason.";

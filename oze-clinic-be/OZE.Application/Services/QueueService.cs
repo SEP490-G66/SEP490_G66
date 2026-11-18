@@ -18,11 +18,14 @@ namespace OZE.Application.Services
     {
         private readonly IQueueRepository _queueRepository;
         private readonly ILogger<QueueService> _logger;
+        private readonly INotificationService? _notifications;
 
-        public QueueService(IQueueRepository queueRepository, ILogger<QueueService> logger)
+        // Notifications are optional so unit tests can build the service without them
+        public QueueService(IQueueRepository queueRepository, ILogger<QueueService> logger, INotificationService? notifications = null)
         {
             _queueRepository = queueRepository;
             _logger = logger;
+            _notifications = notifications;
         }
 
         public async Task<QueueEntry> EnqueueAsync(
@@ -149,6 +152,9 @@ namespace OZE.Application.Services
                     continue;
                 }
 
+                // Saved by the update above; the copy below only builds the answer and must not be saved again
+                _queueRepository.Detach(next);
+
                 next.Status = QueueConstants.Called;
                 next.CalledAt = calledAt;
                 if (roomId.HasValue)
@@ -156,7 +162,9 @@ namespace OZE.Application.Services
                     next.RoomId = roomId.Value;
                 }
 
-                return MapToResponse(next, includePatientDetails: true);
+                var called = MapToResponse(next, includePatientDetails: true);
+                await NotifyCalledAsync(next, called, cancellationToken);
+                return called;
             }
 
             return null;
@@ -188,6 +196,8 @@ namespace OZE.Application.Services
             // Checked again in the update itself: someone else may have called this number a moment ago
             ConditionGuard.Ensure(await _queueRepository.TryMarkCalledAsync(entry.Id, roomId, calledAt, cancellationToken),
                 ErrorConstants.QueueMessage.OnlyWaitingCanBeCalled);
+            // Saved by the update above; the copy below only builds the answer and must not be saved again
+            _queueRepository.Detach(entry);
 
             entry.Status = QueueConstants.Called;
             entry.CalledAt = calledAt;
@@ -196,7 +206,52 @@ namespace OZE.Application.Services
                 entry.RoomId = roomId.Value;
             }
 
-            return MapToResponse(entry, includePatientDetails: true);
+            var response = MapToResponse(entry, includePatientDetails: true);
+            await NotifyCalledAsync(entry, response, cancellationToken);
+            return response;
+        }
+
+        // The patient learns at once that it is their turn; a failed notification never undoes the call
+        private async Task NotifyCalledAsync(QueueEntry entry, QueueEntryResponse called, CancellationToken cancellationToken)
+        {
+            var patientId = entry.Appointment?.PatientId;
+            if (_notifications == null || patientId == null)
+            {
+                return;
+            }
+
+            var number = called.QueueNumber.ToString("D2");
+            var message = string.IsNullOrWhiteSpace(called.RoomName)
+                ? string.Format(NotificationConstants.Text.YourTurnAtDeskMessage, number)
+                : string.Format(NotificationConstants.Text.YourTurnMessage, number, called.RoomName);
+            await NotifyPatientOfEntryAsync(entry, patientId.Value, NotificationConstants.Text.YourTurnTitle, message, cancellationToken);
+        }
+
+        // Called and not there: the patient keeps the number and is called again later
+        private async Task NotifySkippedAsync(QueueEntry entry, CancellationToken cancellationToken)
+        {
+            var patientId = entry.Appointment?.PatientId;
+            if (_notifications == null || patientId == null)
+            {
+                return;
+            }
+
+            var message = string.Format(NotificationConstants.Text.MissedTurnMessage, entry.QueueNumber.ToString("D2"));
+            await NotifyPatientOfEntryAsync(entry, patientId.Value, NotificationConstants.Text.MissedTurnTitle, message, cancellationToken);
+        }
+
+        // A notification never fails the queue action it reports
+        private async Task NotifyPatientOfEntryAsync(QueueEntry entry, int patientId, string title, string message, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _notifications!.NotifyPatientAsync(patientId,
+                    new NotificationContent(title, message, NotificationConstants.Reference.Appointment, entry.AppointmentId.ToString()), cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not notify the patient of queue entry {QueueEntryId}", entry.Id);
+            }
         }
 
         // The examination queue uses the waiting-list order, so "call next" calls the patient shown on top of the
@@ -213,6 +268,39 @@ namespace OZE.Application.Services
                 string.Format(ErrorConstants.AppointmentMessage.ConfigMissing, ConfigKeyConstants.CheckInLateMinutes));
 
             return WaitingOrder.Sort(entries, e => e.Appointment, e => e.SkipCount, lateMinutes);
+        }
+
+        public async Task<QueueEntry?> ReassignAsync(
+            long appointmentId,
+            string queueType,
+            int? roomId,
+            int? assignedStaffId,
+            CancellationToken cancellationToken = default)
+        {
+            var entry = await _queueRepository.GetActiveByAppointmentAndTypeAsync(appointmentId, queueType, cancellationToken);
+            if (entry == null)
+            {
+                return null;
+            }
+
+            entry.RoomId = roomId;
+            entry.AssignedStaffId = assignedStaffId;
+            // Called by the doctor who left: waiting again, now for the new doctor
+            if (entry.Status == QueueConstants.Called)
+            {
+                entry.Status = QueueConstants.Waiting;
+                entry.CalledAt = null;
+            }
+
+            await _queueRepository.UpdateAsync(entry, cancellationToken);
+            _logger.LogInformation("Queue entry {QueueId} of appointment {AppointmentId} moved to staff {StaffId}, keeping number {QueueNumber}",
+                entry.Id, appointmentId, assignedStaffId, entry.QueueNumber);
+            return entry;
+        }
+
+        public Task<QueueEntry?> GetActiveEntryAsync(long appointmentId, string queueType, CancellationToken cancellationToken = default)
+        {
+            return _queueRepository.GetActiveByAppointmentAndTypeAsync(appointmentId, queueType, cancellationToken);
         }
 
         public async Task<bool> IsDoctorOffDutyAsync(int staffId, CancellationToken cancellationToken = default)
@@ -240,6 +328,8 @@ namespace OZE.Application.Services
             // Checked again in the update itself: the patient may have walked in at this very moment
             ConditionGuard.Ensure(await _queueRepository.TryMoveBackAsync(entry.Id, cancellationToken),
                 ErrorConstants.QueueMessage.OnlyCalledCanBeSkipped);
+            // Saved by the update above; the copy below only builds the answer and must not be saved again
+            _queueRepository.Detach(entry);
 
             entry.Status = QueueConstants.Waiting;
             entry.CalledAt = null;
@@ -247,6 +337,7 @@ namespace OZE.Application.Services
             _logger.LogInformation("Queue entry {QueueId} of appointment {AppointmentId} was called and not there, now skipped {SkipCount} time(s)",
                 entry.Id, entry.AppointmentId, entry.SkipCount);
 
+            await NotifySkippedAsync(entry, cancellationToken);
             return MapToResponse(entry, includePatientDetails: true);
         }
 

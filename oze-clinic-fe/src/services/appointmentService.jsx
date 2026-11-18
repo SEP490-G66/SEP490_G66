@@ -52,7 +52,7 @@ const toAppointment = (item) => {
         cancellationReason: item.cancellationReason ?? "",
         examinationId: item.examinationId ?? null,
         examinationStatus: item.examinationStatus ?? null,
-        queue: null,
+        queue: Number.isInteger(item.queueNumber) ? { queueNumber: item.queueNumber } : null,
     };
 };
 

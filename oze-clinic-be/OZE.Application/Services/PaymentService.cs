@@ -168,7 +168,7 @@ namespace OZE.Application.Services
         private Task NotifyPaidAsync(Invoice invoice, Payment payment, CancellationToken cancellationToken) =>
             NotifyAsync(n => n.NotifyPatientAsync(invoice.PatientId,
                 new NotificationContent(NotificationConstants.Text.PaymentConfirmedTitle, string.Format(NotificationConstants.Text.PaymentConfirmedMessage, NotificationFormat.Money(payment.Amount), invoice.InvoiceNumber),
-                    NotificationConstants.Reference.Invoice, invoice.Id.ToString()), cancellationToken));
+                    NotificationConstants.Reference.Payment, payment.Id.ToString()), cancellationToken));
 
         public Task<PaymentResponse> VoidAsync(
             long paymentId,

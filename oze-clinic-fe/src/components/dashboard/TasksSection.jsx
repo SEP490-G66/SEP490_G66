@@ -4,7 +4,7 @@ import DetailLink from "@/components/ui/DetailLink";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { GENERIC_ERROR_MESSAGE, INVOICE_PAYMENT_STATUS, PATIENT_DEBT_STATUS, TREATMENT_PLAN_STATUS } from "@/utils/messages";
-import { ROUTES, getTreatmentPlanRoute } from "@/utils/routes";
+import { getPaymentDebtDetailRoute, getTreatmentPlanRoute } from "@/utils/routes";
 
 const TASK_INVOICE_STATUS = { ...INVOICE_PAYMENT_STATUS, OVERDUE: PATIENT_DEBT_STATUS.overdue };
 
@@ -37,7 +37,7 @@ const describeTask = (task) => {
         statusLabels: TASK_INVOICE_STATUS,
         linkLabel: "Xem công nợ",
         linkContext: task.invoiceNumber,
-        to: ROUTES.PAYMENT_DEBTS,
+        to: getPaymentDebtDetailRoute(task.debtId),
     };
 };
 

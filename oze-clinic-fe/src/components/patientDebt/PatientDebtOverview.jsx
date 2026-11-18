@@ -15,7 +15,7 @@ const Figure = ({ label, value, className }) => (
 
 const PatientDebtOverview = ({ item, h1Ref }) => {
     const progress = debtProgress(item);
-    const full = item.left <= 0;
+    const full = item.due + item.planned <= 0;
     return (
         <section className="card-app p-0">
             <div className="flex flex-wrap justify-between gap-3 px-5 pt-5">
@@ -31,10 +31,11 @@ const PatientDebtOverview = ({ item, h1Ref }) => {
                 </div>
             </div>
             <div className="px-5 py-4">
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <Figure label={PATIENT_DEBT_TEXT.TOTAL} value={item.total} className="text-ink" />
                     <Figure label={PATIENT_DEBT_TEXT.PAID} value={item.paid} className="text-success" />
-                    <Figure label={PATIENT_DEBT_TEXT.LEFT} value={item.left} className={full ? "text-success" : "text-ink"} />
+                    <Figure label={PATIENT_DEBT_TEXT.DUE} value={item.due} className={item.due > 0 ? "text-danger" : "text-ink"} />
+                    <Figure label={PATIENT_DEBT_TEXT.PLANNED} value={item.planned} className="text-ink" />
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                     <div
@@ -52,7 +53,7 @@ const PatientDebtOverview = ({ item, h1Ref }) => {
                     </div>
                     <span className="num text-caption font-semibold text-ink">{progress.percent}%</span>
                 </div>
-                <p className="mt-2 text-muted">{PATIENT_DEBT_TEXT.PAY_RULE(item.rule)}</p>
+                <p className="mt-2 text-muted">{PATIENT_DEBT_TEXT.PAY_NOTE[item.type]}</p>
             </div>
         </section>
     );

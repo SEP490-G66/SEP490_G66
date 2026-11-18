@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { AlertCircle, Receipt } from "lucide-react";
 import StatusDefinitionDrawer from "@/components/medicalRecord/StatusDefinitionDrawer";
 import PatientDebtRefunds from "@/components/patientDebt/PatientDebtRefunds";
+import UnlinkedProfileCard from "@/components/patientDebt/UnlinkedProfileCard";
 import PaymentHistorySummary from "@/components/paymentHistory/PaymentHistorySummary";
 import PaymentHistoryTable from "@/components/paymentHistory/PaymentHistoryTable";
 import PaymentHistoryToolbar from "@/components/paymentHistory/PaymentHistoryToolbar";
@@ -150,6 +151,7 @@ const PaymentHistory = () => {
                 {liveText({ ...view, total: items.length }, hasData)}
             </p>
             {load.status === "loading" && <LoadingSkeleton />}
+            {load.status === "unlinked" && <UnlinkedProfileCard />}
             {load.status === "error" && (
                 <StateBox icon={AlertCircle} title={PAYMENT_HISTORY_TEXT.ERROR_TITLE} text={PAYMENT_HISTORY_TEXT.ERROR_TEXT}>
                     <button id={HISTORY_RETRY_ID} type="button" className="btn btn-secondary mt-3" onClick={retry}>

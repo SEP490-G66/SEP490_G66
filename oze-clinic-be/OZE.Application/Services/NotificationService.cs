@@ -13,11 +13,14 @@ namespace OZE.Application.Services
     {
         private readonly INotificationRepository _repository;
         private readonly ILogger<NotificationService> _logger;
+        private readonly INotificationPusher? _pusher;
 
-        public NotificationService(INotificationRepository repository, ILogger<NotificationService> logger)
+        // The pusher is optional so unit tests can build the service without it
+        public NotificationService(INotificationRepository repository, ILogger<NotificationService> logger, INotificationPusher? pusher = null)
         {
             _repository = repository;
             _logger = logger;
+            _pusher = pusher;
         }
 
         public async Task<NotificationListResponse> GetMineAsync(string userId, NotificationQueryParameters query, CancellationToken cancellationToken = default)
@@ -97,6 +100,7 @@ namespace OZE.Application.Services
 
                 await _repository.AddRangeAsync(notifications, cancellationToken);
                 await _repository.SaveChangesAsync(cancellationToken);
+                await PushAsync(notifications, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -148,6 +152,27 @@ namespace OZE.Application.Services
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Could not find patient {PatientId} to notify for \"{Title}\"", patientId, content.Title);
+            }
+        }
+
+        // Saved already; a page that is not open simply reads it from the list later
+        private async Task PushAsync(List<Notification> notifications, CancellationToken cancellationToken)
+        {
+            if (_pusher == null)
+            {
+                return;
+            }
+
+            foreach (var notification in notifications)
+            {
+                try
+                {
+                    await _pusher.PushAsync(notification.UserId, ToResponse(notification), cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not push notification {NotificationId} to user {UserId}", notification.Id, notification.UserId);
+                }
             }
         }
 

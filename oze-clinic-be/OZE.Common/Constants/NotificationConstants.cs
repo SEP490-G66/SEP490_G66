@@ -49,8 +49,24 @@ namespace OZE.Common.Constants
             public const string FollowUpScheduledTitle = "Lịch hẹn tái khám";
             public const string FollowUpScheduledMessage = "Bạn có lịch hẹn tái khám lúc {0} ngày {1}.";
             public const string FollowUpReminderTitle = "Nhắc lịch tái khám";
+            public const string YourTurnTitle = "Đến lượt bạn";
+            public const string YourTurnMessage = "Số {0}, mời bạn vào {1}.";
+            public const string YourTurnAtDeskMessage = "Số {0}, mời bạn đến quầy lễ tân để được chỉ phòng.";
+            public const string MissedTurnTitle = "Bạn đã lỡ lượt gọi";
+            public const string MissedTurnMessage = "Số {0} đã được gọi khi bạn vắng mặt. Bạn vẫn giữ số và sẽ được gọi lại.";
+            public const string CheckedInTitle = "Check-in thành công";
+            public const string CheckedInMessage = "Số thứ tự của bạn là {0}.";
+            public const string CheckedInWithPlaceMessage = "Số thứ tự của bạn là {0}. Khám với {1}.";
+            public const string MovedToDoctorTitle = "Bạn được chuyển bác sĩ";
+            public const string MovedToDoctorMessage = "Bạn được chuyển sang khám với {0}. Số thứ tự của bạn vẫn là {1}.";
+            public const string AppointmentReminderTitle = "Nhắc lịch hẹn ngày mai";
+            public const string AppointmentReminderMessage = "Bạn có lịch hẹn lúc {0} ngày {1} tại Nha khoa OZE.";
+            public const string ExaminationCompletedTitle = "Đã có phiếu khám";
+            public const string ExaminationCompletedMessage = "Phiếu khám ngày {0} đã có trong Sổ khám bệnh.";
             public const string RefundApprovedTitle = "Yêu cầu hoàn tiền đã được duyệt";
-            public const string RefundApprovedMessage = "Yêu cầu hoàn {0} cho hóa đơn {1} đã được duyệt.";
+            public const string RefundApprovedMessage = "Yêu cầu hoàn {0} cho hóa đơn {1} đã được duyệt. Phòng khám sẽ liên hệ để hoàn tiền cho bạn.";
+            public const string RefundPaidOutTitle = "Đã hoàn tiền";
+            public const string RefundPaidOutMessage = "Phòng khám đã hoàn {0} cho hóa đơn {1}.";
             public const string RefundRejectedTitle = "Yêu cầu hoàn tiền bị từ chối";
             public const string RefundRejectedMessage = "Yêu cầu hoàn tiền cho hóa đơn {0} bị từ chối. Lý do: {1}";
 

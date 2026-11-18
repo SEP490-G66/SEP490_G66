@@ -1,8 +1,6 @@
 import { Search } from "lucide-react";
-import { ArrowLink } from "@/components/patientDebt/PatientDebtCard";
 import { PAYMENT_HISTORY_TEXT } from "@/utils/messages";
 import { HISTORY_RECEIPT_TITLE_ID } from "@/utils/paymentHistory";
-import { getMedicalRecordDetailRoute } from "@/utils/routes";
 import PaymentReceiptPaper from "./PaymentReceiptPaper";
 
 const TITLE_CLASS = "scroll-mt-topbar outline-none focus-visible:shadow-none";
@@ -34,10 +32,6 @@ const PaymentReceipt = ({ receipt, profile, missing, titleRef, onShowLatest }) =
                     </h2>
                     <p className="num text-caption font-medium text-muted">{receipt.date}</p>
                 </div>
-                <ArrowLink to={getMedicalRecordDetailRoute(receipt.id)}>
-                    {PAYMENT_HISTORY_TEXT.MEDICAL_RECORD}
-                    <span className="sr-only">{PAYMENT_HISTORY_TEXT.MEDICAL_RECORD_CONTEXT(receipt.no)}</span>
-                </ArrowLink>
             </div>
             <div className="px-5 py-4">
                 <PaymentReceiptPaper receipt={receipt} profile={profile} />

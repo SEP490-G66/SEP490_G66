@@ -13,6 +13,11 @@ namespace OZE.Application.Interfaces
             long? invoiceId,
             CancellationToken cancellationToken = default);
 
+        Task<int?> GetPatientIdByUserIdAsync(string userId, CancellationToken cancellationToken = default);
+
+        // Every non-cancelled invoice of the patient with its payments, refunds, items, plan and doctor
+        Task<IReadOnlyList<Invoice>> GetPatientInvoicesForRefundAsync(int patientId, CancellationToken cancellationToken = default);
+
         Task<bool> HasPendingForInvoiceAsync(long invoiceId, CancellationToken cancellationToken = default);
 
         Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken = default);

@@ -27,6 +27,33 @@ namespace OZE.Persistence.Repositories
             _context.Invoices.Update(invoice);
         }
 
+        public async Task<IReadOnlyList<Invoice>> GetPatientBillingAsync(int patientId, CancellationToken cancellationToken = default)
+        {
+            return await _context.Invoices
+                .AsNoTracking()
+                .Where(x => x.PatientId == patientId && x.CancelledAt == null && x.PaymentStatus != InvoiceConstants.Cancelled)
+                .Include(x => x.Items)
+                    .ThenInclude(x => x.TreatmentPlanStage)
+                .Include(x => x.Payments)
+                .Include(x => x.RefundAdjustmentRequests)
+                .Include(x => x.InstallmentPlans)
+                    .ThenInclude(x => x.Periods)
+                .Include(x => x.Appointment)
+                    .ThenInclude(x => x!.Doctor)
+                .Include(x => x.Appointment)
+                    .ThenInclude(x => x!.Examination)
+                        .ThenInclude(x => x!.Diagnoses)
+                .Include(x => x.TreatmentPlan)
+                    .ThenInclude(x => x!.Stages)
+                        .ThenInclude(x => x.Service)
+                .Include(x => x.TreatmentPlan)
+                    .ThenInclude(x => x!.CreatedByDoctor)
+                .AsSplitQuery()
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<Invoice?> GetByIdWithDetailsAsync(long id, CancellationToken cancellationToken = default)
         {
             var invoice = await _context.Invoices
