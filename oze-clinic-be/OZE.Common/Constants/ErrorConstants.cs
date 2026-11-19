@@ -175,6 +175,12 @@ namespace OZE.Common.Constants
             public const string ShiftHasAppointments = "Cannot delete this work shift because it has booked appointments. Please move the appointments first";
             public const string CannotUpdateStartedShift = "Cannot update a work shift that has already started or passed";
             public const string ShiftHasAppointmentsCannotChange = "Cannot change staff, date or time of this work shift because it has booked appointments. Please move the appointments first";
+            public const string BulkShiftInvalidRange = "Bulk shift date range is invalid or longer than 62 days";
+            public const string BulkShiftInvalidSlots = "Bulk shift slots are invalid or overlap each other";
+            public const string BulkShiftInvalidStaff = "Bulk shift must include between 1 and 20 unique staff members";
+            public const string BulkShiftInvalidDaysOfWeek = "Bulk shift days of week must be between 0 (Sunday) and 6 (Saturday) and not empty";
+            public const string BulkShiftNothingToCreate = "No valid work shifts to create";
+            public const string BulkShiftBatchOverlap = "This shift overlaps another shift in the same bulk request";
         }
         public static class Common
         {
