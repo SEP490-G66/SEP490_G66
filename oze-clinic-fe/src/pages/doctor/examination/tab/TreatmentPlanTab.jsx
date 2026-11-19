@@ -9,12 +9,13 @@ import PlanServiceList from "@/components/examination/PlanServiceList";
 import PlanSummaryCard from "@/components/examination/PlanSummaryCard";
 import StepActionBar from "@/components/examination/StepActionBar";
 
-const NO_SERVICE_HINT = "Bệnh nhân chỉ đăng ký khám tổng quát, không có dịch vụ cần lập kế hoạch.";
+const NO_SERVICE_HINT = "Chưa có dịch vụ nào trong kế hoạch. Thêm dịch vụ từ danh mục để lập kế hoạch.";
 
 // Once the patient agreed (Approved) the plan is followed, not edited
 const LOCKED_STATUSES = ["Approved", "InProgress", "Completed"];
 
-// Step 3 "Lập kế hoạch điều trị": sessions of each registered service, in treatment order, with the summary.
+// Step 3 "Lập kế hoạch điều trị": sessions of each service to treat, in treatment order, with the summary. The plan starts
+// with the booked services; the doctor adds others from record.planCatalog ([{ serviceId, name }]) in every case.
 // record.plan is the plan of the visit ({ services, planId?, status? }); every change is saved to the backend
 // (treatment plan and its stages) and passed to onPlanChange. record.planTypes: { [serviceId]: [{ id, name, price }] },
 // the service's variants offered as "Loại dịch vụ". The plan is checked (validatePlan) before "Hoàn thành", which asks
@@ -98,11 +99,13 @@ const TreatmentPlanTab = ({ queueId, record, busy = false, onPlanChange, onCompl
                 <fieldset disabled={locked} className="m-0 min-w-0 border-0 p-0">
                     <PlanServiceList
                         services={plan.services}
+                        catalog={record.planCatalog ?? []}
                         typeOptionsOf={typeOptionsOf}
                         expandedIds={expandedIds}
                         errors={errors}
                         onToggle={toggleService}
                         onChange={changeServices}
+                        onAdd={(service) => setExpandedIds((current) => [...current, service.id])}
                     />
                 </fieldset>
                 <div className="lg:sticky lg:top-4">

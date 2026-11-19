@@ -39,7 +39,7 @@ export const roomTypeRole = (roomType) => rolesByRoomType[roomType];
 
 // What the shift is for, as the backend seeds it.
 const assignmentOf = (room) => {
-    if (room.type === RECEPTION_DESK.type) return "Quầy lễ tân";
+    if (room.type === RECEPTION_DESK.type) return "Phòng tiếp tân";
     return room.type === ROOM_TYPES.XRAY ? "Chụp phim" : "Khám & điều trị";
 };
 
