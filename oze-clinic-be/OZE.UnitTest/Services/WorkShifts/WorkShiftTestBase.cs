@@ -6,6 +6,7 @@ using OZE.Common.Constants;
 using OZE.Common.Models;
 using OZE.Domain.Entities;
 using System;
+using System.Collections.Generic;
 
 namespace OZE.UnitTest.Services.WorkShifts
 {
@@ -15,6 +16,7 @@ namespace OZE.UnitTest.Services.WorkShifts
         protected readonly Mock<IWorkShiftRepository> _workShiftRepositoryMock;
         protected readonly Mock<IStaffRepository> _staffRepositoryMock;
         protected readonly Mock<IRoomRepository> _roomRepositoryMock;
+        protected readonly Mock<IAuditLogService> _auditLogServiceMock;
         protected readonly WorkShiftService _service;
 
         protected const string ValidStaffUserId = "staff-user-1";
@@ -27,11 +29,14 @@ namespace OZE.UnitTest.Services.WorkShifts
             _workShiftRepositoryMock = new Mock<IWorkShiftRepository>();
             _staffRepositoryMock = new Mock<IStaffRepository>();
             _roomRepositoryMock = new Mock<IRoomRepository>();
+            _auditLogServiceMock = new Mock<IAuditLogService>();
 
             _service = new WorkShiftService(
                 _workShiftRepositoryMock.Object,
                 _staffRepositoryMock.Object,
-                _roomRepositoryMock.Object);
+                _roomRepositoryMock.Object,
+                notifications: null,
+                auditLogService: _auditLogServiceMock.Object);
         }
 
         protected static DateOnly TodayDate => DateOnly.FromDateTime(ClinicClock.Today);
@@ -135,8 +140,42 @@ namespace OZE.UnitTest.Services.WorkShifts
                 .Returns(Task.CompletedTask);
 
             _workShiftRepositoryMock
+                .Setup(r => r.AddRangeAsync(It.IsAny<IEnumerable<StaffSchedule>>()))
+                .Returns(Task.CompletedTask);
+
+            _workShiftRepositoryMock
                 .Setup(r => r.SaveChangesAsync())
                 .Returns(Task.CompletedTask);
+
+            _auditLogServiceMock
+                .Setup(a => a.LogAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<object?>(),
+                    It.IsAny<object?>(),
+                    It.IsAny<string?>()))
+                .Returns(Task.CompletedTask);
+        }
+
+        protected BulkWorkShiftRequest CreateValidBulkRequest(DateOnly? from = null, DateOnly? to = null)
+        {
+            var fromDate = from ?? TomorrowDate;
+            var toDate = to ?? fromDate.AddDays(6);
+            return new BulkWorkShiftRequest
+            {
+                StaffUserIds = new List<string> { ValidStaffUserId },
+                FromDate = fromDate,
+                ToDate = toDate,
+                DaysOfWeek = new List<int> { (int)fromDate.DayOfWeek },
+                Slots = new List<BulkWorkShiftSlot>
+                {
+                    new() { ShiftStart = new TimeOnly(8, 0), ShiftEnd = new TimeOnly(12, 0) }
+                },
+                RoomId = ValidRoomId,
+                Assignment = "Kham rang tong quat",
+                Note = "Bulk note"
+            };
         }
     }
 }

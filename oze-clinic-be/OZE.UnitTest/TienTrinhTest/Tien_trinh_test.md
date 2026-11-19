@@ -1,11 +1,11 @@
 # Tiến trình Unit Test – Report_5.1_Unit_Test
 
-File theo dõi tiến độ điền báo cáo unit test trên Google Sheet `Report_5.1_Unit_Test` (142 tab). **Làm xong tab nào thì cập nhật dòng của tab đó ngay trong cùng commit.**
+File theo dõi tiến độ điền báo cáo unit test trên Google Sheet `Report_5.1_Unit_Test` (143 tab hàm sau khi thêm OZ-WS-07). **Làm xong tab nào thì cập nhật dòng của tab đó ngay trong cùng commit.**
 
 - Sheet: https://docs.google.com/spreadsheets/d/14Ji9LXKToC5fVQj5RDwWtV1jwaQhX5bUR-UHQSfSAZQ/edit
 - Quy ước điền từng tab: mục [Quy ước](#quy-ước-điền-tab) cuối file.
 - Đặc tả chức năng (danh sách ca cần test ở mục 8 mỗi file): [`docs/chuc-nang/README.md`](../../docs/chuc-nang/README.md)
-- Cập nhật lần cuối: **16/11/2026** – DuongDH
+- Cập nhật lần cuối: **19/11/2026** – DuongDH
 
 ## Ký hiệu trạng thái
 
@@ -29,13 +29,13 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 2 | OZ-ME | 15–19 | 5 | 5 | 0 | 0 | 0 | 0 |
 | 3 | OZ-PAT | 20–26 | 7 | 7 | 0 | 0 | 0 | 0 |
 | 4 | OZ-SVC | 27–35 | 9 | 8 | 0 | 0 | 1 | 0 |
-| 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–60 | 25 | 18 | 0 | 7 | 0 | 0 |
-| 6 | OZ-APPT, OZ-Q | 61–84 | 24 | 0 | 6 | 17 | 1 | 0 |
-| 7 | OZ-EXAM, OZ-IMG, OZ-MR | 85–113 | 29 | 0 | 5 | 22 | 2 | 0 |
-| 8 | OZ-TP, OZ-INV | 114–125 | 12 | 0 | 1 | 7 | 4 | 0 |
-| 9 | OZ-HOME, OZ-CFG, OZ-LEAVE, OZ-NOTIF, OZ-WH | 126–133 | 8 | 0 | 2 | 2 | 4 | 0 |
-| 10 | OZ-SIM | 134–142 | 9 | 0 | 0 | 0 | 0 | 9 |
-| | **Tổng tab hàm** | 4–142 | **139** | **49** | **14** | **55** | **12** | **9** |
+| 5 | OZ-ROOM, OZ-ROLE, OZ-STAFF, OZ-WS, OZ-DS | 36–61 | 26 | 18 | 1 | 7 | 0 | 0 |
+| 6 | OZ-APPT, OZ-Q | 62–85 | 24 | 0 | 6 | 17 | 1 | 0 |
+| 7 | OZ-EXAM, OZ-IMG, OZ-MR | 86–114 | 29 | 0 | 5 | 22 | 2 | 0 |
+| 8 | OZ-TP, OZ-INV | 115–126 | 12 | 0 | 1 | 7 | 4 | 0 |
+| 9 | OZ-HOME, OZ-CFG, OZ-LEAVE, OZ-NOTIF, OZ-WH | 127–134 | 8 | 0 | 2 | 2 | 4 | 0 |
+| 10 | OZ-SIM | 135–143 | 9 | 0 | 0 | 0 | 0 | 9 |
+| | **Tổng tab hàm** | 4–143 | **140** | **49** | **15** | **55** | **12** | **9** |
 
 **Thứ tự đề xuất:** đợt 3 → 4 → 7 (phần chụp phim) → 6 (phần có test) → 0, rồi viết test cho các tab ✍️ theo đợt 2 → 5 → 6 → 7 → 8 → 9.
 
@@ -126,117 +126,118 @@ Cột **Test trong code** đếm số hàm test ở tầng service (mỗi hàm =
 | 54 | UpdateWorkShift | OZ-WS-04 | 0 | ✍️ | | | |
 | 55 | DeleteWorkShift | OZ-WS-05 | 0 | ✍️ | | | |
 | 56 | ReopenShift | OZ-WS-06 | 0 | ✍️ | | | |
-| 57 | GetMySchedule | OZ-DS-01 | 0 | ✍️ | | | |
-| 58 | GetMyShiftDetail | OZ-DS-02 | 0 | ✍️ | | | |
-| 59 | StartShift | OZ-DS-03 | 0 | ✍️ | | | |
-| 60 | EndShift | OZ-DS-04 | 0 | ✍️ | | | Xử lý NO_SHOW khi hết ca |
+| 57 | CreateBulkWorkShift | OZ-WS-07 | WorkShifts/CreateBulkWorkShiftTests: 10 | 📝 | DuongDH | 19/11/2026 | 10 UTCID (2N, 2B, 6A) provisional; thiếu Trait/UTCID comment; JSON handoff đã xuất, chờ điền sheet |
+| 58 | GetMySchedule | OZ-DS-01 | 0 | ✍️ | | | |
+| 59 | GetMyShiftDetail | OZ-DS-02 | 0 | ✍️ | | | |
+| 60 | StartShift | OZ-DS-03 | 0 | ✍️ | | | |
+| 61 | EndShift | OZ-DS-04 | 0 | ✍️ | | | Xử lý NO_SHOW khi hết ca |
 
 ## Đợt 6 – OZ-APPT, OZ-Q (Lịch hẹn, tiếp đón, hàng chờ)
 
 | # | Tab | Mã | Test trong code | Trạng thái | Người làm | Cập nhật | Ghi chú |
 |---|---|---|---|---|---|---|---|
-| 61 | GetBookableServices | OZ-APPT-01 | 0 | ✍️ | | | |
-| 62 | GetAvailableSlots | OZ-APPT-02 | 0 | ✍️ | | | |
-| 63 | BookAsGuest | OZ-APPT-03 | 0 | ✍️ | | | |
-| 64 | BookAsPatient | OZ-APPT-04 | 0 | ✍️ | | | |
-| 65 | CreateWalkIn | OZ-APPT-05 | 0 | ✍️ | | | |
-| 66 | GetAppointments | OZ-APPT-06 | 0 (1) | ✍️ | | | Chỉ có test controller |
-| 67 | GetMyAppointments | OZ-APPT-07 | 0 | ✍️ | | | |
-| 68 | GetAppointmentById | OZ-APPT-08 | 0 (3) | ✍️ | | | Chỉ có test controller |
-| 69 | GetWaitingList | OZ-APPT-09 | Appointments/GetWaitingListTests: 1 | 📝 | | | |
-| 70 | GetNeedsAttention | OZ-APPT-10 | 0 | ✍️ | | | |
-| 71 | ConfirmAppointment | OZ-APPT-11 | 0 | ✍️ | | | |
-| 72 | CancelAppointment | OZ-APPT-12 | Appointments/CancelAppointmentTests: 1 (2) | 📝 | | | Mới có 1 test (hủy lịch tái khám), cần bổ sung |
-| 73 | RescheduleAppointment | OZ-APPT-13 | Appointments/RescheduleAppointmentTests: 1 | 📝 | | | Mới có 1 test (đổi lịch tái khám), cần bổ sung |
-| 74 | CheckInAppointment | OZ-APPT-14 | 0 (1) | ✍️ | | | Test service check-in đã bị bỏ khỏi commit, file sao lưu còn trong scratchpad |
-| 75 | SetPriority | OZ-APPT-15 | 0 | ✍️ | | | |
-| 76 | MarkNoShow | OZ-APPT-16 | 0 | ✍️ | | | |
-| 77 | ReassignDoctor | OZ-APPT-17 | 0 | ✍️ | | | |
-| 78 | StartExamination | OZ-APPT-18 | Appointments/StartExaminationTests: 9 (2) | 📝 | | | |
-| 79 | CompleteExamination | OZ-APPT-19 | Appointments/CompleteExaminationTests: 4 | 📝 | | | |
-| 80 | StaffProxyBooking | OZ-APPT-20 | 0 | ⛔ | | | Lễ tân đặt hộ chưa có API |
-| 81 | GetQueue | OZ-Q-01 | 0 | ✍️ | | | |
-| 82 | CallNext | OZ-Q-02 | Queue/CallNextTests: 6 | 📝 | HiepNX | 11/11/2026 | Gọi tiếp dùng chung thứ tự với danh sách chờ (WaitingOrder); chờ điền sheet |
-| 83 | CallQueueEntry | OZ-Q-03 | 0 | ✍️ | | | |
-| 84 | SkipQueueEntry | OZ-Q-04 | 0 | ✍️ | | | |
+| 62 | GetBookableServices | OZ-APPT-01 | 0 | ✍️ | | | |
+| 63 | GetAvailableSlots | OZ-APPT-02 | 0 | ✍️ | | | |
+| 64 | BookAsGuest | OZ-APPT-03 | 0 | ✍️ | | | |
+| 65 | BookAsPatient | OZ-APPT-04 | 0 | ✍️ | | | |
+| 66 | CreateWalkIn | OZ-APPT-05 | 0 | ✍️ | | | |
+| 67 | GetAppointments | OZ-APPT-06 | 0 (1) | ✍️ | | | Chỉ có test controller |
+| 68 | GetMyAppointments | OZ-APPT-07 | 0 | ✍️ | | | |
+| 69 | GetAppointmentById | OZ-APPT-08 | 0 (3) | ✍️ | | | Chỉ có test controller |
+| 70 | GetWaitingList | OZ-APPT-09 | Appointments/GetWaitingListTests: 1 | 📝 | | | |
+| 71 | GetNeedsAttention | OZ-APPT-10 | 0 | ✍️ | | | |
+| 72 | ConfirmAppointment | OZ-APPT-11 | 0 | ✍️ | | | |
+| 73 | CancelAppointment | OZ-APPT-12 | Appointments/CancelAppointmentTests: 1 (2) | 📝 | | | Mới có 1 test (hủy lịch tái khám), cần bổ sung |
+| 74 | RescheduleAppointment | OZ-APPT-13 | Appointments/RescheduleAppointmentTests: 1 | 📝 | | | Mới có 1 test (đổi lịch tái khám), cần bổ sung |
+| 75 | CheckInAppointment | OZ-APPT-14 | 0 (1) | ✍️ | | | Test service check-in đã bị bỏ khỏi commit, file sao lưu còn trong scratchpad |
+| 76 | SetPriority | OZ-APPT-15 | 0 | ✍️ | | | |
+| 77 | MarkNoShow | OZ-APPT-16 | 0 | ✍️ | | | |
+| 78 | ReassignDoctor | OZ-APPT-17 | 0 | ✍️ | | | |
+| 79 | StartExamination | OZ-APPT-18 | Appointments/StartExaminationTests: 9 (2) | 📝 | | | |
+| 80 | CompleteExamination | OZ-APPT-19 | Appointments/CompleteExaminationTests: 4 | 📝 | | | |
+| 81 | StaffProxyBooking | OZ-APPT-20 | 0 | ⛔ | | | Lễ tân đặt hộ chưa có API |
+| 82 | GetQueue | OZ-Q-01 | 0 | ✍️ | | | |
+| 83 | CallNext | OZ-Q-02 | Queue/CallNextTests: 6 | 📝 | HiepNX | 11/11/2026 | Gọi tiếp dùng chung thứ tự với danh sách chờ (WaitingOrder); chờ điền sheet |
+| 84 | CallQueueEntry | OZ-Q-03 | 0 | ✍️ | | | |
+| 85 | SkipQueueEntry | OZ-Q-04 | 0 | ✍️ | | | |
 
 ## Đợt 7 – OZ-EXAM, OZ-IMG, OZ-MR (Khám bệnh, chụp phim, hồ sơ bệnh án)
 
 | # | Tab | Mã | Test trong code | Trạng thái | Người làm | Cập nhật | Ghi chú |
 |---|---|---|---|---|---|---|---|
-| 85 | GetExamination | OZ-EXAM-01 | 0 | ✍️ | | | `ExaminationService` chưa có test |
-| 86 | UpdateExamContent | OZ-EXAM-02 | 0 | ✍️ | | | |
-| 87 | AddExamService | OZ-EXAM-03 | 0 | ✍️ | | | |
-| 88 | UpdateExamService | OZ-EXAM-04 | 0 | ✍️ | | | |
-| 89 | RemoveExamService | OZ-EXAM-05 | 0 | ✍️ | | | |
-| 90 | GetDentalChart | OZ-EXAM-06 | 0 | ✍️ | | | |
-| 91 | SetTooth | OZ-EXAM-07 | 0 | ✍️ | | | |
-| 92 | RemoveToothChange | OZ-EXAM-08 | 0 | ✍️ | | | |
-| 93 | GetPrescription | OZ-EXAM-09 | 0 | ✍️ | | | |
-| 94 | SavePrescriptionNotes | OZ-EXAM-10 | 0 | ✍️ | | | |
-| 95 | AddPrescriptionItem | OZ-EXAM-11 | 0 | ✍️ | | | |
-| 96 | UpdatePrescriptionItem | OZ-EXAM-12 | 0 | ✍️ | | | |
-| 97 | DeletePrescriptionItem | OZ-EXAM-13 | 0 | ✍️ | | | |
-| 98 | DeletePrescription | OZ-EXAM-14 | 0 | ✍️ | | | |
-| 99 | FinalizePrescription | OZ-EXAM-15 | 0 | ✍️ | | | |
-| 100 | ReopenPrescription | OZ-EXAM-16 | 0 | ✍️ | | | |
-| 101 | AddDiagnosis | OZ-EXAM-17 | 0 | ✍️ | | | |
-| 102 | UpdateDiagnosis | OZ-EXAM-18 | 0 | ✍️ | | | |
-| 103 | DeleteDiagnosis | OZ-EXAM-19 | 0 | ✍️ | | | |
-| 104 | AddClinicalAddendum | OZ-EXAM-20 | 0 | ⛔ | | | Phụ lục sau khóa phiếu chưa có API |
-| 105 | CreateImagingRequest | OZ-IMG-01 | Imaging/CreateImagingRequestTests: 7 | 📝 | | | |
-| 106 | GetImagingByExam | OZ-IMG-02 | Imaging/GetImagingByExamTests: 4 | 📝 | | | |
-| 107 | GetImagingById | OZ-IMG-03 | Imaging/GetImagingByIdTests: 3 | 📝 | | | |
-| 108 | GetImagingQueue | OZ-IMG-04 | Imaging/GetImagingQueueTests: 2 | 📝 | | | |
-| 109 | CancelImagingRequest | OZ-IMG-05 | Imaging/CancelImagingRequestTests: 5 | 📝 | | | |
-| 110 | CompleteImagingRequest | OZ-IMG-06 | 0 | ✍️ | | | |
-| 111 | UploadImagingResult | OZ-IMG-07 | 0 | ⛔ | | | Chưa có API tải ảnh |
-| 112 | GetPatientRecord | OZ-MR-01 | 0 | ✍️ | | | `MedicalRecordService` chưa có test |
-| 113 | GetExamDetail | OZ-MR-02 | 0 | ✍️ | | | |
+| 86 | GetExamination | OZ-EXAM-01 | 0 | ✍️ | | | `ExaminationService` chưa có test |
+| 87 | UpdateExamContent | OZ-EXAM-02 | 0 | ✍️ | | | |
+| 88 | AddExamService | OZ-EXAM-03 | 0 | ✍️ | | | |
+| 89 | UpdateExamService | OZ-EXAM-04 | 0 | ✍️ | | | |
+| 90 | RemoveExamService | OZ-EXAM-05 | 0 | ✍️ | | | |
+| 91 | GetDentalChart | OZ-EXAM-06 | 0 | ✍️ | | | |
+| 92 | SetTooth | OZ-EXAM-07 | 0 | ✍️ | | | |
+| 93 | RemoveToothChange | OZ-EXAM-08 | 0 | ✍️ | | | |
+| 94 | GetPrescription | OZ-EXAM-09 | 0 | ✍️ | | | |
+| 95 | SavePrescriptionNotes | OZ-EXAM-10 | 0 | ✍️ | | | |
+| 96 | AddPrescriptionItem | OZ-EXAM-11 | 0 | ✍️ | | | |
+| 97 | UpdatePrescriptionItem | OZ-EXAM-12 | 0 | ✍️ | | | |
+| 98 | DeletePrescriptionItem | OZ-EXAM-13 | 0 | ✍️ | | | |
+| 99 | DeletePrescription | OZ-EXAM-14 | 0 | ✍️ | | | |
+| 100 | FinalizePrescription | OZ-EXAM-15 | 0 | ✍️ | | | |
+| 101 | ReopenPrescription | OZ-EXAM-16 | 0 | ✍️ | | | |
+| 102 | AddDiagnosis | OZ-EXAM-17 | 0 | ✍️ | | | |
+| 103 | UpdateDiagnosis | OZ-EXAM-18 | 0 | ✍️ | | | |
+| 104 | DeleteDiagnosis | OZ-EXAM-19 | 0 | ✍️ | | | |
+| 105 | AddClinicalAddendum | OZ-EXAM-20 | 0 | ⛔ | | | Phụ lục sau khóa phiếu chưa có API |
+| 106 | CreateImagingRequest | OZ-IMG-01 | Imaging/CreateImagingRequestTests: 7 | 📝 | | | |
+| 107 | GetImagingByExam | OZ-IMG-02 | Imaging/GetImagingByExamTests: 4 | 📝 | | | |
+| 108 | GetImagingById | OZ-IMG-03 | Imaging/GetImagingByIdTests: 3 | 📝 | | | |
+| 109 | GetImagingQueue | OZ-IMG-04 | Imaging/GetImagingQueueTests: 2 | 📝 | | | |
+| 110 | CancelImagingRequest | OZ-IMG-05 | Imaging/CancelImagingRequestTests: 5 | 📝 | | | |
+| 111 | CompleteImagingRequest | OZ-IMG-06 | 0 | ✍️ | | | |
+| 112 | UploadImagingResult | OZ-IMG-07 | 0 | ⛔ | | | Chưa có API tải ảnh |
+| 113 | GetPatientRecord | OZ-MR-01 | 0 | ✍️ | | | `MedicalRecordService` chưa có test |
+| 114 | GetExamDetail | OZ-MR-02 | 0 | ✍️ | | | |
 
 ## Đợt 8 – OZ-TP, OZ-INV (Kế hoạch điều trị, hóa đơn)
 
 | # | Tab | Mã | Test trong code | Trạng thái | Người làm | Cập nhật | Ghi chú |
 |---|---|---|---|---|---|---|---|
-| 114 | GetTpProgress | OZ-TP-01 | 0 | ✍️ | | | `TreatmentPlanService` chưa có test |
-| 115 | StartTpStage | OZ-TP-02 | 0 | ✍️ | | | |
-| 116 | UpdateTpStage | OZ-TP-03 | 0 | ✍️ | | | |
-| 117 | CompleteTpStage | OZ-TP-04 | 0 | ✍️ | | | |
-| 118 | CreateTreatmentPlan | OZ-TP-05 | 0 | ✍️ | | | API đã có (`POST api/examinations/{id}/treatment-plans`) |
-| 119 | ConfirmTreatmentPlan | OZ-TP-06 | 0 | ✍️ | | | Ứng với `propose` + `approve` |
-| 120 | VersionTreatmentPlan | OZ-TP-07 | 0 | ⛔ | | | Phiên bản kế hoạch chưa làm |
-| 121 | CreateInvoice | OZ-INV-01 | 0 | ✍️ | | | Code còn thiếu kiểm tra BR-PAY-01..03 |
-| 122 | GetInvoice | OZ-INV-02 | 0 | ⛔ | | | |
-| 123 | CreatePayment | OZ-INV-03 | 2 | 📝 | HiepNX | 11/11/2026 | Invoices/RecordPaymentTests: khoản thu chỉ cộng một lần (lỗi cộng đôi PaidAmount đã sửa) |
-| 124 | RequestRefund | OZ-INV-04 | 0 | ⛔ | | | |
-| 125 | ApproveRefund | OZ-INV-05 | 0 | ⛔ | | | |
+| 115 | GetTpProgress | OZ-TP-01 | 0 | ✍️ | | | `TreatmentPlanService` chưa có test |
+| 116 | StartTpStage | OZ-TP-02 | 0 | ✍️ | | | |
+| 117 | UpdateTpStage | OZ-TP-03 | 0 | ✍️ | | | |
+| 118 | CompleteTpStage | OZ-TP-04 | 0 | ✍️ | | | |
+| 119 | CreateTreatmentPlan | OZ-TP-05 | 0 | ✍️ | | | API đã có (`POST api/examinations/{id}/treatment-plans`) |
+| 120 | ConfirmTreatmentPlan | OZ-TP-06 | 0 | ✍️ | | | Ứng với `propose` + `approve` |
+| 121 | VersionTreatmentPlan | OZ-TP-07 | 0 | ⛔ | | | Phiên bản kế hoạch chưa làm |
+| 122 | CreateInvoice | OZ-INV-01 | 0 | ✍️ | | | Code còn thiếu kiểm tra BR-PAY-01..03 |
+| 123 | GetInvoice | OZ-INV-02 | 0 | ⛔ | | | |
+| 124 | CreatePayment | OZ-INV-03 | 2 | 📝 | HiepNX | 11/11/2026 | Invoices/RecordPaymentTests: khoản thu chỉ cộng một lần (lỗi cộng đôi PaidAmount đã sửa) |
+| 125 | RequestRefund | OZ-INV-04 | 0 | ⛔ | | | |
+| 126 | ApproveRefund | OZ-INV-05 | 0 | ⛔ | | | |
 
 ## Đợt 9 – Khác: trang chủ, cấu hình, nghỉ phép, thông báo, webhook
 
 | # | Tab | Mã | Test trong code | Trạng thái | Người làm | Cập nhật | Ghi chú |
 |---|---|---|---|---|---|---|---|
-| 126 | GetHome | OZ-HOME-01 | 0 | ✍️ | | | |
-| 127 | GetSystemConfig | OZ-CFG-01 | 0 | ⛔ | | | |
-| 128 | UpdateSystemConfig | OZ-CFG-02 | 0 | ⛔ | | | |
-| 129 | CreateLeaveRequest | OZ-LEAVE-01 | 6 | 📝 | HiepNX | 11/11/2026 | API đã làm: gửi, rút đơn (LeaveRequests/CreateLeaveRequestTests) |
-| 130 | ApproveLeaveRequest | OZ-LEAVE-02 | 6 | 📝 | HiepNX | 11/11/2026 | API đã làm: duyệt có/không người thay, từ chối (LeaveRequests/ApproveLeaveRequestTests) |
-| 131 | GetNotifications | OZ-NOTIF-01 | 0 | ⛔ | | | |
-| 132 | MarkNotifRead | OZ-NOTIF-02 | 0 | ⛔ | | | |
-| 133 | ImagingSimWebhook | OZ-WH-01 | 0 | ✍️ | | | |
+| 127 | GetHome | OZ-HOME-01 | 0 | ✍️ | | | |
+| 128 | GetSystemConfig | OZ-CFG-01 | 0 | ⛔ | | | |
+| 129 | UpdateSystemConfig | OZ-CFG-02 | 0 | ⛔ | | | |
+| 130 | CreateLeaveRequest | OZ-LEAVE-01 | 6 | 📝 | HiepNX | 11/11/2026 | API đã làm: gửi, rút đơn (LeaveRequests/CreateLeaveRequestTests) |
+| 131 | ApproveLeaveRequest | OZ-LEAVE-02 | 6 | 📝 | HiepNX | 11/11/2026 | API đã làm: duyệt có/không người thay, từ chối (LeaveRequests/ApproveLeaveRequestTests) |
+| 132 | GetNotifications | OZ-NOTIF-01 | 0 | ⛔ | | | |
+| 133 | MarkNotifRead | OZ-NOTIF-02 | 0 | ⛔ | | | |
+| 134 | ImagingSimWebhook | OZ-WH-01 | 0 | ✍️ | | | |
 
 ## Đợt 10 – OZ-SIM (Máy chụp giả lập, repo `oze-xray-simulator`)
 
 | # | Tab | Mã | Test trong code | Trạng thái | Người làm | Cập nhật | Ghi chú |
 |---|---|---|---|---|---|---|---|
-| 134 | StartCapture | OZ-SIM-01 | Chưa kiểm tra | 🔗 | | | |
-| 135 | GetCapture | OZ-SIM-02 | Chưa kiểm tra | 🔗 | | | |
-| 136 | CancelCapture | OZ-SIM-03 | Chưa kiểm tra | 🔗 | | | |
-| 137 | ListCaptureImages | OZ-SIM-04 | Chưa kiểm tra | 🔗 | | | |
-| 138 | GetCaptureImage | OZ-SIM-05 | Chưa kiểm tra | 🔗 | | | |
-| 139 | ListDevices | OZ-SIM-06 | Chưa kiểm tra | 🔗 | | | |
-| 140 | GetDevice | OZ-SIM-07 | Chưa kiểm tra | 🔗 | | | |
-| 141 | DemoSetDeviceState | OZ-SIM-08 | Chưa kiểm tra | 🔗 | | | |
-| 142 | DemoInjectFault | OZ-SIM-09 | Chưa kiểm tra | 🔗 | | | |
+| 135 | StartCapture | OZ-SIM-01 | Chưa kiểm tra | 🔗 | | | |
+| 136 | GetCapture | OZ-SIM-02 | Chưa kiểm tra | 🔗 | | | |
+| 137 | CancelCapture | OZ-SIM-03 | Chưa kiểm tra | 🔗 | | | |
+| 138 | ListCaptureImages | OZ-SIM-04 | Chưa kiểm tra | 🔗 | | | |
+| 139 | GetCaptureImage | OZ-SIM-05 | Chưa kiểm tra | 🔗 | | | |
+| 140 | ListDevices | OZ-SIM-06 | Chưa kiểm tra | 🔗 | | | |
+| 141 | GetDevice | OZ-SIM-07 | Chưa kiểm tra | 🔗 | | | |
+| 142 | DemoSetDeviceState | OZ-SIM-08 | Chưa kiểm tra | 🔗 | | | |
+| 143 | DemoInjectFault | OZ-SIM-09 | Chưa kiểm tra | 🔗 | | | |
 
 ## Có test hoặc API nhưng chưa có tab trên sheet
 
@@ -322,6 +323,7 @@ Cần thêm tab (copy một tab mẫu, thêm dòng vào MethodList và Statistic
 | 13/11/2026 | HungPVA | OZ-WS-01 CreateWorkShift: ✍️→✅. Viết 13 unit test service (3N, 3B, 7A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-01` → 13 Passed. Điền sheet CreateWorkShift. |
 | 14/11/2026 | HungPVA | OZ-WS-02 GetWorkShifts: ✍️→✅. Viết 12 unit test service (7N, 3B, 2A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-02` → 12 Passed. Điền sheet GetWorkShifts. |
 | 14/11/2026 | HungPVA | OZ-WS-03 GetWorkShiftById: ✍️→✅. Viết 7 unit test service (4N, 2B, 1A) và 2 test controller. `dotnet test --filter Tab=OZ-WS-03` → 7 Passed. Điền sheet GetWorkShiftById. |
+| 19/11/2026 | DuongDH | OZ-WS-07 CreateBulkWorkShift: thêm tracking (chức năng bulk mới). Service tests đã có 10 UTCID (2N, 2B, 6A, provisional). `dotnet test --filter FullyQualifiedName~CreateBulkWorkShiftTests` → 10 Passed. Xuất JSON handoff; trạng thái 📝 chờ điền sheet. |
 
 ---
 
