@@ -12,7 +12,8 @@ import { call } from "./receptionService";
 // - api/Staff: name, role and phone of each person, and who can be put on a shift
 // - api/leave-requests (Approved): who is on leave. Approving a leave with a substitute moves the shifts to the
 //   substitute; without one the shift stays with the person, marked absent.
-// Copying a week and the monthly schedule are made of single create calls, one per shift.
+// Copying a week still uses single create calls. Monthly schedule uses POST /api/work-shifts/bulk
+// (preview + create), one request per (room, slot) group from the weekly pattern.
 
 const WEEK_MS = 7 * 86_400_000;
 const LEAVE_PAGE_SIZE = 100;
@@ -73,6 +74,12 @@ const MESSAGES = {
     "Cannot update a work shift that has already started or passed": "Ca này đã bắt đầu, không thể thay đổi.",
     "Cannot change staff, date or time of this work shift because it has booked appointments. Please move the appointments first":
         "Ca này đã có lịch hẹn nên không đổi được người. Hãy chuyển các lịch hẹn trước.",
+    "Bulk shift date range is invalid or longer than 62 days": "Khoảng ngày không hợp lệ hoặc dài hơn 62 ngày.",
+    "Bulk shift slots are invalid or overlap each other": "Các khung giờ không hợp lệ hoặc bị chồng nhau.",
+    "Bulk shift must include between 1 and 20 unique staff members": "Cần chọn từ 1 đến 20 nhân viên, không trùng.",
+    "Bulk shift days of week must be between 0 (Sunday) and 6 (Saturday) and not empty": "Ngày trong tuần không hợp lệ.",
+    "No valid work shifts to create": "Không có ca hợp lệ để tạo.",
+    "This shift overlaps another shift in the same bulk request": "Ca này trùng với ca khác trong cùng lần xếp.",
 };
 
 const toVietnamese = (message) => MESSAGES[message] ?? message ?? GENERIC_ERROR;
@@ -441,76 +448,181 @@ export const roomsForRole = (rooms, role) => rooms.filter((room) => roomTypeRole
 // Key for a calendar cell / deselection: "yyyy-mm-dd|morning"
 export const monthlyShiftKey = (date, slot) => `${date}|${slot}`;
 
-// Monthly schedule for one person. pattern[weekday][slot] = room id or "" (not working), weekday 0 = Monday.
-// Days the person is on approved leave and places someone else already has are skipped.
-// Returns { created, skippedLeave, conflicts, items }. dryRun = true builds items without saving.
-// excludeKeys: optional list of monthlyShiftKey(...) the manager unchecked on the calendar preview.
+// FE weekday 0=Mon … 6=Sun → .NET DayOfWeek 0=Sun … 6=Sat (bulk API).
+const toBulkDayOfWeek = (feWeekday) => (feWeekday + 1) % 7;
+
+const hhmmOnly = (value) => {
+    if (value == null) return "";
+    const text = String(value);
+    return text.length >= 5 ? text.slice(0, 5) : text;
+};
+
+const dateOnlyOf = (value) => {
+    if (value == null) return "";
+    if (typeof value === "string") return value.slice(0, 10);
+    return String(value).slice(0, 10);
+};
+
+// Bulk API accepts one roomId per request; the monthly form can pick a different room per weekday/slot.
+// Group as one request per (room, slot) with the weekdays that use that room for that slot.
+const buildMonthlyBulkGroups = (pattern, rooms) => {
+    const roomById = (id) => rooms.find((room) => String(room.id) === String(id));
+    const groups = new Map();
+    pattern.forEach((dayPattern, feWeekday) => {
+        SHIFT_SLOT_OPTIONS.forEach((slot) => {
+            const selected = dayPattern?.[slot.value];
+            if (!selected) return;
+            const room = roomById(selected);
+            if (!room) return;
+            const apiRoomId = room.id === RECEPTION_DESK.id ? null : Number(room.id);
+            const key = `${apiRoomId ?? "reception"}|${slot.value}`;
+            if (!groups.has(key)) {
+                groups.set(key, { room, apiRoomId, slot, daysOfWeek: new Set() });
+            }
+            groups.get(key).daysOfWeek.add(toBulkDayOfWeek(feWeekday));
+        });
+    });
+    return [...groups.values()];
+};
+
+const toBulkBody = ({ staffId, from, to, group, skippedItems }) => ({
+    staffUserIds: [staffId],
+    fromDate: from,
+    toDate: to,
+    daysOfWeek: [...group.daysOfWeek],
+    slots: [{ shiftStart: `${group.slot.start}:00`, shiftEnd: `${group.slot.end}:00` }],
+    roomId: group.apiRoomId,
+    assignment: assignmentOf(group.room),
+    skippedItems: skippedItems?.length ? skippedItems : undefined,
+});
+
+const mapBulkPreviewItem = (item, rooms) => {
+    const date = dateOnlyOf(item.scheduleDate);
+    const start = hhmmOnly(item.shiftStart);
+    const end = hhmmOnly(item.shiftEnd);
+    const slot = slotOfTime(`${start}:00`);
+    const slotOption = slotOf(slot);
+    const room =
+        item.roomId == null
+            ? RECEPTION_DESK
+            : (rooms.find((entry) => String(entry.id) === String(item.roomId)) ?? { id: item.roomId, name: `Phòng ${item.roomId}` });
+    return {
+        key: monthlyShiftKey(date, slot),
+        date,
+        slot,
+        slotLabel: slot === SHIFT_SLOTS.MORNING ? "Sáng" : "Chiều",
+        start: slotOption.start,
+        end: slotOption.end,
+        roomId: room.id,
+        roomName: room.name,
+        valid: Boolean(item.valid),
+        reason: item.valid ? null : toVietnamese(item.reason),
+    };
+};
+
+const skippedItemFromKey = (staffId, key) => {
+    const [date, slot] = key.split("|");
+    const slotOption = slotOf(slot);
+    if (!date || !slotOption) return null;
+    return { staffUserId: staffId, scheduleDate: date, shiftStart: `${slotOption.start}:00` };
+};
+
+// Monthly schedule via bulk APIs (preview + create). Still one person + weekly room pattern on the form.
+// dryRun → POST /api/work-shifts/bulk/preview (one call per room×slot group), merged into calendar items.
+// create → POST /api/work-shifts/bulk with skippedItems for deselected chips and leave slots.
 export const createMonthlyShifts = async ({ staffId, staffName, rooms, from, to, pattern, dryRun = false, excludeKeys = [] }) => {
     if (!staffId) return { success: false, message: null, data: null, errors: { staffId: "Vui lòng chọn nhân viên." } };
     if (!from || !to || from > to) return { success: false, message: null, data: null, errors: { to: "Đến ngày phải sau Từ ngày." } };
 
-    const { failed, data } = await loadAll([loadShifts(from, to), loadLeaves(from, to)]);
-    if (failed) return failed;
-    const [shifts, leaves] = data;
-    const roomById = (id) => rooms.find((room) => String(room.id) === String(id));
-    const excluded = new Set(excludeKeys);
-
-    const result = { created: 0, skippedLeave: [], conflicts: [], items: [] };
-    const bodies = [];
-    for (let day = parseDay(from); toDateOnly(day) <= to; day = addDays(day, 1)) {
-        const date = toDateOnly(day);
-        for (const slot of SHIFT_SLOT_OPTIONS) {
-            const room = roomById(pattern[weekdayOf(date)]?.[slot.value]);
-            if (!room || !isFuture(date, slot.start)) continue;
-
-            const base = {
-                key: monthlyShiftKey(date, slot.value),
-                date,
-                slot: slot.value,
-                slotLabel: slot.value === SHIFT_SLOTS.MORNING ? "Sáng" : "Chiều",
-                start: slot.start,
-                end: slot.end,
-                roomId: room.id,
-                roomName: room.name,
-            };
-
-            if (leaveOf(leaves, staffId, date, slot.value)) {
-                result.skippedLeave.push(date);
-                result.items.push({ ...base, valid: false, reason: "Nghỉ phép" });
-                continue;
-            }
-            const sameSlot = shiftsAt(shifts, date, slot.value);
-            const own = sameSlot.find((shift) => shift.staffUserId === staffId);
-            if (own) {
-                const reason = `đã có ca ở ${own.roomName ?? RECEPTION_DESK.name}`;
-                if (String(roomIdOf(own)) !== String(room.id)) result.conflicts.push({ date, slot: slot.value, reason });
-                result.items.push({ ...base, valid: false, reason });
-                continue;
-            }
-            const other = room.id === RECEPTION_DESK.id ? null : sameSlot.find((shift) => String(roomIdOf(shift)) === String(room.id));
-            if (other) {
-                const reason = `${room.name} đã có ${displayName(other.staffName)}`;
-                result.conflicts.push({ date, slot: slot.value, reason });
-                result.items.push({ ...base, valid: false, reason });
-                continue;
-            }
-            result.items.push({ ...base, valid: true, reason: null });
-            if (!excluded.has(base.key)) bodies.push(toApiShift({ staffId, date, slot: slot.value, room }));
-        }
-    }
-
-    if (dryRun) {
+    const groups = buildMonthlyBulkGroups(pattern, rooms);
+    if (groups.length === 0) {
         return {
             success: true,
             message: null,
             errors: null,
-            data: { ...result, created: result.items.filter((item) => item.valid).length },
+            data: { created: 0, skippedLeave: [], conflicts: [], items: [] },
         };
     }
 
-    const { created, refused } = await createShifts(bodies);
-    result.created = created;
-    refused.forEach(({ body, reason }) => result.conflicts.push({ date: body.scheduleDate, slot: slotOfTime(body.shiftStart), reason }));
-    const skipped = refused.length > 0 ? ` ${refused.length} ca không tạo được.` : "";
-    return { success: true, errors: null, data: result, message: `Đã tạo ${created} ca cho ${staffName}.${skipped}` };
+    const leavesResult = await loadLeaves(from, to);
+    if (!leavesResult.success) return leavesResult;
+    const leaves = leavesResult.data;
+
+    if (dryRun) {
+        const itemsByKey = new Map();
+        for (const group of groups) {
+            const preview = await call(() => api.post("/api/work-shifts/bulk/preview", toBulkBody({ staffId, from, to, group })));
+            if (!preview.success) return { ...preview, message: toVietnamese(preview.message), errors: { form: toVietnamese(preview.message) } };
+            (preview.data?.items ?? []).forEach((raw) => {
+                const mapped = mapBulkPreviewItem(raw, rooms);
+                itemsByKey.set(mapped.key, mapped);
+            });
+        }
+
+        const skippedLeave = [];
+        const conflicts = [];
+        const items = [...itemsByKey.values()].map((item) => {
+            if (item.valid && leaveOf(leaves, staffId, item.date, item.slot)) {
+                skippedLeave.push(item.date);
+                return { ...item, valid: false, reason: "Nghỉ phép" };
+            }
+            if (!item.valid) conflicts.push({ date: item.date, slot: item.slot, reason: item.reason });
+            return item;
+        });
+
+        return {
+            success: true,
+            message: null,
+            errors: null,
+            data: {
+                created: items.filter((item) => item.valid).length,
+                skippedLeave,
+                conflicts,
+                items,
+            },
+        };
+    }
+
+    const leaveSkipKeys = [];
+    for (let day = parseDay(from); toDateOnly(day) <= to; day = addDays(day, 1)) {
+        const date = toDateOnly(day);
+        for (const slot of SHIFT_SLOT_OPTIONS) {
+            if (leaveOf(leaves, staffId, date, slot.value)) leaveSkipKeys.push(monthlyShiftKey(date, slot.value));
+        }
+    }
+
+    const skippedItems = [...new Set([...excludeKeys, ...leaveSkipKeys])]
+        .map((key) => skippedItemFromKey(staffId, key))
+        .filter(Boolean);
+
+    let created = 0;
+    let hardFailure = null;
+
+    for (const group of groups) {
+        const result = await call(() => api.post("/api/work-shifts/bulk", toBulkBody({ staffId, from, to, group, skippedItems })));
+        if (result.success) {
+            created += result.data?.createdCount ?? 0;
+            continue;
+        }
+        if (result.message === "No valid work shifts to create") continue;
+        hardFailure = result;
+        break;
+    }
+
+    if (hardFailure) {
+        return { ...hardFailure, message: toVietnamese(hardFailure.message), errors: { form: toVietnamese(hardFailure.message) } };
+    }
+
+    // conflicts left empty: bulk also returns known preview-invalids in skipped; popup lists those from previewItems.
+    return {
+        success: true,
+        errors: null,
+        data: {
+            created,
+            skippedLeave: leaveSkipKeys.map((key) => key.split("|")[0]),
+            conflicts: [],
+            items: [],
+        },
+        message: `Đã tạo ${created} ca cho ${staffName}.`,
+    };
 };
