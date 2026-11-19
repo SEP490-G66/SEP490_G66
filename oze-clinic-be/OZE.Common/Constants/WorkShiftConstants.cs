@@ -14,5 +14,10 @@ namespace OZE.Common.Constants
 
         // A doctor can start a shift this long before it is due to begin, until it is over
         public const int ClockInEarlyMinutes = 30;
+
+        // Bulk create (F-ADM-09): max inclusive span between fromDate and toDate
+        public const int MaxBulkRangeDays = 62;
+        public const int MaxBulkStaffCount = 20;
+        public const int MaxBulkSlotCount = 3;
     }
 }

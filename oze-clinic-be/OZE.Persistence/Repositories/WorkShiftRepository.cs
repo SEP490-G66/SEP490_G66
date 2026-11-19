@@ -19,9 +19,14 @@ namespace OZE.Persistence.Repositories
         {
             context = _context;
         }
-            public async Task AddAsync(StaffSchedule schedule)
+        public async Task AddAsync(StaffSchedule schedule)
         {
-             await context.StaffSchedules.AddAsync(schedule);
+            await context.StaffSchedules.AddAsync(schedule);
+        }
+
+        public async Task AddRangeAsync(IEnumerable<StaffSchedule> schedules)
+        {
+            await context.StaffSchedules.AddRangeAsync(schedules);
         }
 
         public async Task<List<StaffSchedule>> GetAllAsync(DateOnly fromDate, DateOnly toDate, string? staffUserId, int? roomId)
