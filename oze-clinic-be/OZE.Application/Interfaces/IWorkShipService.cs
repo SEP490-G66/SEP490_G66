@@ -10,6 +10,8 @@ namespace OZE.Application.Interfaces
     public interface IWorkShipService
     {
         Task<WorkShipResponse> CreateWorkShipAsync(CreateWorkShiftRequest request);
+        Task<BulkWorkShiftPreviewResponse> PreviewBulkWorkShiftsAsync(BulkWorkShiftRequest request);
+        Task<BulkWorkShiftResultResponse> CreateBulkWorkShiftsAsync(BulkWorkShiftRequest request);
         Task<List<WorkShipResponse>> GetWorkShiftsAsync(WorkShiftQueryRequest query);
         Task<WorkShipResponse> GetWorkShiftByIdAsync(long id);  
         Task<WorkShipResponse> UpdateWorkShiftAsync(long id, UpdateWorkShiftRequest request);
