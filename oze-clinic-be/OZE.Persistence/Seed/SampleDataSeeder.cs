@@ -800,6 +800,18 @@ namespace OZE.Persistence.Seed
                 var tuesday = WeekDate(1, 1).DayNumber - Today.DayNumber;
                 Open(new Visit { Patient = "BN000161", Day = tuesday, Time = "13:30", Doctor = Anh, Book = new[] { "DV001", "DV002-02" } }, AppointmentConstants.ConfirmedStatus);
                 Open(new Visit { Patient = "BN000162", Day = tuesday, Time = "15:00", Doctor = Anh, Complaint = "Tư vấn nhổ răng khôn" }, AppointmentConstants.ConfirmedStatus);
+
+                // KHOA_QUEUE_NEXT_DAYS: confirmed for the next two days, checked in at the counter on the day
+                Open(new Visit { Patient = "BN000101", Day = 1, Time = "08:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000123", Day = 1, Time = "09:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000125", Day = 1, Time = "09:30", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000151", Day = 1, Time = "10:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000152", Day = 1, Time = "11:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000153", Day = 2, Time = "08:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000154", Day = 2, Time = "09:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000117", Day = 2, Time = "09:30", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000158", Day = 2, Time = "10:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000159", Day = 2, Time = "11:00", Doctor = Khoa, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
             }
 
             // MOCK_REFUND_REQUESTS, on the invoices made in AddPastVisits
