@@ -438,10 +438,14 @@ export const getShiftStaff = async () => {
 // Rooms a role can work in, for the monthly schedule.
 export const roomsForRole = (rooms, role) => rooms.filter((room) => roomTypeRole(room.type) === role);
 
+// Key for a calendar cell / deselection: "yyyy-mm-dd|morning"
+export const monthlyShiftKey = (date, slot) => `${date}|${slot}`;
+
 // Monthly schedule for one person. pattern[weekday][slot] = room id or "" (not working), weekday 0 = Monday.
 // Days the person is on approved leave and places someone else already has are skipped.
-// Returns { created, skippedLeave: [date], conflicts: [{ date, slot, reason }] }. dryRun = true only counts, without saving.
-export const createMonthlyShifts = async ({ staffId, staffName, rooms, from, to, pattern, dryRun = false }) => {
+// Returns { created, skippedLeave, conflicts, items }. dryRun = true builds items without saving.
+// excludeKeys: optional list of monthlyShiftKey(...) the manager unchecked on the calendar preview.
+export const createMonthlyShifts = async ({ staffId, staffName, rooms, from, to, pattern, dryRun = false, excludeKeys = [] }) => {
     if (!staffId) return { success: false, message: null, data: null, errors: { staffId: "Vui lòng chọn nhân viên." } };
     if (!from || !to || from > to) return { success: false, message: null, data: null, errors: { to: "Đến ngày phải sau Từ ngày." } };
 
@@ -449,34 +453,60 @@ export const createMonthlyShifts = async ({ staffId, staffName, rooms, from, to,
     if (failed) return failed;
     const [shifts, leaves] = data;
     const roomById = (id) => rooms.find((room) => String(room.id) === String(id));
+    const excluded = new Set(excludeKeys);
 
-    const result = { created: 0, skippedLeave: [], conflicts: [] };
+    const result = { created: 0, skippedLeave: [], conflicts: [], items: [] };
     const bodies = [];
     for (let day = parseDay(from); toDateOnly(day) <= to; day = addDays(day, 1)) {
         const date = toDateOnly(day);
         for (const slot of SHIFT_SLOT_OPTIONS) {
             const room = roomById(pattern[weekdayOf(date)]?.[slot.value]);
             if (!room || !isFuture(date, slot.start)) continue;
+
+            const base = {
+                key: monthlyShiftKey(date, slot.value),
+                date,
+                slot: slot.value,
+                slotLabel: slot.value === SHIFT_SLOTS.MORNING ? "Sáng" : "Chiều",
+                start: slot.start,
+                end: slot.end,
+                roomId: room.id,
+                roomName: room.name,
+            };
+
             if (leaveOf(leaves, staffId, date, slot.value)) {
                 result.skippedLeave.push(date);
+                result.items.push({ ...base, valid: false, reason: "Nghỉ phép" });
                 continue;
             }
             const sameSlot = shiftsAt(shifts, date, slot.value);
             const own = sameSlot.find((shift) => shift.staffUserId === staffId);
             if (own) {
-                if (String(roomIdOf(own)) !== String(room.id)) result.conflicts.push({ date, slot: slot.value, reason: `đã có ca ở ${own.roomName ?? RECEPTION_DESK.name}` });
+                const reason = `đã có ca ở ${own.roomName ?? RECEPTION_DESK.name}`;
+                if (String(roomIdOf(own)) !== String(room.id)) result.conflicts.push({ date, slot: slot.value, reason });
+                result.items.push({ ...base, valid: false, reason });
                 continue;
             }
             const other = room.id === RECEPTION_DESK.id ? null : sameSlot.find((shift) => String(roomIdOf(shift)) === String(room.id));
             if (other) {
-                result.conflicts.push({ date, slot: slot.value, reason: `${room.name} đã có ${displayName(other.staffName)}` });
+                const reason = `${room.name} đã có ${displayName(other.staffName)}`;
+                result.conflicts.push({ date, slot: slot.value, reason });
+                result.items.push({ ...base, valid: false, reason });
                 continue;
             }
-            bodies.push(toApiShift({ staffId, date, slot: slot.value, room }));
+            result.items.push({ ...base, valid: true, reason: null });
+            if (!excluded.has(base.key)) bodies.push(toApiShift({ staffId, date, slot: slot.value, room }));
         }
     }
 
-    if (dryRun) return { success: true, message: null, errors: null, data: { ...result, created: bodies.length } };
+    if (dryRun) {
+        return {
+            success: true,
+            message: null,
+            errors: null,
+            data: { ...result, created: result.items.filter((item) => item.valid).length },
+        };
+    }
 
     const { created, refused } = await createShifts(bodies);
     result.created = created;

@@ -377,9 +377,36 @@
   .modal-sm { @apply max-w-[400px]; }
   .modal-md { @apply max-w-[640px]; }
   .modal-lg { @apply max-w-[800px]; }
+  .modal-xl { @apply max-w-[1100px]; }
   .modal-title { @apply font-heading text-heading-3 text-ink; }
   /* Phone: buttons stacked full width, the main (last) one at the bottom within thumb reach. */
   .modal-actions { @apply mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end; }
+
+  /* ---------- Monthly shift preview calendar (F-ADM-09 UI) ---------- */
+  .cal { @apply overflow-hidden rounded-lg border border-border bg-canvas; }
+  .cal-head { @apply grid grid-cols-7 border-b border-border bg-surface-tint; }
+  .cal-head span { @apply px-1.5 py-2.5 text-center text-caption font-semibold uppercase tracking-wide text-muted; }
+  .cal-grid { @apply grid grid-cols-7; }
+  .cal-cell { @apply min-h-24 border-r border-b border-border p-1.5 last:border-r-0; }
+  .cal-cell:nth-child(7n) { @apply border-r-0; }
+  .cal-cell-out { @apply bg-surface-tint; }
+  .cal-day { @apply num mb-1 text-caption font-semibold text-ink; }
+  .cal-cell-out .cal-day { @apply text-placeholder; }
+  .cal-slots { @apply flex flex-col gap-1; }
+  .cal-chip {
+    @apply block w-full rounded-md border border-border-strong bg-canvas px-1.5 py-1 text-left text-[11px] leading-snug text-body;
+  }
+  .cal-chip-room { @apply block font-normal leading-tight text-muted break-words; }
+  .cal-chip-on { @apply border-transparent bg-primary-soft font-semibold text-primary; }
+  .cal-chip-on .cal-chip-room { @apply text-primary/85; }
+  .cal-chip-off { @apply border-dashed text-muted opacity-85; }
+  .cal-chip-bad { @apply cursor-not-allowed border-transparent bg-danger-soft font-semibold text-danger; }
+  .cal-chip-bad .cal-chip-room { @apply text-danger/80; }
+  .cal-legend { @apply flex flex-wrap gap-x-4 gap-y-3 text-caption text-muted; }
+  .cal-legend-swatch { @apply mr-1.5 inline-block size-3 rounded-sm align-[-1px]; }
+  .cal-legend-on { @apply bg-primary-soft; }
+  .cal-legend-off { @apply border border-dashed border-border-strong bg-canvas; }
+  .cal-legend-bad { @apply bg-danger-soft; }
 
   /* ---------- Drawer (panel sliding in from the right) ---------- */
   .drawer-backdrop { @apply fixed inset-0 z-50 flex justify-end bg-surface-navy/45; }
