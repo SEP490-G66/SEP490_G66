@@ -562,7 +562,7 @@ const HistoryGroup = ({ title, tone, options, value, onChange, other, onOther, o
 
 const Section = ({ title, note, children }) => (
     <section className="rounded-lg border border-border p-4">
-        <h3 className="mb-3 flex flex-wrap items-baseline gap-2 font-semibold text-ink">
+        <h3 className="mb-3 flex flex-wrap items-baseline gap-2 font-heading text-heading-3 text-ink">
             {title}
             {note && <small className="text-caption font-normal text-muted">{note}</small>}
         </h3>
@@ -662,7 +662,7 @@ const NewWalkInDialog = ({ doctors, waiting, onClose, onSubmit }) => {
     const saved = record?.medicalProfiles ?? [];
 
     return (
-        <Modal title={T.TITLE} description={T.DESCRIPTION} size="xl" onClose={onClose} closeDisabled={busy}>
+        <Modal title={T.TITLE} size="xl" onClose={onClose} closeDisabled={busy}>
             <form noValidate onSubmit={handleSubmit} className="mt-4">
                 <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
                     <div className="space-y-4">
@@ -750,7 +750,7 @@ const NewWalkInDialog = ({ doctors, waiting, onClose, onSubmit }) => {
                             </div>
                         </Section>
                         {!found && (
-                            <Section title={T.SEC_GUARDIAN} note={T.OPTIONAL}>
+                            <Section title={T.SEC_GUARDIAN}>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="field">
                                         <label className="label" htmlFor={`${ids}-g-name`}>

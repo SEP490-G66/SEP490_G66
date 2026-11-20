@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cx } from "@/utils/cx";
 import { normalizeText } from "@/utils/format";
@@ -14,16 +14,18 @@ const allOptions = (options, value) => [...options, ...value.filter((item) => !o
 
 // One collapsible group of the medical history (Dị ứng, Bệnh nền…): tick items, or type one that is not listed.
 // Collapsed, the head shows the ticked items.
-const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "neutral", placeholder, note, defaultOpen = true, locked, itemNotes, maxLength, emptyError }) => {
+const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "neutral", placeholder, note, defaultOpen = true, locked, itemNotes, maxLength, emptyError, otherLabel }) => {
     const panelId = useId();
     const inputId = useId();
     const errorId = useId();
     const [open, setOpen] = useState(defaultOpen);
     const [draft, setDraft] = useState("");
     const [draftError, setDraftError] = useState(false);
+    const [other, setOther] = useState({ on: false, text: "", added: null });
+    const otherRef = useRef(null);
     const isLocked = (item) => Boolean(locked?.includes(item));
     const colors = TONES[tone] ?? TONES.neutral;
-    const items = allOptions(options, value);
+    const items = allOptions(options, value).filter((item) => item !== other.added);
     const isChecked = (item) => value.includes(item);
 
     const toggle = (item) => {
@@ -41,6 +43,15 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
         if (!existing) onChange?.([...value, text]);
         else if (!isChecked(existing)) onChange?.([...value, existing]);
         setDraft("");
+    };
+
+    const changeOther = (on, text) => {
+        const rest = other.added ? value.filter((entry) => entry !== other.added) : value;
+        const typed = on ? text.trim() : "";
+        const known = typed ? rest.find((entry) => normalizeText(entry) === normalizeText(typed)) : null;
+        const added = typed && !known ? typed : null;
+        setOther({ on, text: on ? text : "", added });
+        onChange?.(added ? [...rest, added] : rest);
     };
 
     return (
@@ -95,33 +106,61 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
                         </div>
                     </fieldset>
                     {note && <p className="text-caption text-muted">{note}</p>}
-                    <div className="flex gap-2">
-                        <label htmlFor={inputId} className="sr-only">
-                            Thêm mục khác vào {title}
-                        </label>
-                        <input
-                            id={inputId}
-                            className="input min-w-0 flex-1"
-                            placeholder={placeholder}
-                            value={draft}
-                            maxLength={maxLength}
-                            aria-invalid={draftError ? "true" : undefined}
-                            aria-describedby={draftError ? errorId : undefined}
-                            onChange={(event) => {
-                                setDraft(event.target.value);
-                                if (draftError) setDraftError(false);
-                            }}
-                            onKeyDown={(event) => {
-                                if (event.key !== "Enter") return;
-                                event.preventDefault();
-                                addDraft();
-                            }}
-                        />
-                        <button type="button" className="btn btn-secondary shrink-0" disabled={emptyError ? undefined : !draft.trim()} onClick={addDraft}>
-                            + Thêm
-                        </button>
-                    </div>
-                    {draftError && (
+                    {otherLabel ? (
+                        <div className="flex items-center gap-2">
+                            <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-body-sm">
+                                <input
+                                    type="checkbox"
+                                    className={cx("size-4", colors.accent)}
+                                    checked={other.on}
+                                    onChange={(event) => {
+                                        changeOther(event.target.checked, other.text);
+                                        if (event.target.checked) setTimeout(() => otherRef.current?.focus(), 0);
+                                    }}
+                                />
+                                {otherLabel}
+                            </label>
+                            <input
+                                ref={otherRef}
+                                id={inputId}
+                                className="input min-w-0 flex-1 disabled:bg-surface-muted"
+                                aria-label={placeholder}
+                                placeholder={placeholder}
+                                value={other.text}
+                                maxLength={maxLength}
+                                disabled={!other.on}
+                                onChange={(event) => changeOther(true, event.target.value)}
+                            />
+                        </div>
+                    ) : (
+                        <div className="flex gap-2">
+                            <label htmlFor={inputId} className="sr-only">
+                                Thêm mục khác vào {title}
+                            </label>
+                            <input
+                                id={inputId}
+                                className="input min-w-0 flex-1"
+                                placeholder={placeholder}
+                                value={draft}
+                                maxLength={maxLength}
+                                aria-invalid={draftError ? "true" : undefined}
+                                aria-describedby={draftError ? errorId : undefined}
+                                onChange={(event) => {
+                                    setDraft(event.target.value);
+                                    if (draftError) setDraftError(false);
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key !== "Enter") return;
+                                    event.preventDefault();
+                                    addDraft();
+                                }}
+                            />
+                            <button type="button" className="btn btn-secondary shrink-0" disabled={emptyError ? undefined : !draft.trim()} onClick={addDraft}>
+                                + Thêm
+                            </button>
+                        </div>
+                    )}
+                    {!otherLabel && draftError && (
                         <p id={errorId} className="error-text">
                             {emptyError}
                         </p>
