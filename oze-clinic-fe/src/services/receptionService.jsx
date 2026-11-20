@@ -60,6 +60,10 @@ export const createWalkIn = (request, config = {}) => call(() => api.post("/api/
 export const findPatientsByKeyword = (keyword) =>
     call(() => api.get("/api/patients", { params: { searchKeyword: keyword, pageSize: 5 } }));
 
+// Records are stored as +84…, 84… or 0…; the 9 subscriber digits match all of them (the caller re-checks the phone)
+export const findPatientsByPhone = (subscriber, config = {}) =>
+    call(() => api.get("/api/patients", { ...config, params: { searchKeyword: subscriber, pageSize: 20 } }));
+
 // ----- queue (M4) -----
 export const getWaitingList = (config = {}) => call(() => api.get("/api/appointments/waiting-list", config));
 

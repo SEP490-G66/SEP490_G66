@@ -9,7 +9,8 @@ import EarliestSlotBar from "@/components/booking/EarliestSlotBar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { BOOKING_IDS, dayText } from "@/utils/booking";
 import { formatTime } from "@/utils/format";
-import { BOOKING_TEXT, CLINIC_HOTLINE, PATIENT_APPOINTMENT_STATUS } from "@/utils/messages";
+import { BOOKING_TEXT, CLINIC_HOTLINE, PATIENT_APPOINTMENT_STATUS, RECEPTION_BOOKING_TEXT } from "@/utils/messages";
+import { cx } from "@/utils/cx";
 import { ROUTES, getAppointmentDetailRoute } from "@/utils/routes";
 
 const GROUP_LABEL = "mt-7 mb-2.5 block font-heading text-heading-3 text-ink";
@@ -25,7 +26,7 @@ export const BookingSectionHeading = ({ number, title }) => (
     </div>
 );
 
-export const LoadErrorBox = ({ headingLevel, onRetry }) => (
+export const LoadErrorBox = ({ headingLevel, onRetry, staff = false }) => (
     <BookingStateBox
         tone="warning"
         icon={CircleAlert}
@@ -38,7 +39,11 @@ export const LoadErrorBox = ({ headingLevel, onRetry }) => (
             </button>
         }
     >
-        {BOOKING_TEXT.LOAD_ERROR_TEXT} <Hotline /> {BOOKING_TEXT.LOAD_ERROR_TEXT_END}
+        {staff ? RECEPTION_BOOKING_TEXT.LOAD_ERROR_TEXT : (
+            <>
+                {BOOKING_TEXT.LOAD_ERROR_TEXT} <Hotline /> {BOOKING_TEXT.LOAD_ERROR_TEXT_END}
+            </>
+        )}
     </BookingStateBox>
 );
 
@@ -64,7 +69,7 @@ const BlockedBox = ({ appointment }) => (
     </BookingStateBox>
 );
 
-const NoSlotsBox = ({ showAllDoctors, onAllDoctors }) => (
+const NoSlotsBox = ({ showAllDoctors, onAllDoctors, staff }) => (
     <BookingStateBox
         icon={CalendarDays}
         title={BOOKING_TEXT.NO_SLOTS_TITLE}
@@ -77,7 +82,11 @@ const NoSlotsBox = ({ showAllDoctors, onAllDoctors }) => (
             )
         }
     >
-        {BOOKING_TEXT.NO_SLOTS_TEXT} <Hotline /> {BOOKING_TEXT.NO_SLOTS_TEXT_END}
+        {staff ? RECEPTION_BOOKING_TEXT.NO_SLOTS_TEXT : (
+            <>
+                {BOOKING_TEXT.NO_SLOTS_TEXT} <Hotline /> {BOOKING_TEXT.NO_SLOTS_TEXT_END}
+            </>
+        )}
     </BookingStateBox>
 );
 
@@ -105,7 +114,8 @@ const DoctorSelect = ({ doctors, value, onChange }) => (
     </>
 );
 
-const BookingSchedule = ({ form }) => {
+// staff: the receptionist's dialog – no hotline lines, a Cancel button beside submit
+const BookingSchedule = ({ form, staff = false, onCancel }) => {
     const { state, actions, services, earliest, unfinished, blocked, bounds, rangeBusy, slotsBusy, busy, slotsKey } = form;
     const { context } = state;
     const rangeError = state.range.error && !rangeBusy;
@@ -131,7 +141,7 @@ const BookingSchedule = ({ form }) => {
     );
 
         if (page.status === "error" || firstLoadFailed) {
-            return <LoadErrorBox headingLevel={3} onRetry={page.status === "error" ? actions.retryContext : actions.retryDays} />;
+            return <LoadErrorBox headingLevel={3} staff={staff} onRetry={page.status === "error" ? actions.retryContext : actions.retryDays} />;
         }
         if (blocked) return <BlockedBox appointment={state.blockedLoading ? null : unfinished} />;
         if (!state.formShown) {
@@ -163,7 +173,7 @@ const BookingSchedule = ({ form }) => {
                 )}
                 {doctorSelect}
                 {weekPicker}
-                {noSlots && !rangeError && <NoSlotsBox showAllDoctors={Boolean(state.doctorId)} onAllDoctors={actions.allDoctors} />}
+                {noSlots && !rangeError && <NoSlotsBox staff={staff} showAllDoctors={Boolean(state.doctorId)} onAllDoctors={actions.allDoctors} />}
                 {(!noSlots || rangeError) && (
                     <BookingDayStrip
                         weekStart={state.weekStart}
@@ -202,20 +212,31 @@ const BookingSchedule = ({ form }) => {
                         <div id="booking-submit-error" role="alert">
                             {state.submitError && (
                                 <p className="alert alert-danger mt-3 block">
-                                    {state.submitError} <Hotline />.
+                                    {state.submitError}
+                                    {!staff && (
+                                        <>
+                                            {" "}
+                                            <Hotline />.
+                                        </>
+                                    )}
                                 </p>
                             )}
                         </div>
-                        <div className="mt-7 flex justify-end border-t border-border pt-5">
+                        <div className="mt-7 flex flex-wrap justify-end gap-3 border-t border-border pt-5">
+                            {staff && (
+                                <button type="button" className="btn btn-secondary max-sm:flex-1" onClick={onCancel}>
+                                    {RECEPTION_BOOKING_TEXT.CANCEL}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 id={BOOKING_IDS.SUBMIT}
-                                className="btn btn-primary min-w-45 max-sm:w-full max-sm:min-w-0"
+                                className={cx("btn btn-primary", staff ? "min-w-32 max-sm:flex-1" : "min-w-45 max-sm:w-full max-sm:min-w-0")}
                                 aria-disabled={locked || undefined}
                                 aria-describedby="booking-submit-error"
                                 onClick={actions.submit}
                             >
-                                {state.submitting ? BOOKING_TEXT.SUBMITTING : BOOKING_TEXT.SUBMIT}
+                                {state.submitting ? BOOKING_TEXT.SUBMITTING : staff ? RECEPTION_BOOKING_TEXT.SUBMIT : BOOKING_TEXT.SUBMIT}
                             </button>
                         </div>
                     </>

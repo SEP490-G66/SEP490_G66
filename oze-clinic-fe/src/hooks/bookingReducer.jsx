@@ -34,7 +34,12 @@ export const slotsKeyOf = (state) => (state.day ? `${state.day}|${state.doctorId
 
 const sameScope = (rangeKey, slotsKey) => rangeKey.split("|").slice(1).join("|") === slotsKey.split("|").slice(1).join("|");
 
-export const createInitialState = (today) => ({
+// preset: { day, slot, doctorId } chosen before the form opens (the receptionist's week grid)
+// embedded: the form sits in a dialog; errors stay on the form instead of the patient-only screens
+const presetFields = (preset) =>
+    preset?.day ? { weekStart: weekStartOf(preset.day), day: preset.day, slot: preset.slot ?? null, autoPick: "week" } : { day: null, slot: null, autoPick: "earliest" };
+
+export const createInitialState = (today, { preset = null, embedded = false } = {}) => ({
     page: { status: "loading", profileLoaded: false },
     context: null,
     contextVersion: 0,
@@ -46,11 +51,11 @@ export const createInitialState = (today) => ({
     serviceError: null,
     goneMessages: [],
     today,
-    doctorId: null,
+    doctorId: preset?.doctorId ?? null,
     weekStart: weekStartOf(today),
-    day: null,
-    slot: null,
-    autoPick: "earliest",
+    ...presetFields(preset),
+    preset,
+    embedded,
     formShown: false,
     calendar: { open: false, month: monthOf(weekStartOf(today)) },
     version: 0,
@@ -207,9 +212,10 @@ const submitFailed = (state, { result, today, snapshot }) => {
             );
         }
         case BOOKING_ERROR_CODE.HAS_UNFINISHED:
-            return requestFocus({ ...base, blockedByServer: true, blockedLoading: true }, [BOOKING_IDS.STATE_TITLE]);
         case BOOKING_ERROR_CODE.PROFILE_NOT_FOUND:
-            return requestFocus({ ...base, page: { status: "unlinked", profileLoaded: false } }, [BOOKING_IDS.STATE_TITLE]);
+            if (state.embedded) return requestFocus({ ...base, submitError: result.submitError ?? BOOKING_TEXT.SUBMIT_ERROR }, [BOOKING_IDS.SUBMIT]);
+            if (result.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND) return requestFocus({ ...base, page: { status: "unlinked", profileLoaded: false } }, [BOOKING_IDS.STATE_TITLE]);
+            return requestFocus({ ...base, blockedByServer: true, blockedLoading: true }, [BOOKING_IDS.STATE_TITLE]);
         default:
             return requestFocus({ ...base, submitError: result.submitError ?? BOOKING_TEXT.SUBMIT_ERROR }, [BOOKING_IDS.SUBMIT]);
     }
@@ -248,9 +254,7 @@ export const bookingReducer = (state, action) => {
                 today: action.today,
                 version: state.version + 1,
                 formShown: false,
-                autoPick: "earliest",
-                day: null,
-                slot: null,
+                ...presetFields(state.preset),
                 cause: null,
                 focusSeq: state.focusSeq + 1,
                 focusRequest: { targets: [BOOKING_IDS.SERVICE, BOOKING_IDS.STATE_TITLE], waitFor: "ready", interim: BOOKING_IDS.PAGE_TITLE, seq: state.focusSeq + 1 },

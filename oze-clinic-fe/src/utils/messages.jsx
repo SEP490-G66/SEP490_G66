@@ -929,6 +929,32 @@ export const BOOKING_ERROR_CODE = {
     GENERIC: "GENERIC",
 };
 
+// "Đặt lịch hộ": the receptionist books for a patient; the booking is confirmed at once
+export const RECEPTION_BOOKING_TEXT = {
+    TITLE: "Đặt lịch hộ",
+    PHONE: "Số điện thoại",
+    PHONE_HELP: "Nhập số rồi rời ô để tìm hồ sơ có sẵn.",
+    PHONE_REQUIRED: "Nhập số điện thoại để tìm hồ sơ.",
+    SEARCHING: "Đang tìm hồ sơ…",
+    NEW_PATIENT: "Chưa có hồ sơ với số này. Điền thông tin để tạo hồ sơ mới.",
+    MANY_RECORDS: "Số này gắn với nhiều hồ sơ. Mở Hồ sơ bệnh nhân để chọn đúng người rồi đặt lịch từ hồ sơ đó.",
+    LOOKUP_ERROR: "Không tìm được hồ sơ.",
+    RETRY: "Thử lại",
+    CODE: "Mã BN",
+    CANCEL: "Hủy",
+    SUBMIT: "Đặt lịch",
+    NO_SLOTS_TEXT: "Thử chọn bác sĩ khác hoặc bớt dịch vụ.",
+    LOAD_ERROR_TEXT: "Bấm \"Thử lại\" để tải lại dịch vụ và bác sĩ.",
+    SUBMIT_ERROR: "Chưa đặt được lịch. Thông tin đã chọn vẫn được giữ, vui lòng bấm \"Đặt lịch\" lại.",
+    ERROR_HAS_UNFINISHED: "Bệnh nhân đang có một lịch hẹn chưa khám xong. Hủy hoặc dời lịch đó trước khi đặt lịch mới.",
+    ERROR_PATIENT_GONE: "Hồ sơ bệnh nhân này không còn. Tìm lại hồ sơ rồi đặt lịch.",
+    ERROR_MULTIPLE_RECORDS: "Số điện thoại này gắn với nhiều hồ sơ. Mở Hồ sơ bệnh nhân để chọn đúng người.",
+    ERROR_PHONE: "Số điện thoại không hợp lệ.",
+    ERROR_EMAIL: "Email không hợp lệ.",
+    ERROR_GENDER: "Giới tính không hợp lệ.",
+    ERROR_BIRTHDATE: "Ngày sinh không được sau ngày hôm nay.",
+};
+
 export const BOOKING_TEXT = {
     TITLE: "Đặt lịch khám",
     SUCCESS_DOCUMENT_TITLE: "Đặt lịch khám thành công",
@@ -1467,7 +1493,6 @@ export const SCHEDULE_TEXT = {
     TITLE: "Quản lý lịch hẹn",
     CRUMB: "Lịch hẹn",
     DOC_TITLE: "Quản lý lịch hẹn – OZE",
-    DESCRIPTION: "Bấm vào một ô để xem lịch hẹn của ca đó. Bấm ô trống để đặt lịch.",
     BOOK: "Đặt lịch",
     PREV_WEEK: "Tuần trước",
     NEXT_WEEK: "Tuần sau",
@@ -1479,7 +1504,8 @@ export const SCHEDULE_TEXT = {
     WEEKDAYS_SHORT: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
     WEEKDAYS: ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"],
     TODAY: "Hôm nay",
-    CLOSED: "Nghỉ",
+    NO_SHIFT: "Không có ca",
+    NOT_OPEN: "Chưa mở lịch",
     BREAK: (lunch, from, to) => `${lunch ? "Nghỉ trưa" : "Nghỉ"} ${from} – ${to}`,
     CELL_LABEL: (day, time, n) => `${day}, ${time}: ${n} lịch hẹn`,
     ADD_LABEL: (day, time) => `Đặt lịch vào ${day}, ${time}`,

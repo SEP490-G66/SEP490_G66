@@ -170,6 +170,12 @@ namespace OZE.Application.Services
                 ConditionGuard.ThrowIf(email != null && !new EmailAddressAttribute().IsValid(email), ErrorConstants.AuthMessage.EmailInvalid);
             }
 
+            // Basic details for a new record; an existing record is never overwritten
+            ConditionGuard.Ensure(PatientConstants.Gender.TryNormalize(request.Gender, out var gender), ErrorConstants.PatientMessage.InvalidGender);
+            ConditionGuard.Ensure(request.DateOfBirth == null || request.DateOfBirth.Value <= DateOnly.FromDateTime(ClinicClock.Today),
+                ErrorConstants.PatientMessage.InvalidDateOfBirth);
+            var address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
+
             var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
                 request.DoctorId, request.Note, receptionistUserId, async () =>
@@ -200,6 +206,9 @@ namespace OZE.Application.Services
                             FullName = request.FullName!.Trim(),
                             PhoneNumber = phone,
                             Email = email,
+                            Gender = gender,
+                            DateOfBirth = request.DateOfBirth,
+                            Address = address,
                             CreatedAt = DateTimeOffset.UtcNow
                         };
                         await _appointmentRepository.AddPatientAsync(patient);

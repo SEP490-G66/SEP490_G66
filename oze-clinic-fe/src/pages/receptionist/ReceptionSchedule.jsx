@@ -8,8 +8,8 @@ import BookingDialog from "@/components/reception/BookingDialog";
 import { Card } from "@/components/reception/shared";
 import { clinicClock } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { clinicToday, getAppointmentsInRange, getAvailableSlots, getBookableServices, getDoctorOptions } from "@/services/receptionService";
-import { addDays, ddmm, dmy, hhmm, isSunday, mondayOf, weekdayIndex } from "@/utils/calendar";
+import { clinicToday, getAppointmentsInRange, getAvailableSlots, getBookableServices, getDoctorOptions, getDoctorsOnDuty } from "@/services/receptionService";
+import { addDays, ddmm, dmy, hhmm, mondayOf, weekdayIndex } from "@/utils/calendar";
 import { CELL_DOT, CELL_KEYS, LEGEND, breakBefore, cellKeyOf, currentRow, hasService, rowOf, scheduleRows, slotLabel, slotPhase, slotStep } from "@/utils/appointmentSchedule";
 import { SCHEDULE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
@@ -17,6 +17,23 @@ import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
+const TOO_FAR = "too far in advance";
+
+// Free slots of one day (all doctors, or the filtered one). A day without free slots asks the duty list whether it has a shift at all:
+// today after the shift, or inside the "book at least 2 hours ahead" window, has no free slot but still has a shift.
+// Returns { state: "ok", slots, shift } | { state: "notOpen" } (past the booking limit) | { state: "error" } | null (aborted)
+const loadDay = async (date, doctorId, config) => {
+    const free = await getAvailableSlots({ date, doctorId: doctorId || undefined }, config);
+    if (free.aborted) return null;
+    if (!free.success) return { state: String(free.message ?? "").toLowerCase().includes(TOO_FAR) ? "notOpen" : "error" };
+    const slots = (Array.isArray(free.data) ? free.data : []).map((x) => x.slotStart);
+    if (slots.length) return { state: "ok", slots, shift: true };
+    const duty = await getDoctorsOnDuty(date, config);
+    if (duty.aborted) return null;
+    if (!duty.success) return { state: "ok", slots, shift: "error" };
+    const shift = (duty.data ?? []).some((d) => (!doctorId || String(d.doctorId) === String(doctorId)) && d.status !== "OnLeave");
+    return { state: "ok", slots, shift };
+};
 
 const ReceptionSchedule = () => {
     const navigate = useNavigate();
@@ -37,18 +54,18 @@ const ReceptionSchedule = () => {
     useEffect(() => {
         const controller = new AbortController();
         const config = { ...READ, signal: controller.signal };
-        const open = Array.from({ length: 7 }, (_, i) => addDays(week, i)).filter((d) => d >= clinicToday() && !isSunday(d));
+        const open = Array.from({ length: 7 }, (_, i) => addDays(week, i)).filter((d) => d >= clinicToday());
         Promise.all([
             getAppointmentsInRange({ fromDate: week, toDate: addDays(week, 6), doctorId }, config),
-            ...open.map((date) => getAvailableSlots({ date, doctorId: doctorId || undefined }, config)),
-        ]).then(([response, ...free]) => {
-            if (controller.signal.aborted || response.aborted) return;
+            ...open.map((date) => loadDay(date, doctorId, config)),
+        ]).then(([response, ...loaded]) => {
+            if (controller.signal.aborted || response.aborted || loaded.includes(null)) return;
             setClock({ today: clinicToday(), now: clinicClock() });
             setResult({
                 key: requestKey,
                 ok: response.success,
                 items: response.success ? response.items : [],
-                free: free.flatMap((r) => (r.success && Array.isArray(r.data) ? r.data.map((x) => hhmm(x.slotStart)) : [])),
+                days: Object.fromEntries(open.map((date, i) => [date, loaded[i]])),
             });
         });
         return () => controller.abort();
@@ -71,14 +88,32 @@ const ReceptionSchedule = () => {
 
     const { today, now } = clock;
     const current = result?.key === requestKey ? result : null;
-    const appointments = (current?.items ?? result?.items ?? []).filter((a) => a.timeSlotStart && hasService(a, serviceId));
+    const booked = (current?.items ?? result?.items ?? []).filter((a) => a.timeSlotStart);
+    const appointments = booked.filter((a) => hasService(a, serviceId));
     const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
-    const free = current?.free ?? result?.free ?? [];
+    const dayInfo = current?.days ?? result?.days ?? {};
+    const free = Object.values(dayInfo).flatMap((d) => (d.state === "ok" ? d.slots.map(hhmm) : []));
     const step = slotStep([...free, ...appointments.map((a) => hhmm(a.timeSlotStart))]);
     const rows = scheduleRows(appointments, free, step);
     const nowRow = week === mondayOf(today) ? currentRow(rows, now) : null;
     const inCell = (day, time) => appointments.filter((a) => a.appointmentDate === day && rowOf(a.timeSlotStart, step) === time);
     const dayName = (day) => `${TEXT.WEEKDAYS[weekdayIndex(day)]} ${ddmm(day)}`;
+
+    // past | loading | unknown (a request failed) | notOpen | noShift | open. Counts every appointment, not only the filtered service
+    const columnOf = (day) => {
+        if (day < today) return "past";
+        const info = current?.days?.[day];
+        if (!info) return "loading";
+        if (info.state === "error" || !current.ok) return "unknown";
+        if (info.state === "notOpen") return "notOpen";
+        const noShift = !info.slots.length && info.shift === false && !booked.some((a) => a.appointmentDate === day);
+        return noShift ? "noShift" : "open";
+    };
+    // The earliest free slot (as the API gives it, HH:mm:ss) that falls on this row
+    const freeSlotAt = (day, time) => {
+        const info = current?.days?.[day];
+        return info?.state === "ok" ? ([...info.slots].sort().find((slot) => rowOf(slot, step) === time) ?? null) : null;
+    };
 
     const openCell = (day, time, items) => {
         const slot = slotLabel(items[0]) || time;
@@ -87,19 +122,25 @@ const ReceptionSchedule = () => {
     };
 
     const cell = (day, time) => {
-        if (isSunday(day)) return <td key={day} className="h-14 border-b border-l border-border bg-surface-tint p-1" />;
         const items = inCell(day, time);
         const phase = slotPhase(day, time, today, now, step);
         const label = `${dayName(day)}, ${time}`;
-        const tdClass = cx("h-14 border-b border-l border-border p-1 align-top", day === today && "bg-primary-softer", day === today && phase === "now" && "bg-warning-soft");
+        const column = columnOf(day);
+        const closed = column === "noShift" || column === "notOpen";
+        const tdClass = cx(
+            "h-14 border-b border-l border-border p-1 align-top",
+            closed ? "bg-surface-tint" : day === today && "bg-primary-softer",
+            !closed && day === today && phase === "now" && "bg-warning-soft",
+        );
         if (!items.length) {
+            const slotStart = column === "open" && phase === "future" ? freeSlotAt(day, time) : null;
             return (
                 <td key={day} className={tdClass}>
-                    {phase === "future" && (
+                    {slotStart && (
                         <button
                             type="button"
-                            aria-label={TEXT.ADD_LABEL(dayName(day), time)}
-                            onClick={() => setBooking({ date: day })}
+                            aria-label={TEXT.ADD_LABEL(dayName(day), hhmm(slotStart))}
+                            onClick={() => setBooking({ date: day, slotStart, doctorId: doctorId ? Number(doctorId) : null })}
                             className="grid h-full min-h-12 w-full place-items-center rounded-lg border border-dashed border-transparent text-title text-transparent hover:border-border-strong hover:bg-canvas hover:text-primary focus-visible:border-border-strong focus-visible:text-primary"
                         >
                             +
@@ -150,7 +191,6 @@ const ReceptionSchedule = () => {
                 <div className="min-w-64 flex-1">
                     <Breadcrumb items={CRUMBS} className="mb-2" />
                     <h1 className="page-title">{TEXT.TITLE}</h1>
-                    <p className="page-description">{TEXT.DESCRIPTION}</p>
                 </div>
                 <button type="button" className="btn btn-primary" onClick={() => setBooking({})}>
                     {TEXT.BOOK}
@@ -193,23 +233,24 @@ const ReceptionSchedule = () => {
                         <thead>
                             <tr>
                                 <th className="w-16 border-b border-border bg-surface-tint" />
-                                {days.map((day) => (
-                                    <th
-                                        key={day}
-                                        className={cx(
-                                            "border-b border-l border-border px-1.5 py-2.5 text-center font-medium",
-                                            day === today ? "bg-primary-soft" : "bg-surface-tint",
-                                        )}
-                                    >
-                                        <small className="block text-caption text-muted">{TEXT.WEEKDAYS_SHORT[weekdayIndex(day)]}</small>
-                                        <b className={cx("num text-title", day === today ? "text-primary" : "text-ink")}>{day.slice(8)}</b>
-                                        {(day === today || isSunday(day)) && (
-                                            <em className={cx("block text-caption not-italic", day === today ? "text-primary" : "text-muted")}>
-                                                {day === today ? TEXT.TODAY : TEXT.CLOSED}
-                                            </em>
-                                        )}
-                                    </th>
-                                ))}
+                                {days.map((day) => {
+                                    const column = columnOf(day);
+                                    const status = column === "noShift" ? TEXT.NO_SHIFT : column === "notOpen" ? TEXT.NOT_OPEN : null;
+                                    return (
+                                        <th
+                                            key={day}
+                                            className={cx(
+                                                "border-b border-l border-border px-1.5 py-2.5 text-center font-medium",
+                                                day === today && !status ? "bg-primary-soft" : "bg-surface-tint",
+                                            )}
+                                        >
+                                            <small className="block text-caption text-muted">{TEXT.WEEKDAYS_SHORT[weekdayIndex(day)]}</small>
+                                            <b className={cx("num text-title", day === today ? "text-primary" : "text-ink")}>{day.slice(8)}</b>
+                                            {day === today && <em className="block text-caption not-italic text-primary">{TEXT.TODAY}</em>}
+                                            {status && <em className="block text-caption not-italic text-muted">{status}</em>}
+                                        </th>
+                                    );
+                                })}
                             </tr>
                         </thead>
                         <tbody>
