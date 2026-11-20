@@ -1,7 +1,7 @@
 import api from "./api";
 import { call } from "./receptionService";
 import { addDays, getClinicToday, parseDateOnly, toDateOnly } from "../utils/format";
-import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, GUEST_BOOKING_TEXT, RECEPTION_BOOKING_TEXT } from "../utils/messages";
+import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, GUEST_BOOKING_TEXT, RECEPTION_BOOKING_TEXT } from "../utils/messages";
 
 const READ = { skipErrorPage: true };
 
@@ -105,17 +105,37 @@ export const getBookingSlots = async ({ date, doctorId, services, signal } = {})
     return result.success ? success(uniqueSlots(listOf(result.data))) : failure();
 };
 
+// The chosen services cannot be booked together (every day answers the same 400): say why instead of showing "no free slot"
+const SERVICES_ERRORS = [
+    ["different rooms", BOOKING_TEXT.SERVICES_DIFFERENT_ROOMS],
+    ["choose a variant", BOOKING_TEXT.SERVICES_INVALID],
+    ["only one variant", BOOKING_TEXT.SERVICES_INVALID],
+    ["not available for booking", BOOKING_TEXT.SERVICES_INVALID],
+    ["service not found", BOOKING_TEXT.SERVICES_INVALID],
+    ["variant not found", BOOKING_TEXT.SERVICES_INVALID],
+];
+const servicesErrorOf = (result) => {
+    const message = String(result.message ?? "").toLowerCase();
+    return SERVICES_ERRORS.find(([text]) => message.includes(text))?.[1] ?? null;
+};
+
 export const getBookingDays = async ({ from, to, doctorId, services, signal } = {}) => {
     const dates = [];
     for (let date = from; date <= to; date = toDateOnly(addDays(parseDateOnly(date), 1))) dates.push(date);
     const days = new Array(dates.length);
     let next = 0;
     let broken = false;
+    let servicesError = null;
     const worker = async () => {
         while (next < dates.length && !broken) {
             const index = next++;
             const result = await loadSlots(dates[index], doctorId, services, signal);
             if (result.aborted || result.noResponse || (result.status ?? 0) >= 500) {
+                broken = true;
+                return;
+            }
+            if (!result.success) servicesError = servicesError ?? servicesErrorOf(result);
+            if (servicesError) {
                 broken = true;
                 return;
             }
@@ -125,6 +145,7 @@ export const getBookingDays = async ({ from, to, doctorId, services, signal } = 
     };
     await Promise.all(Array.from({ length: Math.min(DAY_REQUESTS_AT_ONCE, dates.length) }, worker));
     if (signal?.aborted) throw abortError();
+    if (servicesError) return failure(BOOKING_ERROR_CODE.SERVICES_INVALID, { servicesError });
     return broken ? failure() : success(days);
 };
 

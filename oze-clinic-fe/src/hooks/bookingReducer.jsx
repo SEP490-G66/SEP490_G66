@@ -262,7 +262,7 @@ export const bookingReducer = (state, action) => {
         case "RANGE_LOADED": {
             if (action.key !== rangeKeyOf(state)) return state;
             if (!action.result.success) {
-                const failed = { ...state, range: { ...state.range, key: action.key, error: true }, cause: null };
+                const failed = { ...state, range: { ...state.range, key: action.key, error: true, servicesError: action.result.servicesError ?? null }, cause: null };
                 return failed.formShown ? failed : requestFocus(failed, [BOOKING_IDS.STATE_TITLE]);
             }
             let days = toDayMap(action.result.data);

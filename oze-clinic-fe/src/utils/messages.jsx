@@ -926,6 +926,7 @@ export const BOOKING_ERROR_CODE = {
     TOO_FAR_AHEAD: "TOO_FAR_AHEAD",
     VARIANT_INACTIVE: "VARIANT_INACTIVE",
     HAS_UNFINISHED: "PATIENT_HAS_UNFINISHED",
+    SERVICES_INVALID: "SERVICES_INVALID",
     GENERIC: "GENERIC",
 };
 
@@ -940,7 +941,6 @@ export const RECEPTION_BOOKING_TEXT = {
     MANY_RECORDS: "Số này gắn với nhiều hồ sơ. Mở Hồ sơ bệnh nhân để chọn đúng người rồi đặt lịch từ hồ sơ đó.",
     LOOKUP_ERROR: "Không tìm được hồ sơ.",
     RETRY: "Thử lại",
-    CODE: "Mã BN",
     CANCEL: "Hủy",
     SUBMIT: "Đặt lịch",
     NO_SLOTS_TEXT: "Thử chọn bác sĩ khác hoặc bớt dịch vụ.",
@@ -956,6 +956,8 @@ export const RECEPTION_BOOKING_TEXT = {
 };
 
 export const BOOKING_TEXT = {
+    SERVICES_DIFFERENT_ROOMS: "Các dịch vụ đã chọn làm ở các phòng khác nhau nên không đặt chung một lịch được. Bỏ bớt dịch vụ, hoặc đặt mỗi dịch vụ một lịch.",
+    SERVICES_INVALID: "Không đặt được các dịch vụ đã chọn. Bỏ bớt hoặc chọn lại dịch vụ.",
     TITLE: "Đặt lịch khám",
     SUCCESS_DOCUMENT_TITLE: "Đặt lịch khám thành công",
     DESCRIPTION: "Chọn dịch vụ, ngày và ca khám. Lễ tân sẽ xác nhận lịch hẹn qua SMS hoặc email.",
@@ -1231,8 +1233,7 @@ export const PATIENT_RECORD_TEXT = {
     ADMIN_CARD: "Thông tin hành chính",
     HISTORY_CARD: "Tiền sử bệnh",
     FIELDS: {
-        CODE: "Mã BN",
-        FULL_NAME: "Họ và tên",
+            FULL_NAME: "Họ và tên",
         GENDER: "Giới tính",
         DOB: "Ngày sinh",
         PHONE: "Số điện thoại",

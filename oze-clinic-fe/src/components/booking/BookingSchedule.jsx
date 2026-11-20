@@ -118,9 +118,11 @@ const DoctorSelect = ({ doctors, value, onChange }) => (
 const BookingSchedule = ({ form, staff = false, onCancel }) => {
     const { state, actions, services, earliest, unfinished, blocked, bounds, rangeBusy, slotsBusy, busy, slotsKey } = form;
     const { context } = state;
-    const rangeError = state.range.error && !rangeBusy;
+    // The services cannot go in one appointment: a message under the picker, no days or slots to choose
+    const servicesError = !rangeBusy && state.range.error ? state.range.servicesError : null;
+    const rangeError = state.range.error && !rangeBusy && !servicesError;
     const firstLoadFailed = rangeError && !state.formShown;
-    const noSlots = state.formShown && !earliest;
+    const noSlots = state.formShown && !earliest && !servicesError;
     const slotsReady = slotsKey && state.slots.key === slotsKey;
     const page = state.page;
 
@@ -157,24 +159,28 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
         const locked = state.submitting || busy;
         return (
             <>
-                {!noSlots && (
-                    <BookingServicePicker
-                        services={services}
-                        items={state.items}
-                        pickService={state.pickService}
-                        pickVariant={state.pickVariant}
-                        error={state.serviceError}
-                        goneMessages={state.goneMessages}
-                        onPickService={actions.pickService}
-                        onPickVariant={actions.pickVariant}
-                        onAdd={actions.addService}
-                        onRemove={actions.removeService}
-                    />
+                {/* Always shown: when no slot fits the chosen services, removing one is the way out */}
+                <BookingServicePicker
+                    services={services}
+                    items={state.items}
+                    pickService={state.pickService}
+                    pickVariant={state.pickVariant}
+                    error={state.serviceError}
+                    goneMessages={state.goneMessages}
+                    onPickService={actions.pickService}
+                    onPickVariant={actions.pickVariant}
+                    onAdd={actions.addService}
+                    onRemove={actions.removeService}
+                />
+                {servicesError && (
+                    <p role="alert" className="alert alert-warning mt-3 block">
+                        {servicesError}
+                    </p>
                 )}
                 {doctorSelect}
                 {weekPicker}
                 {noSlots && !rangeError && <NoSlotsBox staff={staff} showAllDoctors={Boolean(state.doctorId)} onAllDoctors={actions.allDoctors} />}
-                {(!noSlots || rangeError) && (
+                {(!noSlots || rangeError) && !servicesError && (
                     <BookingDayStrip
                         weekStart={state.weekStart}
                         today={state.today}
@@ -187,7 +193,7 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
                         onRetry={actions.retryDays}
                     />
                 )}
-                {!noSlots && (
+                {!noSlots && !servicesError && (
                     <>
                         <EarliestSlotBar
                             earliest={earliest}

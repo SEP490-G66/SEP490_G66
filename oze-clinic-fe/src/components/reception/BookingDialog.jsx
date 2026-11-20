@@ -41,7 +41,7 @@ const ReceptionPatientCard = ({ patient }) => (
         <div className="min-w-50 flex-1">
             <p className="font-heading text-heading-3 text-ink">{patient.fullName}</p>
             <p className="text-body-sm text-body">
-                {[patient.patientCode && `${TEXT.CODE} ${patient.patientCode}`, GENDER_LABEL[patient.gender], formatDate(patient.dateOfBirth), phoneDisplay(patient.phoneNumber)]
+                {[patient.patientCode, GENDER_LABEL[patient.gender], formatDate(patient.dateOfBirth), phoneDisplay(patient.phoneNumber)]
                     .filter(Boolean)
                     .join(" · ")}
             </p>
