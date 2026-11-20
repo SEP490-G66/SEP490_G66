@@ -8,11 +8,16 @@ export const STATE_ORDER = ["notyet", "checkedin", "serving", "done", "noshow", 
 
 const STATE_OF = { PENDING: "notyet", CONFIRMED: "notyet", CHECKED_IN: "checkedin", IN_SERVICE: "serving", COMPLETED: "done", NO_SHOW: "noshow", CANCELLED: "cancelled" };
 
-const CALL_NOTE = { CallBack: "callback", Unreachable: "noanswer" };
+const UNAVAILABLE = ["Ended", "OnLeave"];
 
 export const stateOf = (appointment) => STATE_OF[appointment.status] ?? "notyet";
 
-export const confirmNoteOf = (appointment) => (appointment.status === "PENDING" ? (CALL_NOTE[appointment.confirmCallOutcome] ?? "pending") : null);
+export const isDoctorAway = (appointment, doctors, loaded) => {
+    if (!appointment.doctorId) return true;
+    if (!loaded) return false;
+    const own = doctors.find((d) => d.id === appointment.doctorId);
+    return !own || UNAVAILABLE.includes(own.status);
+};
 
 export const slotOf = (appointment) => (appointment.timeSlotStart ? `${hhmm(appointment.timeSlotStart)} – ${hhmm(appointment.timeSlotEnd)}` : "");
 
@@ -54,14 +59,8 @@ export const sortCheckIn = (list) => {
 export const isLate = (appointment, now) => stateOf(appointment) === "notyet" && Boolean(appointment.timeSlotEnd) && hhmm(appointment.timeSlotEnd) <= now;
 
 // The "⋯" menu of an appointment row. open(type) returns the click handler that opens that dialog.
-export const appointmentMenu = (appointment, { isToday, late, open }) => {
-    const unconfirmed = appointment.status === "PENDING";
-    const text = DASHBOARD_TEXT;
-    return [
-        ...(unconfirmed && isToday && !late ? [{ label: text.ACT_CONFIRM, onSelect: open("confirm") }] : []),
-        ...(late ? [{ label: text.ACT_NO_SHOW, onSelect: open("noShow") }] : []),
-        ...(appointment.timeSlotStart ? [{ label: text.ACT_RESCHEDULE, onSelect: open("reschedule") }] : []),
-        null,
-        { label: text.ACT_CANCEL, danger: true, onSelect: open("cancel") },
-    ];
-};
+export const appointmentMenu = (appointment, { open }) => [
+    ...(appointment.timeSlotStart ? [{ label: DASHBOARD_TEXT.ACT_RESCHEDULE, onSelect: open("reschedule") }] : []),
+    null,
+    { label: DASHBOARD_TEXT.ACT_CANCEL, danger: true, onSelect: open("cancel") },
+];

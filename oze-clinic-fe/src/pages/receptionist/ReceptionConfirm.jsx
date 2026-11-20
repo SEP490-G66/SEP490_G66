@@ -18,7 +18,6 @@ import {
     getAppointmentsInRange,
     getDoctorOptions,
     recordConfirmCall,
-    rescheduleAppointment,
 } from "@/services/receptionService";
 import { addDays, ddmm, hhmm } from "@/utils/calendar";
 import { allergiesOf, appointmentMenu, matchesKeyword, serviceNames, slotOf } from "@/utils/checkIn";
@@ -118,7 +117,7 @@ const ReceptionConfirm = () => {
             <RowActions
                 name={row.patientName}
                 primary={state !== "confirmed" ? { label: TEXT.CONFIRM, onClick: open("confirm") } : null}
-                items={appointmentMenu(row, { isToday: false, late: false, open })}
+                items={appointmentMenu(row, { open })}
             />
         );
     };
@@ -278,7 +277,16 @@ const ReceptionConfirm = () => {
                     }}
                 />
             )}
-            {dialog?.type === "reschedule" && <RescheduleDialog appointment={a} onClose={close} onSubmit={(v) => act(rescheduleAppointment(a.id, v), TEXT.RESCHEDULED(a.patientName))} />}
+            {dialog?.type === "reschedule" && (
+                <RescheduleDialog
+                    appointment={a}
+                    onClose={close}
+                    onDone={() => {
+                        setDialog(null);
+                        setReload((n) => n + 1);
+                    }}
+                />
+            )}
             {dialog?.type === "cancel" && <CancelDialog appointment={a} onClose={close} onSubmit={(reason) => act(cancelAppointment(a.id, reason), TEXT.CANCELLED(a.patientName))} />}
             {dialog?.type === "book" && (
                 <BookingDialog

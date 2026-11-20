@@ -22,6 +22,9 @@ namespace OZE.Common.Models
         public TimeOnly? ActualEndTime { get; set; }
         // NotStarted, Working, Ended, OnLeave
         public string Status { get; set; } = string.Empty;
+
+        // Why the doctor is away (leave, or the reason given when ending the shift)
+        public string? AbsenceReason { get; set; }
     }
 
     public class MyShiftsQuery

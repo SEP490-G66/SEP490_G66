@@ -49,12 +49,10 @@ export const getTodayAppointments = (config = {}) =>
 
 export const confirmAppointment = (id) => call(() => api.post(`/api/appointments/${id}/confirm`));
 
-export const checkInAppointment = (id, { priority, reason, doctorId }) =>
-    call(() => api.post(`/api/appointments/${id}/check-in`, { priority, reason: reason || null, doctorId: doctorId || undefined }));
+export const checkInAppointment = (id, { doctorId } = {}) => call(() => api.post(`/api/appointments/${id}/check-in`, { doctorId: doctorId || null }));
 
 export const cancelAppointment = (id, reason) => call(() => api.post(`/api/appointments/${id}/cancel`, { reason }));
 
-// Only for a checked-in patient who left before being seen
 export const markNoShow = (id) => call(() => api.post(`/api/appointments/${id}/no-show`));
 
 export const createWalkIn = (request, config = {}) => call(() => api.post("/api/appointments/walk-in", request, config));
@@ -173,8 +171,8 @@ export const getAvailableSlots = ({ date, doctorId, serviceIds = [], variantIds 
     return call(() => api.get(`/api/appointments/available-slots?${params}`, config));
 };
 
-export const rescheduleAppointment = (id, { date, slotStart, doctorId }) =>
-    call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null }));
+export const rescheduleAppointment = (id, { date, slotStart, doctorId, reason }) =>
+    call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null, reason: reason || null }));
 
 // ----- invoices from an examination (F-PAY-01) -----
 export const createInvoice = (request, config = {}) => call(() => api.post("/api/invoices", request, config));

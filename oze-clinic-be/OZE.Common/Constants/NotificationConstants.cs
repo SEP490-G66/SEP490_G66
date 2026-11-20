@@ -37,6 +37,8 @@ namespace OZE.Common.Constants
             public const string AppointmentBookedByClinicMessage = "Bạn có lịch hẹn lúc {0} ngày {1}. Lịch đã được xác nhận.";
             public const string AppointmentRescheduledTitle = "Lịch hẹn đã được đổi";
             public const string AppointmentRescheduledMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1}.";
+            public const string AppointmentRescheduledWithDoctorMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1} với {2}.";
+            public const string AppointmentRescheduledReasonSuffix = " Lý do: {0}";
             public const string AppointmentCancelledTitle = "Lịch hẹn đã bị hủy";
             public const string AppointmentCancelledMessage = "Lịch hẹn lúc {0} ngày {1} đã bị hủy. Lý do: {2}";
             public const string AppointmentShiftEndedTitle = "Lịch hẹn cần đổi giờ";
