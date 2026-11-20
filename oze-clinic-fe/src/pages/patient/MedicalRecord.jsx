@@ -59,7 +59,6 @@ const PANELS = {
                 onOpenDrawer={handlers.openDrawer}
                 onCloseDrawer={handlers.closeDrawer}
                 onOpenVisit={handlers.openVisitFromLog}
-                onApproved={handlers.refresh}
             />
         );
     },
