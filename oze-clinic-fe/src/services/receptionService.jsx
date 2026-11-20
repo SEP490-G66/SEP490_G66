@@ -115,8 +115,7 @@ export const remindDueFollowUps = () => call(() => api.post("/api/examinations/f
 
 // ----- reports -----
 // Confirmed collections per clinic day, cash vs transfer (at most 31 days)
-export const getRevenueByDay = ({ from, to, groupBy }, config = {}) =>
-    call(() => api.get("/api/invoice-reports/revenue-by-day", { ...config, params: { from, to, groupBy: groupBy === "shift" ? "shift" : undefined } }));
+export const getRevenueByDay = ({ from, to }, config = {}) => call(() => api.get("/api/invoice-reports/revenue-by-day", { ...config, params: { from, to } }));
 
 // ----- doctors on duty -----
 // Doctors with a shift today: room, time and status (NotStarted, Working, Ended, OnLeave)
@@ -330,7 +329,3 @@ export const moveQueueEntry = (id, roomId, reason) => call(() => api.post(`/api/
 export const removeQueueEntry = (id, reason) => call(() => api.post(`/api/queues/${id}/remove`, { reason }));
 
 export const keepQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/keep`));
-
-export const callAppointment = (id) => call(() => api.post(`/api/appointments/${id}/call`));
-
-export const callQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/call`));

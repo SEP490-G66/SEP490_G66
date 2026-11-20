@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import SegmentedControl from "@/components/ui/SegmentedControl";
 import { Card } from "./shared";
 import { clinicToday, getRevenueByDay } from "@/services/receptionService";
-import { addDays, ddmm, dmy, isSunday, weekdayIndex } from "@/utils/calendar";
+import { addDays, ddmm, dmy, weekdayIndex } from "@/utils/calendar";
 import { DASHBOARD_TEXT as TEXT, SCHEDULE_TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
@@ -13,10 +12,7 @@ const H = 250;
 const LEFT = 48;
 const TOP = 12;
 const MAX_DAYS = 31;
-const GROUP_OPTIONS = [
-    { value: "day", label: TEXT.BY_DAY },
-    { value: "shift", label: TEXT.BY_SHIFT },
-];
+const BOTTOM = 28;
 
 const vnd = (value) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
 const dayName = (key) => `${SCHEDULE_TEXT.WEEKDAYS_SHORT[weekdayIndex(key)]} ${ddmm(key)}`;
@@ -29,31 +25,20 @@ const sumOf = (list) =>
         { cash: 0, transfer: 0 },
     );
 
-const groupsOf = (day, by) => {
-    if (by !== "shift") return [{ key: "all", ...sumOf([day]) }];
-    const shifts = day?.shifts ?? [];
-    const pick = (type) => shifts.find((s) => s.shiftType === type) ?? null;
-    return [
-        { key: "Morning", label: TEXT.MORNING, ...sumOf([pick("Morning")]) },
-        { key: "Afternoon", label: TEXT.AFTERNOON, ...sumOf([pick("Afternoon")]) },
-    ];
-};
-
 const RevenueChart = () => {
     const [today] = useState(clinicToday);
     const [range, setRange] = useState(() => ({
         from: addDays(today, -6),
         to: today,
-        by: "day",
     }));
     const [result, setResult] = useState(null);
     const [hover, setHover] = useState(null);
 
-    const key = `${range.from}|${range.to}|${range.by}`;
+    const key = `${range.from}|${range.to}`;
 
     useEffect(() => {
         const controller = new AbortController();
-        getRevenueByDay({ from: range.from, to: range.to, groupBy: range.by }, { skipErrorPage: true, signal: controller.signal }).then((response) => {
+        getRevenueByDay({ from: range.from, to: range.to }, { skipErrorPage: true, signal: controller.signal }).then((response) => {
             if (controller.signal.aborted || response.aborted) return;
             setResult({
                 key,
@@ -82,27 +67,25 @@ const RevenueChart = () => {
 
     const byDate = new Map((result?.days ?? []).map((d) => [d.date, d]));
     const keys = [];
-    for (let k = range.from; k <= range.to; k = addDays(k, 1)) if (!isSunday(k)) keys.push(k);
-    const total = sumOf([...byDate.values()]);
+    for (let k = range.from; k <= range.to; k = addDays(k, 1)) keys.push(k);
     const rows = keys.map((k) => ({
         key: k,
-        groups: groupsOf(byDate.get(k), range.by),
+        ...sumOf([byDate.get(k)]),
         future: k > today,
     }));
+    const total = sumOf(rows);
 
-    const bottom = range.by === "day" ? 28 : 44;
-    const max = Math.max(1, ...rows.flatMap((r) => r.groups.map((g) => g.cash + g.transfer)));
+    const max = Math.max(1, ...rows.map((r) => r.cash + r.transfer));
     const step = Math.max(1, Math.ceil(max / 4 / 1e6)) * 1e6;
     const top = step * 4;
-    const plotH = H - TOP - bottom;
+    const plotH = H - TOP - BOTTOM;
     const cw = (W - LEFT - 8) / Math.max(1, rows.length);
-    const groupCount = range.by === "day" ? 1 : 2;
-    const bw = Math.max(6, Math.min(40, (cw - 18) / groupCount));
+    const bw = Math.max(6, Math.min(40, cw - 18));
     const scale = (v) => (plotH * v) / top;
 
     const bar = (x, g) => {
         const parts = [];
-        let y = H - bottom;
+        let y = H - BOTTOM;
         [
             ["cash", g.cash, CASH],
             ["transfer", g.transfer, TRANSFER],
@@ -131,7 +114,6 @@ const RevenueChart = () => {
             title={TEXT.REVENUE}
             actions={
                 <div className="flex flex-1 flex-wrap items-center gap-3">
-                    <SegmentedControl label={TEXT.GROUP_LABEL} options={GROUP_OPTIONS} value={range.by} onChange={(by) => setRange((r) => ({ ...r, by }))} />
                     <span className="flex items-center gap-2">
                         <label htmlFor="rv-from" className="sr-only">
                             {TEXT.FROM}
@@ -185,7 +167,7 @@ const RevenueChart = () => {
                             viewBox={`0 0 ${W} ${H}`}
                             className="block h-auto w-full"
                             role="img"
-                            aria-label={TEXT.CHART_LABEL(range.by, ddmm(range.from), ddmm(range.to))}
+                            aria-label={TEXT.CHART_LABEL(ddmm(range.from), ddmm(range.to))}
                         >
                             {[0, 1, 2, 3, 4].map((i) => {
                                 const y = TOP + plotH * (1 - i / 4);
@@ -199,23 +181,11 @@ const RevenueChart = () => {
                                 );
                             })}
                             {rows.map((r, i) => {
-                                const x0 = LEFT + i * cw + (cw - bw * groupCount - (groupCount - 1) * 4) / 2;
+                                const x = LEFT + i * cw + (cw - bw) / 2;
                                 return (
                                     <g key={r.key}>
                                         {hover === r.key && <rect x={LEFT + i * cw} y={TOP} width={cw} height={plotH} className="fill-surface-muted" />}
-                                        {r.groups.map((g, j) => {
-                                            const x = x0 + j * (bw + 4);
-                                            return (
-                                                <g key={g.key}>
-                                                    {bar(x, g)}
-                                                    {g.label && (
-                                                        <text x={x + bw / 2} y={H - bottom + 14} textAnchor="middle" className="fill-muted text-[10px]">
-                                                            {g.label}
-                                                        </text>
-                                                    )}
-                                                </g>
-                                            );
-                                        })}
+                                        {bar(x, r)}
                                         <text
                                             x={LEFT + i * cw + cw / 2}
                                             y={H - 8}
@@ -241,18 +211,13 @@ const RevenueChart = () => {
                                 {hovered.future ? (
                                     <span className="text-muted">{TEXT.NOT_YET}</span>
                                 ) : (
-                                    hovered.groups.map((g) => (
-                                        <span key={g.key} className="block">
-                                            {g.label && <span className="block pt-1 font-semibold text-body">{TEXT.SHIFT_FULL[g.key]}</span>}
-                                            {[
-                                                [TEXT.CASH, g.cash, CASH],
-                                                [TEXT.TRANSFER, g.transfer, TRANSFER],
-                                            ].map(([label, value, color]) => (
-                                                <span key={label} className="flex items-center gap-1.5 whitespace-nowrap text-body">
-                                                    <i aria-hidden="true" className="size-2 rounded-sm" style={{ background: color }} />
-                                                    {label} <b className="num ml-auto text-ink">{vnd(value)}</b>
-                                                </span>
-                                            ))}
+                                    [
+                                        [TEXT.CASH, hovered.cash, CASH],
+                                        [TEXT.TRANSFER, hovered.transfer, TRANSFER],
+                                    ].map(([label, value, color]) => (
+                                        <span key={label} className="flex items-center gap-1.5 whitespace-nowrap text-body">
+                                            <i aria-hidden="true" className="size-2 rounded-sm" style={{ background: color }} />
+                                            {label} <b className="num ml-auto text-ink">{vnd(value)}</b>
                                         </span>
                                     ))
                                 )}
@@ -270,16 +235,13 @@ const RevenueChart = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map((r) => {
-                            const s = sumOf(r.groups);
-                            return (
-                                <tr key={r.key}>
-                                    <td>{dmy(r.key)}</td>
-                                    <td>{vnd(s.cash)}</td>
-                                    <td>{vnd(s.transfer)}</td>
-                                </tr>
-                            );
-                        })}
+                        {rows.map((r) => (
+                            <tr key={r.key}>
+                                <td>{dmy(r.key)}</td>
+                                <td>{vnd(r.cash)}</td>
+                                <td>{vnd(r.transfer)}</td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
             </div>

@@ -59,7 +59,6 @@ export const appointmentMenu = (appointment, { isToday, late, open }) => {
     const text = DASHBOARD_TEXT;
     return [
         ...(unconfirmed && isToday && !late ? [{ label: text.ACT_CONFIRM, onSelect: open("confirm") }] : []),
-        ...(unconfirmed && !late ? [{ label: text.ACT_CALL, onSelect: open("call") }] : []),
         ...(late ? [{ label: text.ACT_NO_SHOW, onSelect: open("noShow") }] : []),
         ...(appointment.timeSlotStart ? [{ label: text.ACT_RESCHEDULE, onSelect: open("reschedule") }] : []),
         null,
