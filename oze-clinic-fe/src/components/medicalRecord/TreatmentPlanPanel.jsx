@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, CircleCheck, Clock, Info } from "lucide-react";
+import { ArrowRight, CircleCheck, Info } from "lucide-react";
 import { cx } from "@/utils/cx";
 import { formatCurrency } from "@/utils/format";
 import { RECORD_NAV_FLAG, RECORD_STATUS_BUTTON_ID, SHEET_TAB, buildRecordUrl, displayText, isPlainClick } from "@/utils/medicalRecord";
@@ -70,25 +70,19 @@ const CostTable = ({ plan }) => (
     </>
 );
 
-const ProposedBox = ({ plan }) => (
+const ProposedCostBox = ({ plan }) => (
     <section className="card-app p-0">
         <div className={CARD_HEADER_CLASS}>
-            <div className="flex items-center gap-2">
-                <Clock className="size-5 text-muted" aria-hidden="true" />
-                <h2 className="card-title">{TEXT.PROPOSED_TITLE}</h2>
-            </div>
+            <h2 className="card-title">{TEXT.PROPOSED_COST_TITLE}</h2>
         </div>
         <CostTable plan={plan} />
-        <div className="flex flex-col gap-3 border-t border-border px-5 py-4">
-            <p className="text-body-sm">{TEXT.PROPOSED_INFO}</p>
-            <p className="text-caption text-muted">
-                {TEXT.PROPOSED_CHANGE}{" "}
-                <a href={`tel:${CLINIC_HOTLINE.TEL}`} className="font-semibold text-primary hover:underline">
-                    {CLINIC_HOTLINE.DISPLAY}
-                </a>
-                .
-            </p>
-        </div>
+        <p className="border-t border-border px-5 py-4 text-caption text-muted">
+            {TEXT.PROPOSED_AT_CLINIC}{" "}
+            <a href={`tel:${CLINIC_HOTLINE.TEL}`} className="font-semibold text-primary hover:underline">
+                {CLINIC_HOTLINE.DISPLAY}
+            </a>
+            .
+        </p>
     </section>
 );
 
@@ -183,7 +177,7 @@ const PlanCard = ({ plan, first, visitId, visitIds, onOpenDrawer, onOpenVisit })
                     </div>
                 )}
             </section>
-            {proposed ? <ProposedBox plan={plan} /> :<LogTable plan={plan} visitId={visitId} visitIds={visitIds} onOpenVisit={onOpenVisit} />}
+            {proposed ? <ProposedCostBox plan={plan} /> : <LogTable plan={plan} visitId={visitId} visitIds={visitIds} onOpenVisit={onOpenVisit} />}
         </div>
     );
 };

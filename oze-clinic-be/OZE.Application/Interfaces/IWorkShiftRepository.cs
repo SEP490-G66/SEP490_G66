@@ -14,6 +14,7 @@ namespace OZE.Application.Interfaces
         Task<bool> HasRoomOverlapAsync(int roomId, DateOnly scheduleDate, TimeOnly shiftStart, TimeOnly shiftEnd, long? excludeShiftId = null);
         Task<string?> GetConfigValueAsync(string configKey);
         Task AddAsync(StaffSchedule schedule);
+        Task AddRangeAsync(IEnumerable<StaffSchedule> schedules);
         Task SaveChangesAsync();
         Task<List<StaffSchedule>> GetAllAsync(DateOnly fromDate, DateOnly toDate, string? staffUserId, int? roomId);
         Task<StaffSchedule?> GetByIdAsync(long id);

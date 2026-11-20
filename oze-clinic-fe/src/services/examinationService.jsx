@@ -85,6 +85,7 @@ const state = {
     prescriptionSaves: new Map(), // examinationId → the step 5 save on its way (one after another)
     planSaves: new Map(), // examinationId → the plan save on its way (saves of one plan run one after another)
     types: new Map(), // serviceId → [{ id, name, price }]: the service's variants ("Loại dịch vụ")
+    catalog: [], // [{ serviceId, name }]: the services a doctor can add to a plan (all bookable ones but the check-up)
 };
 
 const stepKey = (examinationId) => `oze.exam.step.${examinationId}`;
@@ -156,7 +157,8 @@ const TYPE_LINE = "Loại: ";
 const PLAN_OPEN_STATUSES = ["Draft", "Proposed", "Approved", "InProgress"];
 const PLAN_EDITABLE_STATUSES = ["Draft", "Proposed"];
 
-// The variants of every bookable service (GET api/appointments/bookable-services), loaded once
+// The variants of every bookable service (GET api/appointments/bookable-services), loaded once, and the services the
+// doctor can add to a plan: what the examination finds may need a service the patient did not book
 const loadPlanTypes = async () => {
     if (state.types.size) return;
     const response = await call(() => api.get("/api/appointments/bookable-services"));
@@ -166,6 +168,7 @@ const loadPlanTypes = async () => {
             service.serviceId,
             (service.variants ?? []).map((variant) => ({ id: String(variant.variantId), name: variant.variantName, price: Number(variant.referencePrice) || 0 })),
         );
+        if (!service.isMandatory && !isCheckup({ name: service.serviceName })) state.catalog.push({ serviceId: service.serviceId, name: service.serviceName });
     }
 };
 
@@ -197,7 +200,9 @@ const planFromApi = (plan, item, doctorName) => {
     for (const stage of [...plan.stages].sort((a, b) => a.stageNumber - b.stageNumber)) {
         let service = services.find((entry) => entry.serviceId === stage.serviceId);
         if (!service) {
-            service = { id: `plan-${stage.serviceId}`, serviceId: stage.serviceId, name: stage.serviceName ?? "", sessions: [] };
+            // added: the doctor put it in the plan, the patient did not book it (it can be taken out again)
+            const added = !base.services.some((entry) => entry.serviceId === stage.serviceId);
+            service = { id: `plan-${stage.serviceId}`, serviceId: stage.serviceId, name: stage.serviceName ?? "", sessions: [], ...(added && { added }) };
             services.push(service);
             stagesOf.set(service.id, []);
         }
@@ -299,6 +304,9 @@ const thenReload = async (request, message) => {
 };
 
 const itemOf = (id) => state.room.get(id);
+
+// The examination of a queue item once it has started (null before): other services call its examination's endpoints.
+export const examinationIdOf = (id) => itemOf(id)?.examinationId ?? null;
 
 // Queue of the doctor's room for the current shift: { shift, queue, done }.
 export const getExamWorkspace = () => loadWorkspace();
@@ -446,7 +454,8 @@ export const getExamRecord = async (id) => {
     const local = localOf(item);
     // The plan saved in this visit; until there is one, the draft made from the registered services
     if (savedPlan) local.plan = planFromApi(savedPlan, item, local.plan.doctorName);
-    const planTypes = Object.fromEntries(local.plan.services.map((service) => [service.serviceId, typesOf(service.serviceId)]));
+    // Every service can be added to the plan, so the types of all of them
+    const planTypes = Object.fromEntries(state.types);
     if (past.history) {
         // What the patient's record already has: shown ticked and locked (the backend can add a profile, not remove one)
         local.historySaved = past.history;
@@ -508,6 +517,7 @@ export const getExamRecord = async (id) => {
             exam,
             plan: local.plan,
             planTypes,
+            planCatalog: state.catalog,
             treatment: local.treatment,
             prescription: local.prescription,
         }),

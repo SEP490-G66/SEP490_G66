@@ -26,6 +26,9 @@ const REFERENCE_PAGES = {
         [DENTAL_IMAGING_TECHNICIAN]: ROUTES.TECHNICIAN_IMAGING_REQUESTS,
         [DOCTOR]: ROUTES.DOCTOR_IMAGING_REVIEWS,
     },
+    DocumentRequest: {
+        [DOCTOR]: ROUTES.DOCTOR_EXAMINATION,
+    },
     Examination: {
         [PATIENT]: (id) => generatePath(ROUTES.MEDICAL_RECORD_DETAIL, { examinationId: id }),
         [DOCTOR]: ROUTES.DOCTOR_IMAGING_REVIEWS,

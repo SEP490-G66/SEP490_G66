@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cx } from "@/utils/cx";
 import { sessionsCost } from "@/utils/examination";
@@ -20,9 +20,10 @@ const MoveButton = ({ icon: Icon, label, disabled, onClick }) => (
     </button>
 );
 
-// One registered service of the plan, in treatment order. Collapsed: name, status, "2 buổi · 800.000 ₫".
+// One service of the plan, in treatment order. Collapsed: name, status, "2 buổi · 800.000 ₫".
 // Expanded: its sessions (PlanSessionForm) and "+ Thêm buổi điều trị".
 // errors: { service?: message, sessions: { [sessionId]: {...} } } from validatePlan.
+// onRemove: takes the service out of the plan (only given for a service the doctor added).
 const PlanServiceItem = ({
     index,
     service,
@@ -34,6 +35,7 @@ const PlanServiceItem = ({
     onToggle,
     onMoveUp,
     onMoveDown,
+    onRemove,
     onAddSession,
     onChangeSession,
     onRemoveSession,
@@ -64,6 +66,7 @@ const PlanServiceItem = ({
                 </button>
                 <MoveButton icon={ArrowUp} label={`Đưa ${service.name} lên trước`} disabled={!canMoveUp} onClick={onMoveUp} />
                 <MoveButton icon={ArrowDown} label={`Đưa ${service.name} xuống sau`} disabled={!canMoveDown} onClick={onMoveDown} />
+                {onRemove && <MoveButton icon={Trash2} label={`Bỏ ${service.name} khỏi kế hoạch`} onClick={onRemove} />}
                 <button
                     type="button"
                     className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted outline-none hover:bg-surface-tint focus-visible:shadow-focus"
