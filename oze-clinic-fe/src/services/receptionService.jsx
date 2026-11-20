@@ -53,7 +53,7 @@ export const checkInAppointment = (id, { doctorId } = {}) => call(() => api.post
 
 export const cancelAppointment = (id, reason) => call(() => api.post(`/api/appointments/${id}/cancel`, { reason }));
 
-export const markNoShow = (id) => call(() => api.post(`/api/appointments/${id}/no-show`));
+export const markNoShow = (id, reason) => call(() => api.post(`/api/appointments/${id}/no-show`, { reason: reason || null }));
 
 export const createWalkIn = (request, config = {}) => call(() => api.post("/api/appointments/walk-in", request, config));
 
@@ -70,12 +70,6 @@ export const getNeedsAttention = () => call(() => api.get("/api/appointments/nee
 
 // reason is required: it goes into the notification the patient receives
 export const reassignDoctor = (id, doctorId, reason) => call(() => api.post(`/api/appointments/${id}/reassign-doctor`, { doctorId, reason }));
-
-// A checked-in patient who goes home without being seen: the appointment becomes "Bỏ về" (not no-show), data is kept
-export const leaveAppointment = (id, reason) => call(() => api.post(`/api/appointments/${id}/leave`, { reason }));
-
-// The receptionist saw the patient after repeated missed calls and keeps them in the queue
-export const keepInQueue = (id) => call(() => api.post(`/api/appointments/${id}/keep-in-queue`));
 
 // ----- cashier (M8) -----
 // Every page of /api/invoices for these filters (a page holds 100). MAX_PAGES stops a runaway loop.
@@ -319,11 +313,3 @@ export const getPaymentHistory = ({ keyword, method, status, fromDate, toDate, p
 
 // Active entries of every room queue (Examination, Imaging, Treatment): WAITING, CALLED, IN_PROGRESS
 export const getQueueEntries = (queueType, config = {}) => call(() => api.get("/api/queues", { ...config, params: { queueType: queueType || undefined } }));
-
-export const setQueuePriority = (id, { priority, reason }) => call(() => api.post(`/api/queues/${id}/priority`, { priority, reason: reason || null }));
-
-export const moveQueueEntry = (id, roomId, reason) => call(() => api.post(`/api/queues/${id}/move`, { roomId, reason }));
-
-export const removeQueueEntry = (id, reason) => call(() => api.post(`/api/queues/${id}/remove`, { reason }));
-
-export const keepQueueEntry = (id) => call(() => api.post(`/api/queues/${id}/keep`));

@@ -14,14 +14,9 @@ import {
     getQueueEntries,
     getTodayAppointments,
     getWaitingList,
-    keepInQueue,
-    keepQueueEntry,
-    leaveAppointment,
-    moveQueueEntry,
+    markNoShow,
     reassignDoctor,
-    removeQueueEntry,
     setPriority,
-    setQueuePriority,
 } from "@/services/receptionService";
 import {
     EMPTY_QUEUE_FILTERS,
@@ -124,7 +119,7 @@ const ReceptionQueue = () => {
     const waiting = data?.waiting ?? [];
     const serving = (data?.today ?? []).filter((a) => a.status === "IN_SERVICE");
     const allRooms = [...examRooms(doctors, waiting, serving), ...otherRooms(data?.entries ?? [])];
-    const allRows = [...examRows(waiting, serving), ...entryRows(data?.entries ?? [])];
+    const allRows = [...examRows(waiting, serving, data?.entries ?? []), ...entryRows(data?.entries ?? [])];
     const rooms = allRooms.filter((r) => r.tab === tab);
     const roomOf = new Map(allRooms.map((r) => [r.key, r]));
     const tabRows = orderRows(
@@ -186,7 +181,7 @@ const ReceptionQueue = () => {
     // Moving all of an ended room takes everyone still waiting there; moving one takes that patient only if still in that room
     const liveRows = (rows, fromKey) => {
         const keys = new Set(rows.map((r) => r.key));
-        return allRows.filter((r) => r.state !== "serving" && r.roomKey === fromKey && (rows.length > 1 || keys.has(r.key)));
+        return allRows.filter((r) => r.kind === "exam" && !r.examined && r.state !== "serving" && r.roomKey === fromKey && (rows.length > 1 || keys.has(r.key)));
     };
 
     const moveRows = async (picked, fromKey, choice) => {
@@ -209,8 +204,7 @@ const ReceptionQueue = () => {
         }
         const failures = [];
         for (const row of rows) {
-            const result =
-                row.kind === "exam" ? await reassignDoctor(row.appointmentId, target.doctorId, reason) : await moveQueueEntry(row.entryId, target.roomId, reason);
+            const result = await reassignDoctor(row.appointmentId, target.doctorId, reason);
             if (!result.success) failures.push(`${row.patientName}: ${result.message}`);
         }
         const label = [target.name, target.staff].filter(Boolean).join(" · ");
@@ -220,7 +214,19 @@ const ReceptionQueue = () => {
     };
 
     const endedRooms = rooms.filter((r) => r.ended);
-    const keep = (r) => act(() => (r.kind === "exam" ? keepInQueue(r.appointmentId) : keepQueueEntry(r.entryId)), TEXT.KEPT(r.patientName));
+    const menuOf = (r) =>
+        r.kind !== "exam" || r.state === "serving"
+            ? null
+            : [
+                  { label: TEXT.MENU_PRIORITY, onSelect: () => setDialog({ type: "priority", row: r }) },
+                  ...(r.examined
+                      ? []
+                      : [
+                            { label: TEXT.MENU_MOVE, onSelect: () => setDialog({ type: "move", rows: [r], from: r.roomKey }) },
+                            null,
+                            { label: TEXT.MENU_LEAVE, danger: true, onSelect: () => setDialog({ type: "leave", row: r }) },
+                        ]),
+              ];
     const bookedLater = (room) => (data?.today ?? []).some((a) => a.doctorId === room.doctorId && ["PENDING", "CONFIRMED"].includes(a.status));
 
     const row = dialog?.row;
@@ -255,6 +261,7 @@ const ReceptionQueue = () => {
                         {pageItems.map((r) => {
                             const room = roomOf.get(r.roomKey);
                             const decide = needsDecision(r);
+                            const menu = menuOf(r);
                             return (
                                 <tr key={r.key} className={r.state === "serving" ? "bg-primary-softer" : decide ? "bg-warning-soft" : undefined}>
                                     <td data-label={columns[0]} className="num font-semibold text-ink">
@@ -298,18 +305,9 @@ const ReceptionQueue = () => {
                                         {clockOf(r.checkInAt)}
                                     </td>
                                     <td data-actions>
-                                        {r.state !== "serving" && (
+                                        {menu && (
                                             <div className="flex justify-end">
-                                                <RowMenu
-                                                    label={TEXT.ACTIONS_FOR(r.patientName)}
-                                                    items={[
-                                                        { label: TEXT.MENU_PRIORITY, onSelect: () => setDialog({ type: "priority", row: r }) },
-                                                        { label: TEXT.MENU_MOVE, onSelect: () => setDialog({ type: "move", rows: [r], from: r.roomKey }) },
-                                                        ...(decide ? [{ label: TEXT.MENU_KEEP, onSelect: () => keep(r) }] : []),
-                                                        null,
-                                                        { label: TEXT.MENU_LEAVE, danger: true, onSelect: () => setDialog({ type: "leave", row: r }) },
-                                                    ]}
-                                                />
+                                                <RowMenu label={TEXT.ACTIONS_FOR(r.patientName)} items={menu} />
                                             </div>
                                         )}
                                     </td>
@@ -464,7 +462,7 @@ const ReceptionQueue = () => {
                     onClose={() => setDialog(null)}
                     onSubmit={({ priority, reason }) =>
                         act(
-                            () => (row.kind === "exam" ? setPriority(row.appointmentId, { priority, reason }) : setQueuePriority(row.entryId, { priority, reason })),
+                            () => setPriority(row.appointmentId, { priority, reason }),
                             TEXT.PRIORITY_CHANGED(row.patientName, PRIORITY_LABEL[priority]),
                         )
                     }
@@ -485,7 +483,7 @@ const ReceptionQueue = () => {
                     roomName={roomName}
                     onClose={() => setDialog(null)}
                     onSubmit={(reason) =>
-                        act(() => (row.kind === "exam" ? leaveAppointment(row.appointmentId, reason) : removeQueueEntry(row.entryId, reason)), TEXT.LEFT(row.patientName))
+                        act(() => markNoShow(row.appointmentId, reason), TEXT.LEFT(row.patientName))
                     }
                 />
             )}

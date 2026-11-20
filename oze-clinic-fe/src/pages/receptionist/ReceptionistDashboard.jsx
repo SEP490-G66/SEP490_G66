@@ -101,7 +101,7 @@ const ReceptionistDashboard = () => {
 
     const serving = todays.filter((a) => a.status === "IN_SERVICE");
     const rooms = [...examRooms(doctors, data?.waiting ?? [], serving), ...otherRooms(data?.entries ?? [])];
-    const rows = orderRows([...examRows(data?.waiting ?? [], serving), ...entryRows(data?.entries ?? [])], rooms);
+    const rows = orderRows([...examRows(data?.waiting ?? [], serving, data?.entries ?? []), ...entryRows(data?.entries ?? [])], rooms);
     const roomOf = new Map(rooms.map((r) => [r.key, r]));
     const byTab = (state, tab) => rows.filter((r) => state(r) && roomOf.get(r.roomKey)?.tab === tab).length;
     const isWaiting = (r) => r.state !== "serving";
