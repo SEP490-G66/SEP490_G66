@@ -55,7 +55,7 @@ namespace OZE.Application
             services.AddScoped<IHomeService, HomeService>();
             services.AddHttpClient<ISmsSender, SmsSender>(client =>
             {
-                client.BaseAddress = new Uri("https://api.speedsms.vn/");
+                client.BaseAddress = new Uri("https://rest.esms.vn/");
             });
             services.AddScoped<IWorkShipService, WorkShiftService>();
             services.AddScoped<ITreatmentPlanService, TreatmentPlanService>();

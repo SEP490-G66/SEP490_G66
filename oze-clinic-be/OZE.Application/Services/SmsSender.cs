@@ -1,6 +1,6 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OZE.Application.Interfaces;
@@ -10,7 +10,7 @@ namespace OZE.Application.Services
 {
     public class SmsSender : ISmsSender
     {
-        private const string SendPath = "index.php/sms/send";
+        private const string SendPath = "MainService.svc/json/SendMultipleMessage_V4_post_json/";
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -33,7 +33,8 @@ namespace OZE.Application.Services
 
         public async Task SendSmsAsync(string toPhoneNumber, string message)
         {
-            if (string.IsNullOrWhiteSpace(_options.AccessToken))
+            if (string.IsNullOrWhiteSpace(_options.ApiKey)
+                || string.IsNullOrWhiteSpace(_options.SecretKey))
             {
                 _logger.LogWarning(
                     "SMS is not configured. Message to {Phone} was not sent via network. Body: {Message}",
@@ -42,51 +43,54 @@ namespace OZE.Application.Services
                 return;
             }
 
-            var phone = NormalizeForSpeedSms(toPhoneNumber);
-            var smsType = _options.SmsType > 0 ? _options.SmsType : 4;
-            var sender = string.IsNullOrWhiteSpace(_options.Sender) ? "Verify" : _options.Sender.Trim();
+            var phone = NormalizeForEsms(toPhoneNumber);
+            var smsType = string.IsNullOrWhiteSpace(_options.SmsType) ? "2" : _options.SmsType.Trim();
+            var isUnicode = string.IsNullOrWhiteSpace(_options.IsUnicode) ? "0" : _options.IsUnicode.Trim();
+            var sandbox = string.IsNullOrWhiteSpace(_options.Sandbox) ? "1" : _options.Sandbox.Trim();
+            var brandname = _options.Brandname?.Trim() ?? string.Empty;
 
-            var url = QueryHelpers.AddQueryString(SendPath, new Dictionary<string, string?>
+            var payload = new
             {
-                ["access-token"] = _options.AccessToken.Trim(),
-                ["to"] = phone,
-                ["content"] = message,
-                ["type"] = smsType.ToString(),
-                ["sender"] = sender
-            });
+                ApiKey = _options.ApiKey.Trim(),
+                SecretKey = _options.SecretKey.Trim(),
+                Phone = phone,
+                Content = message,
+                Brandname = brandname,
+                SmsType = smsType,
+                IsUnicode = isUnicode,
+                Sandbox = sandbox
+            };
 
-            using var response = await _httpClient.GetAsync(url);
+            using var response = await _httpClient.PostAsJsonAsync(SendPath, payload);
             var body = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError(
-                    "SpeedSMS HTTP {StatusCode} when sending to {Phone}: {Body}",
+                    "eSMS HTTP {StatusCode} when sending to {Phone}: {Body}",
                     (int)response.StatusCode,
                     phone,
                     body);
                 throw new Exception($"SMS sending failed: HTTP {(int)response.StatusCode}");
             }
 
-            SpeedSmsSendResponse? result;
+            EsmsSendResponse? result;
             try
             {
-                result = JsonSerializer.Deserialize<SpeedSmsSendResponse>(body, JsonOptions);
+                result = JsonSerializer.Deserialize<EsmsSendResponse>(body, JsonOptions);
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, "SpeedSMS returned invalid JSON when sending to {Phone}: {Body}", phone, body);
-                throw new Exception("SMS sending failed: invalid response from SpeedSMS");
+                _logger.LogError(ex, "eSMS returned invalid JSON when sending to {Phone}: {Body}", phone, body);
+                throw new Exception("SMS sending failed: invalid response from eSMS");
             }
 
-            if (result == null
-                || !string.Equals(result.Status, "success", StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(result.Code, "00", StringComparison.OrdinalIgnoreCase))
+            if (result == null || !string.Equals(result.CodeResult, "100", StringComparison.OrdinalIgnoreCase))
             {
-                var code = result?.Code ?? "unknown";
-                var errorMessage = result?.Message ?? body;
+                var code = result?.CodeResult ?? "unknown";
+                var errorMessage = result?.ErrorMessage ?? body;
                 _logger.LogError(
-                    "Failed to send SMS via SpeedSMS: {Code} {Message}",
+                    "Failed to send SMS via eSMS: {Code} {Message}",
                     code,
                     errorMessage);
                 throw new Exception($"SMS sending failed: {code} {errorMessage}");
@@ -94,34 +98,34 @@ namespace OZE.Application.Services
         }
 
         /// <summary>
-        /// SpeedSMS expects 84xxxxxxxxx (no leading +). App stores E.164 as +84...
+        /// eSMS docs use national VN numbers (0xxxxxxxxx). App stores E.164 as +84...
         /// </summary>
-        internal static string NormalizeForSpeedSms(string phoneNumber)
+        internal static string NormalizeForEsms(string phoneNumber)
         {
             var trimmed = phoneNumber.Trim();
             if (trimmed.StartsWith('+'))
             {
-                return trimmed[1..];
+                trimmed = trimmed[1..];
             }
 
-            if (trimmed.StartsWith('0') && trimmed.Length >= 10)
+            if (trimmed.StartsWith("84") && trimmed.Length >= 11)
             {
-                return "84" + trimmed[1..];
+                return "0" + trimmed[2..];
             }
 
             return trimmed;
         }
 
-        private sealed class SpeedSmsSendResponse
+        private sealed class EsmsSendResponse
         {
-            [JsonPropertyName("status")]
-            public string? Status { get; set; }
+            [JsonPropertyName("CodeResult")]
+            public string? CodeResult { get; set; }
 
-            [JsonPropertyName("code")]
-            public string? Code { get; set; }
+            [JsonPropertyName("SMSID")]
+            public string? SmsId { get; set; }
 
-            [JsonPropertyName("message")]
-            public string? Message { get; set; }
+            [JsonPropertyName("ErrorMessage")]
+            public string? ErrorMessage { get; set; }
         }
     }
 }

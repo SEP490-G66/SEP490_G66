@@ -2,16 +2,28 @@ namespace OZE.Common.Models
 {
     public class AuthSmsSenderOptions
     {
-        public string? AccessToken { get; set; }
+        public string? ApiKey { get; set; }
+
+        public string? SecretKey { get; set; }
 
         /// <summary>
-        /// SpeedSMS type: 2 random, 3 brandname, 4 default Verify/Notify, 5 android app.
+        /// Registered eSMS Brandname (carrier-approved sender name).
         /// </summary>
-        public int SmsType { get; set; } = 4;
+        public string Brandname { get; set; } = string.Empty;
 
         /// <summary>
-        /// Brandname or default sender (Verify / Notify for type 4).
+        /// eSMS type: 2 = CSKH / OTP Brandname.
         /// </summary>
-        public string Sender { get; set; } = "Verify";
+        public string SmsType { get; set; } = "2";
+
+        /// <summary>
+        /// 0 = no diacritics, 1 = Unicode (Vietnamese with tones).
+        /// </summary>
+        public string IsUnicode { get; set; } = "0";
+
+        /// <summary>
+        /// 1 = sandbox (no real SMS, no charge), 0 = live send.
+        /// </summary>
+        public string Sandbox { get; set; } = "1";
     }
 }

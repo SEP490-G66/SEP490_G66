@@ -55,7 +55,7 @@ Luồng chính của phòng khám: đặt lịch → xác nhận → check-in �
 
 ## 3. Việc tồn và rủi ro
 
-- **Khóa bí mật trong repo** (JWT, mật khẩu `sa` trong `appsettings*.json`) cần xoay / đưa ra biến môi trường. SendGrid key / SpeedSMS AccessToken đang trống.
+- **Khóa bí mật trong repo** (JWT, mật khẩu `sa` trong `appsettings*.json`) cần xoay / đưa ra biến môi trường. SendGrid key / eSMS ApiKey+SecretKey đang trống.
 - **Múi giờ**: nghiệp vụ lịch/check-in đã dùng `ClinicClock` (`Asia/Ho_Chi_Minh`). Không còn phụ thuộc `DateTime.Now` của server như bản ghi 31/10.
 - **CI/CD** (nếu chưa đổi): cần xác nhận lại có chạy test và migration trên nhánh feature hay chưa.
 - Unit test đã phủ Auth, check-in, waiting list, start examination, imaging, ownership, patients, services (~257). Vẫn mỏng hoặc thiếu cho đặt lịch bệnh nhân, `/my`, đổi lịch, walk-in, end-shift, examination content / prescription / diagnoses.

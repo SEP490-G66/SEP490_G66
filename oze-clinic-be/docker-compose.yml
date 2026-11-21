@@ -17,6 +17,9 @@ services:
       - AuthMessageSenderOptions__SendGridKey=${SENDGRID_KEY:-}
       - AuthMessageSenderOptions__SenderEmail=${SENDER_EMAIL:-support@oze.com}
       - AuthMessageSenderOptions__SenderName=${SENDER_NAME:-OZE Support}
-      - AuthSmsSenderOptions__AccessToken=${SPEEDSMS_ACCESS_TOKEN:-}
-      - AuthSmsSenderOptions__SmsType=${SPEEDSMS_SMS_TYPE:-4}
-      - AuthSmsSenderOptions__Sender=${SPEEDSMS_SENDER:-Verify}
+      - AuthSmsSenderOptions__ApiKey=${ESMS_API_KEY:-}
+      - AuthSmsSenderOptions__SecretKey=${ESMS_SECRET_KEY:-}
+      - AuthSmsSenderOptions__Brandname=${ESMS_BRANDNAME:-}
+      - AuthSmsSenderOptions__SmsType=${ESMS_SMS_TYPE:-2}
+      - AuthSmsSenderOptions__IsUnicode=${ESMS_IS_UNICODE:-0}
+      - AuthSmsSenderOptions__Sandbox=${ESMS_SANDBOX:-1}
