@@ -2,11 +2,11 @@ import DetailLink from "@/components/ui/DetailLink";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatDate, formatTime } from "@/utils/format";
 import { APPOINTMENT_STATUS, PATIENT_APPOINTMENT_STATUS } from "@/utils/messages";
-import { formatQueueNumber, isInClinic } from "@/utils/patientQueue";
+import { PATIENT_QUEUE_ENABLED, formatQueueNumber, isInClinic } from "@/utils/patientQueue";
 import { getAppointmentDetailRoute } from "@/utils/routes";
 
 const SKELETON_ROW_COUNT = 5;
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = PATIENT_QUEUE_ENABLED ? 8 : 7;
 const QUEUE_LABEL = "STT";
 const NO_QUEUE_LABEL = "Chưa có số";
 
@@ -41,7 +41,7 @@ const AppointmentTable = ({ appointments = [], labelledBy, loading = false }) =>
                 <thead>
                     <tr>
                         <th scope="col">Mã lịch</th>
-                        <th scope="col">{QUEUE_LABEL}</th>
+                        {PATIENT_QUEUE_ENABLED && <th scope="col">{QUEUE_LABEL}</th>}
                         <th scope="col">Ngày khám</th>
                         <th scope="col">Giờ khám</th>
                         <th scope="col">Dịch vụ</th>
@@ -66,9 +66,11 @@ const AppointmentTable = ({ appointments = [], labelledBy, loading = false }) =>
                         : appointments.map((appointment) => (
                               <tr key={appointment.id}>
                                   <td className="cell-primary">{appointment.appointmentCode}</td>
-                                  <td>
-                                      <QueueCell queueNumber={getQueueNumber(appointment)} />
-                                  </td>
+                                  {PATIENT_QUEUE_ENABLED && (
+                                      <td>
+                                          <QueueCell queueNumber={getQueueNumber(appointment)} />
+                                      </td>
+                                  )}
                                   <td>{formatDate(appointment.appointmentDate)}</td>
                                   <td>{formatTime(appointment.timeSlotStart)}</td>
                                   <td>{appointment.serviceName}</td>

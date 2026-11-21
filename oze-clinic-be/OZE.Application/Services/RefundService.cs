@@ -188,10 +188,10 @@ namespace OZE.Application.Services
 
                 var now = DateTimeOffset.UtcNow;
                 refundRequest.Amount = refundAmount;
-                refundRequest.Status = PaymentConstants.RefundRequestStatus.Processed;
+                // BE-B3: approved, the receptionist pays it out later (payout)
+                refundRequest.Status = PaymentConstants.RefundRequestStatus.Approved;
                 refundRequest.ApprovedByUserId = string.IsNullOrWhiteSpace(approvedByUserId) ? null : approvedByUserId;
                 refundRequest.ApprovedAt = now;
-                refundRequest.ProcessedAt = now;
                 refundRequest.UpdatedAt = now;
 
                 InvoiceMoneyHelper.Recalculate(invoice);
@@ -213,18 +213,16 @@ namespace OZE.Application.Services
                         approvedByUserId
                     });
 
-                await SafeAuditAsync(
-                    AuditConstants.RefundProcessed,
-                    refundRequest.Id.ToString(),
-                    null,
-                    new { refundRequest.InvoiceId, refundRequest.Amount, refundRequest.ProcessedAt });
                 await NotifyAsync(n => n.NotifyPatientAsync(invoice.PatientId,
                     new NotificationContent(NotificationConstants.Text.RefundApprovedTitle, string.Format(NotificationConstants.Text.RefundApprovedMessage, NotificationFormat.Money(refundRequest.Amount), invoice.InvoiceNumber),
-                        NotificationConstants.Reference.Invoice, invoice.Id.ToString()), cancellationToken));
-                await NotifyAsync(n => n.NotifyUsersAsync(new[] { refundRequest.RequestedByUserId },
-                    new NotificationContent(NotificationConstants.Text.RefundDecidedForRequesterTitle,
-                        string.Format(NotificationConstants.Text.RefundDecidedForRequesterMessage, invoice.InvoiceNumber, "đã duyệt, hoàn " + NotificationFormat.Money(refundRequest.Amount)),
                         NotificationConstants.Reference.RefundRequest, refundRequest.Id.ToString()), cancellationToken));
+                if (!IsSentByPatient(refundRequest, invoice))
+                {
+                    await NotifyAsync(n => n.NotifyUsersAsync(new[] { refundRequest.RequestedByUserId },
+                        new NotificationContent(NotificationConstants.Text.RefundDecidedForRequesterTitle,
+                            string.Format(NotificationConstants.Text.RefundDecidedForRequesterMessage, invoice.InvoiceNumber, "đã duyệt, hoàn " + NotificationFormat.Money(refundRequest.Amount)),
+                            NotificationConstants.Reference.RefundRequest, refundRequest.Id.ToString()), cancellationToken));
+                }
 
                 return ToResponse(refundRequest, invoice);
             }, cancellationToken);
@@ -276,15 +274,170 @@ namespace OZE.Application.Services
                     });
                 await NotifyAsync(n => n.NotifyPatientAsync(invoice.PatientId,
                     new NotificationContent(NotificationConstants.Text.RefundRejectedTitle, string.Format(NotificationConstants.Text.RefundRejectedMessage, invoice.InvoiceNumber, rejectionReason),
-                        NotificationConstants.Reference.Invoice, invoice.Id.ToString()), cancellationToken));
-                await NotifyAsync(n => n.NotifyUsersAsync(new[] { refundRequest.RequestedByUserId },
-                    new NotificationContent(NotificationConstants.Text.RefundDecidedForRequesterTitle,
-                        string.Format(NotificationConstants.Text.RefundDecidedForRequesterMessage, invoice.InvoiceNumber, "bị từ chối, lý do: " + rejectionReason),
+                        NotificationConstants.Reference.RefundRequest, refundRequest.Id.ToString()), cancellationToken));
+                if (!IsSentByPatient(refundRequest, invoice))
+                {
+                    await NotifyAsync(n => n.NotifyUsersAsync(new[] { refundRequest.RequestedByUserId },
+                        new NotificationContent(NotificationConstants.Text.RefundDecidedForRequesterTitle,
+                            string.Format(NotificationConstants.Text.RefundDecidedForRequesterMessage, invoice.InvoiceNumber, "bị từ chối, lý do: " + rejectionReason),
+                            NotificationConstants.Reference.RefundRequest, refundRequest.Id.ToString()), cancellationToken));
+                }
+
+                return ToResponse(refundRequest, invoice);
+            }, cancellationToken);
+        }
+
+        public Task<RefundRequestResponse> PayoutAsync(
+            long requestId,
+            string paidOutByUserId,
+            CancellationToken cancellationToken = default)
+        {
+            return _refundRepository.ExecuteInTransactionAsync(async () =>
+            {
+                var refundRequest = await _refundRepository.GetByIdWithInvoiceAsync(requestId, cancellationToken);
+                ConditionGuard.Ensure<NotFoundException>(
+                    refundRequest != null,
+                    ErrorConstants.RefundMessage.RequestNotFound);
+
+                ConditionGuard.Ensure(
+                    refundRequest!.Status == PaymentConstants.RefundRequestStatus.Approved,
+                    ErrorConstants.RefundMessage.RequestNotApproved);
+
+                var now = DateTimeOffset.UtcNow;
+                refundRequest.Status = PaymentConstants.RefundRequestStatus.Processed;
+                refundRequest.ProcessedAt = now;
+                refundRequest.UpdatedAt = now;
+
+                var invoice = refundRequest.Invoice;
+                invoice.UpdatedAt = now;
+                _invoiceRepository.Update(invoice);
+                await _refundRepository.SaveChangesAsync(cancellationToken);
+
+                await SafeAuditAsync(
+                    AuditConstants.RefundProcessed,
+                    refundRequest.Id.ToString(),
+                    null,
+                    new { refundRequest.InvoiceId, refundRequest.Amount, refundRequest.ProcessedAt, paidOutByUserId });
+                await NotifyAsync(n => n.NotifyPatientAsync(invoice.PatientId,
+                    new NotificationContent(NotificationConstants.Text.RefundPaidOutTitle,
+                        string.Format(NotificationConstants.Text.RefundPaidOutMessage, NotificationFormat.Money(refundRequest.Amount), invoice.InvoiceNumber),
                         NotificationConstants.Reference.RefundRequest, refundRequest.Id.ToString()), cancellationToken));
 
                 return ToResponse(refundRequest, invoice);
             }, cancellationToken);
         }
+
+        public async Task<IReadOnlyList<MyRefundRequestResponse>> GetMyAsync(
+            string userId,
+            CancellationToken cancellationToken = default)
+        {
+            var invoices = await GetMyInvoicesAsync(userId, cancellationToken);
+            return invoices
+                .SelectMany(invoice => invoice.RefundAdjustmentRequests
+                    .Where(r => r.RequestType == PaymentConstants.RefundRequestType.Refund)
+                    .Select(r => ToMyResponse(r, invoice)))
+                .OrderByDescending(r => r.CreatedAt)
+                .ThenByDescending(r => r.Id)
+                .ToList();
+        }
+
+        public async Task<IReadOnlyList<MyRefundableInvoiceResponse>> GetMyRefundableInvoicesAsync(
+            string userId,
+            CancellationToken cancellationToken = default)
+        {
+            var invoices = await GetMyInvoicesAsync(userId, cancellationToken);
+            return invoices
+                .Where(invoice => invoice.PaymentStatus != InvoiceConstants.Refunded
+                    && InvoiceMoneyHelper.GetNetPaidAmount(invoice) > 0
+                    && !invoice.RefundAdjustmentRequests.Any(r => r.Status == PaymentConstants.RefundRequestStatus.Pending))
+                .Select(invoice => new MyRefundableInvoiceResponse
+                {
+                    InvoiceId = invoice.Id,
+                    InvoiceNumber = invoice.InvoiceNumber,
+                    TreatmentPlanId = invoice.TreatmentPlanId,
+                    AccountName = AccountName(invoice),
+                    InvoiceDate = invoice.CreatedAt,
+                    DoctorName = DoctorName(invoice),
+                    PaidAmount = InvoiceMoneyHelper.GetNetPaidAmount(invoice)
+                })
+                .ToList();
+        }
+
+        public async Task<MyRefundRequestResponse> RequestMyAsync(
+            string userId,
+            CreateMyRefundRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var patientId = await GetMyPatientIdAsync(userId, cancellationToken);
+            var invoice = await _invoiceRepository.GetByIdWithDetailsAsync(request.InvoiceId, cancellationToken);
+            // Another patient's invoice looks the same as a missing one
+            ConditionGuard.Ensure<NotFoundException>(invoice != null && invoice.PatientId == patientId, ErrorConstants.RefundMessage.InvoiceNotFound);
+
+            var created = await RequestAsync(request.InvoiceId, userId, new CreateRefundRequest { Reason = request.Reason }, cancellationToken);
+            var mine = await GetMyAsync(userId, cancellationToken);
+            return mine.First(r => r.Id == created.Id);
+        }
+
+        private async Task<int> GetMyPatientIdAsync(string userId, CancellationToken cancellationToken)
+        {
+            var patientId = await _refundRepository.GetPatientIdByUserIdAsync(userId, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(patientId.HasValue, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
+            return patientId!.Value;
+        }
+
+        private async Task<IReadOnlyList<Invoice>> GetMyInvoicesAsync(string userId, CancellationToken cancellationToken)
+        {
+            var patientId = await GetMyPatientIdAsync(userId, cancellationToken);
+            return await _refundRepository.GetPatientInvoicesForRefundAsync(patientId, cancellationToken);
+        }
+
+        private static MyRefundRequestResponse ToMyResponse(RefundAdjustmentRequest request, Invoice invoice)
+        {
+            var decided = request.Status == PaymentConstants.RefundRequestStatus.Approved
+                || request.Status == PaymentConstants.RefundRequestStatus.Processed;
+            return new MyRefundRequestResponse
+            {
+                Id = request.Id,
+                Code = $"HT{request.Id:D6}",
+                InvoiceId = invoice.Id,
+                InvoiceNumber = invoice.InvoiceNumber,
+                TreatmentPlanId = invoice.TreatmentPlanId,
+                AccountName = AccountName(invoice),
+                InvoiceDate = invoice.CreatedAt,
+                DoctorName = DoctorName(invoice),
+                // Once decided, Amount = paid − work done, so the paid amount at that time is their sum
+                PaidAmount = decided ? request.Amount + (request.WorkDoneAmount ?? 0m) : InvoiceMoneyHelper.GetNetPaidAmount(invoice),
+                RefundAmount = decided ? request.Amount : null,
+                WorkDoneAmount = decided ? request.WorkDoneAmount : null,
+                Reason = request.Reason,
+                Status = request.Status,
+                RejectionReason = request.RejectionReason,
+                CreatedAt = request.CreatedAt,
+                ApprovedAt = request.ApprovedAt,
+                ProcessedAt = request.ProcessedAt,
+                RefundMethod = RefundMethod(request, invoice)
+            };
+        }
+
+        private static string? AccountName(Invoice invoice) =>
+            invoice.TreatmentPlan?.PlanName is { Length: > 0 } planName
+                ? planName
+                : string.Join(" · ", invoice.Items.OrderBy(i => i.SortOrder).Select(i => i.ServiceName).Distinct());
+
+        private static string? DoctorName(Invoice invoice) =>
+            invoice.Appointment?.Doctor?.FullName ?? invoice.TreatmentPlan?.CreatedByDoctor?.FullName;
+
+        // Money goes back the way it was paid: the chosen payment, otherwise the latest confirmed one
+        private static string? RefundMethod(RefundAdjustmentRequest request, Invoice invoice)
+        {
+            var confirmed = invoice.Payments.Where(p => p.PaymentStatus == PaymentConstants.Confirmed).ToList();
+            var payment = confirmed.FirstOrDefault(p => p.Id == request.PaymentId)
+                ?? confirmed.OrderByDescending(p => p.PaidAt ?? p.CreatedAt).FirstOrDefault();
+            return payment?.PaymentMethod;
+        }
+
+        private static bool IsSentByPatient(RefundAdjustmentRequest request, Invoice? invoice) =>
+            invoice?.Patient?.UserId is { Length: > 0 } patientUserId && patientUserId == request.RequestedByUserId;
 
         private static void EnsureInvoiceRefundable(Invoice invoice)
         {
@@ -343,7 +496,8 @@ namespace OZE.Application.Services
                 InvoicePaymentStatus = invoice?.PaymentStatus,
                 PatientName = invoice?.Patient?.FullName,
                 PatientCode = invoice?.Patient?.PatientCode,
-                ServiceNames = invoice?.Items is { Count: > 0 } items ? string.Join(" · ", items.Select(i => i.ServiceName)) : null
+                ServiceNames = invoice?.Items is { Count: > 0 } items ? string.Join(" · ", items.Select(i => i.ServiceName)) : null,
+                RequestedByName = IsSentByPatient(request, invoice) ? "Bệnh nhân" : "Lễ tân"
             };
         }
     }

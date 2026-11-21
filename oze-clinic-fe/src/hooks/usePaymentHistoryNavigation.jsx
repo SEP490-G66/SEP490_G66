@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useLocation, useNavigate, useNavigationType, useSearchParams } from "react-router-dom";
-import { getMyPaymentHistory } from "@/services/patientDashboardService";
-import { PAYMENT_HISTORY_TEXT } from "@/utils/messages";
+import { getMyPaymentReceipts } from "@/services/patientBillingService";
+import { BOOKING_ERROR_CODE, PAYMENT_HISTORY_TEXT } from "@/utils/messages";
 import {
     HISTORY_NAV_FLAG,
     HISTORY_RETRY_ID,
@@ -81,14 +81,15 @@ const usePaymentHistoryNavigation = () => {
         if (load.status !== "loading") return undefined;
         const controller = new AbortController();
         let active = true;
-        const finish = (result) => {
+        const finish = (result, status) => {
             if (!active) return;
-            setLoad((current) => (current.id === load.id ? { ...current, status: result ? "ready" : "error", data: result } : current));
+            setLoad((current) => (current.id === load.id ? { ...current, status: status ?? (result ? "ready" : "error"), data: result } : current));
         };
-        getMyPaymentHistory({ signal: controller.signal })
-            .then((response) =>
-                finish(response?.success && Array.isArray(response.data?.items) ? { items: response.data.items, profile: response.data.profile ?? {} } : null),
-            )
+        getMyPaymentReceipts({ signal: controller.signal })
+            .then((response) => {
+                if (response?.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND) finish(null, "unlinked");
+                else finish(response?.success && Array.isArray(response.data?.items) ? { items: response.data.items, profile: response.data.profile ?? {} } : null);
+            })
             .catch(() => finish(null));
         return () => {
             active = false;

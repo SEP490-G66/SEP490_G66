@@ -3,7 +3,7 @@ import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
 import { createRoom, updateRoom } from "@/services/roomService";
 import { cx } from "@/utils/cx";
-import { ROOM_STATUSES, ROOM_STATUS_OPTIONS, ROOM_TYPE_OPTIONS } from "@/utils/room";
+import { ROOM_STATUSES, ROOM_STATUS_OPTIONS, ROOM_TYPE_OPTIONS } from "@/utils/constants/room";
 import { isRequiredEmpty, requiredMessage } from "@/utils/validation";
 
 const ROOM_LIMITS = { NAME_MAX: 100, FLOOR_MAX: 20, DESCRIPTION_MAX: 500 };

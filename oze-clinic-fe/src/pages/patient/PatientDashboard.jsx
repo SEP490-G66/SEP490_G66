@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { CalendarDays, ReceiptText, Stethoscope } from "lucide-react";
+import { CalendarDays, CircleAlert, ReceiptText, Stethoscope } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Hotline } from "@/components/booking/BookingSchedule";
+import BookingStateBox from "@/components/booking/BookingStateBox";
 import RecentVisitsSection from "@/components/dashboard/RecentVisitsSection";
 import StatCard from "@/components/dashboard/StatCard";
 import TasksSection from "@/components/dashboard/TasksSection";
@@ -8,9 +10,11 @@ import TreatmentProgressSection from "@/components/dashboard/TreatmentProgressSe
 import UpcomingAppointmentsSection from "@/components/dashboard/UpcomingAppointmentsSection";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
-import { getMyAppointments, getMyInvoices, getMyTreatmentPlans } from "@/services/patientDashboardService";
-import { formatCurrency, formatDate, formatTime, formatWeekday, toDateOnly } from "@/utils/format";
-import { APPOINTMENT_STATUS, EXAMINATION_STATUS, PAYMENT_STATUS, PLAN_STATUS, STAGE_STATUS } from "@/utils/messages";
+import { getMyAppointments } from "@/services/appointmentService";
+import { getMyDues } from "@/services/invoiceDueService";
+import { getMyTreatmentPlans } from "@/services/medicalBookService";
+import { formatCurrency, formatDate, formatTime, formatWeekday, getClinicToday } from "@/utils/format";
+import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, EXAMINATION_STATUS, INVOICE_PAYMENT_STATUS, PAYMENT_STATUS, PLAN_STATUS, STAGE_STATUS } from "@/utils/messages";
 import { ROUTES, getTreatmentPlanRoute } from "@/utils/routes";
 
 const EMPTY_VALUE = "—";
@@ -24,11 +28,32 @@ const TODAY_STATUS_RANK = {
     [APPOINTMENT_STATUS.PENDING]: 2,
 };
 const RECENT_EXAMINATION_STATUSES = [EXAMINATION_STATUS.COMPLETED, EXAMINATION_STATUS.LOCKED];
-const UNPAID_STATUSES = [PAYMENT_STATUS.UNPAID, PAYMENT_STATUS.PARTIALLY_PAID];
+const TREATMENT_PLAN_ENABLED = true;
+const OVERDUE_STATUS = "OVERDUE";
+const EMPTY_DUES = { items: [], total: 0 };
 
-const toResource = ({ loading, error, value }) => {
-    const failed = !loading && (Boolean(error) || value?.success === false || !Array.isArray(value?.data));
-    return { loading, failed, data: !loading && !failed ? value.data : [] };
+const TEXT = {
+    DUE_LABEL: "Còn nợ",
+    DUE_CAPTION: (count) => `${count} khoản · thanh toán tại quầy`,
+    NO_DUE: "Không có khoản còn nợ",
+    UNLINKED_TEXT: "Vui lòng gọi",
+    UNLINKED_TEXT_END: "để lễ tân gắn hồ sơ.",
+};
+
+const isUnlinked = ({ loading, error, value }) => !loading && !error && value?.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND;
+
+const toResource = (state) => {
+    const { loading, error, value } = state;
+    const unlinked = isUnlinked(state);
+    const failed = !loading && !unlinked && (Boolean(error) || value?.success === false || !Array.isArray(value?.data));
+    return { loading, failed, unlinked, data: !loading && !failed && !unlinked ? value.data : [] };
+};
+
+const toDueResource = (state) => {
+    const { loading, error, value } = state;
+    const unlinked = isUnlinked(state);
+    const failed = !loading && !unlinked && (Boolean(error) || value?.success !== true || !Array.isArray(value?.data?.items));
+    return { loading, failed, unlinked, data: !loading && !failed && !unlinked ? value.data : EMPTY_DUES };
 };
 
 const dateOf = (appointment) => (appointment.appointmentDate ?? "").slice(0, 10);
@@ -85,36 +110,23 @@ const getStageProgress = (stages) => {
     };
 };
 
-const getRemainder = (invoice) => Math.max(0, (invoice.finalAmount ?? 0) - (invoice.paidAmount ?? 0));
+const getDueItems = (dues) => [...dues.items].sort((a, b) => Number(b.overdue) - Number(a.overdue) || (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id - b.id);
 
-const getUnpaidInvoices = (invoices) =>
-    invoices
-        .filter((invoice) => UNPAID_STATUSES.includes(invoice.paymentStatus) && getRemainder(invoice) > 0)
-        .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? "") || a.id - b.id);
+const taskStatus = (item) => {
+    if (item.overdue) return OVERDUE_STATUS;
+    return Object.hasOwn(INVOICE_PAYMENT_STATUS, item.paymentStatus) ? item.paymentStatus : PAYMENT_STATUS.UNPAID;
+};
 
-const getTasks = (plans, unpaidInvoices) => [
-    ...plans
-        .filter((plan) => plan.status === PLAN_STATUS.PROPOSED)
-        .sort((a, b) => (b.proposedAt ?? "").localeCompare(a.proposedAt ?? "") || b.treatmentPlanId - a.treatmentPlanId)
-        .map((plan) => ({
-            kind: "plan",
-            id: plan.treatmentPlanId,
-            status: plan.status,
-            planName: plan.planName,
-            doctorName: plan.doctorName,
-            proposedAt: plan.proposedAt,
-            stageCount: getStageProgress(plan.stages).y,
-            estimatedTotalCost: plan.estimatedTotalCost,
-        })),
-    ...unpaidInvoices.map((invoice) => ({
+const getTasks = (dueItems) =>
+    dueItems.map((item) => ({
         kind: "invoice",
-        id: invoice.id,
-        status: invoice.paymentStatus,
-        invoiceNumber: invoice.invoiceNumber,
-        remainder: getRemainder(invoice),
-        appointmentDate: invoice.appointmentDate,
-    })),
-];
+        id: item.id,
+        debtId: item.debtId,
+        status: taskStatus(item),
+        invoiceNumber: item.invoiceNumber,
+        remainder: item.due,
+        appointmentDate: item.visitDate ?? undefined,
+    }));
 
 const getGreeting = (userName, today) => {
     const name = userName?.trim();
@@ -129,18 +141,18 @@ const getPlanStat = (activePlan, progress) => {
 
 const PatientDashboard = () => {
     const { userName } = useSession();
-    const [today] = useState(() => toDateOnly(new Date()));
+    const [today] = useState(getClinicToday);
     const appointments = toResource(useAsync(getMyAppointments, []));
     const plans = toResource(useAsync(getMyTreatmentPlans, []));
-    const invoices = toResource(useAsync(getMyInvoices, []));
+    const dues = toDueResource(useAsync(getMyDues, []));
 
     const upcoming = getUpcoming(appointments.data, today);
     const highlighted = getHighlighted(appointments.data, today, upcoming);
     const activePlan = getActivePlan(plans.data);
     const progress = getStageProgress(activePlan?.stages);
-    const unpaidInvoices = getUnpaidInvoices(invoices.data);
-    const unpaidTotal = unpaidInvoices.reduce((sum, invoice) => sum + getRemainder(invoice), 0);
+    const dueItems = getDueItems(dues.data);
     const planStat = plans.failed ? { value: EMPTY_VALUE } : getPlanStat(activePlan, progress);
+    const unlinked = appointments.unlinked || dues.unlinked || plans.unlinked;
 
     return (
         <>
@@ -153,59 +165,67 @@ const PatientDashboard = () => {
                     Đặt lịch hẹn
                 </Link>
             </div>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <StatCard
-                    icon={CalendarDays}
-                    label="Lịch hẹn sắp tới"
-                    value={appointments.failed ? EMPTY_VALUE : upcoming.length}
-                    caption={appointments.failed ? null : getStatOneCaption(upcoming, highlighted)}
-                    to={ROUTES.APPOINTMENTS}
-                    loading={appointments.loading}
-                />
-                <StatCard
-                    icon={Stethoscope}
-                    label="Kế hoạch đang điều trị"
-                    value={planStat.value}
-                    caption={planStat.caption}
-                    to={getTreatmentPlanRoute()}
-                    loading={plans.loading}
-                />
-                <StatCard
-                    icon={ReceiptText}
-                    label="Hóa đơn chưa thanh toán"
-                    value={invoices.failed ? EMPTY_VALUE : formatCurrency(unpaidTotal)}
-                    caption={
-                        invoices.failed
-                            ? null
-                            : unpaidInvoices.length > 0
-                              ? `${unpaidInvoices.length} hóa đơn · thanh toán tại quầy`
-                              : "Không có hóa đơn chưa thanh toán"
-                    }
-                    to={ROUTES.PAYMENT_DEBTS}
-                    loading={invoices.loading}
-                />
-            </div>
-            <div className="mt-6 flex flex-col gap-6">
-                <TasksSection
-                    tasks={getTasks(plans.data, unpaidInvoices)}
-                    loading={plans.loading || invoices.loading}
-                    failed={plans.failed || invoices.failed}
-                />
-                <UpcomingAppointmentsSection
-                    highlighted={highlighted}
-                    highlightedIsToday={highlighted ? dateOf(highlighted) === today : false}
-                    nextAppointments={getNextAppointments(upcoming, highlighted)}
-                    loading={appointments.loading}
-                    failed={appointments.failed}
-                />
-                <TreatmentProgressSection
-                    plan={activePlan && { ...activePlan, stages: progress.stages }}
-                    progress={activePlan && progress}
-                    loading={plans.loading}
-                    failed={plans.failed}
-                />
-                <RecentVisitsSection visits={getRecentVisits(appointments.data)} loading={appointments.loading} failed={appointments.failed} />
-            </div>
+            {unlinked ? (
+                <section className="card-app">
+                    <BookingStateBox tone="warning" icon={CircleAlert} title={BOOKING_TEXT.UNLINKED_TITLE} headingLevel={2}>
+                        {TEXT.UNLINKED_TEXT} <Hotline /> {TEXT.UNLINKED_TEXT_END}
+                    </BookingStateBox>
+                </section>
+            ) : (
+                <>
+                    <div className={TREATMENT_PLAN_ENABLED ? "grid grid-cols-1 gap-4 xl:grid-cols-3" : "grid grid-cols-1 gap-4 md:grid-cols-2"}>
+                        <StatCard
+                            icon={CalendarDays}
+                            label="Lịch hẹn sắp tới"
+                            value={appointments.failed ? EMPTY_VALUE : upcoming.length}
+                            caption={appointments.failed ? null : getStatOneCaption(upcoming, highlighted)}
+                            to={ROUTES.APPOINTMENTS}
+                            loading={appointments.loading}
+                        />
+                        {TREATMENT_PLAN_ENABLED && (
+                            <StatCard
+                                icon={Stethoscope}
+                                label="Kế hoạch đang điều trị"
+                                value={planStat.value}
+                                caption={planStat.caption}
+                                to={getTreatmentPlanRoute()}
+                                loading={plans.loading}
+                            />
+                        )}
+                        <StatCard
+                            icon={ReceiptText}
+                            label={TEXT.DUE_LABEL}
+                            value={dues.failed ? EMPTY_VALUE : formatCurrency(dues.data.total)}
+                            caption={dues.failed ? null : dueItems.length > 0 ? TEXT.DUE_CAPTION(dueItems.length) : TEXT.NO_DUE}
+                            to={ROUTES.PAYMENT_DEBTS}
+                            loading={dues.loading}
+                        />
+                    </div>
+                    <div className="mt-6 flex flex-col gap-6">
+                        <TasksSection
+                            tasks={getTasks(dueItems)}
+                            loading={dues.loading}
+                            failed={dues.failed}
+                        />
+                        <UpcomingAppointmentsSection
+                            highlighted={highlighted}
+                            highlightedIsToday={highlighted ? dateOf(highlighted) === today : false}
+                            nextAppointments={getNextAppointments(upcoming, highlighted)}
+                            loading={appointments.loading}
+                            failed={appointments.failed}
+                        />
+                        {TREATMENT_PLAN_ENABLED && (
+                            <TreatmentProgressSection
+                                plan={activePlan && { ...activePlan, stages: progress.stages }}
+                                progress={activePlan && progress}
+                                loading={plans.loading}
+                                failed={plans.failed}
+                            />
+                        )}
+                        <RecentVisitsSection visits={getRecentVisits(appointments.data)} loading={appointments.loading} failed={appointments.failed} />
+                    </div>
+                </>
+            )}
         </>
     );
 };

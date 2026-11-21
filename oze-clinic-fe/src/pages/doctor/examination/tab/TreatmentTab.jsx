@@ -22,10 +22,14 @@ const initialDraftOf = ({ plan, treatment }) => {
     return { ...treatment, sessionId, items: isNew ? initialTreatmentItems(session) : treatment.items };
 };
 
+// The plan the patient agreed to; only then can its sessions be carried out
+const AGREED_STATUSES = ["Approved", "InProgress", "Completed"];
+
 // Step 4 "Thực hiện điều trị": today's session of the plan, what was done and its price, a note and the session invoice.
 // When today's session is the last one of the plan, the doctor can also propose a check-up date ("Hẹn tái khám").
-// record.treatment is the saved draft; changes are saved automatically and passed to onTreatmentChange.
-// "Chuyển sang Đơn thuốc" marks the session done (onPlanChange gets the new plan) then onComplete.
+// record.treatment is the saved draft; changes are saved automatically (the session's stage is started on the first
+// change, then its actual cost and note updated) and passed to onTreatmentChange.
+// "Chuyển sang Đơn thuốc" completes the session's stage (onPlanChange gets the new plan) then onComplete.
 const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlanChange, onEditPlan, onComplete, onEnd }) => {
     const [initialDraft] = useState(() => initialDraftOf(record));
     const { value: draft, setValue: setDraft, statusText, saveNow } = useAutosave((value) => saveTreatmentDraft(queueId, value), initialDraft, onTreatmentChange);
@@ -67,10 +71,28 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
         onComplete();
     };
 
+    const saveDraft = async () => {
+        const response = await saveNow();
+        if (response.success) toast.success("Đã lưu nháp.");
+        else toast.error(response.message ?? GENERIC_ERROR_MESSAGE);
+    };
+
     const endVisit = async () => {
         await saveNow();
         onEnd();
     };
+
+    if (record.plan.planId && !AGREED_STATUSES.includes(record.plan.status)) {
+        return (
+            <div className="card-app flex flex-col items-center gap-3 py-14 text-center">
+                <p className="font-semibold text-ink">Bệnh nhân chưa đồng ý kế hoạch điều trị</p>
+                <p className="text-muted">Xác nhận kế hoạch ở bước Lập kế hoạch điều trị trước khi thực hiện buổi điều trị.</p>
+                <button type="button" className="btn btn-secondary" onClick={onEditPlan}>
+                    Quay lại Lập kế hoạch điều trị
+                </button>
+            </div>
+        );
+    }
 
     if (!draft.sessionId) {
         return (
@@ -100,7 +122,7 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
             <SessionInvoiceCard items={draft.items} />
             {isLastSession && <FollowUpCard value={draft.followUpDate} today={getClinicToday()} onChange={(followUpDate) => setDraft({ ...draft, followUpDate })} />}
             <StepActionBar status={statusText}>
-                <button type="button" className="btn btn-secondary" disabled={disabled} onClick={saveNow}>
+                <button type="button" className="btn btn-secondary" disabled={disabled} onClick={saveDraft}>
                     Lưu nháp
                 </button>
                 <button type="button" className="btn btn-secondary" disabled={disabled} onClick={endVisit}>

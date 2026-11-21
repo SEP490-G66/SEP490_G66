@@ -9,6 +9,7 @@ import PatientDebtRefunds from "@/components/patientDebt/PatientDebtRefunds";
 import PatientDebtSchedule from "@/components/patientDebt/PatientDebtSchedule";
 import PatientDebtTable from "@/components/patientDebt/PatientDebtTable";
 import PatientDebtToolbar from "@/components/patientDebt/PatientDebtToolbar";
+import UnlinkedProfileCard from "@/components/patientDebt/UnlinkedProfileCard";
 import usePatientDebtNavigation from "@/hooks/usePatientDebtNavigation";
 import { cx } from "@/utils/cx";
 import { isPlainClick } from "@/utils/medicalRecord";
@@ -174,6 +175,7 @@ const PaymentDebts = () => {
                 </div>
                 {liveRegion}
                 {load.status === "loading" && <ListSkeleton />}
+                {load.status === "unlinked" && <UnlinkedProfileCard />}
                 {load.status === "error" && (
                     <StateBox icon={AlertCircle} title={PATIENT_DEBT_TEXT.ERROR_TITLE} text={PATIENT_DEBT_TEXT.ERROR_TEXT}>
                         <button id={DEBT_RETRY_ID} type="button" className="btn btn-secondary mt-3" onClick={retry}>
@@ -223,7 +225,8 @@ const PaymentDebts = () => {
         );
     }
 
-    const crumbLast = load.status === "loading" ? PATIENT_DEBT_TEXT.CRUMB_LOADING : load.status === "error" ? PATIENT_DEBT_TEXT.CRUMB_ERROR : (item?.name ?? PATIENT_DEBT_TEXT.CRUMB_NOT_FOUND);
+    const crumbLast =
+        load.status === "loading" ? PATIENT_DEBT_TEXT.CRUMB_LOADING : load.status === "error" || load.status === "unlinked" ? PATIENT_DEBT_TEXT.CRUMB_ERROR : (item?.name ?? PATIENT_DEBT_TEXT.CRUMB_NOT_FOUND);
     const detailTitle = (hidden) => (
         <h1 id={DEBT_TITLE_ID} ref={h1Ref} tabIndex={-1} className={cx(TITLE_CLASS, hidden ? "sr-only" : "mb-6")}>
             {PATIENT_DEBT_TEXT.DETAIL_TITLE}
@@ -242,6 +245,7 @@ const PaymentDebts = () => {
             {liveRegion}
             {!item && detailTitle(load.status === "loading")}
             {load.status === "loading" && <DetailSkeleton />}
+            {load.status === "unlinked" && <UnlinkedProfileCard />}
             {load.status === "error" && (
                 <>
                     <StateBox icon={AlertCircle} title={PATIENT_DEBT_TEXT.ERROR_TITLE} text={PATIENT_DEBT_TEXT.ERROR_TEXT}>

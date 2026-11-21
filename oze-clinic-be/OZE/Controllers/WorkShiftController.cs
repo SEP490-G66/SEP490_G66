@@ -25,6 +25,22 @@ namespace OZE.ProjectBase.Controllers
             var shift = await _workShipService.CreateWorkShipAsync(request);
             return Ok(ApiResponse<WorkShipResponse>.SuccessResult(shift, "Work shift created successfully"));
         }
+
+        [HttpPost("bulk/preview")]
+        public async Task<ActionResult<ApiResponse<BulkWorkShiftPreviewResponse>>> PreviewBulkWorkShiftsAsync([FromBody] BulkWorkShiftRequest request)
+        {
+            var preview = await _workShipService.PreviewBulkWorkShiftsAsync(request);
+            return Ok(ApiResponse<BulkWorkShiftPreviewResponse>.SuccessResult(preview));
+        }
+
+        [HttpPost("bulk")]
+        public async Task<ActionResult<ApiResponse<BulkWorkShiftResultResponse>>> CreateBulkWorkShiftsAsync([FromBody] BulkWorkShiftRequest request)
+        {
+            var result = await _workShipService.CreateBulkWorkShiftsAsync(request);
+            return StatusCode(StatusCodes.Status201Created,
+                ApiResponse<BulkWorkShiftResultResponse>.SuccessResult(result, $"Created {result.CreatedCount} work shift(s)"));
+        }
+
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<WorkShipResponse>>>> GetWorkShiftsAsync([FromQuery] WorkShiftQueryRequest query)
         {

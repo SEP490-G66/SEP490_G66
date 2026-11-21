@@ -1,4 +1,5 @@
 using OZE.Common.Models;
+using OZE.Common.Models.Base;
 using OZE.Domain.Entities;
 
 namespace OZE.Application.Interfaces
@@ -12,6 +13,9 @@ namespace OZE.Application.Interfaces
         Task AddAsync(TreatmentPlan plan, CancellationToken cancellationToken = default);
         Task<bool> PatientExistsAsync(int patientId, CancellationToken cancellationToken = default);
         Task<List<TreatmentPlanSummaryResponse>> GetByPatientAsync(int patientId, bool includeClosed, CancellationToken cancellationToken = default);
+        Task<PagedResult<TreatmentPlanSummaryResponse>> GetAllAsync(TreatmentPlanQueryParameters query, CancellationToken cancellationToken = default);
+        Task<TreatmentPlanStage?> GetStageByIdAsync(long stageId, CancellationToken cancellationToken = default);
+        Task<TreatmentPlan?> GetByStageIdWithStagesAsync(long stageId, CancellationToken cancellationToken = default);
         Task<bool> IsInvoicedAsync(long treatmentPlanId, CancellationToken cancellationToken = default);
         void Remove(TreatmentPlan plan);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);

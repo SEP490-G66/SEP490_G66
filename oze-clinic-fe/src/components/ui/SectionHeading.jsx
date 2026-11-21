@@ -1,7 +1,7 @@
 const SectionHeading = ({ id, children }) => {
     return (
         <div className="flex flex-col items-center">
-            <h2 id={id} className="text-center font-heading text-display-section text-ink">
+            <h2 id={id} className="text-center font-heading text-display-md text-ink md:text-display-section">
                 {children}
             </h2>
             <div aria-hidden="true" className="mt-4 flex w-60 max-w-3/5 items-center gap-2">

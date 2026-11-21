@@ -3,6 +3,8 @@ import { APPOINTMENT_STATUS, MESSAGES, QUEUE_STATUS } from "./messages";
 
 export const QUEUE_IN_PROGRESS = "IN_PROGRESS";
 
+export const PATIENT_QUEUE_ENABLED = false;
+
 export const PATIENT_QUEUE_STATE = {
     IN_SERVICE: "inservice",
     NO_QUEUE: "noqueue",
@@ -12,6 +14,7 @@ export const PATIENT_QUEUE_STATE = {
     DESK: "desk",
     SKIPPED: "skipped",
     WAITING: "waiting",
+    ARRIVED: "arrived",
 };
 
 export const PATIENT_QUEUE_BADGE = {
@@ -44,6 +47,7 @@ export const getPatientQueueState = (appointment) => {
     if (!isInClinic(appointment)) return null;
     const queue = appointment.queue;
     if (appointment.status === APPOINTMENT_STATUS.IN_SERVICE || isQueueInService(queue?.status)) return PATIENT_QUEUE_STATE.IN_SERVICE;
+    if (!PATIENT_QUEUE_ENABLED) return PATIENT_QUEUE_STATE.ARRIVED;
     if (formatQueueNumber(queue?.queueNumber) === null) return PATIENT_QUEUE_STATE.NO_QUEUE;
     if (queue.imaging != null) return PATIENT_QUEUE_STATE.IMAGING;
     if (queue.status === QUEUE_STATUS.CALLED) return PATIENT_QUEUE_STATE.CALLED;
@@ -93,13 +97,14 @@ const getWaitingDetail = (queue) => {
 
 const getQueueGuide = (appointment, state) => {
     const queue = appointment.queue;
-    const room = queue?.roomName;
+    const room = queue?.roomName || appointment.roomName;
     switch (state) {
-        case PATIENT_QUEUE_STATE.IN_SERVICE: {
-            const place = [room, appointment.doctorName].filter(Boolean).join(" · ");
-            const note = "Phiếu khám sẽ có trong Sổ khám bệnh sau buổi khám.";
-            return { tone: "info", title: "Bạn đang được khám", detail: place ? `${place}. ${note}` : note };
+        case PATIENT_QUEUE_STATE.ARRIVED: {
+            const number = formatQueueNumber(queue?.queueNumber);
+            return { tone: "success", title: "Check-in thành công", detail: number ? `Số thứ tự của bạn: ${number}` : null };
         }
+        case PATIENT_QUEUE_STATE.IN_SERVICE:
+            return null;
         case PATIENT_QUEUE_STATE.NO_QUEUE:
             return { tone: "warning", title: "Bạn đã báo có mặt nhưng chưa có số thứ tự", detail: "Vui lòng hỏi lễ tân tại quầy." };
         case PATIENT_QUEUE_STATE.IMAGING:

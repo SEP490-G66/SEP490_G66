@@ -14,7 +14,7 @@ import useAsync from "@/hooks/useAsync";
 import { getStaffAccounts, unlockStaffAccount } from "@/services/staffService";
 import { cx } from "@/utils/cx";
 import { formatPhone } from "@/utils/format";
-import { ACCOUNT_STATUSES, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_OPTIONS, STAFF_ROLE_OPTIONS, staffRoleLabel } from "@/utils/staff";
+import { ACCOUNT_STATUSES, ACCOUNT_STATUS_LABELS, ACCOUNT_STATUS_OPTIONS, STAFF_ROLE_OPTIONS, staffRoleLabel } from "@/utils/constants/staff";
 
 const SEARCH_DELAY_MS = 300;
 const SKELETON_ROW_COUNT = 5;

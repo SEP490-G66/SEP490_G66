@@ -2,7 +2,7 @@ import { AlertCircle, Check, Clock } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { cx } from "@/utils/cx";
 import { formatCurrency } from "@/utils/format";
-import { MEDICAL_RECORD_PAYMENT_STATUS, PATIENT_DEBT_TEXT } from "@/utils/messages";
+import { PATIENT_DEBT_STAGE_STATUS, PATIENT_DEBT_TEXT } from "@/utils/messages";
 import { getPaymentHistoryRoute } from "@/utils/routes";
 import { ArrowLink, CardNote, DebtCard, RefundLink } from "./PatientDebtCard";
 
@@ -24,8 +24,8 @@ const StageBody = ({ stage }) => (
         </div>
         <p className="mt-0.5">{stage.milestone}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
-            <StatusBadge status={stage.status} labels={MEDICAL_RECORD_PAYMENT_STATUS} />
-            <CardNote>{stage.note}</CardNote>
+            <StatusBadge status={stage.status} labels={PATIENT_DEBT_STAGE_STATUS} />
+            {stage.note && <CardNote>{stage.note}</CardNote>}
         </div>
         {stage.refund && (
             <p className="mt-1.5">
@@ -45,9 +45,7 @@ const NextAlert = ({ stage }) => {
                     <p className="alert-title num">
                         {stage.label} · {formatCurrency(stage.amount)}
                     </p>
-                    <p>
-                        {stage.milestone} · {stage.note}
-                    </p>
+                    <p>{[stage.milestone, stage.note].filter(Boolean).join(" · ")}</p>
                 </div>
             </div>
         </div>
@@ -115,8 +113,8 @@ const Step = ({ item }) => (
                             </td>
                             <td className="whitespace-nowrap text-right">{formatCurrency(stage.amount)}</td>
                             <td className="py-2">
-                                <StatusBadge status={stage.status} labels={MEDICAL_RECORD_PAYMENT_STATUS} />
-                                <p className="text-caption text-muted">{stage.note}</p>
+                                <StatusBadge status={stage.status} labels={PATIENT_DEBT_STAGE_STATUS} />
+                                {stage.note && <p className="text-caption text-muted">{stage.note}</p>}
                             </td>
                         </tr>
                     ))}
@@ -130,6 +128,7 @@ const Step = ({ item }) => (
                 </li>
             ))}
         </ul>
+        {item.prepaid > 0 && <p className="num border-t border-border px-5 py-3 text-caption text-muted">{PATIENT_DEBT_TEXT.PREPAID(formatCurrency(item.prepaid))}</p>}
     </DebtCard>
 );
 
@@ -139,7 +138,7 @@ const Once = ({ item }) => (
         title={PATIENT_DEBT_TEXT.ONCE_TITLE(item.start)}
         aside={
             <div className="flex flex-wrap items-center gap-2.5">
-                <ArrowLink to={getPaymentHistoryRoute(item.visitId)}>{PATIENT_DEBT_TEXT.VIEW_RECEIPT}</ArrowLink>
+                <ArrowLink to={getPaymentHistoryRoute(item.invoiceId)}>{PATIENT_DEBT_TEXT.VIEW_RECEIPT}</ArrowLink>
                 <RefundLink refund={item.refunds[0]} />
             </div>
         }
@@ -149,7 +148,6 @@ const Once = ({ item }) => (
                 <thead>
                     <tr>
                         <th scope="col">{PATIENT_DEBT_TEXT.COL_PROCEDURE}</th>
-                        <th scope="col">{PATIENT_DEBT_TEXT.COL_CONTENT}</th>
                         <th scope="col" className="text-right">
                             {PATIENT_DEBT_TEXT.COL_LINE_TOTAL}
                         </th>
@@ -159,7 +157,6 @@ const Once = ({ item }) => (
                     {item.lines.map((line) => (
                         <tr key={line.key}>
                             <td className="font-semibold text-ink">{line.name}</td>
-                            <td>{line.detail}</td>
                             <td className="whitespace-nowrap text-right">{formatCurrency(line.total)}</td>
                         </tr>
                     ))}
@@ -173,7 +170,6 @@ const Once = ({ item }) => (
                         <b className="font-semibold text-ink">{line.name}</b>
                         <b className="num whitespace-nowrap font-semibold text-ink">{formatCurrency(line.total)}</b>
                     </div>
-                    <p className="mt-0.5">{line.detail}</p>
                 </li>
             ))}
         </ul>

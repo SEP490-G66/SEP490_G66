@@ -177,6 +177,11 @@ namespace OZE.Persistence.Repositories
             await _context.SaveChangesAsync(cancellationToken);
         }
 
+        public void Detach(QueueEntry entry)
+        {
+            _context.Entry(entry).State = EntityState.Detached;
+        }
+
         // A day of the clinic runs on the server's local time, like check-in does
         public async Task<string?> GetConfigValueAsync(string configKey, CancellationToken cancellationToken = default)
         {

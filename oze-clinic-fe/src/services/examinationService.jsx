@@ -2,16 +2,19 @@ import api from "./api";
 import { call } from "./receptionService";
 import { getMyShifts } from "./myScheduleService";
 import { EMPTY_PRESCRIPTION_DRAFT, EMPTY_TREATMENT_DRAFT } from "../utils/data/mockExamination";
-import { icdName, newPlanSession } from "../utils/examination";
+import { icdName, newPlanSession, validatePlan } from "../utils/examination";
 import { formatClock, getClinicDateTimeParts, getClinicToday } from "../utils/format";
-import { AFTERNOON_STARTS_AT } from "../utils/shift";
+import { AFTERNOON_STARTS_AT } from "../utils/constants/shift";
 import { imagingTypeLabel } from "../utils/imagingRequest";
 import { QUEUE_STATUS } from "../utils/messages";
 
 // Doctor's examination room ("Khám bệnh"). Every call returns the ApiResponse shape ({ success, message, data, errors }).
 // Real API: the room queue (DoctorRoomController), call / skip (QueuesController), start / complete (AppointmentsController),
-// step 2 "Khám & Chẩn đoán" (ExaminationsController: content, tooth findings, diagnoses) and X-ray orders (ImagingRequestsController).
-// TODO(api): step 1 medical history and steps 3-5 (plan, treatment, prescription) are still kept in the browser only.
+// step 2 "Khám & Chẩn đoán" (ExaminationsController: content, tooth findings, diagnoses), X-ray orders (ImagingRequestsController)
+// and step 3 "Lập kế hoạch điều trị" (TreatmentPlansController: create / update / propose / approve; types from bookable-services).
+// Step 4 "Thực hiện điều trị" works on the plan's stages (start / update / complete) and the visit's follow-up date.
+// Step 5 "Kê đơn thuốc" saves the visit's prescription (items, note, finalize / reopen), and step 1 adds the new history
+// items to the patient's medical profiles (PatientsController; the backend cannot remove a profile).
 //
 // A queue item is identified by its appointment id (it does not change when the patient goes for an X-ray and comes back).
 
@@ -23,7 +26,14 @@ const MESSAGES = [
     [/already has an appointment in service|another .*in service/i, "Đang có bệnh nhân trong phòng. Kết thúc lượt khám trước khi gọi người tiếp theo."],
     [/off duty|not on shift|start your shift/i, "Bạn chưa bắt đầu ca làm. Bấm “Bắt đầu ca” trước khi khám."],
     [/at least one diagnosis|clinical notes/i, "Cần ít nhất một chẩn đoán hoặc ghi chú lâm sàng trước khi kết thúc lượt khám."],
-    [/draft prescription/i, "Đơn thuốc nháp còn thuốc: chốt hoặc xoá đơn trước khi kết thúc."],
+    [/draft prescription|finalize the prescription, or delete it/i, "Đơn thuốc nháp còn thuốc: chốt hoặc xoá đơn trước khi kết thúc."],
+    [/prescription is finalized/i, "Đơn thuốc đã được chốt. Mở lại đơn để sửa."],
+    [/at least one medication before finalizing/i, "Thêm ít nhất một thuốc trước khi chốt đơn."],
+    [/medication name is too long|dosage is too long|frequency is too long|duration is too long|instructions are too long/i, "Thông tin thuốc quá dài."],
+    [/Please enter the medication name/i, "Nhập tên thuốc."],
+    [/quantity must be/i, "Số lượng phải là số nguyên từ 1 đến 1000."],
+    [/prescription note is too long/i, "Lời dặn tối đa 500 ký tự."],
+    [/Medication not found in this prescription/i, "Thuốc này không còn trong đơn. Tải lại trang rồi thử lại."],
     [/only IN_SERVICE|must be in service|not in service/i, "Bệnh nhân không còn trong phòng khám (có thể đang đi chụp X-quang)."],
     [/Cannot request imaging because the examination is/i, "Lượt khám đã kết thúc, không gửi chỉ định chụp được."],
     [/Please enter clinical indication/i, "Nhập mục đích chụp."],
@@ -33,6 +43,22 @@ const MESSAGES = [
     [/tooth number|FDI/i, "Số răng không hợp lệ."],
     [/Too many symptoms/i, "Quá nhiều triệu chứng hoặc triệu chứng quá dài."],
     [/record changed|changed meanwhile|modified by someone/i, "Phiếu khám vừa được thay đổi ở nơi khác. Tải lại trang rồi thử lại."],
+    [/Scheduled date is invalid/i, "Ngày dự kiến không hợp lệ: không được ở quá khứ và phải theo thứ tự các buổi."],
+    [/at least one treatment stage/i, "Thêm ít nhất một buổi điều trị."],
+    [/Estimated cost is invalid/i, "Chi phí dự kiến không hợp lệ."],
+    [/Only a draft or proposed treatment plan can be edited/i, "Kế hoạch đã được bệnh nhân đồng ý, không sửa được nữa."],
+    [/already has an invoice/i, "Kế hoạch đã có hoá đơn, không sửa được nữa."],
+    [/already has an open treatment plan/i, "Lượt khám này đã có kế hoạch điều trị. Tải lại trang để xem."],
+    [/not available for booking|Service not found/i, "Có dịch vụ trong kế hoạch không còn hoạt động."],
+    [/treatment stage is listed more than once/i, "Một buổi điều trị bị lặp. Tải lại trang rồi thử lại."],
+    [/Only a draft treatment plan can be proposed|Only a proposed treatment plan can be approved/i, "Trạng thái kế hoạch vừa thay đổi. Tải lại trang rồi thử lại."],
+    [/plan is not approved/i, "Bệnh nhân chưa đồng ý kế hoạch điều trị. Quay lại bước Lập kế hoạch để xác nhận."],
+    [/earlier stage is not completed/i, "Còn buổi điều trị trước chưa hoàn thành."],
+    [/stage because it is not scheduled|stage because it is not in progress|plan is not in progress/i, "Buổi điều trị này đã kết thúc hoặc chưa bắt đầu. Tải lại trang để xem."],
+    [/note when the actual cost differs/i, "Chi phí khác dự kiến: cần có ghi chú cho buổi điều trị."],
+    [/Actual cost is invalid/i, "Chi phí thực tế không hợp lệ."],
+    [/Follow-up date must be in the future/i, "Ngày tái khám phải sau hôm nay."],
+    [/follow-up appointment has already been scheduled/i, "Lượt khám này đã có lịch tái khám."],
 ];
 
 const translate = (response) => {
@@ -51,6 +77,15 @@ const state = {
     local: new Map(), // appointmentId → { history, plan, treatment, prescription }
     saved: new Map(), // examinationId → last saved step 2 draft
     ids: new Map(), // "tooth-123" / "diag-123" (made on screen) → server id
+    plans: new Map(), // examinationId → { id, status } of the treatment plan made in this visit
+    stageIds: new Map(), // plan session id (made on screen) → treatment stage id
+    stageStatus: new Map(), // treatment stage id → StageStatus (Scheduled, InProgress, Completed, Cancelled)
+    treatmentSaves: new Map(), // examinationId → the step 4 save on its way (one after another)
+    prescriptions: new Map(), // examinationId → the prescription as last saved ({ items with server ids, notes, status })
+    prescriptionSaves: new Map(), // examinationId → the step 5 save on its way (one after another)
+    planSaves: new Map(), // examinationId → the plan save on its way (saves of one plan run one after another)
+    types: new Map(), // serviceId → [{ id, name, price }]: the service's variants ("Loại dịch vụ")
+    catalog: [], // [{ serviceId, name }]: the services a doctor can add to a plan (all bookable ones but the check-up)
 };
 
 const stepKey = (examinationId) => `oze.exam.step.${examinationId}`;
@@ -112,6 +147,98 @@ const localOf = (item, doctorName = "") => {
         });
     }
     return state.local.get(item.appointmentId);
+};
+
+// ---- Step 3 treatment plan: the screen's services → sessions, the backend's flat list of stages ----
+// A session is one stage: title = StageName, date = ScheduledDate, cost = EstimatedCost. A stage has no variant column,
+// so the chosen type ("Loại dịch vụ", a service variant) is kept on the first line of its Description, before the note.
+
+const TYPE_LINE = "Loại: ";
+const PLAN_OPEN_STATUSES = ["Draft", "Proposed", "Approved", "InProgress"];
+const PLAN_EDITABLE_STATUSES = ["Draft", "Proposed"];
+
+// The variants of every bookable service (GET api/appointments/bookable-services), loaded once, and the services the
+// doctor can add to a plan: what the examination finds may need a service the patient did not book
+const loadPlanTypes = async () => {
+    if (state.types.size) return;
+    const response = await call(() => api.get("/api/appointments/bookable-services"));
+    if (!response.success) return;
+    for (const service of response.data ?? []) {
+        state.types.set(
+            service.serviceId,
+            (service.variants ?? []).map((variant) => ({ id: String(variant.variantId), name: variant.variantName, price: Number(variant.referencePrice) || 0 })),
+        );
+        if (!service.isMandatory && !isCheckup({ name: service.serviceName })) state.catalog.push({ serviceId: service.serviceId, name: service.serviceName });
+    }
+};
+
+const typesOf = (serviceId) => state.types.get(serviceId) ?? [];
+
+const describeSession = (serviceId, session) => {
+    const type = typesOf(serviceId).find((option) => option.id === session.typeId);
+    return [type && `${TYPE_LINE}${type.name}`, session.note?.trim()].filter(Boolean).join("\n") || null;
+};
+
+const readDescription = (serviceId, description) => {
+    const [first = "", ...rest] = String(description ?? "").split("\n");
+    if (!first.startsWith(TYPE_LINE)) return { typeId: "", note: description ?? "" };
+    const name = first.slice(TYPE_LINE.length);
+    return { typeId: typesOf(serviceId).find((option) => option.name === name)?.id ?? "", note: rest.join("\n") };
+};
+
+const serviceStatusOf = (sessions, stages) => {
+    if (sessions.length && sessions.every((session) => session.status === "done")) return "done";
+    return sessions.some((session) => session.status === "done") || stages.some((stage) => stage.stageStatus === "InProgress") ? "inProgress" : "notStarted";
+};
+
+// The backend's plan as the screen shows it: services in the order of their first stage, then the registered services
+// the plan does not have yet (one empty session each, as a new plan).
+const planFromApi = (plan, item, doctorName) => {
+    const base = planFromServices(item, doctorName);
+    const services = [];
+    const stagesOf = new Map();
+    for (const stage of [...plan.stages].sort((a, b) => a.stageNumber - b.stageNumber)) {
+        let service = services.find((entry) => entry.serviceId === stage.serviceId);
+        if (!service) {
+            // added: the doctor put it in the plan, the patient did not book it (it can be taken out again)
+            const added = !base.services.some((entry) => entry.serviceId === stage.serviceId);
+            service = { id: `plan-${stage.serviceId}`, serviceId: stage.serviceId, name: stage.serviceName ?? "", sessions: [], ...(added && { added }) };
+            services.push(service);
+            stagesOf.set(service.id, []);
+        }
+        const sessionId = `stage-${stage.id}`;
+        state.stageIds.set(sessionId, stage.id);
+        state.stageStatus.set(stage.id, stage.stageStatus);
+        stagesOf.get(service.id).push(stage);
+        service.sessions.push({
+            id: sessionId,
+            title: stage.stageName ?? "",
+            ...readDescription(stage.serviceId, stage.description),
+            date: stage.scheduledDate ?? "",
+            cost: stage.estimatedCost == null ? null : Number(stage.estimatedCost),
+            status: stage.stageStatus === "Completed" ? "done" : "pending",
+        });
+    }
+    for (const service of services) service.status = serviceStatusOf(service.sessions, stagesOf.get(service.id));
+    const missing = base.services.filter((entry) => !services.some((service) => service.serviceId === entry.serviceId));
+    return {
+        code: `KH${String(plan.treatmentPlanId).padStart(6, "0")}`,
+        doctorName: plan.createdByDoctorName ?? doctorName,
+        planId: plan.treatmentPlanId,
+        status: plan.status,
+        services: [...services, ...missing],
+    };
+};
+
+// The plan made in this visit (ExaminationDetailResponse lists the plans of the examination), or null
+const loadPlan = async (examinationId) => {
+    const visit = await call(() => api.get(`/api/medical-records/examinations/${examinationId}`));
+    const summary = (visit.success ? (visit.data?.treatmentPlans ?? []) : []).find((plan) => PLAN_OPEN_STATUSES.includes(plan.status));
+    if (!summary) return null;
+    const detail = await call(() => api.get(`/api/treatmentplans/${summary.id}`));
+    if (!detail.success) return null;
+    state.plans.set(examinationId, { id: detail.data.treatmentPlanId, status: detail.data.status });
+    return detail.data;
 };
 
 // ---- Workspace (queue panel) ----
@@ -178,6 +305,9 @@ const thenReload = async (request, message) => {
 
 const itemOf = (id) => state.room.get(id);
 
+// The examination of a queue item once it has started (null before): other services call its examination's endpoints.
+export const examinationIdOf = (id) => itemOf(id)?.examinationId ?? null;
+
 // Queue of the doctor's room for the current shift: { shift, queue, done }.
 export const getExamWorkspace = () => loadWorkspace();
 
@@ -222,6 +352,11 @@ export const endExamination = async (id) => {
     if (response.success && item.examinationId) {
         clearStep(item.examinationId);
         state.saved.delete(item.examinationId);
+        state.plans.delete(item.examinationId);
+        state.planSaves.delete(item.examinationId);
+        state.treatmentSaves.delete(item.examinationId);
+        state.prescriptions.delete(item.examinationId);
+        state.prescriptionSaves.delete(item.examinationId);
         state.local.delete(id);
     }
     return response;
@@ -237,6 +372,7 @@ const toEntry = (finding) => ({
     note: finding.notes ?? "",
     ...(finding.isReplaced ? { replaced: true } : {}),
 });
+
 
 const toDiagnosis = (diagnosis) => ({ id: diagnosis.id, code: diagnosis.diagnosisCode ?? "", teeth: diagnosis.teeth ?? [], note: diagnosis.description ?? "" });
 
@@ -262,13 +398,34 @@ const loadFilms = async (examinationId) => {
     return (requests.success ? requests.data : []).slice().reverse().map((request) => toFilm(request, reviewById.get(request.id)));
 };
 
+// Step 1 history groups ↔ the patient's medical profiles (PatientMedicalProfiles.RecordType). Dental history has no
+// record type of its own: it is a "History" profile marked by this description.
+const DENTAL_HISTORY_MARK = "Tiền sử nha khoa";
+const HISTORY_GROUPS = [
+    { key: "allergies", recordType: "Allergy", description: null },
+    { key: "conditions", recordType: "Condition", description: null },
+    { key: "dental", recordType: "History", description: DENTAL_HISTORY_MARK },
+];
+
+const sameTitle = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+const historyFromProfiles = (profiles) => {
+    const titles = (match) => [...new Set(profiles.filter(match).map((profile) => profile.title?.trim()).filter(Boolean))];
+    const isDental = (profile) => profile.recordType === "History" && profile.description === DENTAL_HISTORY_MARK;
+    return {
+        allergies: titles((profile) => profile.recordType === "Allergy"),
+        // Other history (not dental) is shown with the underlying conditions, as before
+        conditions: titles((profile) => profile.recordType === "Condition" || (profile.recordType === "History" && !isDental(profile))),
+        dental: titles(isDental),
+    };
+};
+
 const loadHistoryAndVisits = async (item) => {
     const response = await call(() => api.get(`/api/medical-records/patients/${item.patientId}`));
     if (!response.success) return { history: null, visits: [] };
     const profiles = response.data.medicalProfiles ?? [];
-    const titles = (type) => profiles.filter((profile) => profile.recordType === type).map((profile) => profile.title).filter(Boolean);
     return {
-        history: { allergies: titles("Allergy"), conditions: [...titles("Condition"), ...titles("History")], dental: [] },
+        history: historyFromProfiles(profiles),
         visits: (response.data.examinations ?? [])
             .filter((visit) => visit.id !== item.examinationId)
             .map((visit) => ({
@@ -285,30 +442,55 @@ export const getExamRecord = async (id) => {
     const item = itemOf(id);
     if (!item) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
 
-    const [work, films, past] = await Promise.all([
+    const [work, films, past, savedPlan] = await Promise.all([
         item.examinationId ? call(() => api.get(`/api/examinations/${item.examinationId}`)) : Promise.resolve(null),
         item.examinationId ? loadFilms(item.examinationId) : Promise.resolve([]),
         loadHistoryAndVisits(item),
+        item.examinationId ? loadPlan(item.examinationId) : Promise.resolve(null),
+        loadPlanTypes(),
     ]);
     if (work && !work.success) return translate(work);
 
     const local = localOf(item);
-    if (past.history && !local.historyLoaded) {
-        local.history = past.history;
-        local.historyLoaded = true;
+    // The plan saved in this visit; until there is one, the draft made from the registered services
+    if (savedPlan) local.plan = planFromApi(savedPlan, item, local.plan.doctorName);
+    // Every service can be added to the plan, so the types of all of them
+    const planTypes = Object.fromEntries(state.types);
+    if (past.history) {
+        // What the patient's record already has: shown ticked and locked (the backend can add a profile, not remove one)
+        local.historySaved = past.history;
+        if (!local.historyLoaded) {
+            local.history = structuredClone(past.history);
+            local.historyLoaded = true;
+        }
     }
 
     const data = work?.data;
+    // Step 4 after a reload: the session still in progress comes back from its stage (what was done, the note), and the
+    // follow-up date from the examination. Once per visit, so a draft being edited is not replaced.
+    if (!local.treatmentLoaded && (savedPlan || data)) {
+        const running = savedPlan?.stages.find((stage) => stage.stageStatus === "InProgress");
+        if (running) local.treatment = { ...local.treatment, ...treatmentFromNotes(running.notes), sessionId: `stage-${running.id}` };
+        if (data?.followUpDate) local.treatment = { ...local.treatment, followUpDate: data.followUpDate };
+        local.treatmentLoaded = true;
+    }
+    // Step 5: the prescription of the visit as the backend has it (an empty draft until a medicine is added)
+    if (data?.prescription) {
+        local.prescription = toPrescription(data.prescription);
+        state.prescriptions.set(item.examinationId, structuredClone(local.prescription));
+    }
+    // The reason for the visit starts from what the patient said when booking / checking in
     const exam = data
         ? {
+              chiefComplaint: data.chiefComplaint ?? item.reason ?? "",
               symptoms: data.symptoms ?? [],
               note: data.clinicalNotes ?? "",
               entries: (data.toothFindings ?? []).map(toEntry),
               films,
               diagnoses: (data.diagnoses ?? []).map(toDiagnosis),
           }
-        : { symptoms: [], note: "", entries: [], films, diagnoses: [] };
-    if (data) state.saved.set(item.examinationId, { ...structuredClone(exam), chiefComplaint: data.chiefComplaint ?? null });
+        : { chiefComplaint: item.reason ?? "", symptoms: [], note: "", entries: [], films, diagnoses: [] };
+    if (data) state.saved.set(item.examinationId, { ...structuredClone(exam), chiefComplaint: data.chiefComplaint ?? "" });
 
     return success(
         structuredClone({
@@ -330,9 +512,12 @@ export const getExamRecord = async (id) => {
                 appointmentTime: item.timeSlotStart ? item.timeSlotStart.slice(0, 5) : null,
             },
             history: local.history,
+            historySaved: local.historySaved ?? { allergies: [], conditions: [], dental: [] },
             visits: past.visits,
             exam,
             plan: local.plan,
+            planTypes,
+            planCatalog: state.catalog,
             treatment: local.treatment,
             prescription: local.prescription,
         }),
@@ -438,12 +623,18 @@ export const saveExamDraft = async (id, exam) => {
     const item = itemOf(id);
     if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
     const examinationId = item.examinationId;
-    const saved = state.saved.get(examinationId) ?? { symptoms: [], note: "", entries: [], diagnoses: [], chiefComplaint: null };
+    const saved = state.saved.get(examinationId) ?? { symptoms: [], note: "", entries: [], diagnoses: [], chiefComplaint: "" };
+    const chiefComplaint = exam.chiefComplaint ?? "";
 
-    if (exam.note !== saved.note || exam.symptoms.join("|") !== saved.symptoms.join("|")) {
+    // The content call replaces the reason, the notes and the symptoms together
+    if (chiefComplaint !== saved.chiefComplaint || exam.note !== saved.note || exam.symptoms.join("|") !== saved.symptoms.join("|")) {
         const response = translate(
             await call(() =>
-                api.put(`/api/examinations/${examinationId}/content`, { chiefComplaint: saved.chiefComplaint, clinicalNotes: exam.note || null, symptoms: exam.symptoms }),
+                api.put(`/api/examinations/${examinationId}/content`, {
+                    chiefComplaint: chiefComplaint.trim() || null,
+                    clinicalNotes: exam.note || null,
+                    symptoms: exam.symptoms,
+                }),
             ),
         );
         if (!response.success) return response;
@@ -478,7 +669,7 @@ export const saveExamDraft = async (id, exam) => {
         entries: exam.entries.map((entry) => ({ ...structuredClone(entry), id: serverId(entry.id) ?? entry.id })),
         diagnoses: exam.diagnoses.map((diagnosis) => ({ ...structuredClone(diagnosis), id: serverId(diagnosis.id) ?? diagnosis.id })),
         films: exam.films,
-        chiefComplaint: saved.chiefComplaint,
+        chiefComplaint,
     });
     return success({ savedAt: Date.now() });
 };
@@ -511,56 +702,380 @@ export const requestXray = async (id, request) => {
     return success(films, `Đã gửi ${films.length} yêu cầu chụp tới kỹ thuật viên. Bệnh nhân sang phòng chụp, chụp xong sẽ quay lại đầu hàng chờ.`);
 };
 
-// ---- Steps 1, 3-5: kept in the browser until their APIs are wired ----
+// ---- Step 1 "Lập hồ sơ bệnh án": the patient's medical history ----
 
-const localDraft = (id) => {
-    const item = itemOf(id);
-    return item ? localOf(item) : null;
-};
-
-// Draft save of step 1. history: { allergies, conditions, dental }.
-export const saveMedicalHistory = async (id, history) => {
-    const local = localDraft(id);
-    if (!local) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
+// Draft save of step 1. history: { allergies, conditions, dental }. Every item the patient's record does not have yet
+// becomes a medical profile (POST patients/{id}/medical-profiles). The backend cannot remove a profile, so an item
+// already saved stays (the screen locks it). data.saved: the items now in the record, by group.
+const writeHistory = async (item, history) => {
+    const local = localOf(item);
     local.history = structuredClone(history);
-    return success({ savedAt: Date.now() });
-};
+    const saved = structuredClone(local.historySaved ?? { allergies: [], conditions: [], dental: [] });
 
-// Draft save of step 3. plan: { services: [...] } (see utils/examination).
-export const saveTreatmentPlan = async (id, plan) => {
-    const local = localDraft(id);
-    if (!local) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
-    local.plan = structuredClone(plan);
-    return success({ savedAt: Date.now() });
-};
-
-// Draft save of step 4. treatment: see EMPTY_TREATMENT_DRAFT.
-export const saveTreatmentDraft = async (id, treatment) => {
-    const local = localDraft(id);
-    if (!local) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
-    local.treatment = structuredClone(treatment);
-    return success({ savedAt: Date.now() });
-};
-
-// Leaving step 4 for the prescription: saves the draft and marks today's session done. Returns the updated plan.
-export const completeTreatmentSession = async (id, treatment) => {
-    const local = localDraft(id);
-    if (!local) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
-    if (!treatment.items.length) return failure("Thêm ít nhất một nội dung điều trị.");
-    local.treatment = structuredClone(treatment);
-    const service = local.plan.services.find((entry) => entry.sessions.some((session) => session.id === treatment.sessionId));
-    if (service) {
-        service.sessions = service.sessions.map((session) => (session.id === treatment.sessionId ? { ...session, status: "done" } : session));
-        service.status = service.sessions.every((session) => session.status === "done") ? "done" : "inProgress";
+    for (const group of HISTORY_GROUPS) {
+        for (const title of history[group.key] ?? []) {
+            if (!title.trim() || saved[group.key].some((existing) => sameTitle(existing, title))) continue;
+            const response = translate(
+                await call(() =>
+                    api.post(`/api/patients/${item.patientId}/medical-profiles`, {
+                        recordType: group.recordType,
+                        title: title.trim().slice(0, 200),
+                        description: group.description,
+                        status: "Active",
+                    }),
+                ),
+            );
+            if (!response.success) {
+                local.historySaved = saved;
+                return response;
+            }
+            saved[group.key].push(title.trim());
+        }
     }
-    return success(structuredClone(local.plan));
+    local.historySaved = saved;
+    return success({ savedAt: Date.now(), saved: structuredClone(saved) });
 };
 
-// Draft save of step 5. prescription: see EMPTY_PRESCRIPTION_DRAFT.
-export const savePrescriptionDraft = async (id, prescription) => {
-    const local = localDraft(id);
-    if (!local) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
-    if (local.prescription.status === "Finalized") return failure("Đơn thuốc đã được chốt, không sửa được nữa.");
+const historySaves = new Map(); // patientId → the step 1 save on its way (one after another)
+
+export const saveMedicalHistory = async (id, history) => {
+    const item = itemOf(id);
+    if (!item?.patientId) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
+    const previous = historySaves.get(item.patientId) ?? Promise.resolve();
+    const next = previous.then(() => writeHistory(item, history));
+    historySaves.set(item.patientId, next.catch(() => null));
+    return next;
+};
+
+// Step 3 draft save. plan: { services: [...] } (see utils/examination). The plan of the visit is created on the first
+// save that has a session (POST examinations/{id}/treatment-plans), then replaced as a whole (PUT treatmentplans/{id}):
+// the stages are the sessions in treatment order, a session that is no longer there is removed by the backend.
+// A plan the patient agreed to (Approved and later) is not changed any more.
+const writePlan = async (item, plan) => {
+    const examinationId = item.examinationId;
+    const sessions = plan.services.flatMap((service) => service.sessions.map((session) => ({ service, session })));
+    if (!sessions.length) return success({ savedAt: Date.now() });
+
+    const dateErrors = Object.values(validatePlan(plan.services, (service) => typesOf(service.serviceId), getClinicToday()).sessions).some((errors) => errors.date);
+    if (dateErrors) return failure("Ngày dự kiến chưa hợp lệ: không được ở quá khứ và phải theo thứ tự các buổi.");
+
+    const saved = state.plans.get(examinationId);
+    if (saved && !PLAN_EDITABLE_STATUSES.includes(saved.status)) return failure("Kế hoạch đã được bệnh nhân đồng ý, không sửa được nữa.");
+
+    // A new plan has no stage ids yet; an update sends the id of every stage it keeps
+    const stages = sessions.map(({ service, session }) => ({
+        ...(saved && { id: state.stageIds.get(session.id) ?? null }),
+        serviceId: service.serviceId,
+        stageName: session.title.trim() || null,
+        description: describeSession(service.serviceId, session),
+        estimatedCost: Number.isFinite(session.cost) ? session.cost : null,
+        scheduledDate: session.date || null,
+    }));
+    const names = plan.services.filter((service) => service.sessions.length).map((service) => service.name);
+    const body = { planName: `Kế hoạch điều trị · ${names.join(", ")}`.slice(0, 200), description: null, stages };
+
+    const response = translate(
+        await call(() =>
+            saved
+                ? api.put(`/api/treatmentplans/${saved.id}`, body)
+                : api.post(`/api/examinations/${examinationId}/treatment-plans`, body),
+        ),
+    );
+    if (!response.success) return response;
+
+    // The backend numbers the stages in the order they were sent: remember which stage each session became
+    const result = response.data;
+    const ordered = [...result.stages].sort((a, b) => a.stageNumber - b.stageNumber);
+    sessions.forEach(({ session }, index) => {
+        if (!ordered[index]) return;
+        state.stageIds.set(session.id, ordered[index].id);
+        state.stageStatus.set(ordered[index].id, ordered[index].stageStatus);
+    });
+    state.plans.set(examinationId, { id: result.treatmentPlanId, status: result.status });
+    const local = localOf(item);
+    local.plan = { ...structuredClone(plan), planId: result.treatmentPlanId, status: result.status, code: `KH${String(result.treatmentPlanId).padStart(6, "0")}` };
+    return success({ savedAt: Date.now() });
+};
+
+export const saveTreatmentPlan = async (id, plan) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    // One save at a time per plan, so a quick second change never creates a second plan
+    const previous = state.planSaves.get(item.examinationId) ?? Promise.resolve();
+    const next = previous.then(() => writePlan(item, plan));
+    state.planSaves.set(item.examinationId, next.catch(() => null));
+    return next;
+};
+
+// "Hoàn thành": the doctor has agreed the plan with the patient in the room. Saves it, proposes it and records the
+// patient's agreement (Draft → Proposed → Approved) so the treatment step can start its first session.
+export const confirmTreatmentPlan = async (id, plan) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    const saved = await saveTreatmentPlan(id, plan);
+    if (!saved.success && !/không sửa được nữa/.test(saved.message ?? "")) return saved;
+
+    const current = state.plans.get(item.examinationId);
+    if (!current) return failure("Chưa có buổi điều trị nào để gửi.");
+    if (current.status === "Draft") {
+        const proposed = translate(await call(() => api.post(`/api/treatmentplans/${current.id}/propose`)));
+        if (!proposed.success) return proposed;
+        current.status = proposed.data.status;
+    }
+    if (current.status === "Proposed") {
+        const approved = translate(await call(() => api.post(`/api/treatmentplans/${current.id}/approve`)));
+        if (!approved.success) return approved;
+        current.status = approved.data.status;
+    }
+    const local = localOf(item);
+    local.plan = { ...local.plan, status: current.status };
+    return success(structuredClone(local.plan), "Bệnh nhân đã đồng ý kế hoạch điều trị.");
+};
+
+// ---- Step 4 "Thực hiện điều trị": today's session is one stage of the approved plan ----
+// The stage keeps one actual cost and one note, so: ActualCost = the total of the items, Notes = one line per item
+// ("• Trám composite răng 36 — 400.000 ₫") then a blank line and the doctor's note. Read back the same way after a reload.
+
+const ITEM_LINE = /^• (.+) — ([\d.,]+) ₫$/;
+
+const treatmentNotes = (treatment) => {
+    const lines = treatment.items.map((item) => `• ${item.content.trim()} — ${formatMoney(item.price)} ₫`);
+    return [lines.join("\n"), treatment.note?.trim()].filter(Boolean).join("\n\n") || null;
+};
+
+const formatMoney = (value) => (Number.isFinite(value) ? value : 0).toLocaleString("vi-VN");
+
+function treatmentFromNotes(notes) {
+    const lines = String(notes ?? "").split("\n");
+    const items = [];
+    let index = 0;
+    for (; index < lines.length; index += 1) {
+        const match = lines[index].match(ITEM_LINE);
+        if (!match) break;
+        items.push({ id: `item-${index}`, content: match[1], price: Number(match[2].replace(/\D/g, "")) || 0, createdAt: new Date().toISOString() });
+    }
+    return { items, note: lines.slice(index).join("\n").trim() };
+}
+
+const itemsTotal = (treatment) => treatment.items.reduce((total, item) => total + (Number.isFinite(item.price) ? item.price : 0), 0);
+
+// Today's stage and the plan it belongs to, or why the session cannot be saved to the backend
+const sessionStage = (item, treatment) => {
+    const plan = state.plans.get(item.examinationId);
+    const stageId = state.stageIds.get(treatment.sessionId);
+    if (!plan || !stageId) return { error: "Kế hoạch điều trị chưa được lưu. Quay lại bước Lập kế hoạch." };
+    if (!["Approved", "InProgress"].includes(plan.status)) return { error: "Bệnh nhân chưa đồng ý kế hoạch điều trị. Quay lại bước Lập kế hoạch để xác nhận." };
+    return { plan, stageId };
+};
+
+// Marks the stage in progress the first time something is saved for it (StartStage)
+const ensureStageStarted = async (plan, stageId) => {
+    if (state.stageStatus.get(stageId) === "InProgress") return success(null);
+    const response = translate(await call(() => api.post(`/api/treatmentplans/${plan.id}/stages/${stageId}/start`)));
+    if (!response.success) return response;
+    state.stageStatus.set(stageId, "InProgress");
+    plan.status = response.data.status;
+    return response;
+};
+
+const writeTreatment = async (item, treatment) => {
+    // A session already completed is not saved again (e.g. the last autosave when the tab closes after "Chuyển sang Đơn thuốc")
+    if (state.stageStatus.get(state.stageIds.get(treatment.sessionId)) === "Completed") return success({ savedAt: Date.now() });
+    const local = localOf(item);
+    local.treatment = structuredClone(treatment);
+    // Nothing done yet: the session is not started
+    if (!treatment.items.length && !treatment.note?.trim()) return success({ savedAt: Date.now() });
+
+    const { plan, stageId, error } = sessionStage(item, treatment);
+    if (error) return failure(error);
+    const started = await ensureStageStarted(plan, stageId);
+    if (!started.success) return started;
+
+    const response = translate(
+        await call(() =>
+            api.patch(`/api/treatmentplans/${plan.id}/stages/${stageId}`, { notes: treatmentNotes(treatment) ?? "", actualCost: itemsTotal(treatment) }),
+        ),
+    );
+    return response.success ? success({ savedAt: Date.now() }) : response;
+};
+
+// One save at a time per visit, in the order they were made
+const queueTreatment = (item, work) => {
+    const previous = state.treatmentSaves.get(item.examinationId) ?? Promise.resolve();
+    const next = previous.then(work);
+    state.treatmentSaves.set(item.examinationId, next.catch(() => null));
+    return next;
+};
+
+// Draft save of step 4. treatment: { sessionId, items: [{ id, content, price, createdAt }], note, followUpDate }.
+export const saveTreatmentDraft = async (id, treatment) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return queueTreatment(item, () => writeTreatment(item, treatment));
+};
+
+// Leaving step 4 for the prescription: saves the session, completes its stage (CompleteStage) and, after the last
+// session, sets the follow-up date of the visit (PUT examinations/{id}/follow-up). Returns the updated plan.
+export const completeTreatmentSession = async (id, treatment) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    if (!treatment.items.length) return failure("Thêm ít nhất một nội dung điều trị.");
+
+    return queueTreatment(item, async () => {
+        const saved = await writeTreatment(item, treatment);
+        if (!saved.success) return saved;
+        const { plan, stageId } = sessionStage(item, treatment);
+
+        const completed = translate(
+            await call(() =>
+                api.post(`/api/treatmentplans/${plan.id}/stages/${stageId}/complete`, { notes: treatmentNotes(treatment), actualCost: itemsTotal(treatment) }),
+            ),
+        );
+        if (!completed.success) return completed;
+        state.stageStatus.set(stageId, "Completed");
+        plan.status = completed.data.status;
+
+        if (treatment.followUpDate) {
+            const followUp = translate(
+                await call(() => api.put(`/api/examinations/${item.examinationId}/follow-up`, { followUpDate: treatment.followUpDate, followUpNotes: null })),
+            );
+            if (!followUp.success) return followUp;
+        }
+
+        const local = localOf(item);
+        const service = local.plan.services.find((entry) => entry.sessions.some((session) => session.id === treatment.sessionId));
+        if (service) {
+            service.sessions = service.sessions.map((session) => (session.id === treatment.sessionId ? { ...session, status: "done" } : session));
+            service.status = service.sessions.every((session) => session.status === "done") ? "done" : "inProgress";
+        }
+        local.plan = { ...local.plan, status: plan.status };
+        // The next visit starts a new session
+        local.treatment = { ...structuredClone(EMPTY_TREATMENT_DRAFT), followUpDate: treatment.followUpDate };
+        return success(structuredClone(local.plan));
+    });
+};
+
+// ---- Step 5 "Kê đơn thuốc": the prescription of the visit (ExaminationsController prescription endpoints) ----
+// Saved like step 2: each medicine added, changed or removed against what the backend has, then the note. Every call
+// answers with the whole prescription. A finalized prescription is read only until it is reopened.
+
+const toPrescriptionItem = (item) => ({
+    id: item.id,
+    medicationName: item.medicationName ?? "",
+    dosage: item.dosage ?? "",
+    frequency: item.frequency ?? "",
+    duration: item.duration ?? "",
+    quantity: item.quantity ?? null,
+    instructions: item.instructions ?? "",
+});
+
+function toPrescription(prescription) {
+    return { items: (prescription.items ?? []).map(toPrescriptionItem), notes: prescription.notes ?? "", status: prescription.status || "Draft" };
+}
+
+const prescriptionItemBody = (item) => ({
+    medicationName: item.medicationName.trim(),
+    dosage: item.dosage?.trim() || null,
+    frequency: item.frequency?.trim() || null,
+    duration: item.duration?.trim() || null,
+    quantity: Number.isFinite(item.quantity) ? item.quantity : null,
+    instructions: item.instructions?.trim() || null,
+});
+
+const sameItem = (a, b) =>
+    JSON.stringify(prescriptionItemBody({ ...a, medicationName: a.medicationName ?? "" })) === JSON.stringify(prescriptionItemBody({ ...b, medicationName: b.medicationName ?? "" }));
+
+const writePrescription = async (item, prescription) => {
+    const examinationId = item.examinationId;
+    const saved = state.prescriptions.get(examinationId) ?? { items: [], notes: "", status: "Draft" };
+    if (saved.status === "Finalized") return failure("Đơn thuốc đã được chốt. Mở lại đơn để sửa.");
+    const base = `/api/examinations/${examinationId}/prescription`;
+    const savedById = new Map(saved.items.map((entry) => [entry.id, entry]));
+    const keep = new Set();
+
+    for (const entry of prescription.items) {
+        const id = typeof entry.id === "number" ? entry.id : (state.ids.get(entry.id) ?? null);
+        if (id == null) {
+            const response = translate(await call(() => api.post(`${base}/items`, prescriptionItemBody(entry))));
+            if (!response.success) return response;
+            // A new medicine goes to the end of the list: the last one the backend sends is the one just added
+            const added = response.data.items?.[response.data.items.length - 1]?.id;
+            if (added != null) {
+                state.ids.set(entry.id, added);
+                keep.add(added);
+            }
+            continue;
+        }
+        keep.add(id);
+        const before = savedById.get(id);
+        if (before && sameItem(before, entry)) continue;
+        const response = translate(await call(() => api.put(`${base}/items/${id}`, prescriptionItemBody(entry))));
+        if (!response.success) return response;
+    }
+    for (const entry of saved.items) {
+        if (keep.has(entry.id)) continue;
+        const response = translate(await call(() => api.delete(`${base}/items/${entry.id}`)));
+        if (!response.success && response.status !== 404) return response;
+    }
+    if ((prescription.notes ?? "") !== saved.notes) {
+        const response = translate(await call(() => api.put(base, { notes: prescription.notes?.trim() ?? "" })));
+        if (!response.success) return response;
+    }
+
+    state.prescriptions.set(examinationId, {
+        items: prescription.items.map((entry) => ({ ...toPrescriptionItem(entry), id: typeof entry.id === "number" ? entry.id : state.ids.get(entry.id) })),
+        notes: prescription.notes ?? "",
+        status: "Draft",
+    });
+    const local = localOf(item);
     local.prescription = structuredClone(prescription);
     return success({ savedAt: Date.now() });
+};
+
+const queuePrescription = (item, work) => {
+    const previous = state.prescriptionSaves.get(item.examinationId) ?? Promise.resolve();
+    const next = previous.then(work);
+    state.prescriptionSaves.set(item.examinationId, next.catch(() => null));
+    return next;
+};
+
+// The prescription the backend answered with becomes the saved one and the screen's copy
+const takePrescription = (item, response, message) => {
+    if (!response.success) return response;
+    const prescription = toPrescription(response.data);
+    state.prescriptions.set(item.examinationId, structuredClone(prescription));
+    localOf(item).prescription = structuredClone(prescription);
+    return success(prescription, message);
+};
+
+// Draft save of step 5. prescription: { items: [{ id, medicationName, dosage, frequency, duration, quantity, instructions }], notes, status }.
+export const savePrescriptionDraft = async (id, prescription) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return queuePrescription(item, () => writePrescription(item, prescription));
+};
+
+// "Hoàn tất": saves, then finalizes a prescription that has medicines (the visit cannot end on a draft with medicines;
+// an empty draft is simply dropped by the backend). Returns the prescription.
+export const finalizePrescription = async (id, prescription) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return queuePrescription(item, async () => {
+        const current = state.prescriptions.get(item.examinationId);
+        if (current?.status === "Finalized") return success(structuredClone(current));
+        const saved = await writePrescription(item, prescription);
+        if (!saved.success) return saved;
+        if (!prescription.items.length) return success(structuredClone(state.prescriptions.get(item.examinationId)));
+        const response = translate(await call(() => api.post(`/api/examinations/${item.examinationId}/prescription/finalize`)));
+        return takePrescription(item, response, "Đã chốt đơn thuốc.");
+    });
+};
+
+// "Mở lại đơn": a finalized prescription goes back to draft so it can be changed.
+export const reopenPrescription = async (id) => {
+    const item = itemOf(id);
+    if (!item?.examinationId) return failure("Lượt khám này không còn mở.");
+    return queuePrescription(item, async () =>
+        takePrescription(item, translate(await call(() => api.post(`/api/examinations/${item.examinationId}/prescription/reopen`))), "Đã mở lại đơn thuốc."),
+    );
 };

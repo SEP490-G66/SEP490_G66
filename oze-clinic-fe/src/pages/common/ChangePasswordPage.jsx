@@ -6,19 +6,18 @@ import FormField from "@/components/ui/FormField";
 import PasswordInput from "@/components/ui/PasswordInput";
 import { changePassword, signOut } from "@/services/authService";
 import { cx } from "@/utils/cx";
-import { MESSAGES, PASSWORD_LENGTH, VALIDATION_MESSAGES } from "@/utils/messages";
+import { CHANGE_PASSWORD_TEXT, MESSAGES, PASSWORD_LENGTH, VALIDATION_MESSAGES } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
-import { isPasswordEmpty, requiredMessage } from "@/utils/validation";
+import { hasDigit, hasLowercase, isPasswordEmpty, requiredMessage } from "@/utils/validation";
 
 const EMPTY_VALUES = { currentPassword: "", newPassword: "", confirmPassword: "" };
 const FIELD_ORDER = ["currentPassword", "newPassword", "confirmPassword"];
 
-// Shown next to the form; the first two are the rules the form checks.
+// Shown next to the form; the first one is the rule the form checks.
 const PASSWORD_TIPS = [
-    `Mật khẩu mới dài từ ${PASSWORD_LENGTH.MIN} đến ${PASSWORD_LENGTH.MAX} ký tự và phải khác mật khẩu hiện tại.`,
+    `Mật khẩu mới dài từ ${PASSWORD_LENGTH.MIN} đến ${PASSWORD_LENGTH.MAX} ký tự, có ít nhất một chữ cái thường và một chữ số, và phải khác mật khẩu hiện tại.`,
     "Nên kết hợp chữ hoa, chữ thường, chữ số và ký tự đặc biệt để khó đoán hơn.",
     "Không dùng lại mật khẩu của tài khoản khác và không chia sẻ mật khẩu cho bất kỳ ai, kể cả nhân viên phòng khám.",
-    "Nhập sai mật khẩu hiện tại nhiều lần, tài khoản sẽ bị tạm khoá và bạn phải đăng nhập lại.",
 ];
 
 const hasValidLength =(password) => password.length >= PASSWORD_LENGTH.MIN && password.length <= PASSWORD_LENGTH.MAX;
@@ -26,6 +25,8 @@ const hasValidLength =(password) => password.length >= PASSWORD_LENGTH.MIN && pa
 // The rules shown under "Mật khẩu mới"; they turn green as soon as they are met.
 const getRules = (values) => [
     { key: "length", label: `Từ ${PASSWORD_LENGTH.MIN} đến ${PASSWORD_LENGTH.MAX} ký tự`, met: hasValidLength(values.newPassword) },
+    { key: "lowercase", label: "Có ít nhất một chữ cái thường", met: hasLowercase(values.newPassword) },
+    { key: "digit", label: "Có ít nhất một chữ số", met: hasDigit(values.newPassword) },
     {
         key: "different",
         label: "Khác mật khẩu hiện tại",
@@ -39,6 +40,8 @@ const validateField = (name, values) => {
     if (name === "newPassword") {
         if (isPasswordEmpty(value)) return requiredMessage("mật khẩu mới");
         if (!hasValidLength(value)) return VALIDATION_MESSAGES.PASSWORD_LENGTH;
+        if (!hasLowercase(value)) return VALIDATION_MESSAGES.PASSWORD_LOWERCASE;
+        if (!hasDigit(value)) return VALIDATION_MESSAGES.PASSWORD_DIGIT;
         if (value === values.currentPassword) return MESSAGES.MSG25;
         return undefined;
     }
@@ -86,21 +89,29 @@ const ChangePasswordPage = () => {
         }
 
         setSaving(true);
-        const result = await changePassword({ currentPassword: values.currentPassword, newPassword: values.newPassword });
+        const result = await changePassword({
+            currentPassword: values.currentPassword,
+            newPassword: values.newPassword,
+            confirmPassword: values.confirmPassword,
+        });
         setSaving(false);
 
+        if (result.success && result.data.sessionReplaced) {
+            signOut();
+            toast.info(CHANGE_PASSWORD_TEXT.SIGN_IN_AGAIN);
+            navigate(ROUTES.SIGN_IN, { replace: true });
+            return;
+        }
         if (result.success) {
             toast.success(MESSAGES.MSG64);
             setValues(EMPTY_VALUES);
             return;
         }
-        if (result.data?.locked) {
-            signOut();
+        const { field } = result.data;
+        if (!field) {
             toast.error(result.message);
-            navigate(ROUTES.SIGN_IN, { replace: true });
             return;
         }
-        const field = result.data?.attemptsLeft !== undefined ? "currentPassword" : "newPassword";
         setErrors({ [field]: result.message });
         focusField(field);
     };

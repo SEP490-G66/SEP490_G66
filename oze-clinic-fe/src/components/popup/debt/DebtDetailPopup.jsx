@@ -1,7 +1,7 @@
 import Avatar from "@/components/ui/Avatar";
 import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { DEBT_PAYMENT_STATUS_LABELS, DEBT_STATUS_LABELS, getDebtAgeLevel } from "@/utils/debt";
+import { DEBT_PAYMENT_STATUS_LABELS, DEBT_STATUS_LABELS, getDebtAgeLevel } from "@/utils/constants/debt";
 import { cx } from "@/utils/cx";
 import { formatCurrency, formatDate, formatDateTime, formatNumber, formatPhone } from "@/utils/format";
 

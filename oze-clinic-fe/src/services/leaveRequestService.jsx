@@ -1,4 +1,4 @@
-import { LEAVE_REQUEST_STATUSES, leaveMessage } from "../utils/shift";
+import { LEAVE_REQUEST_STATUSES, leaveMessage } from "../utils/constants/shift";
 import { BACKEND_ROLE_NAMES } from "../utils/messages";
 import api from "./api";
 import { call } from "./receptionService";
@@ -55,7 +55,7 @@ const toRequest = (item) => {
             id: shift.shiftId,
             start: shift.shiftStart?.slice(0, 5) ?? "",
             end: shift.shiftEnd?.slice(0, 5) ?? "",
-            roomName: shift.roomName ?? "Quầy lễ tân",
+            roomName: shift.roomName ?? "Phòng tiếp tân",
         })),
     };
 };

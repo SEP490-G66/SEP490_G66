@@ -1,5 +1,5 @@
 import { BACKEND_ROLE_NAMES, USER_ROLES, VALIDATION_MESSAGES } from "../utils/messages";
-import { ACCOUNT_STATUSES } from "../utils/staff";
+import { ACCOUNT_STATUSES } from "../utils/constants/staff";
 import { normalizePhone } from "../utils/validation";
 import api from "./api";
 import { call } from "./receptionService";

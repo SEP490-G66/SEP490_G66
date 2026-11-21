@@ -4,9 +4,14 @@ import { cx } from "@/utils/cx";
 import { EXAM_SYMPTOMS } from "@/utils/messages";
 import ClinicalExamSection from "./ClinicalExamSection";
 
-// "Triệu chứng": tick common symptoms + free-text description. value: the selected symptom labels.
-const SymptomSection = ({ options = EXAM_SYMPTOMS, value = [], note = "", onChange, onNoteChange }) => {
+// Examinations.ChiefComplaint (ExaminationConstants.ChiefComplaintMaxLength)
+const CHIEF_COMPLAINT_MAX = 500;
+
+// "Triệu chứng": the reason for the visit, common symptoms to tick + free-text description.
+// value: the selected symptom labels. chiefComplaint / onChiefComplaintChange: the reason (filled from the booking).
+const SymptomSection = ({ options = EXAM_SYMPTOMS, value = [], note = "", chiefComplaint = "", onChange, onNoteChange, onChiefComplaintChange }) => {
     const noteId = useId();
+    const reasonId = useId();
     const toggle = (symptom) => onChange?.(value.includes(symptom) ? value.filter((item) => item !== symptom) : [...value, symptom]);
 
     return (
@@ -15,6 +20,21 @@ const SymptomSection = ({ options = EXAM_SYMPTOMS, value = [], note = "", onChan
             action={value.length > 0 && <span className="num rounded-full bg-primary-soft px-2 py-0.5 text-caption font-medium text-primary">{value.length} đã chọn</span>}
             bodyClassName="flex flex-col gap-4"
         >
+            {onChiefComplaintChange && (
+                <div className="field">
+                    <label htmlFor={reasonId} className="label">
+                        Lý do khám
+                    </label>
+                    <input
+                        id={reasonId}
+                        className="input"
+                        maxLength={CHIEF_COMPLAINT_MAX}
+                        placeholder="Ví dụ: Đau răng hàm dưới bên trái 3 ngày"
+                        value={chiefComplaint}
+                        onChange={(event) => onChiefComplaintChange(event.target.value)}
+                    />
+                </div>
+            )}
             <fieldset>
                 <legend className="mb-2 font-medium text-ink">Triệu chứng thường gặp</legend>
                 <div className="flex flex-wrap gap-2">

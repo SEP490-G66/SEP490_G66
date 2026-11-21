@@ -4,7 +4,7 @@ import Modal from "@/components/ui/Modal";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatPhone } from "@/utils/format";
 import { USER_ROLES } from "@/utils/messages";
-import { ACCOUNT_STATUS_LABELS, staffRoleLabel } from "@/utils/staff";
+import { ACCOUNT_STATUS_LABELS, staffRoleLabel } from "@/utils/constants/staff";
 
 const Empty = () => <span className="text-muted">—</span>;
 

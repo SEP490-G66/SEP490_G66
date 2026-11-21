@@ -314,7 +314,11 @@ namespace OZE.Application.Services
             {
                 if (!await HasOtherOpenRequestAsync(request, cancellationToken))
                 {
-                    await _queueService.UpdateStatusAsync(appointment.Id, QueueConstants.ImagingType, QueueConstants.Completed, cancellationToken);
+                    // Each order put its own entry in the imaging queue: close them all, or the patient stays "at imaging".
+                    // A closed entry is no longer active, so every call takes the next one until none is left.
+                    while (await _queueService.UpdateStatusAsync(appointment.Id, QueueConstants.ImagingType, QueueConstants.Completed, cancellationToken) != null)
+                    {
+                    }
                 }
 
                 if (isWaiting)

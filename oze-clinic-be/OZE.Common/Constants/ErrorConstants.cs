@@ -175,6 +175,12 @@ namespace OZE.Common.Constants
             public const string ShiftHasAppointments = "Cannot delete this work shift because it has booked appointments. Please move the appointments first";
             public const string CannotUpdateStartedShift = "Cannot update a work shift that has already started or passed";
             public const string ShiftHasAppointmentsCannotChange = "Cannot change staff, date or time of this work shift because it has booked appointments. Please move the appointments first";
+            public const string BulkShiftInvalidRange = "Bulk shift date range is invalid or longer than 62 days";
+            public const string BulkShiftInvalidSlots = "Bulk shift slots are invalid or overlap each other";
+            public const string BulkShiftInvalidStaff = "Bulk shift must include between 1 and 20 unique staff members";
+            public const string BulkShiftInvalidDaysOfWeek = "Bulk shift days of week must be between 0 (Sunday) and 6 (Saturday) and not empty";
+            public const string BulkShiftNothingToCreate = "No valid work shifts to create";
+            public const string BulkShiftBatchOverlap = "This shift overlaps another shift in the same bulk request";
         }
         public static class Common
         {
@@ -268,6 +274,10 @@ namespace OZE.Common.Constants
             public const string PlanNotCancellable = "This treatment plan is already completed or cancelled. A draft plan is deleted instead.";
             public const string StageStillInProgress = "A treatment stage is still in progress. Please complete it before cancelling the plan.";
             public const string CancelReasonRequired = "Please enter the reason for cancelling the treatment plan.";
+            public const string ExaminationIdRequired = "Examination id is required to create a treatment plan.";
+            public const string CannotCreateNewVersion = "Only proposed, approved, or in-progress treatment plans can be updated with a new version.";
+            public const string StageAlreadyCompleted = "This treatment stage is already completed.";
+            public const string FollowUpAppointmentOrPlanRequired = "Either a previous appointment ID or a treatment plan ID is required.";
         }
         public static class AppointmentMessage
         {
@@ -469,6 +479,33 @@ namespace OZE.Common.Constants
             public const string QueueEmpty = "No Data.";
         }
 
+        // Documents the doctor asks the patient to submit ("Yêu cầu bổ sung tài liệu")
+        public static class DocumentRequestMessage
+        {
+            public const string DocumentNameRequired = "Please enter document name.";
+            public const string DocumentNameInvalid = "Document name must be at most 200 characters.";
+            public const string NoteInvalid = "Note must be at most 500 characters.";
+            public const string ExaminationNotInProgress = "Cannot request documents because the examination is {0}.";
+            public const string NotExaminingDoctor = "You do not have permission to request documents for this examination.";
+            public const string CannotViewRequests = "You do not have permission to view document requests for this examination.";
+            public const string RequestNotFound = "Document request not found.";
+            public const string CannotCancelRequest = "You do not have permission to cancel this document request.";
+            public const string RequestNotPending = "Cannot cancel document request because the document request is {0}.";
+            public const string PatientNotFound = "Patient profile not found.";
+            public const string CannotSubmit = "You do not have permission to submit documents for this request.";
+            public const string RequestCancelledCannotSubmit = "Cannot submit documents because the document request is Cancelled.";
+            public const string UploadFilesRequired = "Please choose at least one file.";
+            public const string UploadTooManyFiles = "You can upload at most 10 files at a time.";
+            public const string UploadFileTypeInvalid = "{0} is not a supported file. Use .pdf, .jpg, .jpeg or .png.";
+            public const string UploadFileTooLarge = "{0} is larger than 20 MB.";
+            public const string UploadFileEmpty = "{0} is empty.";
+            public const string DocumentNotFound = "Document not found.";
+            public const string CannotViewDocument = "You do not have permission to view this document.";
+            public const string RequestCreated = "Document request has been sent to the patient.";
+            public const string RequestCancelled = "Document request has been cancelled.";
+            public const string FilesUploaded = "Documents uploaded.";
+        }
+
         // Capturing on the X-ray simulator and reading the stored pictures
         public static class ImagingCaptureMessage
         {
@@ -576,6 +613,8 @@ namespace OZE.Common.Constants
             public const string WorkDoneAmountInvalid = "Work-done amount is invalid.";
             public const string WorkDoneExceedsPaid = "Work-done amount cannot exceed confirmed paid amount.";
             public const string RequestNotPending = "Only pending refund requests can be processed.";
+            public const string RequestNotApproved = "Only approved refund requests can be paid out.";
+            public const string RequestPaidOut = "Refund has been paid out.";
             public const string PendingRequestExists = "A pending refund request already exists for this invoice.";
             public const string PaymentInvalid = "Payment does not belong to this invoice or is not confirmed.";
             public const string RejectionReasonRequired = "Please enter a rejection reason.";

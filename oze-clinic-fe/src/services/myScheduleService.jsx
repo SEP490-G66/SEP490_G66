@@ -1,4 +1,4 @@
-import { leaveMessage } from "../utils/shift";
+import { leaveMessage } from "../utils/constants/shift";
 import api from "./api";
 import { call } from "./receptionService";
 

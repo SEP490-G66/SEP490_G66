@@ -2,7 +2,7 @@ import { cx } from "@/utils/cx";
 import { getToothState, toothName } from "@/utils/medicalRecord";
 import { MEDICAL_RECORD_TOOTH_STATUS } from "@/utils/messages";
 
-const SURFACE_FILL = { watch: "fill-warning-solid/30", done: "fill-primary/45", treating: "fill-warning-solid/60" };
+const SURFACE_FILL = { watch: "fill-warning-solid/30", done: "fill-primary/45", treating: "fill-warning-solid/60", healthy: "", note: "", missing: "" };
 const SURFACE_FILL_DEFAULT = "fill-danger-solid/45";
 const LINE_STROKE = { condition: "stroke-danger", planned: "stroke-danger", treating: "stroke-warning", done: "stroke-primary", watch: "stroke-warning" };
 
@@ -22,7 +22,8 @@ const ToothSvg = ({ tooth, state }) => {
     const top = upper ? 44 : 2;
     const fills = {};
     Object.entries(state.surfaces).forEach(([code, entry]) => {
-        fills[regionOf(code, quadrant, upper)] = SURFACE_FILL[entry.st] ?? SURFACE_FILL_DEFAULT;
+        const fill = SURFACE_FILL[entry.st] ?? SURFACE_FILL_DEFAULT;
+        if (fill) fills[regionOf(code, quadrant, upper)] = fill;
     });
     const regions = {
         T: `2,${top} 32,${top} 22,${top + 10} 12,${top + 10}`,
@@ -77,6 +78,12 @@ const ToothSvg = ({ tooth, state }) => {
                     strokeDasharray={state.crown.st === "planned" ? "4 3" : undefined}
                 />
             )}
+            {state.missing && (
+                <g>
+                    <rect x="1" y={top - 1} width="32" height="32" rx="3" className="fill-surface-muted stroke-placeholder" strokeWidth="1.4" strokeDasharray="3 2" />
+                    <path d={`M7 ${top + 5} L27 ${top + 25} M27 ${top + 5} L7 ${top + 25}`} className="stroke-placeholder" strokeWidth="2.4" strokeLinecap="round" />
+                </g>
+            )}
             {state.watch && (
                 <g>
                     <circle cx="17" cy={upper ? 24 : 52} r="7" className="fill-warning-soft stroke-warning" strokeWidth="1.4" />
@@ -89,7 +96,7 @@ const ToothSvg = ({ tooth, state }) => {
     );
 };
 
-const ToothButton = ({ tooth, entries, selected, onSelect }) => {
+const ToothButton = ({ tooth, entries, selected, inVisit = false, onSelect }) => {
     const hasEntries = entries.length > 0;
     const state = getToothState(entries);
     const upper = Math.floor(tooth / 10) <= 2;
@@ -108,7 +115,7 @@ const ToothButton = ({ tooth, entries, selected, onSelect }) => {
             )}
             onClick={() => onSelect(tooth)}
         >
-            <span className={cx("text-caption font-semibold", selected ? "text-primary" : "text-muted")}>{tooth}</span>
+            <span className={cx("text-caption font-semibold", selected ? "text-primary" : inVisit ? "text-ink underline" : "text-muted")}>{tooth}</span>
             <ToothSvg tooth={tooth} state={state} />
         </button>
     );

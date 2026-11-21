@@ -18,7 +18,7 @@ export const JawLabel = ({ name }) => (
     </div>
 );
 
-export const ToothRow = ({ teeth, entries, selectedTooth, onSelect }) => (
+export const ToothRow = ({ teeth, entries, visitTeeth, selectedTooth, onSelect }) => (
     <div className="relative grid grid-cols-8 gap-x-0.5 gap-y-2 lg:grid-cols-16 lg:gap-y-0.5">
         {teeth.map((tooth) => (
             <ToothButton
@@ -26,6 +26,7 @@ export const ToothRow = ({ teeth, entries, selectedTooth, onSelect }) => (
                 tooth={tooth}
                 entries={entries.filter((entry) => toToothCode(entry.tooth) === tooth)}
                 selected={selectedTooth === tooth}
+                inVisit={visitTeeth?.has(tooth) ?? false}
                 onSelect={onSelect}
             />
         ))}
@@ -39,7 +40,7 @@ const legendItems = (entries) => {
     return [
         [entries.some((entry) => entry.surf), <Swatch key="s" tone="bg-primary/45" />, "Ô tô màu = mặt răng có ghi nhận (ô giữa: mặt nhai / rìa cắn; 4 ô quanh: mặt ngoài, trong, gần, xa)"],
         [statuses.has("condition"), <Swatch key="s" tone="bg-danger-solid/45" />, "Đỏ: sâu, mẻ, viêm — cần điều trị"],
-        [statuses.has("done"), <Swatch key="s" tone="bg-primary/45" />, "Xanh: đã điều trị"],
+        [statuses.has("done"), <Swatch key="s" tone="bg-primary/45" />, "Xanh: đã trám / đã điều trị"],
         [statuses.has("treating"), <Swatch key="s" tone="bg-warning-solid/60" />, "Cam: đang điều trị dở"],
         [
             kinds.has("pulp") || kinds.has("rct"),
@@ -50,7 +51,19 @@ const legendItems = (entries) => {
             </span>,
             "Vạch trong chân răng: tủy răng (đỏ viêm · cam đang chữa · xanh đã trám bít)",
         ],
-        [kinds.has("crown"), <span key="s" className="size-4 shrink-0 rounded-sm border-2 border-dashed border-danger" />, "Khung đứt nét đỏ: mão / bọc sứ theo kế hoạch"],
+        [
+            kinds.has("crown") || kinds.has("implant") || kinds.has("denture"),
+            <span key="s" className="size-4 shrink-0 rounded-sm border-2 border-primary" />,
+            "Khung xanh: bọc mão, implant hoặc hàm giả",
+        ],
+        [
+            kinds.has("missing"),
+            <span key="s" className="grid size-4 shrink-0 place-items-center rounded-sm border border-dashed border-placeholder bg-surface-muted text-caption font-bold text-placeholder">
+                ×
+            </span>,
+            "Gạch chéo xám: mất răng",
+        ],
+        [statuses.has("note"), <span key="s" className="badge badge-neutral">Ghi nhận</span>, "Bác sĩ ghi nhận thêm, xem bảng bên dưới"],
         [
             statuses.has("watch"),
             <span key="s" className="grid size-4 shrink-0 place-items-center rounded-full border border-warning bg-warning-soft text-caption font-bold text-warning">

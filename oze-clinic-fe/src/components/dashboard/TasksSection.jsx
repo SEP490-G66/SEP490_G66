@@ -3,41 +3,28 @@ import DashboardSection from "@/components/dashboard/DashboardSection";
 import DetailLink from "@/components/ui/DetailLink";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { GENERIC_ERROR_MESSAGE, INVOICE_PAYMENT_STATUS, TREATMENT_PLAN_STATUS } from "@/utils/messages";
-import { ROUTES, getTreatmentPlanRoute } from "@/utils/routes";
+import { GENERIC_ERROR_MESSAGE, INVOICE_PAYMENT_STATUS, PATIENT_DEBT_STATUS } from "@/utils/messages";
+import { getPaymentDebtDetailRoute } from "@/utils/routes";
+
+const TASK_INVOICE_STATUS = { ...INVOICE_PAYMENT_STATUS, OVERDUE: PATIENT_DEBT_STATUS.overdue };
 
 const TITLE_ID = "patient-dashboard-tasks";
 
 const joinParts = (parts) => parts.filter(Boolean).join(" · ");
 
-const describeTask = (task) => {
-    if (task.kind === "plan") {
-        const sentBy = task.proposedAt ? [task.doctorName, "gửi", formatDate(task.proposedAt)].filter(Boolean).join(" ") : task.doctorName;
-        return {
-            title: `Kế hoạch ${task.planName} đang chờ bạn chấp nhận`,
-            caption: joinParts([sentBy, `${task.stageCount} giai đoạn`, formatCurrency(task.estimatedTotalCost)]),
-            status: task.status,
-            statusLabels: TREATMENT_PLAN_STATUS,
-            linkLabel: "Xem kế hoạch",
-            linkContext: task.planName,
-            to: getTreatmentPlanRoute(task.id),
-        };
-    }
-
-    return {
-        title: `Hóa đơn ${task.invoiceNumber} chưa thanh toán`,
-        caption: joinParts([
-            formatCurrency(task.remainder),
-            task.appointmentDate && `Lần khám ${formatDate(task.appointmentDate)}`,
-            "Vui lòng thanh toán tại quầy",
-        ]),
-        status: task.status,
-        statusLabels: INVOICE_PAYMENT_STATUS,
-        linkLabel: "Xem công nợ",
-        linkContext: task.invoiceNumber,
-        to: ROUTES.PAYMENT_DEBTS,
-    };
-};
+const describeTask = (task) => ({
+    title: `Hóa đơn ${task.invoiceNumber} chưa thanh toán`,
+    caption: joinParts([
+        formatCurrency(task.remainder),
+        task.appointmentDate && `Lần khám ${formatDate(task.appointmentDate)}`,
+        "Vui lòng thanh toán tại quầy",
+    ]),
+    status: task.status,
+    statusLabels: TASK_INVOICE_STATUS,
+    linkLabel: "Xem công nợ",
+    linkContext: task.invoiceNumber,
+    to: getPaymentDebtDetailRoute(task.debtId),
+});
 
 const TasksSection = ({ tasks = [], loading = false, failed = false }) => {
     const loaded = !loading && !failed;

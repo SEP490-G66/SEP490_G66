@@ -4,53 +4,83 @@ import Card from "@/components/ui/Card";
 import { requestPasswordReset } from "../../services/authService";
 import { VERIFICATION_METHOD, VERIFICATION_METHOD_OPTIONS } from "../../utils/messages";
 import { ROUTES } from "../../utils/routes";
-import { isPhoneEmpty, normalizePhone, validatePhone } from "../../utils/validation";
+import { isRequiredEmpty, normalizePhone, requiredMessage, validateEmail, validatePhone } from "../../utils/validation";
+
+const FIELDS = {
+    [VERIFICATION_METHOD.SMS]: {
+        id: "phone",
+        label: "Số điện thoại",
+        type: "tel",
+        inputMode: "numeric",
+        autoComplete: "tel",
+        placeholder: "0912 345 678",
+        validate: (value) => validatePhone(value),
+        normalize: (value) => normalizePhone(value),
+    },
+    [VERIFICATION_METHOD.EMAIL]: {
+        id: "email",
+        label: "Email",
+        type: "email",
+        inputMode: "email",
+        autoComplete: "email",
+        placeholder: "ten@example.com",
+        validate: (value) => (isRequiredEmpty(value) ? requiredMessage("email") : validateEmail(value.trim())),
+        normalize: (value) => value.trim(),
+    },
+};
+
+const EMPTY_VALUES = { [VERIFICATION_METHOD.SMS]: "", [VERIFICATION_METHOD.EMAIL]: "" };
 
 const ForgotPasswordPage = () => {
     const navigate = useNavigate();
-    const phoneRef = useRef(null);
-    const [phone, setPhone] = useState("");
+    const inputRef = useRef(null);
     const [method, setMethod] = useState(VERIFICATION_METHOD.SMS);
-    const [phoneError, setPhoneError] = useState();
+    const [values, setValues] = useState(EMPTY_VALUES);
+    const [error, setError] = useState();
     const [loading, setLoading] = useState(false);
+    const field = FIELDS[method];
+    const value = values[method];
+    const errorId = `${field.id}-error`;
 
-    const handlePhoneChange = (event) => {
-        setPhone(event.target.value);
-        setPhoneError(undefined);
+    const handleValueChange = (event) => {
+        const next = event.target.value;
+        setValues((current) => ({ ...current, [method]: next }));
+        setError(undefined);
     };
 
-    const handlePhoneBlur = (event) => {
-        const { value } = event.target;
-        if (isPhoneEmpty(value)) return;
-        const error = validatePhone(value);
-        if (error) setPhoneError(error);
+    const handleBlur = (event) => {
+        if (isRequiredEmpty(event.target.value)) return;
+        const fieldError = field.validate(event.target.value);
+        if (fieldError) setError(fieldError);
     };
 
     const handleMethodChange = (event) => {
         setMethod(event.target.value);
+        setError(undefined);
     };
 
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (loading) return;
 
-        const error = validatePhone(phone);
-        setPhoneError(error);
-        if (error) {
-            phoneRef.current?.focus();
+        const fieldError = field.validate(value);
+        setError(fieldError);
+        if (fieldError) {
+            inputRef.current?.focus();
             return;
         }
 
-        const normalizedPhone = normalizePhone(phone);
+        const identifier = field.normalize(value);
         setLoading(true);
         try {
-            const result = await requestPasswordReset({ phone: normalizedPhone, method });
+            const result = await requestPasswordReset({ identifier });
             if (result.success) {
-                navigate(ROUTES.VERIFY_OTP, { state: { phone: normalizedPhone, method } });
+                const { sessionId, maskedDestination } = result.data;
+                navigate(ROUTES.VERIFY_OTP, { state: { identifier, method, sessionId, maskedDestination } });
                 return;
             }
-            setPhoneError(result.message);
-            phoneRef.current?.focus();
+            setError(result.message);
+            inputRef.current?.focus();
         } finally {
             setLoading(false);
         }
@@ -65,35 +95,8 @@ const ForgotPasswordPage = () => {
                 </p>
 
                 <form noValidate onSubmit={handleSubmit}>
-                    <div className="field">
-                        <label htmlFor="phone" className="label label-required">
-                            Số điện thoại
-                        </label>
-                        <input
-                            ref={phoneRef}
-                            id="phone"
-                            name="phone"
-                            type="tel"
-                            inputMode="numeric"
-                            autoComplete="tel"
-                            placeholder="0912 345 678"
-                            className="input"
-                            aria-required="true"
-                            aria-invalid={phoneError ? true : undefined}
-                            aria-describedby={phoneError ? "phone-error" : undefined}
-                            value={phone}
-                            onChange={handlePhoneChange}
-                            onBlur={handlePhoneBlur}
-                        />
-                        {phoneError && (
-                            <p id="phone-error" className="error-text">
-                                {phoneError}
-                            </p>
-                        )}
-                    </div>
-
-                    <fieldset className="mt-4">
-                        <legend className="sr-only">Phương thức nhận mã</legend>
+                    <fieldset>
+                        <legend className="label">Nhận mã xác minh qua</legend>
                         <div className="flex flex-wrap gap-x-6">
                             {VERIFICATION_METHOD_OPTIONS.map((option) => (
                                 <div key={option.value} className="flex h-control items-center gap-2">
@@ -112,6 +115,34 @@ const ForgotPasswordPage = () => {
                             ))}
                         </div>
                     </fieldset>
+
+                    <div className="field mt-4">
+                        <label htmlFor={field.id} className="label label-required">
+                            {field.label}
+                        </label>
+                        <input
+                            key={field.id}
+                            ref={inputRef}
+                            id={field.id}
+                            name={field.id}
+                            type={field.type}
+                            inputMode={field.inputMode}
+                            autoComplete={field.autoComplete}
+                            placeholder={field.placeholder}
+                            className="input"
+                            aria-required="true"
+                            aria-invalid={error ? true : undefined}
+                            aria-describedby={error ? errorId : undefined}
+                            value={value}
+                            onChange={handleValueChange}
+                            onBlur={handleBlur}
+                        />
+                        {error && (
+                            <p id={errorId} className="error-text">
+                                {error}
+                            </p>
+                        )}
+                    </div>
 
                     <button
                         type="submit"

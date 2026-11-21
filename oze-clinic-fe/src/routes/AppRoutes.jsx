@@ -20,7 +20,6 @@ import ProfilePage from "../pages/common/ProfilePage";
 import ChangePasswordPage from "../pages/common/ChangePasswordPage";
 import ComingSoonPage from "../pages/common/ComingSoonPage";
 import ReceptionCheckIn from "../pages/receptionist/ReceptionCheckIn";
-import ReceptionDebts from "../pages/receptionist/ReceptionDebts";
 import ReceptionInvoices from "../pages/receptionist/ReceptionInvoices";
 import ReceptionPatients from "../pages/receptionist/ReceptionPatients";
 import ReceptionSchedule from "../pages/receptionist/ReceptionSchedule";
@@ -43,6 +42,7 @@ import PaymentDebts from "../pages/patient/PaymentDebts";
 import PaymentHistory from "../pages/patient/PaymentHistory";
 import RefundRequests from "../pages/patient/RefundRequests";
 import AuditLogManagement from "../pages/admin/AuditLogManagement";
+import DebtManagement from "../pages/admin/DebtManagement";
 import LeaveRequestManagement from "../pages/admin/LeaveRequestManagement";
 import RefundRequestManagement from "../pages/admin/RefundRequestManagement";
 import RoomManagement from "../pages/admin/RoomManagement";
@@ -235,7 +235,7 @@ const ROLE_PAGES = {
     [ROUTES.ADMIN_LEAVE_REQUESTS]: <LeaveRequestManagement />,
     [ROUTES.ADMIN_REFUNDS]: <RefundRequestManagement />,
     // Real debts from the API; the manager sees them without the receptionist's reminder and payment buttons
-    [ROUTES.ADMIN_DEBTS]: <ReceptionDebts forManager />,
+    [ROUTES.ADMIN_DEBTS]: <DebtManagement />,
     [ROUTES.ADMIN_RECONCILIATION]: <DailyReconciliation />
 }
 

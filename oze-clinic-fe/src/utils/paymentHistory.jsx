@@ -1,7 +1,8 @@
-import { getVisitNumbers, norm } from "./medicalRecord";
+import { formatDate } from "./format";
+import { norm } from "./medicalRecord";
 import { PAYMENT_HISTORY_STATUS, PAYMENT_HISTORY_TEXT } from "./messages";
 import { PAYMENT_HISTORY_QUERY } from "./routes";
-import { collectPayments, collectRefunds, dateKey, lineTotal, receiptOf } from "./patientDebt";
+import { byNewest, clinicDate, dateKey, toPayment, toRefund } from "./patientDebt";
 
 export const HISTORY_NAV_FLAG = "paymentHistoryNav";
 export const XL_QUERY = "(min-width: 80rem)";
@@ -52,72 +53,73 @@ export const focusReceiptTitle = (element) => {
 
 const sum = (list, read) => list.reduce((total, entry) => total + read(entry), 0);
 const toNumber = (value) => Number(value) || 0;
+const GENDER_LABELS = { Male: "Nam", Female: "Nữ" };
 
 const receiptStatus = (paid, left) => {
     if (left <= 0) return "paid";
     return paid > 0 ? "partial" : "unpaid";
 };
 
-const buildReceipt = (visit, receipt, context) => {
-    const lines = receipt.lines.map((line, index) => ({
-        key: `${visit.id}-${index}`,
-        name: line.name,
-        detail: line.detail,
-        quantity: toNumber(line.quantity),
-        unitPrice: toNumber(line.unitPrice),
-        discount: toNumber(line.discount),
-        total: lineTotal(line),
-    }));
-    const gross = sum(lines, (line) => line.quantity * line.unitPrice);
-    const disc = sum(lines, (line) => line.discount);
-    const net = gross - disc;
-    if (net <= 0) return null;
-    const pays = collectPayments(context.debtMock, [visit.id]).map((payment) => ({ ...payment, payer: context.payer }));
-    const paid = sum(pays, (payment) => payment.amount);
-    const left = Math.max(0, net - paid);
+export const toPayerProfile = (me) => ({
+    name: me?.fullName ?? "",
+    dob: formatDate(me?.dateOfBirth),
+    gender: GENDER_LABELS[me?.gender] ?? "",
+    phone: (me?.phoneNumber ?? "").replace(/^\+84/, "0"),
+    addr: me?.address ?? "",
+});
+
+const followUpText = (invoice) => {
+    const date = formatDate(invoice.followUpDate);
+    return [date, invoice.followUpNotes].filter(Boolean).join(" – ") || NO_VALUE;
+};
+
+const toLine = (item, index, invoiceId) => ({
+    key: `${invoiceId}-${index}`,
+    name: item.stageName ? `${item.stageName} – ${item.serviceName}` : item.serviceName,
+    detail: item.description ?? "",
+    quantity: toNumber(item.quantity),
+    unitPrice: toNumber(item.unitPrice),
+    total: toNumber(item.amount),
+});
+
+export const toReceipt = (invoice, payer) => {
+    const date = formatDate(invoice.visitDate) || clinicDate(invoice.createdAt);
+    const lines = (invoice.items ?? []).map((item, index) => toLine(item, index, invoice.id));
+    const diag = (invoice.diagnoses ?? []).filter(Boolean).join(", ");
+    const paid = toNumber(invoice.paidAmount);
+    const left = toNumber(invoice.remainingAmount);
     return {
-        id: visit.id,
-        no: context.numbers.get(visit.id),
-        date: visit.date,
-        doctor: visit.doctor,
-        diag: visit.diag,
-        reason: visit.reason,
-        next: visit.next?.text || NO_VALUE,
+        id: invoice.id,
+        no: invoice.invoiceNumber ?? "",
+        title: invoice.treatmentPlanName ?? "",
+        isPlan: invoice.treatmentPlanId != null,
+        date,
+        doctor: invoice.doctorName ?? "",
+        diag,
+        reason: invoice.chiefComplaint ?? "",
+        next: followUpText(invoice),
         lines,
-        gross,
-        disc,
-        net,
-        pays,
+        gross: toNumber(invoice.totalAmount),
+        disc: toNumber(invoice.discountAmount),
+        net: toNumber(invoice.finalAmount),
+        pays: (invoice.payments ?? []).map((payment) => ({ ...toPayment(payment, invoice.id), payer: payer || NO_VALUE })).sort(byNewest((payment) => payment.date)),
         paid,
         left,
         status: receiptStatus(paid, left),
-        refunds: collectRefunds(context.debtMock, [visit.id], context.visitDates),
-        month: monthKey(visit.date),
-        search: norm([...lines.flatMap((line) => [line.name, line.detail]), visit.diag, visit.doctor, visit.date].join(" ")),
+        refunds: (invoice.refunds ?? []).map((refund) => toRefund(refund, date)).sort(byNewest((refund) => refund.createdAt)),
+        month: monthKey(date),
+        search: norm([invoice.invoiceNumber, invoice.treatmentPlanName, ...lines.flatMap((line) => [line.name, line.detail]), diag, invoice.doctorName, date].filter(Boolean).join(" ")),
     };
 };
 
-export const buildReceipts = (record, debtMock) => {
-    const context = {
-        debtMock,
-        numbers: getVisitNumbers(record.visits),
-        visitDates: new Map(record.visits.map((visit) => [visit.id, visit.date])),
-        payer: record.profile?.name || NO_VALUE,
-    };
-    const items = record.visits
-        .map((visit) => {
-            const receipt = receiptOf(debtMock, visit.id);
-            return receipt ? buildReceipt(visit, receipt, context) : null;
-        })
-        .filter(Boolean);
-    return items.map((item) => ({
+export const withRemainAll = (items) =>
+    items.map((item) => ({
         ...item,
         remainAll: sum(
             items.filter((other) => dateKey(other.date) <= dateKey(item.date)),
             (other) => other.left,
         ),
     }));
-};
 
 const byNewestDate = (a, b) => dateKey(b.date).localeCompare(dateKey(a.date)) || b.id - a.id;
 

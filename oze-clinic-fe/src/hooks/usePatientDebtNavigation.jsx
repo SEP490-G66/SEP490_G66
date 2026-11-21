@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useLocation, useNavigate, useNavigationType, useParams, useSearchParams } from "react-router-dom";
-import { getMyDebts } from "@/services/patientDashboardService";
-import { PATIENT_DEBT_TEXT } from "@/utils/messages";
+import { getMyDebtAccounts } from "@/services/patientBillingService";
+import { BOOKING_ERROR_CODE, PATIENT_DEBT_TEXT } from "@/utils/messages";
 import { DEBT_ID_PATTERN, DEBT_NAV_FLAG, DEBT_RETRY_ID, buildDebtSearch, clampPage, debtOpenSelector, filterDebts, findDebt, readDebtQuery } from "@/utils/patientDebt";
 import { ROUTES } from "@/utils/routes";
 
@@ -65,12 +65,15 @@ const usePatientDebtNavigation = () => {
         if (load.status !== "loading") return undefined;
         const controller = new AbortController();
         let active = true;
-        const finish = (data) => {
+        const finish = (data, status) => {
             if (!active) return;
-            setLoad((current) => (current.id === load.id ? { id: load.id, status: data ? "ready" : "error", data } : current));
+            setLoad((current) => (current.id === load.id ? { id: load.id, status: status ?? (data ? "ready" : "error"), data } : current));
         };
-        getMyDebts({ signal: controller.signal })
-            .then((response) => finish(response?.success && Array.isArray(response.data?.items) ? response.data.items : null))
+        getMyDebtAccounts({ signal: controller.signal })
+            .then((response) => {
+                if (response?.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND) finish(null, "unlinked");
+                else finish(response?.success && Array.isArray(response.data?.items) ? response.data.items : null);
+            })
             .catch(() => finish(null));
         return () => {
             active = false;

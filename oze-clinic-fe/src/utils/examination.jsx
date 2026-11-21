@@ -88,19 +88,28 @@ export const planSummary = (services) => {
     return { perService, total: perService.reduce((total, service) => total + service.cost, 0) };
 };
 
-// Errors before the plan can be sent: every service needs a session; every session a content and a service type.
-// Returns { services: { [serviceId]: message }, sessions: { [sessionId]: { title?, typeId? } }, count }.
-export const validatePlan = (services) => {
+// Errors before the plan can be sent: every service needs a session; every session a content, a service type when the
+// service has types (typeOptionsOf), and a planned date that is not past and not before an earlier session's date
+// (the backend's rule, in treatment order across services). today: "yyyy-mm-dd" (clinic day).
+// Returns { services: { [serviceId]: message }, sessions: { [sessionId]: { title?, typeId?, date? } }, count }.
+export const validatePlan = (services, typeOptionsOf = () => [], today = "") => {
     const errors = { services: {}, sessions: {}, count: 0 };
+    let previousDate = "";
     services.forEach((service) => {
         if (!service.sessions.length) {
             errors.services[service.id] = "Thêm ít nhất một buổi điều trị.";
             errors.count += 1;
         }
+        const hasTypes = typeOptionsOf(service).length > 0;
         service.sessions.forEach((session) => {
             const sessionErrors = {};
             if (!session.title.trim()) sessionErrors.title = "Nhập nội dung buổi.";
-            if (!session.typeId) sessionErrors.typeId = "Chọn loại dịch vụ.";
+            if (hasTypes && !session.typeId) sessionErrors.typeId = "Chọn loại dịch vụ.";
+            if (session.date && session.status !== "done") {
+                if (today && session.date < today) sessionErrors.date = "Ngày dự kiến không được ở quá khứ.";
+                else if (previousDate && session.date < previousDate) sessionErrors.date = "Ngày dự kiến phải sau hoặc bằng ngày của buổi trước.";
+            }
+            if (session.date) previousDate = session.date;
             if (Object.keys(sessionErrors).length) {
                 errors.sessions[session.id] = sessionErrors;
                 errors.count += Object.keys(sessionErrors).length;

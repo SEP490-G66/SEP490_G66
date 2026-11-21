@@ -1,52 +1,114 @@
-import { MOCK_NOTIFICATIONS } from "../utils/data/mockNotifications";
+import { generatePath } from "react-router-dom";
+import api from "./api";
+import { call } from "./receptionService";
+import { getSessionRole } from "./sessionStore";
+import { USER_ROLES } from "@/utils/messages";
+import { ROUTES, getPaymentDebtDetailRoute, getTreatmentPlanRoute } from "@/utils/routes";
 
-const MOCK_DELAY_MS = 300;
+// In-app notifications of the signed-in user, every role (NotificationsController: api/notifications).
+// Every call returns the ApiResponse shape ({ success, message, data, errors }).
 
 export const NOTIFICATION_PAGE_SIZE = 20;
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const { PATIENT, DOCTOR, DENTAL_IMAGING_TECHNICIAN, RECEPTIONIST, CLINIC_MANAGER } = USER_ROLES;
 
-const success = (data) => ({ success: true, message: null, data, errors: null });
+// Page to open for a notification, by the backend's ReferenceType (NotificationConstants.Reference) and the user's role.
+// A function gets the ReferenceId. Missing: the header says the content cannot be opened.
+// The doctor's pages for appointments, treatment plans and imaging orders are not built (ComingSoonPage): the doctor
+// works on them in "Khám bệnh" and reads films in "Duyệt kết quả chụp".
+const REFERENCE_PAGES = {
+    Appointment: {
+        [PATIENT]: (id) => generatePath(ROUTES.APPOINTMENT_DETAIL, { appointmentId: id }),
+        [DOCTOR]: ROUTES.DOCTOR_EXAMINATION,
+        [RECEPTIONIST]: ROUTES.RECEPTION_APPOINTMENTS,
+    },
+    ImagingRequest: {
+        [DENTAL_IMAGING_TECHNICIAN]: ROUTES.TECHNICIAN_IMAGING_REQUESTS,
+        [DOCTOR]: ROUTES.DOCTOR_IMAGING_REVIEWS,
+    },
+    DocumentRequest: {
+        [DOCTOR]: ROUTES.DOCTOR_EXAMINATION,
+    },
+    Examination: {
+        [PATIENT]: (id) => generatePath(ROUTES.MEDICAL_RECORD_DETAIL, { examinationId: id }),
+        [DOCTOR]: ROUTES.DOCTOR_IMAGING_REVIEWS,
+    },
+    TreatmentPlan: {
+        [PATIENT]: (id) => getTreatmentPlanRoute(id),
+        [DOCTOR]: ROUTES.DOCTOR_EXAMINATION,
+    },
+    Invoice: {
+        [PATIENT]: (id) => getPaymentDebtDetailRoute(`invoice-${id}`),
+        [RECEPTIONIST]: ROUTES.RECEPTION_INVOICE_LIST,
+    },
+    Payment: {
+        [PATIENT]: ROUTES.PAYMENT_HISTORY,
+        [RECEPTIONIST]: ROUTES.RECEPTION_INVOICE_LIST,
+    },
+    RefundRequest: {
+        [PATIENT]: ROUTES.REFUND_REQUESTS,
+        [CLINIC_MANAGER]: ROUTES.ADMIN_REFUNDS,
+    },
+    LeaveRequest: {
+        [DOCTOR]: ROUTES.WORK_SCHEDULE,
+        [DENTAL_IMAGING_TECHNICIAN]: ROUTES.WORK_SCHEDULE,
+        [RECEPTIONIST]: ROUTES.WORK_SCHEDULE,
+        [CLINIC_MANAGER]: ROUTES.ADMIN_LEAVE_REQUESTS,
+    },
+    WorkShift: {
+        [DOCTOR]: ROUTES.WORK_SCHEDULE,
+        [DENTAL_IMAGING_TECHNICIAN]: ROUTES.WORK_SCHEDULE,
+        [RECEPTIONIST]: ROUTES.WORK_SCHEDULE,
+        [CLINIC_MANAGER]: ROUTES.ADMIN_WORK_SHIFTS,
+    },
+    ConsultationRequest: {
+        [RECEPTIONIST]: ROUTES.RECEPTION_CONSULTATIONS,
+    },
+    CashSession: {
+        [RECEPTIONIST]: ROUTES.RECEPTION_CASH_HANDOVER,
+        [CLINIC_MANAGER]: ROUTES.ADMIN_RECONCILIATION,
+    },
+};
 
-const notifications = MOCK_NOTIFICATIONS.map((notification) => ({ ...notification })).sort(
-    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-);
+const relatedPathOf = (referenceType, referenceId) => {
+    const page = REFERENCE_PAGES[referenceType]?.[getSessionRole()];
+    if (typeof page !== "function") return page ?? null;
+    return referenceId ? page(referenceId) : null;
+};
 
-const countUnread = () => notifications.filter((notification) => !notification.isRead).length;
+// The header reads { id, title, content, createdAt, isRead, relatedPath }.
+export const toNotification = (item) => ({
+    id: item.id,
+    title: item.title,
+    content: item.message,
+    createdAt: item.createdAt,
+    isRead: item.isRead,
+    referenceType: item.referenceType ?? null,
+    referenceId: item.referenceId ?? null,
+    relatedPath: relatedPathOf(item.referenceType, item.referenceId),
+});
 
+// data: { items, page, pageSize, totalItems, totalPages, unreadCount }
 export const getNotifications = async ({ page = 1, pageSize = NOTIFICATION_PAGE_SIZE } = {}) => {
-    await wait(MOCK_DELAY_MS);
-
-    const totalItems = notifications.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const currentPage = Math.min(Math.max(1, page), totalPages);
-    const start = (currentPage - 1) * pageSize;
-    const items = notifications.slice(start, start + pageSize).map((notification) => ({ ...notification }));
-
-    return success({ items, page: currentPage, pageSize, totalItems, totalPages, unreadCount: countUnread() });
+    const response = await call(() => api.get("/api/notifications", { params: { page, pageSize } }));
+    if (!response.success) return response;
+    const data = response.data ?? {};
+    return {
+        ...response,
+        data: {
+            items: (data.items ?? []).map(toNotification),
+            page: data.page ?? page,
+            pageSize: data.pageSize ?? pageSize,
+            totalItems: data.totalItems ?? 0,
+            totalPages: Math.max(1, data.totalPages ?? 1),
+            unreadCount: data.unreadCount ?? 0,
+        },
+    };
 };
 
-export const markNotificationAsRead = async (id) => {
-    await wait(MOCK_DELAY_MS);
+// data: { unreadCount } for the three calls below
+export const markNotificationAsRead = (id) => call(() => api.post(`/api/notifications/${id}/read`));
 
-    const notification = notifications.find((item) => item.id === id);
-    if (notification) notification.isRead = true;
+export const markAllNotificationsAsRead = () => call(() => api.post("/api/notifications/read-all"));
 
-    return success({ unreadCount: countUnread() });
-};
-
-export const markAllNotificationsAsRead = async () => {
-    await wait(MOCK_DELAY_MS);
-
-    notifications.forEach((notification) => {
-        notification.isRead = true;
-    });
-
-    return success({ unreadCount: 0 });
-};
-
-export const getUnreadNotificationCount = async () => {
-    await wait(MOCK_DELAY_MS);
-
-    return success({ unreadCount: countUnread() });
-};
+export const getUnreadNotificationCount = () => call(() => api.get("/api/notifications/unread-count"));

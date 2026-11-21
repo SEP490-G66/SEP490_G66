@@ -3,17 +3,21 @@ import { ChevronLeft, ChevronRight, Phone, RefreshCw } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import AppointmentNextStep from "@/components/appointment/AppointmentNextStep";
+import CancelAppointmentModal from "@/components/appointment/CancelAppointmentModal";
+import RescheduleAppointmentModal from "@/components/appointment/RescheduleAppointmentModal";
 import DashboardSection from "@/components/dashboard/DashboardSection";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import StatusBadge from "@/components/ui/StatusBadge";
 import useAsync from "@/hooks/useAsync";
-import { getChangeDeadline, getMyAppointmentDetail } from "@/services/patientDashboardService";
+import { LIVE_NOTIFICATION_EVENT } from "@/hooks/useLiveNotifications";
+import { getMyAppointmentDetail } from "@/services/appointmentService";
 import { cx } from "@/utils/cx";
-import { formatClock, formatDate, formatDateTime, formatTime, formatWeekday } from "@/utils/format";
+import { formatClock, formatDate, formatTime, formatWeekday } from "@/utils/format";
 import { APPOINTMENT_STATUS, CLINIC_ADDRESS, CLINIC_HOTLINE, EXAMINATION_STATUS, GENERIC_ERROR_MESSAGE, MESSAGES, PATIENT_APPOINTMENT_STATUS, QUEUE_STATUS } from "@/utils/messages";
 import {
     IMAGING_QUEUE_BADGE,
     PATIENT_QUEUE_BADGE,
+    PATIENT_QUEUE_ENABLED,
     PATIENT_QUEUE_STATE,
     formatQueueNumber,
     getPatientQueueState,
@@ -32,13 +36,15 @@ const BACK_LABEL = "Quay lại Lịch hẹn của tôi";
 const FINISHED_EXAMINATION_STATUSES = [EXAMINATION_STATUS.COMPLETED, EXAMINATION_STATUS.LOCKED];
 const CLOSED_STATUSES = [APPOINTMENT_STATUS.CANCELLED, APPOINTMENT_STATUS.NO_SHOW];
 const MOBILE_ACTION_CLASS = "col-span-2 min-h-11 md:min-h-0";
+const CHANGE_ACTION_CLASS = "min-h-11 md:min-h-0";
+const CHANGEABLE_STATUSES = [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED];
+const MODAL = { CANCEL: "cancel", RESCHEDULE: "reschedule" };
 
 const TEXT = {
     CHANGE_TITLE: "Đổi hoặc hủy lịch",
-    DEADLINE_LABEL: "Hạn đổi / hủy lịch",
-    DEADLINE_PASSED: "Đã quá hạn",
-    CHANGE_HINT: "Để đổi hoặc hủy lịch, vui lòng gọi lễ tân trước thời hạn trên. Lễ tân sẽ hỗ trợ bạn.",
-    CHANGE_HINT_PASSED: "Đã quá hạn đổi / hủy lịch. Vui lòng gọi lễ tân để được hỗ trợ.",
+    CHANGE_HINT: "Bạn có thể tự đổi hoặc hủy lịch trước khi báo có mặt tại quầy. Cần hỗ trợ, vui lòng gọi lễ tân.",
+    CANCEL: "Hủy lịch",
+    RESCHEDULE: "Đổi lịch",
     CALL_RECEPTION: `Gọi lễ tân ${CLINIC_HOTLINE.DISPLAY}`,
     AFTER_TITLE: "Sau buổi khám",
     RESULT_TITLE: "Kết quả khám",
@@ -92,6 +98,7 @@ const getInfoItems = (appointment) => {
     if (appointment.status === APPOINTMENT_STATUS.CANCELLED) items.push({ label: "Lý do hủy", value: appointment.cancellationReason });
     const checkInAt = isInClinic(appointment) ? formatClock(appointment.checkInAt) : "";
     if (checkInAt) items.push({ label: "Báo có mặt lúc", value: checkInAt, numeric: true });
+    if (!PATIENT_QUEUE_ENABLED && isInClinic(appointment) && appointment.roomName) items.push({ label: TEXT.ROOM, value: appointment.roomName });
     return items;
 };
 
@@ -144,7 +151,7 @@ const getQueueCells = (appointment, state) => {
 };
 
 const QueueStrip = ({ appointment }) => {
-    const state = getPatientQueueState(appointment);
+    const state = PATIENT_QUEUE_ENABLED ? getPatientQueueState(appointment) : null;
     if (!state) return null;
     const cells = getQueueCells(appointment, state);
     return (
@@ -196,12 +203,28 @@ const ErrorState = ({ onRetry }) => (
     </div>
 );
 
-const getHeaderActions = (appointment) => {
+const getHeaderActions = (appointment, onOpen) => {
     if (CLOSED_STATUSES.includes(appointment.status)) {
         return (
             <Link to={ROUTES.BOOK_APPOINTMENT} className={`btn btn-primary ${MOBILE_ACTION_CLASS}`}>
                 Đặt lịch mới
             </Link>
+        );
+    }
+    if (CHANGEABLE_STATUSES.includes(appointment.status)) {
+        return (
+            <>
+                <button
+                    type="button"
+                    className={`btn btn-secondary text-danger hover:border-danger-solid hover:text-danger ${CHANGE_ACTION_CLASS}`}
+                    onClick={() => onOpen(MODAL.CANCEL)}
+                >
+                    {TEXT.CANCEL}
+                </button>
+                <button type="button" className={`btn btn-primary ${CHANGE_ACTION_CLASS}`} onClick={() => onOpen(MODAL.RESCHEDULE)}>
+                    {TEXT.RESCHEDULE}
+                </button>
+            </>
         );
     }
     return null;
@@ -214,24 +237,12 @@ const HotlineButton = ({ label = TEXT.CALL }) => (
     </a>
 );
 
-const ChangePanel = ({ appointment, now }) => {
-    const deadline = getChangeDeadline(appointment);
-    const passed = deadline && now >= deadline;
-    return (
-        <DashboardSection id="appointment-change" title={TEXT.CHANGE_TITLE}>
-            {deadline && (
-                <>
-                    <div className="rounded-md bg-warning-soft px-4 py-3">
-                        <p className="text-caption text-warning">{TEXT.DEADLINE_LABEL}</p>
-                        <p className="num text-title text-ink">{passed ? TEXT.DEADLINE_PASSED : formatDateTime(deadline)}</p>
-                    </div>
-                    <p className="text-body-sm">{passed ? TEXT.CHANGE_HINT_PASSED : TEXT.CHANGE_HINT}</p>
-                </>
-            )}
-            <HotlineButton label={TEXT.CALL_RECEPTION} />
-        </DashboardSection>
-    );
-};
+const ChangePanel = () => (
+    <DashboardSection id="appointment-change" title={TEXT.CHANGE_TITLE}>
+        <p className="text-body-sm">{TEXT.CHANGE_HINT}</p>
+        <HotlineButton label={TEXT.CALL_RECEPTION} />
+    </DashboardSection>
+);
 
 const LinkRow = ({ to, title, text }) => (
     <Link to={to} className="flex items-center justify-between gap-3 rounded-md border border-border px-4 py-3 hover:border-primary hover:bg-surface-tint">
@@ -243,11 +254,11 @@ const LinkRow = ({ to, title, text }) => (
     </Link>
 );
 
-const SidePanel = ({ appointment, now }) => {
+const SidePanel = ({ appointment }) => {
     switch (appointment.status) {
         case APPOINTMENT_STATUS.PENDING:
         case APPOINTMENT_STATUS.CONFIRMED:
-            return <ChangePanel appointment={appointment} now={now} />;
+            return <ChangePanel />;
         case APPOINTMENT_STATUS.COMPLETED:
             return (
                 <DashboardSection id="appointment-after" title={TEXT.AFTER_TITLE}>
@@ -265,10 +276,10 @@ const SidePanel = ({ appointment, now }) => {
     }
 };
 
-const LoadedState = ({ detail, titleRef, now, updatedAt, refreshError, onRefresh }) => {
+const LoadedState = ({ detail, titleRef, updatedAt, refreshError, onRefresh, onOpen }) => {
     const { appointment } = detail;
     const showRefresh = isInClinic(appointment) && Boolean(formatQueueNumber(appointment.queue?.queueNumber)) && Boolean(updatedAt);
-    const actions = getHeaderActions(appointment);
+    const actions = getHeaderActions(appointment, onOpen);
 
     return (
         <>
@@ -300,7 +311,7 @@ const LoadedState = ({ detail, titleRef, now, updatedAt, refreshError, onRefresh
                         </dl>
                     </DashboardSection>
                 </div>
-                <SidePanel appointment={appointment} now={now} />
+                <SidePanel appointment={appointment} />
             </div>
         </>
     );
@@ -329,6 +340,8 @@ const AppointmentDetail = () => {
     const pollInterval = !notFound ? POLL_INTERVAL_MS[detail?.appointment.status] : undefined;
     const announcementKey = detail && !notFound ? `${appointmentId}#${getQueueAnnouncementKey(detail.appointment)}` : "";
     const [announcement, setAnnouncement] = useState({ key: announcementKey, text: "" });
+    const [modal, setModal] = useState(null);
+    const restoreFocusRef = useRef(false);
 
     if (announcement.key !== announcementKey) {
         const [previousId, previousKey = ""] = announcement.key.split("#");
@@ -357,6 +370,16 @@ const AppointmentDetail = () => {
     };
 
     const pollNow = useEffectEvent(() => refresh(false));
+
+    const refreshOnNotification = useEffectEvent((event) => {
+        const { referenceType, referenceId } = event.detail ?? {};
+        if (referenceType === "Appointment" && String(referenceId) === appointmentId) refresh(false);
+    });
+
+    useEffect(() => {
+        window.addEventListener(LIVE_NOTIFICATION_EVENT, refreshOnNotification);
+        return () => window.removeEventListener(LIVE_NOTIFICATION_EVENT, refreshOnNotification);
+    }, []);
 
     useEffect(() => {
         if (!pollInterval) return undefined;
@@ -411,6 +434,31 @@ const AppointmentDetail = () => {
         setRetryCount((count) => count + 1);
     };
 
+    useEffect(() => {
+        if (!restoreFocusRef.current || modal) return;
+        restoreFocusRef.current = false;
+        const active = document.activeElement;
+        if (titleRef.current && (!active || active === document.body || !active.isConnected)) titleRef.current.focus();
+    });
+
+    const closeModal = ({ refetch }) => {
+        restoreFocusRef.current = true;
+        setModal(null);
+        if (refetch) retry();
+    };
+
+    const showChanged = (data) => {
+        restoreFocusRef.current = true;
+        setModal(null);
+        setLive({ base: asyncState.value, detail: data, receivedAt: new Date(), error: false });
+    };
+
+    const leaveNotFound = () => {
+        setModal(null);
+        toast.error(MESSAGES.MSG23, { toastId: NOT_FOUND_TOAST_ID });
+        navigate(ROUTES.APPOINTMENTS, { replace: true });
+    };
+
     const crumb = detail?.appointment.appointmentCode || DEFAULT_TITLE;
 
     return (
@@ -426,11 +474,17 @@ const AppointmentDetail = () => {
                 <LoadedState
                     detail={detail}
                     titleRef={titleRef}
-                    now={new Date()}
                     updatedAt={updatedAt}
                     refreshError={refreshError}
                     onRefresh={() => refresh(true)}
+                    onOpen={setModal}
                 />
+            )}
+            {detail && !notFound && modal === MODAL.CANCEL && (
+                <CancelAppointmentModal appointment={detail.appointment} onClose={closeModal} onCancelled={showChanged} onNotFound={leaveNotFound} />
+            )}
+            {detail && !notFound && modal === MODAL.RESCHEDULE && (
+                <RescheduleAppointmentModal appointment={detail.appointment} onClose={closeModal} onRescheduled={showChanged} onNotFound={leaveNotFound} />
             )}
             {(resource.loading || notFound) && <LoadingState />}
             <p className="sr-only" aria-live="polite">

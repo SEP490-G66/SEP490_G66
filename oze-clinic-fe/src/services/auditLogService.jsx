@@ -1,4 +1,4 @@
-import { SYSTEM_ACTOR, auditFieldLabel, auditRoleLabel } from "../utils/auditLog";
+import { SYSTEM_ACTOR, auditFieldLabel, auditRoleLabel } from "../utils/constants/auditLog";
 import api from "./api";
 import { call } from "./receptionService";
 

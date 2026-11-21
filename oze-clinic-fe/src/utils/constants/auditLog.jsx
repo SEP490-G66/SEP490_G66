@@ -1,4 +1,4 @@
-import { BACKEND_ROLE_NAMES, ROLE_LABELS } from "./messages";
+import { BACKEND_ROLE_NAMES, ROLE_LABELS } from "../messages";
 
 // Names for what api/audit-logs returns: the actions and record types of AuditConstants on the backend, the roles,
 // and the fields of the values before / after (JSON with the backend's property names).

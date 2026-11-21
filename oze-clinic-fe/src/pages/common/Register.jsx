@@ -223,7 +223,7 @@ const Register = () => {
                 name="password"
                 type="password"
                 passwordToggle
-                placeholder="Ít nhất 8 ký tự"
+                placeholder="8–32 ký tự, có chữ thường và chữ số"
                 label={<>Mật khẩu <span className="text-danger-solid">*</span></>}
                 value={values.password}
                 onChange={handleChange}

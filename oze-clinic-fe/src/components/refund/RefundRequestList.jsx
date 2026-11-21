@@ -9,15 +9,17 @@ import { formatCurrency } from "@/utils/format";
 import { REFUND_REQUEST_TEXT } from "@/utils/messages";
 import { REFUND_PAGE_SIZE, REFUND_REQUEST_STATUS_LABELS, clinicDate } from "@/utils/refundRequest";
 
-const ForWhat = ({ request }) => {
-    const items = request.itemNames.join(", ");
-    if (!request.stageLabel) return <span className="text-ink">{items || REFUND_REQUEST_TEXT.NO_VALUE}</span>;
-    return (
-        <>
-            <b className="font-semibold text-ink">{request.stageLabel}</b>
-            {items && <span className="block text-caption">{items}</span>}
-        </>
-    );
+const ForWhat = ({ request }) => (
+    <>
+        <b className="font-semibold text-ink">{request.accountName ?? REFUND_REQUEST_TEXT.NO_VALUE}</b>
+        {request.invoiceDate && <span className="num block text-caption">{REFUND_REQUEST_TEXT.ACCOUNT_DATE(clinicDate(request.invoiceDate))}</span>}
+    </>
+);
+
+const RefundAmount = ({ request }) => {
+    if (request.refundAmount != null) return <span className="num font-semibold text-ink">{formatCurrency(request.refundAmount)}</span>;
+    if (request.status === "pending") return <span className="text-caption text-muted">{REFUND_REQUEST_TEXT.REFUND_PENDING}</span>;
+    return <span className="text-muted">{REFUND_REQUEST_TEXT.NO_VALUE}</span>;
 };
 
 const RefundRequestList = ({ view, pickUrl, pickState, onPageChange, onClearAll }) => {
@@ -50,7 +52,6 @@ const RefundRequestList = ({ view, pickUrl, pickState, onPageChange, onClearAll 
 
     const from = (page - 1) * REFUND_PAGE_SIZE;
     const isCurrent = (request) => current?.code === request.code;
-    const doctor = (request) => request.doctorName ?? REFUND_REQUEST_TEXT.NO_VALUE;
 
     const changePage = (next) => {
         if (next === page) return;
@@ -68,10 +69,11 @@ const RefundRequestList = ({ view, pickUrl, pickState, onPageChange, onClearAll 
                             <th scope="col">{REFUND_REQUEST_TEXT.COL_CODE}</th>
                             <th scope="col">{REFUND_REQUEST_TEXT.COL_CREATED}</th>
                             <th scope="col">{REFUND_REQUEST_TEXT.COL_FOR}</th>
-                            <th scope="col">{REFUND_REQUEST_TEXT.COL_PAID_AT}</th>
-                            <th scope="col">{REFUND_REQUEST_TEXT.COL_DOCTOR}</th>
                             <th scope="col" className="text-right">
-                                {REFUND_REQUEST_TEXT.COL_AMOUNT}
+                                {REFUND_REQUEST_TEXT.COL_PAID}
+                            </th>
+                            <th scope="col" className="text-right">
+                                {REFUND_REQUEST_TEXT.COL_REFUND}
                             </th>
                             <th scope="col">{REFUND_REQUEST_TEXT.COL_STATUS}</th>
                             <th scope="col" className="text-center">
@@ -87,9 +89,10 @@ const RefundRequestList = ({ view, pickUrl, pickState, onPageChange, onClearAll 
                                 <td className="py-2.5">
                                     <ForWhat request={request} />
                                 </td>
-                                <td className="num whitespace-nowrap">{clinicDate(request.paidAt)}</td>
-                                <td className="whitespace-nowrap">{doctor(request)}</td>
-                                <td className="num whitespace-nowrap text-right text-ink">{formatCurrency(request.amount)}</td>
+                                <td className="num whitespace-nowrap text-right text-ink">{formatCurrency(request.paidAmount)}</td>
+                                <td className="whitespace-nowrap text-right">
+                                    <RefundAmount request={request} />
+                                </td>
                                 <td>
                                     <StatusBadge status={request.status} labels={REFUND_REQUEST_STATUS_LABELS} />
                                 </td>
@@ -120,22 +123,20 @@ const RefundRequestList = ({ view, pickUrl, pickState, onPageChange, onClearAll 
                         <p className="mt-1">
                             <ForWhat request={request} />
                         </p>
-                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-caption md:grid-cols-4">
+                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-caption md:grid-cols-3">
                             <div>
                                 <dt>{REFUND_REQUEST_TEXT.COL_CREATED}</dt>
                                 <dd className="num text-ink">{clinicDate(request.createdAt)}</dd>
                             </div>
                             <div>
-                                <dt>{REFUND_REQUEST_TEXT.COL_PAID_AT}</dt>
-                                <dd className="num text-ink">{clinicDate(request.paidAt)}</dd>
+                                <dt>{REFUND_REQUEST_TEXT.COL_PAID}</dt>
+                                <dd className="num text-ink">{formatCurrency(request.paidAmount)}</dd>
                             </div>
                             <div>
-                                <dt>{REFUND_REQUEST_TEXT.COL_DOCTOR}</dt>
-                                <dd className="text-ink">{doctor(request)}</dd>
-                            </div>
-                            <div>
-                                <dt>{REFUND_REQUEST_TEXT.COL_AMOUNT}</dt>
-                                <dd className="num font-semibold text-ink">{formatCurrency(request.amount)}</dd>
+                                <dt>{REFUND_REQUEST_TEXT.COL_REFUND}</dt>
+                                <dd>
+                                    <RefundAmount request={request} />
+                                </dd>
                             </div>
                         </dl>
                         <DetailLink

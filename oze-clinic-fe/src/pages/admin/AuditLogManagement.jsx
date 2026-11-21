@@ -10,7 +10,7 @@ import PersonCell from "@/components/ui/PersonCell";
 import SearchInput from "@/components/ui/SearchInput";
 import useAsync from "@/hooks/useAsync";
 import { getAllAuditLogs, getAuditLogs } from "@/services/auditLogService";
-import { AUDIT_ACTION_OPTIONS, AUDIT_ENTITY_OPTIONS, auditActionLook, auditEntityLabel } from "@/utils/auditLog";
+import { AUDIT_ACTION_OPTIONS, AUDIT_ENTITY_OPTIONS, auditActionLook, auditEntityLabel } from "@/utils/constants/auditLog";
 import { getClinicDateTimeParts, getClinicToday } from "@/utils/format";
 import { downloadExcel } from "@/utils/reportExport";
 

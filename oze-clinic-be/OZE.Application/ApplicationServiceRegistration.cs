@@ -68,6 +68,7 @@ namespace OZE.Application
             services.AddScoped<IDoctorScheduleService, DoctorScheduleService>();
             services.AddScoped<IMedicalRecordService, MedicalRecordService>();
             services.AddScoped<IImagingRequestService, ImagingRequestService>();
+            services.AddScoped<IDocumentRequestService, DocumentRequestService>();
             services.AddScoped<IImagingCaptureService, ImagingCaptureService>();
             services.AddScoped<IImagingHistoryService, ImagingHistoryService>();
             services.AddScoped<IImagingReviewService, ImagingReviewService>();
@@ -103,6 +104,7 @@ namespace OZE.Application
             services.AddScoped<IExaminationService, ExaminationService>();
             services.AddScoped<IQueueService, QueueService>();
             services.AddScoped<IInvoiceService, InvoiceService>();
+            services.AddScoped<IPatientBillingService, PatientBillingService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IRefundService, RefundService>();
             services.AddScoped<IInstallmentService, InstallmentService>();
@@ -121,6 +123,7 @@ namespace OZE.Application
             services.AddScoped<ISystemConfigurationService, SystemConfigurationService>();
             services.AddHostedService<OZE.Application.BackgroundServices.FollowUpReminderBackgroundService>();
             services.AddHostedService<OZE.Application.BackgroundServices.PaymentReminderBackgroundService>();
+            services.AddHostedService<OZE.Application.BackgroundServices.AppointmentReminderBackgroundService>();
             return services;
         }
     }

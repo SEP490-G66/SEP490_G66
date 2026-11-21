@@ -611,7 +611,22 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure<NotFoundException>(appointment != null, ErrorConstants.AppointmentMessage.AppointmentNotFound);
             EnsureOwnedBy(appointment!, ownerUserId);
 
-            return MapToResponse(appointment!);
+            var response = MapToResponse(appointment!);
+            response.QueueNumber = await GetQueueNumberAsync(appointment!, cancellationToken);
+            return response;
+        }
+
+        // Only while the patient is in the clinic for this visit; the entry is closed once the examination is done
+        private async Task<int?> GetQueueNumberAsync(Appointment appointment, CancellationToken cancellationToken)
+        {
+            var inClinic = appointment.Status == AppointmentConstants.CheckedInStatus || appointment.Status == AppointmentConstants.InServiceStatus;
+            if (!inClinic || _queueService == null)
+            {
+                return null;
+            }
+
+            var entry = await _queueService.GetActiveEntryAsync(appointment.Id, QueueConstants.ExaminationType, cancellationToken);
+            return entry?.QueueNumber;
         }
 
         public async Task<AppointmentResponse> CancelAppointmentAsync(long id, CancelAppointmentRequest request, string? userId, string? ownerUserId, CancellationToken cancellationToken = default)
@@ -625,13 +640,10 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(!IsOpen(appointment!), ErrorConstants.AppointmentMessage.OnlyOpenCanBeCancelled);
 
             // Staff can cancel at any time (a patient may phone just before the visit).
-            // A patient can only cancel a pending appointment, and only before the cutoff
+            // A patient can cancel a pending or confirmed appointment online, before the cutoff
             if (ownerUserId != null)
             {
-                ConditionGuard.ThrowIf(appointment!.Status == AppointmentConstants.ConfirmedStatus,
-                    ErrorConstants.AppointmentMessage.ConfirmedNeedsReceptionistToCancel);
-
-                await EnsureBeforeCutoffAsync(appointment, ErrorConstants.AppointmentMessage.CancelDeadlinePassed);
+                await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.CancelDeadlinePassed);
             }
 
             var oldStatus = appointment!.Status;
@@ -687,10 +699,8 @@ namespace OZE.Application.Services
             var isPatient = ownerUserId != null;
             if (isPatient)
             {
-                // A confirmed appointment was agreed with the receptionist, so changing it also goes through them
-                ConditionGuard.ThrowIf(appointment!.Status == AppointmentConstants.ConfirmedStatus,
-                    ErrorConstants.AppointmentMessage.ConfirmedNeedsReceptionistToReschedule);
-                await EnsureBeforeCutoffAsync(appointment, ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
+                // A pending or confirmed appointment can be moved online, before the cutoff; it goes back to pending
+                await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
             }
 
             // The services stay the same, so the new slot must fit the same total time and room type
@@ -814,14 +824,16 @@ namespace OZE.Application.Services
 
             await _appointmentRepository.UpdateAsync(appointment);
 
-            await EnterExaminationQueueAsync(appointment, room, request?.Reason, cancellationToken);
+            var entry = await EnterExaminationQueueAsync(appointment, room, request?.Reason, cancellationToken);
 
             await _auditLogService.LogAsync(AuditConstants.AppointmentCheckedIn, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 new { Status = oldStatus }, new { appointment.Status, appointment.Priority }, request?.Reason?.Trim());
+            await NotifyCheckedInAsync(appointment, entry, appointment.Doctor?.FullName, room, cancellationToken);
 
             var response = MapToResponse(appointment);
             response.RoomId = room?.Id;
             response.RoomName = room?.RoomName;
+            response.QueueNumber = entry?.QueueNumber;
             return response;
         }
 
@@ -963,23 +975,26 @@ namespace OZE.Application.Services
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
             await _appointmentRepository.UpdateAsync(appointment);
 
-            // Out of the queue of the doctor who left, to the end of the queue of the new one (the priority and its reason go along)
-            QueueEntry? oldEntry = null;
+            // The same queue entry goes to the new doctor: the number, missed calls and priority stay, so the doctor calls the
+            // number the patient holds. Only a patient without an open entry gets a new one
+            QueueEntry? entry = null;
             if (_queueService != null)
             {
-                oldEntry = await _queueService.UpdateStatusAsync(appointment.Id, QueueConstants.ExaminationType, QueueConstants.Cancelled, cancellationToken);
+                entry = await _queueService.ReassignAsync(appointment.Id, QueueConstants.ExaminationType, room?.Id, newDoctorId, cancellationToken);
             }
-            await EnterExaminationQueueAsync(appointment, room, oldEntry?.Notes, cancellationToken);
+            entry ??= await EnterExaminationQueueAsync(appointment, room, null, cancellationToken);
 
             await _auditLogService.LogAsync(AuditConstants.AppointmentDoctorReassigned, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 new { DoctorId = oldDoctorId }, new { DoctorId = newDoctorId, RoomId = room?.Id });
             await NotifyAsync(n => n.NotifyStaffAsync(newDoctorId,
                 new NotificationContent(NotificationConstants.Text.PatientReassignedTitle, string.Format(NotificationConstants.Text.PatientReassignedMessage, appointment.Patient?.FullName),
                     NotificationConstants.Reference.Appointment, appointment.Id.ToString()), cancellationToken));
+            await NotifyMovedToDoctorAsync(appointment, entry, shift.StaffProfile?.FullName, room, cancellationToken);
 
             var response = MapToResponse(appointment);
             response.DoctorId = newDoctorId;
             response.DoctorName = shift.StaffProfile?.FullName;
+            response.QueueNumber = entry?.QueueNumber;
             response.RoomId = room?.Id;
             response.RoomName = room?.RoomName;
             return response;
@@ -1095,7 +1110,7 @@ namespace OZE.Application.Services
             });
 
             // After the transaction: the queue gives out its numbers in a transaction of its own
-            await EnterExaminationQueueAsync(appointment, room, request.Reason?.Trim(), cancellationToken);
+            var entry = await EnterExaminationQueueAsync(appointment, room, request.Reason?.Trim(), cancellationToken);
 
             await LogCreatedAsync(appointment, lines);
             await _auditLogService.LogAsync(AuditConstants.AppointmentCheckedIn, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
@@ -1113,6 +1128,8 @@ namespace OZE.Application.Services
             response.CheckInAt = appointment.CheckInAt;
             response.RoomId = room?.Id;
             response.RoomName = room?.RoomName;
+            response.QueueNumber = entry?.QueueNumber;
+            await NotifyCheckedInAsync(appointment, entry, shift.StaffProfile?.FullName, room, cancellationToken);
             return response;
         }
 
@@ -1157,12 +1174,53 @@ namespace OZE.Application.Services
         }
 
         // The patient waits for the doctor in the examination queue, in the room of the shift
-        private Task EnterExaminationQueueAsync(Appointment appointment, Room? room, string? reason, CancellationToken cancellationToken)
+        private async Task<QueueEntry?> EnterExaminationQueueAsync(Appointment appointment, Room? room, string? reason, CancellationToken cancellationToken)
         {
             return _queueService == null
-                ? Task.CompletedTask
-                : _queueService.EnqueueAsync(appointment.Id, QueueConstants.ExaminationType, room?.Id, appointment.DoctorId,
+                ? null
+                : await _queueService.EnqueueAsync(appointment.Id, QueueConstants.ExaminationType, room?.Id, appointment.DoctorId,
                     appointment.Priority, reason, cancellationToken);
+        }
+
+        private static string QueueNumberText(int number) => number.ToString("D2");
+
+        private static string? DoctorAndRoom(string? doctorName, Room? room)
+        {
+            var place = string.Join(" · ", new[] { doctorName, room?.RoomName }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            return place.Length == 0 ? null : place;
+        }
+
+        // Moved to another doctor: the patient keeps the number, only the doctor and room change
+        private Task NotifyMovedToDoctorAsync(Appointment appointment, QueueEntry? entry, string? doctorName, Room? room, CancellationToken cancellationToken)
+        {
+            var place = DoctorAndRoom(doctorName, room);
+            if (entry == null || place == null)
+            {
+                return Task.CompletedTask;
+            }
+
+            var message = string.Format(NotificationConstants.Text.MovedToDoctorMessage, place, QueueNumberText(entry.QueueNumber));
+            return NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
+                new NotificationContent(NotificationConstants.Text.MovedToDoctorTitle, message, NotificationConstants.Reference.Appointment, appointment.Id.ToString()),
+                cancellationToken));
+        }
+
+        // The patient learns the number given at the desk
+        private Task NotifyCheckedInAsync(Appointment appointment, QueueEntry? entry, string? doctorName, Room? room, CancellationToken cancellationToken)
+        {
+            if (entry == null)
+            {
+                return Task.CompletedTask;
+            }
+
+            var number = QueueNumberText(entry.QueueNumber);
+            var place = DoctorAndRoom(doctorName, room);
+            var message = place == null
+                ? string.Format(NotificationConstants.Text.CheckedInMessage, number)
+                : string.Format(NotificationConstants.Text.CheckedInWithPlaceMessage, number, place);
+            return NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
+                new NotificationContent(NotificationConstants.Text.CheckedInTitle, message, NotificationConstants.Reference.Appointment, appointment.Id.ToString()),
+                cancellationToken));
         }
 
         // The room the waiting patient was sent to at check-in
@@ -1323,6 +1381,11 @@ namespace OZE.Application.Services
             await _auditLogService.LogAsync(AuditConstants.AppointmentCompleted, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 new { Status = oldStatus }, new { appointment.Status, ExaminationId = examination.Id, examination.ExaminationStatus });
 
+            await NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
+                new NotificationContent(NotificationConstants.Text.ExaminationCompletedTitle,
+                    string.Format(NotificationConstants.Text.ExaminationCompletedMessage, Dmy(appointment.AppointmentDate)),
+                    NotificationConstants.Reference.Examination, examination.Id.ToString()), cancellationToken));
+
             // AD-9: never block clinical completion; attach soft payment warnings for the patient.
             var response = MapToResponse(appointment);
             response.PaymentWarnings = await TryBuildPaymentWarningsAsync(appointment.PatientId, cancellationToken);
@@ -1476,10 +1539,16 @@ namespace OZE.Application.Services
             NotifyAsync(n => n.NotifyStaffAsync(appointment.DoctorId,
                 Content(NotificationConstants.Text.NewAppointmentForDoctorTitle, NotificationConstants.Text.NewAppointmentForDoctorMessage, appointment, patientName ?? string.Empty)));
 
-        // A patient can only cancel or reschedule while the appointment is further away than the cutoff
+        // A patient can only cancel or reschedule while the appointment is further away than the cutoff.
+        // A cutoff of 0 means no limit: until check-in, even after the booked time
         private async Task EnsureBeforeCutoffAsync(Appointment appointment, string errorMessage)
         {
             var cutoffHours = await GetIntConfigAsync(ConfigKeyConstants.BookingCancelCutoffHours);
+            if (cutoffHours <= 0)
+            {
+                return;
+            }
+
             var startsAt = appointment.AppointmentDate.ToDateTime(appointment.TimeSlotStart ?? default);
             ConditionGuard.ThrowIf(startsAt - ClinicClock.Now < TimeSpan.FromHours(cutoffHours), errorMessage);
         }

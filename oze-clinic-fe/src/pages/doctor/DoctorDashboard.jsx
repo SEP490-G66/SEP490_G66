@@ -9,8 +9,7 @@ import TaskItem from "@/components/dashboard/TaskItem";
 import PersonCell from "@/components/ui/PersonCell";
 import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
-import { callNextPatient, getDoctorDashboard } from "@/services/doctorWorkService";
-import { DOCTOR_TASK_TYPES } from "@/utils/data/mockDoctorDashboard";
+import { DOCTOR_TASK_TYPES, callNextPatient, getDoctorDashboard } from "@/services/doctorWorkService";
 import { formatDate, formatWeekday, toDateOnly } from "@/utils/format";
 import { GENERIC_ERROR_MESSAGE } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
@@ -25,9 +24,9 @@ const TASK_META = {
 
 const joinParts = (parts) => parts.filter(Boolean).join(" · ");
 
-// "Có hẹn 08:30 · Dị ứng Penicillin" / "Vãng lai"
+// "Có hẹn 08:30 · Đang đi chụp X-quang" / "Vãng lai"
 const visitNote = (patient) =>
-    joinParts([patient.appointmentTime ? `Có hẹn ${patient.appointmentTime}` : "Vãng lai", patient.allergy && `Dị ứng ${patient.allergy}`]);
+    joinParts([patient.appointmentTime ? `Có hẹn ${patient.appointmentTime}` : "Vãng lai", patient.atImaging && "Đang đi chụp X-quang"]);
 
 const percentOf = (part, total) => (total > 0 ? Math.round((part / total) * 100) : 0);
 
@@ -138,7 +137,8 @@ const DoctorDashboard = () => {
     const data = result?.success ? result.data : null;
     const stats = data?.stats;
     const queue = data?.queue ?? [];
-    const [next] = queue;
+    // The one "Gọi bệnh nhân tiếp" calls: first in line who is not away for an X-ray
+    const next = queue.find((patient) => !patient.atImaging);
     const shift = data?.shift;
 
     const todayDate = toDateOnly(new Date());
@@ -188,7 +188,7 @@ const DoctorDashboard = () => {
                     label="Đã hoàn thành"
                     value={stats?.completed}
                     caption={stats && `${percentOf(stats.completed, stats.totalToday)}% bệnh nhân hôm nay`}
-                    to={ROUTES.DOCTOR_PATIENTS}
+                    to={ROUTES.DOCTOR_EXAMINATION}
                     loading={loading}
                 />
                 <StatCard
@@ -210,8 +210,8 @@ const DoctorDashboard = () => {
                             eyebrow="Bệnh nhân tiếp theo · Hàng chờ khám"
                             queueNumber={next?.queueNumber}
                             name={next?.patientName}
-                            tags={next && joinParts([next.appointmentTime && `Có hẹn ${next.appointmentTime}`, next.gender, `${next.age} tuổi`])}
-                            detail={next && joinParts([next.reason, `Check-in ${next.checkInAt}`])}
+                            tags={next && joinParts([next.appointmentTime && `Có hẹn ${next.appointmentTime}`, next.gender, next.age != null && `${next.age} tuổi`])}
+                            detail={next && joinParts([next.reason, next.checkInAt && `Check-in ${next.checkInAt}`])}
                             action={
                                 <button type="button" className="btn btn-primary" disabled={calling} onClick={handleCallNext}>
                                     {calling && <span className="btn-spinner" aria-hidden="true" />}

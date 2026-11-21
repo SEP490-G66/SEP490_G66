@@ -9,14 +9,12 @@ import { searchServices } from "@/services/dentalService";
 import { PUBLIC_SERVICE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES, getServiceDetailRoute } from "@/utils/routes";
 
-// 10 cards fill whole rows with 1, 2 or 5 columns (the grid below), so no row is left half empty.
 const PAGE_SIZE = 10;
 const SEARCH_ID = "service-search";
 const TITLE_ID = "service-list-title";
 
 const BREADCRUMB = [{ label: TEXT.HOME, href: ROUTES.HOME }, { label: TEXT.SERVICES }];
 
-// /services?q=&page= — every public service (fixed content), searchable, 10 per page.
 const ServiceList = () => {
     const gridRef = useRef(null);
     const { keyword, page, totalPages, items: pageItems, setKeyword: changeKeyword, setPage } = usePublicList(searchServices, PAGE_SIZE);
@@ -34,7 +32,7 @@ const ServiceList = () => {
 
             <section aria-labelledby={TITLE_ID} className="container-public flex flex-col gap-8 pb-12 md:pb-16">
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                    <h1 id={TITLE_ID} className="font-heading text-display-section text-ink">
+                    <h1 id={TITLE_ID} className="font-heading text-display-md text-ink md:text-display-lg">
                         {TEXT.LIST_TITLE}
                     </h1>
                     <SearchInput

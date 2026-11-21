@@ -15,6 +15,7 @@ namespace OZE.Common.Constants
         {
             public const string Appointment = "Appointment";
             public const string ImagingRequest = "ImagingRequest";
+            public const string DocumentRequest = "DocumentRequest";
             public const string Examination = "Examination";
             public const string TreatmentPlan = "TreatmentPlan";
             public const string Invoice = "Invoice";
@@ -39,8 +40,6 @@ namespace OZE.Common.Constants
             public const string AppointmentCancelledTitle = "Lịch hẹn đã bị hủy";
             public const string AppointmentCancelledMessage = "Lịch hẹn lúc {0} ngày {1} đã bị hủy. Lý do: {2}";
             public const string AppointmentShiftEndedTitle = "Lịch hẹn cần đổi giờ";
-            public const string TreatmentPlanProposedTitle = "Kế hoạch điều trị chờ bạn đồng ý";
-            public const string TreatmentPlanProposedMessage = "Bác sĩ đã lập kế hoạch điều trị \"{0}\", dự kiến {1}. Vui lòng xem và trao đổi với phòng khám.";
             public const string InvoiceCreatedTitle = "Có hóa đơn mới";
             public const string InvoiceCreatedMessage = "Hóa đơn {0} với số tiền {1} đã được lập.";
             public const string PaymentConfirmedTitle = "Đã nhận thanh toán";
@@ -49,10 +48,30 @@ namespace OZE.Common.Constants
             public const string FollowUpScheduledTitle = "Lịch hẹn tái khám";
             public const string FollowUpScheduledMessage = "Bạn có lịch hẹn tái khám lúc {0} ngày {1}.";
             public const string FollowUpReminderTitle = "Nhắc lịch tái khám";
+            public const string YourTurnTitle = "Đến lượt bạn";
+            public const string YourTurnMessage = "Số {0}, mời bạn vào {1}.";
+            public const string YourTurnAtDeskMessage = "Số {0}, mời bạn đến quầy lễ tân để được chỉ phòng.";
+            public const string MissedTurnTitle = "Bạn đã lỡ lượt gọi";
+            public const string MissedTurnMessage = "Số {0} đã được gọi khi bạn vắng mặt. Bạn vẫn giữ số và sẽ được gọi lại.";
+            public const string CheckedInTitle = "Check-in thành công";
+            public const string CheckedInMessage = "Số thứ tự của bạn là {0}.";
+            public const string CheckedInWithPlaceMessage = "Số thứ tự của bạn là {0}. Khám với {1}.";
+            public const string MovedToDoctorTitle = "Bạn được chuyển bác sĩ";
+            public const string MovedToDoctorMessage = "Bạn được chuyển sang khám với {0}. Số thứ tự của bạn vẫn là {1}.";
+            public const string AppointmentReminderTitle = "Nhắc lịch hẹn ngày mai";
+            public const string AppointmentReminderMessage = "Bạn có lịch hẹn lúc {0} ngày {1} tại Nha khoa OZE.";
+            public const string ExaminationCompletedTitle = "Đã có phiếu khám";
+            public const string ExaminationCompletedMessage = "Phiếu khám ngày {0} đã có trong Sổ khám bệnh.";
             public const string RefundApprovedTitle = "Yêu cầu hoàn tiền đã được duyệt";
-            public const string RefundApprovedMessage = "Yêu cầu hoàn {0} cho hóa đơn {1} đã được duyệt.";
+            public const string RefundApprovedMessage = "Yêu cầu hoàn {0} cho hóa đơn {1} đã được duyệt. Phòng khám sẽ liên hệ để hoàn tiền cho bạn.";
+            public const string RefundPaidOutTitle = "Đã hoàn tiền";
+            public const string RefundPaidOutMessage = "Phòng khám đã hoàn {0} cho hóa đơn {1}.";
             public const string RefundRejectedTitle = "Yêu cầu hoàn tiền bị từ chối";
             public const string RefundRejectedMessage = "Yêu cầu hoàn tiền cho hóa đơn {0} bị từ chối. Lý do: {1}";
+            public const string DocumentRequestedTitle = "Bác sĩ yêu cầu bổ sung tài liệu";
+            public const string DocumentRequestCancelledTitle = "Bác sĩ đã huỷ yêu cầu bổ sung tài liệu";
+            public const string DocumentRequestCancelledMessage = "{0} không cần bạn nộp \"{1}\" nữa.";
+            public const string DocumentRequestedMessage = "{0} cần bạn nộp \"{1}\" cho lượt khám hôm nay. Vui lòng tải lên trong Sổ khám bệnh, mục Phim và tài liệu.";
 
             // Receptionist
             public const string NewOnlineBookingTitle = "Có lịch đặt mới chờ xác nhận";
@@ -81,6 +100,8 @@ namespace OZE.Common.Constants
             public const string ImagingCompletedMessage = "Phim {0} của {1} đã chụp xong.";
             public const string TreatmentPlanApprovedTitle = "Bệnh nhân đã đồng ý kế hoạch điều trị";
             public const string TreatmentPlanApprovedMessage = "{0} đã đồng ý kế hoạch \"{1}\". Có thể bắt đầu các giai đoạn điều trị.";
+            public const string DocumentSubmittedTitle = "Bệnh nhân đã nộp tài liệu";
+            public const string DocumentSubmittedMessage = "{0} đã nộp {1} file cho yêu cầu \"{2}\".";
 
             // Imaging technician
             public const string NewImagingRequestTitle = "Có chỉ định chụp phim mới";

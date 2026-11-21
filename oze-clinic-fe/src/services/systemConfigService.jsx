@@ -1,4 +1,4 @@
-import { CONFIG_DATA_TYPES, CONFIG_FIELDS, CONFIG_GROUPS, OTHER_GROUP, WORK_END_KEY, WORK_START_KEY } from "../utils/systemConfig";
+import { CONFIG_DATA_TYPES, CONFIG_FIELDS, CONFIG_GROUPS, OTHER_GROUP, WORK_END_KEY, WORK_START_KEY } from "../utils/constants/systemConfig";
 import api from "./api";
 import { call } from "./receptionService";
 

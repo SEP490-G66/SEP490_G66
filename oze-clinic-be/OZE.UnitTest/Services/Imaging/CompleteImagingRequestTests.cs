@@ -60,6 +60,24 @@ namespace OZE.UnitTest.Services.Imaging
             _queueService.Verify(q => q.UpdateStatusAsync(7, QueueConstants.ImagingType, QueueConstants.Completed, It.IsAny<CancellationToken>()), Times.Never);
         }
 
+        // UTCID06 (N): the last of two films is done: both entries of the imaging queue are closed, so the patient
+        // no longer shows "at imaging" and the doctor can call them back
+        [Fact]
+        public async Task CompleteAsync_ShouldCloseEveryImagingEntry_WhenLastRequestOfVisit()
+        {
+            _imagingRequestRepository.Setup(r => r.GetByExaminationIdAsync(ExaminationId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ImagingRequest> { _request, new() { Id = 100, ExaminationId = ExaminationId, RequestStatus = ImagingRequestConstants.Completed } });
+            _queueService.SetupSequence(q => q.UpdateStatusAsync(7, QueueConstants.ImagingType, QueueConstants.Completed, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new QueueEntry { Id = 2 })
+                .ReturnsAsync(new QueueEntry { Id = 1 })
+                .ReturnsAsync((QueueEntry?)null);
+
+            await _fullService.CompleteAsync(99);
+
+            _queueService.Verify(q => q.UpdateStatusAsync(7, QueueConstants.ImagingType, QueueConstants.Completed, It.IsAny<CancellationToken>()), Times.Exactly(3));
+            _queueService.Verify(q => q.UpdateStatusAsync(7, QueueConstants.ExaminationType, QueueConstants.Waiting, It.IsAny<CancellationToken>()), Times.Once);
+        }
+
         // UTCID03 (B): a patient already taken back by the doctor is left as is
         [Fact]
         public async Task CompleteAsync_ShouldNotRequeue_WhenPatientNotWaiting()

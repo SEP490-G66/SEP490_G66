@@ -3,7 +3,7 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import useAsync from "@/hooks/useAsync";
 import { getAuditLog } from "@/services/auditLogService";
-import { auditActionLook, auditEntityLabel } from "@/utils/auditLog";
+import { auditActionLook, auditEntityLabel } from "@/utils/constants/auditLog";
 import { getClinicDateTimeParts } from "@/utils/format";
 
 const SectionTitle = ({ children }) => <h3 className="text-body-sm font-semibold text-ink">{children}</h3>;

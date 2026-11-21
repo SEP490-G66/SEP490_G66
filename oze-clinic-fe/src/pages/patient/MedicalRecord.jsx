@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Link } from "react-router-dom";
 import AppointmentTabs from "@/components/appointment/AppointmentTabs";
 import DentalChartPanel from "@/components/medicalRecord/DentalChartPanel";
+import DocumentRequestPanel from "@/components/medicalRecord/DocumentRequestPanel";
 import ExaminationList from "@/components/medicalRecord/ExaminationList";
 import ExaminationSheet from "@/components/medicalRecord/ExaminationSheet";
 import ImagingPanel from "@/components/medicalRecord/ImagingPanel";
@@ -10,6 +11,7 @@ import NextAppointmentBar from "@/components/medicalRecord/NextAppointmentBar";
 import RecordEmptyCard from "@/components/medicalRecord/RecordEmptyCard";
 import RecordStateBox from "@/components/medicalRecord/RecordStateBox";
 import TreatmentPlanPanel from "@/components/medicalRecord/TreatmentPlanPanel";
+import UnlinkedProfileCard from "@/components/patientDebt/UnlinkedProfileCard";
 import useMedicalRecordNavigation, { INITIAL_UI, focusElement, queryResetPatch } from "@/hooks/useMedicalRecordNavigation";
 import {
     EMPTY_FILTERS,
@@ -22,6 +24,7 @@ import {
     RECORD_TITLE_ID,
     SHEET_TAB,
     chartOf,
+    chartUntil,
     displayText,
     filterVisits,
     getCurrentPage,
@@ -32,7 +35,6 @@ import {
     nextSelection,
     resolveTooth,
     sortByDate,
-    toToothCode,
 } from "@/utils/medicalRecord";
 import { MEDICAL_RECORD_TABS, ROUTES } from "@/utils/routes";
 
@@ -46,32 +48,46 @@ const TABS = [
 
 const PANELS = {
     [SHEET_TAB]: ({ data, visit }) => <ExaminationSheet visit={visit} clinic={data.clinic} profile={data.profile} patient={data.patient} />,
-    [MEDICAL_RECORD_TABS.PLAN]: ({ data, visit, ui, urlVisitId, handlers }) => {
-        const plan = data.plans.find((item) => item.id === visit.plan);
-        if (!plan) return <RecordEmptyCard title="Phiếu này không thuộc kế hoạch điều trị nào" text="Buổi khám lẻ, không nằm trong kế hoạch nhiều bước." />;
+    [MEDICAL_RECORD_TABS.PLAN]: ({ data, visit, ui, handlers }) => {
+        const plans = data.plans.filter((item) => visit.plans.includes(item.id));
+        if (!plans.length) return <RecordEmptyCard title="Phiếu này không thuộc kế hoạch điều trị nào" text="Buổi khám lẻ, không nằm trong kế hoạch nhiều bước." />;
         return (
             <TreatmentPlanPanel
-                plan={plan}
+                plans={plans}
                 visitId={visit.id}
                 visitIds={new Set(data.visits.map((item) => item.id))}
-                urlVisitId={urlVisitId}
                 drawerOpen={ui.drawerOpen}
                 onOpenDrawer={handlers.openDrawer}
                 onCloseDrawer={handlers.closeDrawer}
                 onOpenVisit={handlers.openVisitFromLog}
-                onToothLink={handlers.selectToothFromLink}
             />
         );
     },
     [MEDICAL_RECORD_TABS.FILM]: ({ data, visit }) => {
         const films = data.films.filter((film) => film.visit === visit.id && film.status === "concluded");
-        if (!films.length) return <RecordEmptyCard title="Buổi này không chụp phim" text="Phim X-quang, ảnh chụp do bác sĩ chỉ định trong buổi khám sẽ hiện ở đây." />;
-        return <ImagingPanel films={films} />;
+        return (
+            <div className="flex flex-col gap-4">
+                <DocumentRequestPanel examinationId={visit.id} />
+                {films.length ? (
+                    <ImagingPanel films={films} />
+                ) : (
+                    <RecordEmptyCard title="Buổi này không chụp phim" text="Phim X-quang, ảnh chụp do bác sĩ chỉ định trong buổi khám sẽ hiện ở đây." />
+                )}
+            </div>
+        );
     },
     [MEDICAL_RECORD_TABS.TEETH]: ({ data, visit, ui, handlers }) => {
-        const entries = chartOf(data, visit.id);
-        if (!entries.length) return <RecordEmptyCard title="Buổi này bác sĩ không ghi nhận răng nào" text="Các răng bác sĩ khám, điều trị trong buổi sẽ được tô trên sơ đồ." />;
-        return <DentalChartPanel entries={entries} selectedTooth={ui.tooth} onSelectTooth={handlers.selectTooth} />;
+        const allEntries = chartUntil(data, visit);
+        if (!allEntries.length) return <RecordEmptyCard title="Chưa có ghi nhận răng nào tới buổi này" text="Các răng bác sĩ khám, điều trị sẽ được tô trên sơ đồ." />;
+        return (
+            <DentalChartPanel
+                entries={chartOf(data, visit.id)}
+                allEntries={allEntries}
+                visitId={visit.id}
+                selectedTooth={ui.tooth}
+                onSelectTooth={handlers.selectTooth}
+            />
+        );
     },
     [MEDICAL_RECORD_TABS.HIST]: ({ data, ui, handlers }) => <MedicalHistoryPanel history={data.history} collapsed={ui.collapsed} onToggle={handlers.toggleSection} />,
 };
@@ -208,11 +224,6 @@ const MedicalRecord = () => {
 
     const openVisitFromLog = () => setUi({ ...queryResetPatch(ui), popover: null });
 
-    const selectToothFromLink = (tooth) => {
-        const code = toToothCode(tooth);
-        setUi(code == null ? { popover: null } : { tooth: code, popover: null });
-    };
-
     const openDrawer = (event) => {
         focusElement(event.currentTarget);
         setUi({ drawerOpen: true, popover: null });
@@ -259,6 +270,15 @@ const MedicalRecord = () => {
         );
     }
 
+    if (pageState === PAGE_STATE.UNLINKED) {
+        return (
+            <>
+                {header}
+                <UnlinkedProfileCard />
+            </>
+        );
+    }
+
     if (pageState === PAGE_STATE.NOT_FOUND) {
         return (
             <>
@@ -297,7 +317,7 @@ const MedicalRecord = () => {
         if (!Object.is(effectiveTooth, ui.tooth)) setUi({ tooth: effectiveTooth });
     }
     const nextAppointment = sortByDate(data.upcoming, (appointment) => appointment.date, 1)[0] ?? null;
-    const handlers = { openVisitFromLog, selectToothFromLink, openDrawer, closeDrawer, selectTooth, toggleSection };
+    const handlers = { openVisitFromLog, openDrawer, closeDrawer, selectTooth, toggleSection };
     const panelContext = { data, visit: selectedVisit, ui, urlVisitId, handlers };
 
     return (

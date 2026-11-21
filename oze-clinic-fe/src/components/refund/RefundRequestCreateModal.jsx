@@ -5,22 +5,11 @@ import { createMyRefundRequest, getMyRefundableInvoices } from "@/services/refun
 import { cx } from "@/utils/cx";
 import { formatCurrency } from "@/utils/format";
 import { GENERIC_ERROR_MESSAGE, REFUND_REQUEST_TEXT } from "@/utils/messages";
-import {
-    REFUND_AMOUNT_ID,
-    REFUND_INVOICE_ID,
-    REFUND_REASON_ID,
-    REFUND_REASON_MAX,
-    REFUND_SUBMIT_ID,
-    amountDigits,
-    classifySubmitError,
-    invoiceHint,
-    invoiceOptionLabel,
-    validateRefundForm,
-} from "@/utils/refundRequest";
+import { REFUND_INVOICE_ID, REFUND_REASON_ID, REFUND_REASON_MAX, REFUND_SUBMIT_ID, classifySubmitError, invoiceOptionLabel, validateRefundForm } from "@/utils/refundRequest";
 
 const INVOICES_RETRY_ID = "refund-requests-invoices-retry";
 const CLOSE_TARGET = "close";
-const AMOUNT_HELP_ID = "refund-requests-amount-help";
+const PICKED_ID = "refund-requests-invoice-picked";
 const REASON_HELP_ID = "refund-requests-reason-help";
 const INVOICE_HELP_ID = "refund-requests-invoice-help";
 
@@ -42,7 +31,7 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
     const appliedFocusRef = useRef(0);
 
     const [inv, setInv] = useState({ seq: 1, status: "loading", invoices: null });
-    const [form, setForm] = useState({ invoiceId: "", amount: "", reason: "" });
+    const [form, setForm] = useState({ invoiceId: "", reason: "" });
     const [errors, setErrors] = useState({});
     const [sending, setSending] = useState(false);
     const [focusTarget, setFocusTarget] = useState(null);
@@ -68,7 +57,7 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
             setInv((current) => (current.seq === seq ? { ...current, status: "error" } : current));
             requestFocus(INVOICES_RETRY_ID);
         };
-        getMyRefundableInvoices({ signal: controller.signal, source: "modal" }).then((result) => {
+        getMyRefundableInvoices({ signal: controller.signal }).then((result) => {
             if (!active || controller.signal.aborted) return;
             if (!result?.success || !Array.isArray(result.data)) {
                 fail();
@@ -110,31 +99,7 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
 
     const changeInvoice = (event) => {
         setForm((current) => ({ ...current, invoiceId: event.target.value }));
-        clearError("invoiceId", "amount", "form");
-    };
-
-    const changeAmount = (event) => {
-        const value = event.target.value;
-        const pasted = /^insertFromDrop/.test(event.nativeEvent.inputType ?? "");
-        setForm((current) => ({ ...current, amount: event.nativeEvent.isComposing ? value : amountDigits(value, { pasted }) }));
-        clearError("amount");
-    };
-
-    const pasteAmount = (event) => {
-        const text = event.clipboardData?.getData("text");
-        if (!text) return;
-        event.preventDefault();
-        const input = event.currentTarget;
-        const start = input.selectionStart ?? input.value.length;
-        const end = input.selectionEnd ?? input.value.length;
-        const value = amountDigits(input.value.slice(0, start) + amountDigits(text) + input.value.slice(end), { pasted: false });
-        setForm((current) => ({ ...current, amount: value }));
-        clearError("amount");
-    };
-
-    const endAmountComposition = (event) => {
-        const value = amountDigits(event.currentTarget.value, { pasted: false });
-        setForm((current) => ({ ...current, amount: value }));
+        clearError("invoiceId", "form");
     };
 
     const changeReason = (event) => {
@@ -142,18 +107,12 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
         clearError("reason");
     };
 
-    const handleFailure = (result, amount) => {
-        const outcome = classifySubmitError(result, selected, amount);
+    const handleFailure = (result) => {
+        const outcome = classifySubmitError(result);
         if (outcome.uncertain) onUncertain();
         if (outcome.kind === "field") {
             setErrors(outcome.fields);
-            if (outcome.max != null && selected) {
-                setInv((current) => ({
-                    ...current,
-                    invoices: current.invoices.map((invoice) => (invoice.invoiceId === selected.invoiceId ? { ...invoice, maxRefundable: outcome.max } : invoice)),
-                }));
-            }
-            requestFocus(outcome.fields.amount ? REFUND_AMOUNT_ID : REFUND_REASON_ID);
+            requestFocus(REFUND_REASON_ID);
             return;
         }
         setErrors({ form: outcome.form });
@@ -164,12 +123,10 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
     const submit = async (event) => {
         event.preventDefault();
         if (sendingRef.current || !ready) return;
-        const digits = amountDigits(form.amount, { pasted: false });
-        if (digits !== form.amount) setForm((current) => ({ ...current, amount: digits }));
-        const found = validateRefundForm({ ...form, amount: digits }, selected);
+        const found = validateRefundForm(form);
         if (Object.keys(found).length) {
             setErrors(found);
-            requestFocus(found.invoiceId ? REFUND_INVOICE_ID : found.amount ? REFUND_AMOUNT_ID : REFUND_REASON_ID);
+            requestFocus(found.invoiceId ? REFUND_INVOICE_ID : REFUND_REASON_ID);
             return;
         }
         sendingRef.current = true;
@@ -180,11 +137,10 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
         const sentAt = navKey;
         const controller = new AbortController();
         sendControllerRef.current = controller;
-        const amount = Number(digits);
         let result = null;
         let failed = false;
         try {
-            result = await createMyRefundRequest({ invoiceId: Number(form.invoiceId), amount, reason: form.reason.normalize("NFC").trim() }, { signal: controller.signal });
+            result = await createMyRefundRequest({ invoiceId: Number(form.invoiceId), reason: form.reason.normalize("NFC").trim() }, { signal: controller.signal });
         } catch (error) {
             failed = error?.name !== "AbortError";
         } finally {
@@ -202,7 +158,7 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
             return;
         }
         if (result.success) onCreated(result);
-        else handleFailure(result, amount);
+        else handleFailure(result);
     };
 
     const renderBody = () => {
@@ -274,7 +230,7 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
                         value={form.invoiceId}
                         disabled={sending}
                         aria-invalid={Boolean(errors.invoiceId)}
-                        aria-describedby={errors.invoiceId ? INVOICE_HELP_ID : undefined}
+                        aria-describedby={errors.invoiceId ? INVOICE_HELP_ID : selected ? PICKED_ID : undefined}
                         onChange={changeInvoice}
                     >
                         <option value="">{REFUND_REQUEST_TEXT.INVOICE_PLACEHOLDER}</option>
@@ -289,35 +245,11 @@ const RefundRequestCreateModal = ({ navKey, isCurrentNav, onInvoicesLoaded, onSe
                             {errors.invoiceId}
                         </p>
                     )}
-                </div>
-                <div className="field">
-                    <label htmlFor={REFUND_AMOUNT_ID} className="label label-required">
-                        {REFUND_REQUEST_TEXT.AMOUNT_LABEL}
-                    </label>
-                    <input
-                        id={REFUND_AMOUNT_ID}
-                        className={cx("input", errors.amount && "input-error")}
-                        inputMode="numeric"
-                        autoComplete="off"
-                        value={form.amount}
-                        disabled={sending}
-                        placeholder={selected ? REFUND_REQUEST_TEXT.AMOUNT_PLACEHOLDER(formatCurrency(selected.maxRefundable)) : REFUND_REQUEST_TEXT.AMOUNT_PLACEHOLDER_EMPTY}
-                        aria-invalid={Boolean(errors.amount)}
-                        aria-describedby={errors.amount || selected ? AMOUNT_HELP_ID : undefined}
-                        onChange={changeAmount}
-                        onPaste={pasteAmount}
-                        onCompositionEnd={endAmountComposition}
-                    />
-                    {errors.amount ? (
-                        <p id={AMOUNT_HELP_ID} className="error-text">
-                            {errors.amount}
-                        </p>
-                    ) : (
-                        selected && (
-                            <p id={AMOUNT_HELP_ID} className="help-text">
-                                {invoiceHint(selected)}
-                            </p>
-                        )
+                    {selected && !errors.invoiceId && (
+                        <div id={PICKED_ID} className="rounded-lg border border-primary bg-primary-soft px-3 py-2.5 text-body-sm">
+                            <p className="font-semibold text-ink">{selected.accountName}</p>
+                            <p className="num text-caption text-muted">{REFUND_REQUEST_TEXT.INVOICE_PICKED(selected.doctorName, formatCurrency(selected.paidAmount))}</p>
+                        </div>
                     )}
                 </div>
                 <div className="field">

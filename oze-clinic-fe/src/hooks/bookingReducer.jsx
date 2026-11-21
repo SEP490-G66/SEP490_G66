@@ -14,6 +14,7 @@ import {
     slotId,
     slotRange,
     toDayMap,
+    toServiceParams,
     weekBounds,
     weekRowId,
     weekStartOf,
@@ -21,13 +22,15 @@ import {
 import { formatClock, formatDayMonth } from "@/utils/format";
 import { BOOKING_ERROR_CODE, BOOKING_TEXT } from "@/utils/messages";
 
-const CAUSE_RANK = { refresh: 1, retry: 1, doctor: 2, "submit-slot": 3, "submit-date": 3 };
+const CAUSE_RANK = { refresh: 1, retry: 1, doctor: 2, services: 2, "submit-slot": 3, "submit-date": 3 };
 
 const CLEARED_MESSAGES = { dayInfo: null, slotWarning: null, slotWarningLive: false, slotError: null, submitError: null };
 
-export const rangeKeyOf = (state) => `${state.today}|${state.doctorId ?? ""}|${state.version}`;
+export const serviceKeyOf = (state) => (state.context ? JSON.stringify(toServiceParams(state.items, state.context.services)) : "");
 
-export const slotsKeyOf = (state) => (state.day ? `${state.day}|${state.doctorId ?? ""}|${state.version}` : null);
+export const rangeKeyOf = (state) => `${state.today}|${state.doctorId ?? ""}|${serviceKeyOf(state)}|${state.version}`;
+
+export const slotsKeyOf = (state) => (state.day ? `${state.day}|${state.doctorId ?? ""}|${serviceKeyOf(state)}|${state.version}` : null);
 
 const sameScope = (rangeKey, slotsKey) => rangeKey.split("|").slice(1).join("|") === slotsKey.split("|").slice(1).join("|");
 
@@ -72,6 +75,13 @@ const requestFocus = (state, targets, waitFor = null, interim = null) => ({
 
 const announce = (state, text) => ({ ...state, live: { text, seq: state.live.seq + 1 } });
 
+const isChoiceCause = (cause) => cause?.kind === "doctor" || cause?.kind === "services";
+
+const afterServicesChange = (previous, next) =>
+    serviceKeyOf(previous) === serviceKeyOf(next)
+        ? next
+        : { ...next, dayInfo: null, slotWarning: null, slotWarningLive: false, slotError: null, cause: mergeCause(previous.cause, { kind: "services", prevDay: previous.day, prevSlot: previous.slot }) };
+
 export const mergeCause = (current, next) => {
     if (!current) return next;
     const kind = CAUSE_RANK[next.kind] >= CAUSE_RANK[current.kind] ? next.kind : current.kind;
@@ -83,7 +93,7 @@ const relocate = (state) => {
     const earliest = getEarliest(today, range.days);
     if (!earliest) {
         const next = { ...state, day: null, slot: null, autoPick: "earliest", cause: null, formShown: true };
-        return cause?.kind === "doctor" ? next : requestFocus(next, [BOOKING_IDS.STATE_TITLE]);
+        return isChoiceCause(cause) ? next : requestFocus(next, [BOOKING_IDS.STATE_TITLE]);
     }
     let next = { ...state, formShown: true };
     if (!next.day) {
@@ -96,6 +106,8 @@ const relocate = (state) => {
         const base = { ...next, day: target, weekStart: weekStartOf(target), slot: null };
         if (cause?.kind === "doctor") {
             next = { ...base, dayInfo: BOOKING_TEXT.DAY_GONE_DOCTOR(gone, moved) + (state.slot ? BOOKING_TEXT.DAY_GONE_DOCTOR_SLOT : "") };
+        } else if (cause?.kind === "services") {
+            next = { ...base, dayInfo: BOOKING_TEXT.DAY_GONE_SERVICES(gone, moved) + (state.slot ? BOOKING_TEXT.DAY_GONE_DOCTOR_SLOT : "") };
         } else if (cause?.kind.startsWith("submit")) {
             next = { ...base, dayInfo: BOOKING_TEXT.DAY_GONE(gone, moved) };
         } else {
@@ -131,7 +143,8 @@ const applySlots = (state) => {
     const done = rangeReady ? { ...next, cause: null } : next;
     if (!next.slot || data.some((slot) => slot.slotStart === next.slot)) return done;
     if (next.cause?.kind.startsWith("submit")) return { ...done, slot: null };
-    return { ...done, slot: null, slotWarning: BOOKING_TEXT.SLOT_GONE(slotRange(next.slot)), slotWarningLive: true };
+    const warning = next.cause?.kind === "services" ? BOOKING_TEXT.SLOT_TOO_SHORT : BOOKING_TEXT.SLOT_GONE;
+    return { ...done, slot: null, slotWarning: warning(slotRange(next.slot)), slotWarningLive: true };
 };
 
 const loadContext = (state, result) => {
@@ -182,14 +195,14 @@ const submitFailed = (state, { result, today, snapshot }) => {
             const services = removeGoneVariants(oldServices, result.data?.variantIds ?? []);
             const reconciled = reconcileServices(state.items, state, oldServices, services);
             return requestFocus(
-                {
+                afterServicesChange(base, {
                     ...base,
                     context: { ...state.context, services },
                     items: reconciled.items,
                     pickService: reconciled.pickService,
                     pickVariant: reconciled.pickVariant,
                     goneMessages: reconciled.goneLabels.map(BOOKING_TEXT.SERVICE_GONE),
-                },
+                }),
                 [BOOKING_IDS.SERVICE]
             );
         }
@@ -214,13 +227,13 @@ const addService = (state) => {
         goneMessages: [],
         submitError: null,
     };
-    return requestFocus(announce(next, BOOKING_TEXT.SERVICE_ADDED(itemLabel(services, item), items.length)), [keepService ? BOOKING_IDS.VARIANT : BOOKING_IDS.SERVICE]);
+    return requestFocus(announce(afterServicesChange(state, next), BOOKING_TEXT.SERVICE_ADDED(itemLabel(services, item), items.length)), [keepService ? BOOKING_IDS.VARIANT : BOOKING_IDS.SERVICE]);
 };
 
 const removeService = (state, item) => {
     const label = itemLabel(state.context.services, item);
     const items = state.items.filter((entry) => !(entry.serviceId === item.serviceId && entry.variantId === item.variantId));
-    return requestFocus(announce({ ...state, items, goneMessages: [], submitError: null }, BOOKING_TEXT.SERVICE_REMOVED(label)), [BOOKING_IDS.SERVICE]);
+    return requestFocus(announce(afterServicesChange(state, { ...state, items, goneMessages: [], submitError: null }), BOOKING_TEXT.SERVICE_REMOVED(label)), [BOOKING_IDS.SERVICE]);
 };
 
 export const bookingReducer = (state, action) => {

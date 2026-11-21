@@ -51,7 +51,7 @@ const LabeledAmounts = ({ net, paid, left, strong }) => (
     </dl>
 );
 
-const procedures = (item) => item.lines.map((line) => line.name).join(", ");
+const procedures = (item) => (item.isPlan && item.title ? item.title : item.lines.map((line) => line.name).join(", "));
 
 const PaymentHistoryTable = ({ view, onFocusReceipt, onPageChange, onClearAll }) => {
     const pagerRef = useRef(null);

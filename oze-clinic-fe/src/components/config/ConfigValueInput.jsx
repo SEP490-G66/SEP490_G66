@@ -1,5 +1,5 @@
 import { cx } from "@/utils/cx";
-import { CONFIG_DATA_TYPES as DATA_TYPES } from "@/utils/systemConfig";
+import { CONFIG_DATA_TYPES as DATA_TYPES } from "@/utils/constants/systemConfig";
 
 // Value field of one setting. config: { key, label, dataType: "int" | "time" | "text", unit?, min?, max?, maxLength? }.
 // An int shows its unit ("ngày", "giờ", "phút") inside the box; a time is "HH:mm". value is always a string.
