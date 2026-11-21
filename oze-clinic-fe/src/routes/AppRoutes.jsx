@@ -9,6 +9,8 @@ import SignInPage from "../pages/common/SignInPage";
 import VerifyOtpPage from "../pages/common/VerifyOtpPage";
 import AboutUs from "../pages/common/homepage/AboutUs";
 import ContactPage from "../pages/common/ContactPage";
+import PrivacyPolicyPage from "../pages/common/PrivacyPolicyPage";
+import TermsOfUsePage from "../pages/common/TermsOfUsePage";
 import ServiceDetail from "../pages/common/ServiceDetail";
 import ArticleDetail from "../pages/common/ArticleDetail";
 import ServiceList from "../pages/common/ServiceList";
@@ -83,6 +85,14 @@ const routes = [
     {
         path: ROUTES.CONTACT,
         element: <ContactPage />
+    },
+    {
+        path: ROUTES.PRIVACY_POLICY,
+        element: <PrivacyPolicyPage />
+    },
+    {
+        path: ROUTES.TERMS_OF_USE,
+        element: <TermsOfUsePage />
     },
     {
         path: ROUTES.SERVICES,
