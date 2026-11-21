@@ -42,8 +42,6 @@ namespace OZE.Common.Constants
             public const string AppointmentCancelledTitle = "Lịch hẹn đã bị hủy";
             public const string AppointmentCancelledMessage = "Lịch hẹn lúc {0} ngày {1} đã bị hủy. Lý do: {2}";
             public const string AppointmentShiftEndedTitle = "Lịch hẹn cần đổi giờ";
-            public const string TreatmentPlanProposedTitle = "Kế hoạch điều trị chờ bạn đồng ý";
-            public const string TreatmentPlanProposedMessage = "Bác sĩ đã lập kế hoạch điều trị \"{0}\", dự kiến {1}. Vui lòng xem và trao đổi với phòng khám.";
             public const string InvoiceCreatedTitle = "Có hóa đơn mới";
             public const string InvoiceCreatedMessage = "Hóa đơn {0} với số tiền {1} đã được lập.";
             public const string PaymentConfirmedTitle = "Đã nhận thanh toán";

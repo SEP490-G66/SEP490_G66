@@ -117,19 +117,6 @@ namespace OZE.Controllers
         }
 
         /// <summary>
-        /// Proposed -> Approved by the patient online, for a plan of their own. The doctor who made it is notified.
-        /// </summary>
-        [Authorize(Roles = RoleConstants.PatientRole)]
-        [HttpPost("my/{id:long}/approve")]
-        public async Task<ActionResult<ApiResponse<TreatmentPlanProgressResponse>>> ApproveMyPlanAsync(
-            [FromRoute] long id,
-            CancellationToken cancellationToken)
-        {
-            var plan = await _treatmentPlanService.ApproveByPatientAsync(id, GetUserId(), cancellationToken);
-            return Ok(ApiResponse<TreatmentPlanProgressResponse>.SuccessResult(plan, "Approve treatment plan success!"));
-        }
-
-        /// <summary>
         /// Cancels a proposed, approved or in-progress plan with a reason. Stages not done yet are cancelled.
         /// </summary>
         [Authorize(Roles = DoctorOrReception)]

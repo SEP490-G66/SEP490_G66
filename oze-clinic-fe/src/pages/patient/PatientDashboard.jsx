@@ -117,21 +117,8 @@ const taskStatus = (item) => {
     return Object.hasOwn(INVOICE_PAYMENT_STATUS, item.paymentStatus) ? item.paymentStatus : PAYMENT_STATUS.UNPAID;
 };
 
-const getTasks = (plans, dueItems) => [
-    ...plans
-        .filter((plan) => plan.status === PLAN_STATUS.PROPOSED)
-        .sort((a, b) => (b.proposedAt ?? "").localeCompare(a.proposedAt ?? "") || b.treatmentPlanId - a.treatmentPlanId)
-        .map((plan) => ({
-            kind: "plan",
-            id: plan.treatmentPlanId,
-            status: plan.status,
-            planName: plan.planName,
-            doctorName: plan.doctorName,
-            proposedAt: plan.proposedAt,
-            stageCount: getStageProgress(plan.stages).y,
-            estimatedTotalCost: plan.estimatedTotalCost,
-        })),
-    ...dueItems.map((item) => ({
+const getTasks = (dueItems) =>
+    dueItems.map((item) => ({
         kind: "invoice",
         id: item.id,
         debtId: item.debtId,
@@ -139,8 +126,7 @@ const getTasks = (plans, dueItems) => [
         invoiceNumber: item.invoiceNumber,
         remainder: item.due,
         appointmentDate: item.visitDate ?? undefined,
-    })),
-];
+    }));
 
 const getGreeting = (userName, today) => {
     const name = userName?.trim();
@@ -217,9 +203,9 @@ const PatientDashboard = () => {
                     </div>
                     <div className="mt-6 flex flex-col gap-6">
                         <TasksSection
-                            tasks={getTasks(plans.data, dueItems)}
-                            loading={plans.loading || dues.loading}
-                            failed={plans.failed || dues.failed}
+                            tasks={getTasks(dueItems)}
+                            loading={dues.loading}
+                            failed={dues.failed}
                         />
                         <UpcomingAppointmentsSection
                             highlighted={highlighted}

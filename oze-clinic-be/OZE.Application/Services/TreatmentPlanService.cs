@@ -166,11 +166,6 @@ namespace OZE.Application.Services
             await _treatmentPlanRepository.AddAsync(newPlan, cancellationToken);
             await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
 
-            await NotifyAsync(n => n.NotifyPatientAsync(newPlan.PatientId,
-                new NotificationContent(NotificationConstants.Text.TreatmentPlanProposedTitle,
-                    $"A new version (v{newPlan.PlanVersion}) of treatment plan \"{newPlan.PlanName}\" has been created for you.",
-                    NotificationConstants.Reference.TreatmentPlan, newPlan.Id.ToString()), cancellationToken));
-
             var newCreated = await _treatmentPlanRepository.GetByIdWithStagesAsync(newPlan.Id, cancellationToken);
             return ToProgressResponse(newCreated!);
         }
@@ -277,10 +272,6 @@ namespace OZE.Application.Services
             plan.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
-            await NotifyAsync(n => n.NotifyPatientAsync(plan.PatientId,
-                new NotificationContent(NotificationConstants.Text.TreatmentPlanProposedTitle,
-                    string.Format(NotificationConstants.Text.TreatmentPlanProposedMessage, plan.PlanName ?? string.Empty, NotificationFormat.Money(plan.EstimatedTotalCost)),
-                    NotificationConstants.Reference.TreatmentPlan, plan.Id.ToString()), cancellationToken));
             return ToProgressResponse(plan);
         }
 
@@ -293,21 +284,6 @@ namespace OZE.Application.Services
         {
             var plan = await LoadForStatusChangeAsync(treatmentPlanId, userId, canViewAll, cancellationToken);
             return await ApproveLoadedAsync(plan, cancellationToken);
-        }
-
-        // The patient agrees online to a plan proposed to them (decided 18/11: to think it over at home before agreeing)
-        public async Task<TreatmentPlanProgressResponse> ApproveByPatientAsync(
-            long treatmentPlanId,
-            string userId,
-            CancellationToken cancellationToken = default)
-        {
-            var patient = await _medicalRecordRepository.GetPatientByUserIdAsync(userId, cancellationToken);
-            ConditionGuard.Ensure<NotFoundException>(patient != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
-
-            // Another patient's plan is reported as missing, so its existence is not revealed
-            var plan = await _treatmentPlanRepository.GetTrackedByIdWithStagesAsync(treatmentPlanId, cancellationToken);
-            ConditionGuard.Ensure<NotFoundException>(plan != null && plan.PatientId == patient!.Id, ErrorConstants.TreatmentPlanMessage.PlanNotFound);
-            return await ApproveLoadedAsync(plan!, cancellationToken);
         }
 
         private async Task<TreatmentPlanProgressResponse> ApproveLoadedAsync(TreatmentPlan plan, CancellationToken cancellationToken)
