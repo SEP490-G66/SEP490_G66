@@ -49,6 +49,10 @@ export const ROUTES = {
     RECEPTION_FOLLOW_UPS: "/reception/follow-ups",
     RECEPTION_DEBTS: "/reception/debts",
     RECEPTION_INVOICE_LIST: "/reception/invoice-list",
+    RECEPTION_PAYMENTS: "/reception/payments",
+    RECEPTION_DEPOSITS: "/reception/deposits",
+    RECEPTION_PERIODS: "/reception/periods",
+    RECEPTION_COLLECT: "/reception/collect",
     ADMIN_STAFF: "/admin/staff",
     ADMIN_ROLES: "/admin/roles",
     ADMIN_ROOMS: "/admin/rooms",
@@ -86,7 +90,7 @@ export const ROLE_ROUTES = [
     },
     {
         roles: [USER_ROLES.RECEPTIONIST],
-        paths: [ROUTES.RECEPTION_SCHEDULE, ROUTES.RECEPTION_APPOINTMENTS, ROUTES.RECEPTION_CHECK_IN, ROUTES.RECEPTION_PATIENTS, ROUTES.RECEPTION_CONSULTATIONS, ROUTES.RECEPTION_INVOICES, ROUTES.RECEPTION_CASH_HANDOVER, ROUTES.RECEPTION_QUEUE, ROUTES.RECEPTION_FOLLOW_UPS, ROUTES.RECEPTION_DEBTS, ROUTES.RECEPTION_INVOICE_LIST]
+        paths: [ROUTES.RECEPTION_SCHEDULE, ROUTES.RECEPTION_APPOINTMENTS, ROUTES.RECEPTION_CHECK_IN, ROUTES.RECEPTION_PATIENTS, ROUTES.RECEPTION_CONSULTATIONS, ROUTES.RECEPTION_INVOICES, ROUTES.RECEPTION_CASH_HANDOVER, ROUTES.RECEPTION_QUEUE, ROUTES.RECEPTION_FOLLOW_UPS, ROUTES.RECEPTION_DEBTS, ROUTES.RECEPTION_INVOICE_LIST, ROUTES.RECEPTION_PAYMENTS, ROUTES.RECEPTION_DEPOSITS, ROUTES.RECEPTION_PERIODS, ROUTES.RECEPTION_COLLECT]
     },
     {
         roles: [USER_ROLES.CLINIC_MANAGER],
@@ -171,3 +175,21 @@ export const getReceptionPatientRoute = (patientId, tab) => {
 };
 
 export const getReceptionPatientEditRoute = (patientId) => generatePath(RECEPTION_PATIENT_EDIT, { patientId: String(patientId) });
+
+// Cashier pages: the patient's payment record and the payment option of one plan are nested under Thanh toán;
+// the other pages keep the patient / plan / lines to add in the query string.
+const CASHIER_ACCOUNT = `${ROUTES.RECEPTION_PAYMENTS}/:patientId`;
+const CASHIER_OPTION = `${ROUTES.RECEPTION_PAYMENTS}/:patientId/plans/:planId/option`;
+
+export const getCashierAccountRoute = (patientId) => generatePath(CASHIER_ACCOUNT, { patientId: String(patientId) });
+
+export const getCashierOptionRoute = (patientId, planId) => generatePath(CASHIER_OPTION, { patientId: String(patientId), planId: String(planId) });
+
+export const getCashierRoute = (path, { patient, plan, add } = {}) => {
+    const query = new URLSearchParams();
+    if (patient) query.set("patient", String(patient));
+    if (plan) query.set("plan", String(plan));
+    if (add) query.set("add", add);
+    const text = query.toString();
+    return text ? `${path}?${text}` : path;
+};

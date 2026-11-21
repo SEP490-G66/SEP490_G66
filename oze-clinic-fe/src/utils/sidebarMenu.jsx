@@ -123,7 +123,12 @@ const SIDEBAR_MENU = {
             label: "Thu ngân",
             icon: Wallet,
             children: [
-                { key: "invoices", label: "Thu tiền", to: ROUTES.RECEPTION_INVOICES },
+                { key: "payments", label: "Thanh toán", to: ROUTES.RECEPTION_PAYMENTS },
+                { key: "deposits", label: "Đặt cọc dịch vụ", to: ROUTES.RECEPTION_DEPOSITS },
+                { key: "periods", label: "Thanh toán theo đợt", to: ROUTES.RECEPTION_PERIODS },
+                { key: "collect", label: "Ghi nhận thu tiền", to: ROUTES.RECEPTION_COLLECT },
+                // TEMPORARY: old visit payment page, removed when the cashier pages move to the API (R18)
+                { key: "invoices", label: "Thu tiền lượt khám", to: ROUTES.RECEPTION_INVOICES },
                 { key: "invoice-list", label: "Hóa đơn & công nợ", to: ROUTES.RECEPTION_INVOICE_LIST },
                 { key: "cash-handover", label: "Phiếu giao ca", to: ROUTES.RECEPTION_CASH_HANDOVER },
             ],

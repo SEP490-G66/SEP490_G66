@@ -33,6 +33,12 @@ import ReceptionPayment from "../pages/receptionist/ReceptionPayment";
 import ReceptionQueue from "../pages/receptionist/ReceptionQueue";
 import CashHandover from "../pages/receptionist/CashHandover";
 import CashHandoverDetail from "../pages/receptionist/CashHandoverDetail";
+import CashierPayments from "../pages/receptionist/CashierPayments";
+import CashierAccount from "../pages/receptionist/CashierAccount";
+import CashierPaymentOption from "../pages/receptionist/CashierPaymentOption";
+import CashierDeposits from "../pages/receptionist/CashierDeposits";
+import CashierPeriods from "../pages/receptionist/CashierPeriods";
+import CashierCollect from "../pages/receptionist/CashierCollect";
 import WorkSchedule from "../pages/common/WorkSchedule";
 import MyAppointments from "../pages/patient/MyAppointments";
 import AppointmentDetail from "../pages/patient/AppointmentDetail";
@@ -167,6 +173,17 @@ const ROLE_PAGES = {
     [ROUTES.RECEPTION_FOLLOW_UPS]: <ReceptionFollowUps />,
     [ROUTES.RECEPTION_DEBTS]: <Navigate to={`${ROUTES.RECEPTION_INVOICE_LIST}?tab=debt`} replace />,
     [ROUTES.RECEPTION_INVOICE_LIST]: <ReceptionInvoices />,
+    [ROUTES.RECEPTION_PAYMENTS]: (
+        <Routes>
+            <Route index element={<CashierPayments />} />
+            <Route path=":patientId" element={<CashierAccount />} />
+            <Route path=":patientId/plans/:planId/option" element={<CashierPaymentOption />} />
+            <Route path="*" element={NOT_FOUND} />
+        </Routes>
+    ),
+    [ROUTES.RECEPTION_DEPOSITS]: <CashierDeposits />,
+    [ROUTES.RECEPTION_PERIODS]: <CashierPeriods />,
+    [ROUTES.RECEPTION_COLLECT]: <CashierCollect />,
     [ROUTES.RECEPTION_PATIENTS]: (
         <Routes>
             <Route index element={<ReceptionPatients />} />
