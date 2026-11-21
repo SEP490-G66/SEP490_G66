@@ -63,7 +63,7 @@ export const PRIVACY_POLICY = {
                     items: [
                         "Nhân viên phòng khám được phân quyền theo vai trò: bác sĩ xem hồ sơ của bệnh nhân mình khám; lễ tân xem thông tin hành chính, lịch hẹn và thanh toán; kỹ thuật viên xem chỉ định chụp phim; quản lý xem số liệu vận hành và nhật ký hệ thống.",
                         "Bạn chỉ xem được hồ sơ, lịch hẹn và hóa đơn của chính mình sau khi đăng nhập.",
-                        "Nhà cung cấp dịch vụ gửi tin nhắn SMS và email, chỉ nhận số điện thoại hoặc email cùng nội dung tin cần gửi (ví dụ mã OTP).",
+                        "Nhà cung cấp dịch vụ gửi tin nhắn SMS (eSMS) và dịch vụ gửi email, chỉ nhận số điện thoại hoặc email cùng nội dung tin cần gửi (ví dụ mã OTP, nhắc lịch hẹn).",
                         "Nhà cung cấp hạ tầng lưu trữ (máy chủ Microsoft Azure và Vercel) để vận hành hệ thống.",
                         "Cơ quan nhà nước có thẩm quyền khi pháp luật yêu cầu.",
                     ],
