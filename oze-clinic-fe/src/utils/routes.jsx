@@ -15,6 +15,8 @@ export const ROUTES = {
     SEARCH: "/search",
     ARTICLE_DETAIL: "/articles/:articleSlug",
     CONTACT: "/contact",
+    PRIVACY_POLICY: "/chinh-sach-bao-mat",
+    TERMS_OF_USE: "/dieu-khoan-su-dung",
     BOOK_APPOINTMENT: "/book-appointment",
     PROFILE: "/profile",
     PROFILE_VERIFY_OTP: "/profile/verify-otp",

@@ -270,6 +270,18 @@ const Register = () => {
 
           </div>
 
+          <p className="pt-2 text-body-sm text-body">
+            Bằng việc đăng ký, bạn đồng ý với{' '}
+            <Link to={ROUTES.TERMS_OF_USE} className="font-semibold text-primary hover:underline">
+              Điều khoản sử dụng
+            </Link>{' '}
+            và{' '}
+            <Link to={ROUTES.PRIVACY_POLICY} className="font-semibold text-primary hover:underline">
+              Chính sách bảo mật
+            </Link>{' '}
+            của Nha khoa OZE.
+          </p>
+
           <div className="pt-4">
             <Button
               type="submit"

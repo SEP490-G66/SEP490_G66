@@ -4,7 +4,12 @@ import { FaFacebookF, FaTiktok, FaYoutube } from "react-icons/fa";
 import LogoOze from "@/assets/logo/Logo.png";
 import FooterConsultationForm from "@/components/contact/FooterConsultationForm";
 import { getFooterServices } from "@/services/dentalService";
-import { getServiceDetailRoute } from "@/utils/routes";
+import { ROUTES, getServiceDetailRoute } from "@/utils/routes";
+
+const LEGAL_LINKS = [
+    { label: "Chính sách bảo mật", to: ROUTES.PRIVACY_POLICY },
+    { label: "Điều khoản sử dụng", to: ROUTES.TERMS_OF_USE },
+];
 
 const CONTACTS = [
     { icon: MapPin, text: "Số nhà 55-59, tổ 4, quốc lộ 3, Đông Anh, Hà Nội" },
@@ -98,6 +103,19 @@ const Footer = () => {
                         </ul>
                     </div>
                 </div>
+            </div>
+
+            <div className="mx-auto mt-10 flex w-full max-w-7xl flex-col gap-3 border-t border-border pt-6 text-body-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+                <p>© {new Date().getFullYear()} Nha khoa OZE</p>
+                <ul className="flex flex-wrap gap-x-6 gap-y-2">
+                    {LEGAL_LINKS.map(({ label, to }) => (
+                        <li key={to}>
+                            <Link to={to} className="hover:text-primary hover:underline">
+                                {label}
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
             </div>
         </footer>
     );
