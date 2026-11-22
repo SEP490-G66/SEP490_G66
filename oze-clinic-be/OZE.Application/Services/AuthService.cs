@@ -30,6 +30,7 @@ namespace OZE.Application.Services
         private readonly RegisterOtpSettings _otpSettings;
         private readonly ILogger<AuthService> _logger;
         private readonly IOtpSendLimiter? _otpSendLimiter;
+        private readonly AuthSmsSenderOptions _smsOptions;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
@@ -45,9 +46,11 @@ namespace OZE.Application.Services
             IOptions<JwtSettings> jwtOptions,
             IOptions<RegisterOtpSettings> otpOptions,
             ILogger<AuthService> logger,
-            IOtpSendLimiter? otpSendLimiter = null)
+            IOtpSendLimiter? otpSendLimiter = null,
+            IOptions<AuthSmsSenderOptions>? smsOptions = null)
         {
             _otpSendLimiter = otpSendLimiter;
+            _smsOptions = smsOptions?.Value ?? new AuthSmsSenderOptions();
             _userManager = userManager;
             _signInManager = signInManager;
             _refreshTokenRepository = refreshTokenRepository;
@@ -425,7 +428,7 @@ namespace OZE.Application.Services
                 {
                     await _smsSender.SendSmsAsync(
                         pending.PhoneNumber,
-                        $"Ma OTP OZE cua ban la {otp}. Hieu luc {OtpExpiresInMinutes} phut.");
+                        AuthSmsSenderOptions.RenderOtp(_smsOptions.OtpTemplate, AuthSmsSenderOptions.DefaultOtpTemplate, otp, OtpExpiresInMinutes));
                 }
 
                 return true;
@@ -745,7 +748,7 @@ namespace OZE.Application.Services
                 else
                 {
                     await _smsSender.SendSmsAsync(destination,
-                        $"Ma dat lai mat khau OZE cua ban la {otp}. Hieu luc {OtpExpiresInMinutes} phut.");
+                        AuthSmsSenderOptions.RenderOtp(_smsOptions.ResetPasswordOtpTemplate, AuthSmsSenderOptions.DefaultResetPasswordOtpTemplate, otp, OtpExpiresInMinutes));
                 }
             }
             catch (Exception ex)

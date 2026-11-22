@@ -24,6 +24,7 @@ namespace OZE.Application.Services
         private readonly RegisterOtpSettings _otpSettings;
         private readonly ILogger<UserService> _logger;
         private readonly IOtpSendLimiter? _otpSendLimiter;
+        private readonly AuthSmsSenderOptions _smsOptions;
 
         public UserService(
             UserManager<ApplicationUser> userManager,
@@ -34,9 +35,11 @@ namespace OZE.Application.Services
             IEmailSender emailSender,
             IOptions<RegisterOtpSettings> otpOptions,
             ILogger<UserService> logger,
-            IOtpSendLimiter? otpSendLimiter = null)
+            IOtpSendLimiter? otpSendLimiter = null,
+            IOptions<AuthSmsSenderOptions>? smsOptions = null)
         {
             _otpSendLimiter = otpSendLimiter;
+            _smsOptions = smsOptions?.Value ?? new AuthSmsSenderOptions();
             _userManager = userManager;
             _patientRepository = patientRepository;
             _registrationRepository = registrationRepository;
@@ -380,7 +383,7 @@ namespace OZE.Application.Services
             {
                 await _smsSender.SendSmsAsync(
                     update.PhoneNumber,
-                    $"Ma OTP OZE cua ban la {otp}. Hieu luc {OtpExpiresInMinutes} phut.");
+                    AuthSmsSenderOptions.RenderOtp(_smsOptions.OtpTemplate, AuthSmsSenderOptions.DefaultOtpTemplate, otp, OtpExpiresInMinutes));
                 return true;
             }
             catch (Exception ex)

@@ -23,3 +23,5 @@ services:
       - AuthSmsSenderOptions__SmsType=${ESMS_SMS_TYPE:-2}
       - AuthSmsSenderOptions__IsUnicode=${ESMS_IS_UNICODE:-0}
       - AuthSmsSenderOptions__Sandbox=${ESMS_SANDBOX:-1}
+      - AuthSmsSenderOptions__OtpTemplate=${ESMS_OTP_TEMPLATE:-}
+      - AuthSmsSenderOptions__ResetPasswordOtpTemplate=${ESMS_RESET_PASSWORD_OTP_TEMPLATE:-}
