@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using OZE.Application.Helpers;
 using OZE.Application.Interfaces;
@@ -21,6 +22,7 @@ namespace OZE.Application.Services
         private readonly IEmailSender _emailSender;
         private readonly IAuditLogService _auditLogService;
         private readonly ILogger<AppointmentService> _logger;
+        private readonly UserManager<ApplicationUser> _userManager;
         private readonly IQueueService? _queueService;
         private readonly IInvoiceRepository? _invoiceRepository;
         private readonly IInstallmentRepository? _installmentRepository;
@@ -34,6 +36,7 @@ namespace OZE.Application.Services
             IEmailSender emailSender,
             IAuditLogService auditLogService,
             ILogger<AppointmentService> logger,
+            UserManager<ApplicationUser> userManager,
             IQueueService? queueService = null,
             IInvoiceRepository? invoiceRepository = null,
             IInstallmentRepository? installmentRepository = null,
@@ -46,6 +49,7 @@ namespace OZE.Application.Services
             _emailSender = emailSender;
             _auditLogService = auditLogService;
             _logger = logger;
+            _userManager = userManager;
             _queueService = queueService;
             _invoiceRepository = invoiceRepository;
             _installmentRepository = installmentRepository;
@@ -132,6 +136,8 @@ namespace OZE.Application.Services
 
         public async Task<AppointmentResponse> BookAsPatientAsync(BookingRequest request, string userId)
         {
+            await EnsurePatientPhoneVerifiedAsync(userId);
+
             var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
 
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
@@ -1566,6 +1572,15 @@ namespace OZE.Application.Services
             }
 
             ConditionGuard.Ensure<NotFoundException>(appointment.Patient?.UserId == ownerUserId, ErrorConstants.AppointmentMessage.AppointmentNotFound);
+        }
+
+        private async Task EnsurePatientPhoneVerifiedAsync(string userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            ConditionGuard.Ensure<NotFoundException>(user != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
+            ConditionGuard.Ensure(
+                user!.PhoneNumberConfirmed && !string.IsNullOrWhiteSpace(user.PhoneNumber),
+                ErrorConstants.AppointmentMessage.PhoneNotVerified);
         }
 
         public async Task<AppointmentResponse> ScheduleFollowUpAsync(
