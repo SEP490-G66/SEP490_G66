@@ -73,6 +73,8 @@ jobs:
           ESMS_SMS_TYPE=${{ secrets.ESMS_SMS_TYPE || '2' }}
           ESMS_IS_UNICODE=${{ secrets.ESMS_IS_UNICODE || '0' }}
           ESMS_SANDBOX=${{ secrets.ESMS_SANDBOX || '1' }}
+          ESMS_OTP_TEMPLATE=${{ secrets.ESMS_OTP_TEMPLATE || '' }}
+          ESMS_RESET_PASSWORD_OTP_TEMPLATE=${{ secrets.ESMS_RESET_PASSWORD_OTP_TEMPLATE || '' }}
           EOF
 
       - name: Deploy application using Docker Compose
