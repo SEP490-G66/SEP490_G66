@@ -1,5 +1,5 @@
 import api from "./api";
-import { BACKEND_LOGIN_CODES, CHANGE_PASSWORD_TEXT, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
+import { BACKEND_LOGIN_CODES, CHANGE_PASSWORD_TEXT, GENERIC_ERROR_MESSAGE, GOOGLE_LOGIN_MESSAGES, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
 import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
 import { invalidMessage } from "../utils/validation";
 import { clearSession, getSessionRefreshToken, getSessionToken, isAccessTokenExpired, saveSession, sessionFromAuthResult } from "./sessionStore";
@@ -14,6 +14,10 @@ const loginFailure = (code) => {
     if (code === BACKEND_LOGIN_CODES.INVALID_CREDENTIALS) return failure(MESSAGES.MSG24);
     if (code === BACKEND_LOGIN_CODES.LOCKED_OUT) return failure(MESSAGES.MSG26);
     if (code === BACKEND_LOGIN_CODES.ACCOUNT_DISABLED) return failure(MESSAGES.MSG80);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_TOKEN_INVALID) return failure(GOOGLE_LOGIN_MESSAGES.TOKEN_INVALID);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_EMAIL_NOT_VERIFIED) return failure(GOOGLE_LOGIN_MESSAGES.EMAIL_NOT_VERIFIED);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_NOT_PATIENT) return failure(GOOGLE_LOGIN_MESSAGES.NOT_PATIENT);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_NOT_CONFIGURED) return failure(GOOGLE_LOGIN_MESSAGES.NOT_CONFIGURED);
     return failure(GENERIC_ERROR_MESSAGE);
 };
 
@@ -45,6 +49,15 @@ const completeSignIn = (body) => {
 export const signIn = async ({ identifier, password }) => {
     try {
         const response = await api.post("/api/Auth/login", { identifier, password }, AUTH_REQUEST_CONFIG);
+        return completeSignIn(response.data);
+    } catch (error) {
+        return loginFailure(error.response?.data?.code);
+    }
+};
+
+export const signInWithGoogle = async (idToken) => {
+    try {
+        const response = await api.post("/api/Auth/google-login", { idToken }, AUTH_REQUEST_CONFIG);
         return completeSignIn(response.data);
     } catch (error) {
         return loginFailure(error.response?.data?.code);

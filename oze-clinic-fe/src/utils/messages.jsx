@@ -135,6 +135,18 @@ export const BACKEND_LOGIN_CODES = {
     INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
     LOCKED_OUT: "LOCKED_OUT",
     ACCOUNT_DISABLED: "ACCOUNT_DISABLED",
+    GOOGLE_TOKEN_INVALID: "GOOGLE_TOKEN_INVALID",
+    GOOGLE_EMAIL_NOT_VERIFIED: "GOOGLE_EMAIL_NOT_VERIFIED",
+    GOOGLE_NOT_PATIENT: "GOOGLE_NOT_PATIENT",
+    GOOGLE_NOT_CONFIGURED: "GOOGLE_NOT_CONFIGURED",
+};
+
+export const GOOGLE_LOGIN_MESSAGES = {
+    TOKEN_INVALID: "Đăng nhập Google thất bại. Vui lòng thử lại.",
+    EMAIL_NOT_VERIFIED: "Email Google chưa được xác minh. Vui lòng xác minh email rồi thử lại.",
+    NOT_PATIENT: "Đăng nhập Google chỉ dành cho tài khoản bệnh nhân.",
+    NOT_CONFIGURED: "Đăng nhập Google chưa được cấu hình.",
+    ADD_PHONE_HINT: "Vui lòng bổ sung số điện thoại trong hồ sơ để đặt lịch và nhận thông báo.",
 };
 
 export const ROLE_LABELS = {
@@ -921,6 +933,7 @@ export const PAYMENT_HISTORY_TEXT = {
 
 export const BOOKING_ERROR_CODE = {
     PROFILE_NOT_FOUND: "PATIENT_PROFILE_NOT_FOUND",
+    PHONE_NOT_VERIFIED: "PHONE_NOT_VERIFIED",
     SLOT_NOT_AVAILABLE: "SLOT_NOT_AVAILABLE",
     PAST_DATE: "PAST_DATE",
     TOO_FAR_AHEAD: "TOO_FAR_AHEAD",
@@ -1015,6 +1028,9 @@ export const BOOKING_TEXT = {
     UNLINKED_TITLE: "Tài khoản chưa được gắn với hồ sơ khám",
     UNLINKED_TEXT: "Vì vậy bạn chưa thể đặt lịch trực tuyến. Vui lòng gọi",
     UNLINKED_TEXT_END: "để lễ tân gắn hồ sơ hoặc đặt lịch giúp bạn.",
+    PHONE_UNVERIFIED_TITLE: "Cần xác thực số điện thoại trước khi đặt lịch",
+    PHONE_UNVERIFIED_TEXT: "Vui lòng bổ sung và xác thực số điện thoại trong hồ sơ để đặt lịch khám trực tuyến.",
+    PHONE_UNVERIFIED_ACTION: "Cập nhật hồ sơ",
     BLOCKED_TITLE: "Bạn đang có một lịch hẹn chưa khám xong",
     BLOCKED_APPOINTMENT: (day, time, code) => `Lịch hẹn ${day} lúc ${time} (mã ${code})`,
     BLOCKED_TEXT: "Mỗi lần chỉ đặt được một lịch hẹn. Muốn đặt lịch mới, vui lòng đến khám theo lịch này hoặc hủy lịch trước.",

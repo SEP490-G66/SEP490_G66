@@ -420,6 +420,7 @@ namespace OZE.Application.Services
                 Email = user.Email ?? string.Empty,
                 FullName = patient?.FullName ?? GetFullName(user.Id),
                 PhoneNumber = user.PhoneNumber ?? patient?.PhoneNumber,
+                PhoneNumberConfirmed = user.PhoneNumberConfirmed,
                 DateOfBirth = patient?.DateOfBirth,
                 Gender = patient?.Gender,
                 Address = patient?.Address,

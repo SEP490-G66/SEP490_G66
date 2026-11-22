@@ -61,6 +61,15 @@ namespace OZE.ProjectBase.Controllers
             return result.Success ? Ok(result) : Unauthorized(result);
         }
 
+        [HttpPost("google-login")]
+        [AllowAnonymous]
+        [ApiResponseValidationFilter]
+        public async Task<ActionResult<ApiResponse<AuthResult>>> GoogleLoginAsync([FromBody] GoogleLoginRequest request)
+        {
+            var result = await _authService.GoogleLoginAsync(request);
+            return result.Success ? Ok(result) : Unauthorized(result);
+        }
+
         [HttpPost("refresh-token")]
         [AllowAnonymous]
         [ApiResponseValidationFilter]

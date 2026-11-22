@@ -8,7 +8,9 @@ namespace OZE.Application.Interfaces
         Task<ApiResponse<RegisterPendingResponse>> RegisterAsync(RegisterRequest request, string baseUrl);
         Task<ApiResponse<RegisterPendingResponse>> ResendOtpAsync(ResendOtpRequest request);
         Task<ApiResponse> VerifyOtpAsync(VerifyOtpRequest request, string baseUrl);
-        Task<ApiResponse<RegisterPendingResponse>> ForgotPasswordAsync(ForgotPasswordRequest request); Task<ApiResponse<AuthResult>> LoginAsync(LoginRequest request);
+        Task<ApiResponse<RegisterPendingResponse>> ForgotPasswordAsync(ForgotPasswordRequest request);
+        Task<ApiResponse<AuthResult>> LoginAsync(LoginRequest request);
+        Task<ApiResponse<AuthResult>> GoogleLoginAsync(GoogleLoginRequest request);
         Task<ApiResponse<AuthResult>> RefreshTokenAsync(RefreshTokenRequest request);
         Task<ApiResponse> ConfirmEmailAsync(string userId, string code);
         /// <param name="userId">Authenticated user id; required to revoke every device when no refresh token is sent.</param>

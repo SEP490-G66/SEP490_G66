@@ -14,6 +14,7 @@ services:
       - JwtSettings__Issuer=${JWT_ISSUER:-OZEApp}
       - JwtSettings__Audience=${JWT_AUDIENCE:-OZEApi}
       - JwtSettings__ExpiresInMinutes=${JWT_EXPIRES_IN_MINUTES:-60}
+      - GoogleAuth__ClientId=${GOOGLE_CLIENT_ID:-}
       - AuthMessageSenderOptions__SendGridKey=${SENDGRID_KEY:-}
       - AuthMessageSenderOptions__SenderEmail=${SENDER_EMAIL:-support@oze.com}
       - AuthMessageSenderOptions__SenderName=${SENDER_NAME:-OZE Support}

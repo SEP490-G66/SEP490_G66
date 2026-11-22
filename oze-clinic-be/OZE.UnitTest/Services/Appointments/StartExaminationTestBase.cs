@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Moq;
 using OZE.Application.Interfaces;
@@ -23,6 +24,9 @@ namespace OZE.UnitTest.Services.Appointments
 
         protected StartExaminationTestBase()
         {
+            var userManagerMock = new Mock<UserManager<ApplicationUser>>(
+                Mock.Of<IUserStore<ApplicationUser>>(), null!, null!, null!, null!, null!, null!, null!, null!);
+
             _service = new AppointmentService(
                 _appointmentRepositoryMock.Object,
                 new Mock<IRegistrationRepository>().Object,
@@ -30,7 +34,8 @@ namespace OZE.UnitTest.Services.Appointments
                 new Mock<ISmsSender>().Object,
                 new Mock<IEmailSender>().Object,
                 _auditLogServiceMock.Object,
-                new Mock<ILogger<AppointmentService>>().Object);
+                new Mock<ILogger<AppointmentService>>().Object,
+                userManagerMock.Object);
 
             _appointmentRepositoryMock
                 .Setup(r => r.GetStaffProfileIdByUserIdAsync(DoctorUserId))

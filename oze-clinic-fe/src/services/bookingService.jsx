@@ -36,6 +36,7 @@ const SERVER_ERRORS = [
 const PATIENT_ERRORS = [
     ["not finished", BOOKING_ERROR_CODE.HAS_UNFINISHED],
     [NO_PROFILE, BOOKING_ERROR_CODE.PROFILE_NOT_FOUND],
+    ["verify your phone number", BOOKING_ERROR_CODE.PHONE_NOT_VERIFIED],
 ];
 
 const GUEST_ERRORS = [
@@ -179,6 +180,7 @@ export const getPatientBookingContext = async ({ signal } = {}) => {
     if (signal?.aborted) throw abortError();
     if (!mine.success && isProfileMissing(mine)) return failure(BOOKING_ERROR_CODE.PROFILE_NOT_FOUND);
     if (!me.success || !mine.success || !me.data || !shared) return failure();
+    if (me.data.phoneNumberConfirmed !== true) return failure(BOOKING_ERROR_CODE.PHONE_NOT_VERIFIED);
     return success({ ...shared, patient: toPatient(me.data), unfinished: toUnfinished(listOf(mine.data), today) });
 };
 

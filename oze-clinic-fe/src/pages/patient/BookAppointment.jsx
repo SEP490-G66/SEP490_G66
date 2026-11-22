@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { CircleAlert } from "lucide-react";
 import BookingPatientCard from "@/components/booking/BookingPatientCard";
 import BookingSchedule, { BookingLoadingCard, BookingSectionHeading, Hotline, LoadErrorBox } from "@/components/booking/BookingSchedule";
@@ -8,6 +9,7 @@ import useBookingForm from "@/hooks/useBookingForm";
 import { PATIENT_BOOKING_API } from "@/services/bookingService";
 import { BOOKING_IDS } from "@/utils/booking";
 import { BOOKING_TEXT } from "@/utils/messages";
+import { ROUTES } from "@/utils/routes";
 
 const BookAppointment = () => {
     const form = useBookingForm({ api: PATIENT_BOOKING_API });
@@ -42,6 +44,26 @@ const BookAppointment = () => {
                 <section className="card-app">
                     <BookingStateBox tone="warning" icon={CircleAlert} title={BOOKING_TEXT.UNLINKED_TITLE} headingLevel={2} headingId={BOOKING_IDS.STATE_TITLE}>
                         {BOOKING_TEXT.UNLINKED_TEXT} <Hotline /> {BOOKING_TEXT.UNLINKED_TEXT_END}
+                    </BookingStateBox>
+                </section>
+            );
+        }
+        if (page.status === "phone-unverified") {
+            return (
+                <section className="card-app">
+                    <BookingStateBox
+                        tone="warning"
+                        icon={CircleAlert}
+                        title={BOOKING_TEXT.PHONE_UNVERIFIED_TITLE}
+                        headingLevel={2}
+                        headingId={BOOKING_IDS.STATE_TITLE}
+                        action={
+                            <Link to={ROUTES.PROFILE} className="btn btn-primary min-h-11 md:min-h-0">
+                                {BOOKING_TEXT.PHONE_UNVERIFIED_ACTION}
+                            </Link>
+                        }
+                    >
+                        {BOOKING_TEXT.PHONE_UNVERIFIED_TEXT}
                     </BookingStateBox>
                 </section>
             );
