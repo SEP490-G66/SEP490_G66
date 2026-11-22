@@ -258,8 +258,8 @@ test.describe("UC04_ImagingHistory", () => {
             await expect(page.locator("table")).toHaveAttribute("aria-busy", "false");
         };
         await apply(() => page.getByPlaceholder("Tên, mã bệnh nhân hoặc mã chỉ định").fill(`IR-${run.ordersB[0]}`), keyword);
-        await apply(() => page.getByLabel("Trạng thái").selectOption({ label: "Trạng thái: Hoàn tất" }), "status=Completed");
-        await apply(() => page.getByLabel("Loại chụp").selectOption({ label: `Loại chụp: ${run.typeB}` }), "imagingType=");
+        await apply(() => page.getByLabel("Trạng thái").selectOption({ label: "Hoàn tất" }), "status=Completed");
+        await apply(() => page.getByLabel("Loại chụp").selectOption({ label: run.typeB }), "imagingType=");
         await apply(() => page.getByLabel("Từ ngày").fill(clinicDate()), `from=${clinicDate()}`);
         // "đến" is today already: choosing today again sends no new request
         await page.getByLabel("Đến ngày").fill(clinicDate());

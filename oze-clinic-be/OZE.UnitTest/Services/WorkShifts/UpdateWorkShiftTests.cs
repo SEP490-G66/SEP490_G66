@@ -238,5 +238,36 @@ namespace OZE.UnitTest.Services.WorkShifts
             var error = await act.Should().ThrowAsync<BadRequestException>();
             error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.RoomOverlap);
         }
+
+        // UTCID16 (N): a substitute put on a shift marked absent (leave approved without a substitute) starts unmarked
+        [Fact]
+        public async Task UpdateWorkShiftAsync_ShouldClearAbsence_WhenAbsentShiftGoesToAnotherStaff()
+        {
+            var shift = SetupExistingShift();
+            shift.IsPresent = false;
+            shift.AbsenceReason = "Nghỉ phép: Việc gia đình";
+            var other = new StaffProfile { Id = 20, UserId = OtherStaffUserId, FullName = "Bs. Tran Thi B", IsActive = true };
+            _staffRepositoryMock.Setup(r => r.GetByUserIdAsync(OtherStaffUserId)).ReturnsAsync(other);
+
+            await _service.UpdateWorkShiftAsync(ShiftId, Request(TomorrowDate, staffUserId: OtherStaffUserId));
+
+            shift.StaffProfileId.Should().Be(20);
+            shift.IsPresent.Should().BeNull();
+            shift.AbsenceReason.Should().BeNull();
+        }
+
+        // UTCID17 (N): the same person keeps the absence when only the assignment or note changes
+        [Fact]
+        public async Task UpdateWorkShiftAsync_ShouldKeepAbsence_WhenStaffIsUnchanged()
+        {
+            var shift = SetupExistingShift();
+            shift.IsPresent = false;
+            shift.AbsenceReason = "Nghỉ phép: Việc gia đình";
+
+            await _service.UpdateWorkShiftAsync(ShiftId, Request(TomorrowDate));
+
+            shift.IsPresent.Should().BeFalse();
+            shift.AbsenceReason.Should().Be("Nghỉ phép: Việc gia đình");
+        }
     }
 }

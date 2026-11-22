@@ -4,6 +4,7 @@ import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
 import useAsync from "@/hooks/useAsync";
 import { getShiftCandidates, saveShift } from "@/services/shiftService";
+import { SHIFT_STATUSES } from "@/utils/constants/shift";
 import { formatDayMonth } from "@/utils/format";
 import { ShiftPlaceTable } from "./ShiftInfoTable";
 import StaffPicker from "./StaffPicker";
@@ -12,9 +13,10 @@ const STAFF_ID = "shift-assign-staff";
 
 // Two popups in one:
 // - replace = false: "Phân ca" for an empty shift;
-// - replace = true: "Chọn người thay" for a shift whose person is on approved leave.
+// - replace = true: "Chọn người thay" for a shift whose person is on approved leave or marked absent.
 // onSaved(message) runs after a successful save.
 const ShiftAssignPopup = ({ cell, replace = false, onClose, onSaved }) => {
+    const absent = cell.status === SHIFT_STATUSES.ABSENT;
     const { loading, value: result } = useAsync(
         () => getShiftCandidates({ cell }),
         [cell.key],
@@ -53,7 +55,7 @@ const ShiftAssignPopup = ({ cell, replace = false, onClose, onSaved }) => {
     return (
         <Modal
             title={replace ? "Chọn người thay" : "Phân ca"}
-            description={replace ? "Ca của người đã được duyệt nghỉ" : "Chọn người trực cho ca còn trống"}
+            description={replace ? (absent ? "Ca của người vắng mặt" : "Ca của người đã được duyệt nghỉ") : "Chọn người trực cho ca còn trống"}
             onClose={onClose}
             closeDisabled={saving}
         >
@@ -62,7 +64,9 @@ const ShiftAssignPopup = ({ cell, replace = false, onClose, onSaved }) => {
 
                 {replace && (
                     <p className="alert alert-warning border-0">
-                        {cell.staff.name} đã được duyệt nghỉ ngày {formatDayMonth(cell.date)} ({cell.leave.wholeDay ? "cả ngày" : cell.slotLabel.toLowerCase()}).
+                        {absent
+                            ? `${cell.staff.name} vắng ca ngày ${formatDayMonth(cell.date)}${cell.absenceReason ? ` (${cell.absenceReason})` : ""}.`
+                            : `${cell.staff.name} đã được duyệt nghỉ ngày ${formatDayMonth(cell.date)} (${cell.leave.wholeDay ? "cả ngày" : cell.slotLabel.toLowerCase()}).`}{" "}
                         Chọn người thay cho ca này.
                     </p>
                 )}
