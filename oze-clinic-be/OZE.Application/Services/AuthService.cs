@@ -31,6 +31,10 @@ namespace OZE.Application.Services
         private readonly ILogger<AuthService> _logger;
         private readonly IOtpSendLimiter? _otpSendLimiter;
         private readonly AuthSmsSenderOptions _smsOptions;
+        private readonly IGoogleIdTokenValidator _googleIdTokenValidator;
+        private readonly GoogleAuthSettings _googleAuthSettings;
+
+        private const string GoogleLoginProvider = "Google";
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
@@ -46,6 +50,8 @@ namespace OZE.Application.Services
             IOptions<JwtSettings> jwtOptions,
             IOptions<RegisterOtpSettings> otpOptions,
             ILogger<AuthService> logger,
+            IGoogleIdTokenValidator googleIdTokenValidator,
+            IOptions<GoogleAuthSettings> googleAuthOptions,
             IOtpSendLimiter? otpSendLimiter = null,
             IOptions<AuthSmsSenderOptions>? smsOptions = null)
         {
@@ -64,6 +70,8 @@ namespace OZE.Application.Services
             _jwtSettings = jwtOptions.Value;
             _otpSettings = otpOptions.Value;
             _logger = logger;
+            _googleIdTokenValidator = googleIdTokenValidator;
+            _googleAuthSettings = googleAuthOptions.Value;
         }
 
         public async Task<ApiResponse<RegisterPendingResponse>> RegisterAsync(RegisterRequest request, string baseUrl)
@@ -501,9 +509,188 @@ namespace OZE.Application.Services
                 return ApiResponse<AuthResult>.FailureWithCode(
                     ErrorConstants.AuthMessage.InvalidLogin, ErrorConstants.AuthCode.InvalidCredentials);
 
+            return await IssueAuthResultAsync(user);
+        }
+
+        public async Task<ApiResponse<AuthResult>> GoogleLoginAsync(GoogleLoginRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(_googleAuthSettings.ClientId))
+            {
+                return ApiResponse<AuthResult>.FailureWithCode(
+                    ErrorConstants.AuthMessage.GoogleNotConfigured, ErrorConstants.AuthCode.GoogleNotConfigured);
+            }
+
+            var payload = await _googleIdTokenValidator.ValidateAsync(request.IdToken);
+            if (payload == null)
+            {
+                return ApiResponse<AuthResult>.FailureWithCode(
+                    ErrorConstants.AuthMessage.GoogleTokenInvalid, ErrorConstants.AuthCode.GoogleTokenInvalid);
+            }
+
+            if (string.IsNullOrWhiteSpace(payload.Email))
+            {
+                return ApiResponse<AuthResult>.FailureWithCode(
+                    ErrorConstants.AuthMessage.GoogleTokenInvalid, ErrorConstants.AuthCode.GoogleTokenInvalid);
+            }
+
+            if (!payload.EmailVerified)
+            {
+                return ApiResponse<AuthResult>.FailureWithCode(
+                    ErrorConstants.AuthMessage.GoogleEmailNotVerified, ErrorConstants.AuthCode.GoogleEmailNotVerified);
+            }
+
+            var email = payload.Email.Trim();
+            var user = await _userManager.FindByLoginAsync(GoogleLoginProvider, payload.Subject);
+            if (user == null)
+            {
+                user = await _userManager.FindByEmailAsync(email);
+            }
+
+            if (user != null)
+            {
+                if (await IsPendingRegistrationAsync(user))
+                {
+                    return ApiResponse<AuthResult>.FailureWithCode(
+                        ErrorConstants.AuthMessage.InvalidLogin, ErrorConstants.AuthCode.InvalidCredentials);
+                }
+
+                if (IsPermanentlyDisabled(user))
+                {
+                    return ApiResponse<AuthResult>.FailureWithCode(
+                        ErrorConstants.AuthMessage.AccountDisabled, ErrorConstants.AuthCode.AccountDisabled);
+                }
+
+                if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTimeOffset.UtcNow)
+                {
+                    return ApiResponse<AuthResult>.FailureWithCode(
+                        ErrorConstants.AuthMessage.AccountLocked,
+                        ErrorConstants.AuthCode.LockedOut,
+                        user.LockoutEnd);
+                }
+
+                if (!await _userManager.IsInRoleAsync(user, RoleConstants.PatientRole))
+                {
+                    return ApiResponse<AuthResult>.FailureWithCode(
+                        ErrorConstants.AuthMessage.GoogleNotPatient, ErrorConstants.AuthCode.GoogleNotPatient);
+                }
+
+                var existingLogins = await _userManager.GetLoginsAsync(user);
+                if (!existingLogins.Any(l => l.LoginProvider == GoogleLoginProvider && l.ProviderKey == payload.Subject))
+                {
+                    var addLogin = await _userManager.AddLoginAsync(
+                        user, new UserLoginInfo(GoogleLoginProvider, payload.Subject, GoogleLoginProvider));
+                    if (!addLogin.Succeeded)
+                    {
+                        var errors = addLogin.Errors.Select(e => e.Description).ToList();
+                        return ApiResponse<AuthResult>.FailureResult(ErrorConstants.AuthMessage.GoogleTokenInvalid, errors);
+                    }
+                }
+
+                if (!user.EmailConfirmed)
+                {
+                    user.EmailConfirmed = true;
+                    var confirmResult = await _userManager.UpdateAsync(user);
+                    if (!confirmResult.Succeeded)
+                    {
+                        var errors = confirmResult.Errors.Select(e => e.Description).ToList();
+                        return ApiResponse<AuthResult>.FailureResult(ErrorConstants.AuthMessage.GoogleTokenInvalid, errors);
+                    }
+                }
+            }
+            else
+            {
+                user = await CreatePatientFromGoogleAsync(payload, email);
+                if (user == null)
+                {
+                    return ApiResponse<AuthResult>.FailureResult(ErrorConstants.AuthMessage.GoogleTokenInvalid);
+                }
+            }
+
+            return await IssueAuthResultAsync(user);
+        }
+
+        private async Task<ApplicationUser?> CreatePatientFromGoogleAsync(GoogleIdTokenPayload payload, string email)
+        {
+            var fullName = ResolveGoogleDisplayName(payload.Name, email);
+            var user = new ApplicationUser
+            {
+                Id = Guid.NewGuid().ToString(),
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true,
+                PhoneNumber = null,
+                PhoneNumberConfirmed = false,
+                LockoutEnabled = true,
+                LockoutEnd = null,
+                CreatedAt = DateTimeOffset.UtcNow,
+                SecurityStamp = Guid.NewGuid().ToString()
+            };
+            user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, Guid.NewGuid().ToString("N"));
+
+            var createResult = await _userManager.CreateAsync(user);
+            if (!createResult.Succeeded)
+            {
+                _logger.LogWarning(
+                    "Google patient create failed: {Errors}",
+                    string.Join("; ", createResult.Errors.Select(e => e.Description)));
+                return null;
+            }
+
+            var roleResult = await _userManager.AddToRoleAsync(user, RoleConstants.PatientRole);
+            if (!roleResult.Succeeded)
+            {
+                _logger.LogWarning(
+                    "Google patient role failed: {Errors}",
+                    string.Join("; ", roleResult.Errors.Select(e => e.Description)));
+                return null;
+            }
+
+            var loginResult = await _userManager.AddLoginAsync(
+                user, new UserLoginInfo(GoogleLoginProvider, payload.Subject, GoogleLoginProvider));
+            if (!loginResult.Succeeded)
+            {
+                _logger.LogWarning(
+                    "Google patient external login failed: {Errors}",
+                    string.Join("; ", loginResult.Errors.Select(e => e.Description)));
+                return null;
+            }
+
+            user.Patient = new Patient
+            {
+                PatientCode = GeneratePatientCode(),
+                FullName = fullName,
+                Email = email,
+                PhoneNumber = null,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                _logger.LogWarning(
+                    "Google patient profile save failed: {Errors}",
+                    string.Join("; ", updateResult.Errors.Select(e => e.Description)));
+                return null;
+            }
+
+            return user;
+        }
+
+        private static string ResolveGoogleDisplayName(string? name, string email)
+        {
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return name.Trim();
+            }
+
+            var at = email.IndexOf('@');
+            return at > 0 ? email[..at] : email;
+        }
+
+        private async Task<ApiResponse<AuthResult>> IssueAuthResultAsync(ApplicationUser user)
+        {
             var now = DateTime.UtcNow;
             var accessTokenMinutes = _jwtSettings.ExpiresInMinutes > 0 ? _jwtSettings.ExpiresInMinutes : 60;
-
             var token = await _jwtTokenGenerator.GenerateTokenAsync(user);
             var refreshToken = _jwtTokenGenerator.GenerateRefreshToken();
 
@@ -511,7 +698,6 @@ namespace OZE.Application.Services
             {
                 UserId = user.Id,
                 RefreshToken = refreshToken,
-                //CreationDate = now,
                 ExpiryDate = now.AddDays(7)
             });
             await _refreshTokenRepository.SaveChangesAsync();
@@ -520,6 +706,7 @@ namespace OZE.Application.Services
                 await ToAuthResultAsync(user, token, refreshToken, now.AddMinutes(accessTokenMinutes)),
                 "Login successful");
         }
+
         private async Task<ApplicationUser?> FindUserByIdentifierAsync(string identifier)
         {
             if (identifier.Contains('@'))
