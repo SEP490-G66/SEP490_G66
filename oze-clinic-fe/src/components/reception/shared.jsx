@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import Modal from "@/components/ui/Modal";
-import { PRIORITY, clinicToday, findPatientsByKeyword, getAvailableSlots, getDoctorOptions, getPatient, rescheduleAppointment } from "@/services/receptionService";
-import { PRIORITY_LABEL, dmy, hhmm, slotText, useSubmit } from "./receptionUtils";
+import { PRIORITY, clinicToday, findPatientsByKeyword, getAppointments, getAvailableSlots, getDoctorOptions, getPatient, rescheduleAppointment } from "@/services/receptionService";
+import { PRIORITY_LABEL, STATUS_LABEL, dmy, hhmm, slotText, useSubmit } from "./receptionUtils";
 import { cx } from "@/utils/cx";
 import { PATIENT_RECORD_TEXT, RESCHEDULE_TEXT, WALK_IN_TEXT } from "@/utils/messages";
 import { genderOf, phoneDisplay, walkInName } from "@/utils/patientRecord";
@@ -354,6 +354,51 @@ export const CancelDialog = ({ appointment, onClose, onSubmit }) => {
     );
 };
 
+const FINISHED = ["CANCELLED", "NO_SHOW", "COMPLETED"];
+const IN_CLINIC = ["CHECKED_IN", "IN_SERVICE"];
+
+const walkInNotices = (appointments, today) => {
+    const open = appointments.filter((a) => !FINISHED.includes(a.status));
+    const todays = open.filter((a) => a.appointmentDate === today);
+    const inClinic = todays.find((a) => IN_CLINIC.includes(a.status));
+    if (inClinic) return { blocked: true, items: [{ tone: "alert-danger", text: WALK_IN_TEXT.NOTICE_IN_CLINIC(inClinic.queueNumber) }] };
+    const confirmed = todays.find((a) => a.status === "CONFIRMED");
+    if (confirmed) return { blocked: true, items: [{ tone: "alert-danger", text: WALK_IN_TEXT.NOTICE_CONFIRMED_TODAY(hhmm(confirmed.timeSlotStart)) }] };
+    return {
+        blocked: false,
+        items: [
+            ...todays.filter((a) => a.status === "PENDING").map((a) => ({ tone: "alert-warning", text: WALK_IN_TEXT.NOTICE_PENDING_TODAY(hhmm(a.timeSlotStart)) })),
+            ...open
+                .filter((a) => a.appointmentDate > today)
+                .map((a) => ({ tone: "alert-info", text: WALK_IN_TEXT.NOTICE_OTHER_DAY(dmy(a.appointmentDate), hhmm(a.timeSlotStart), STATUS_LABEL[a.status]?.[0] ?? a.status) })),
+        ],
+    };
+};
+
+const NO_NOTICES = { blocked: false, items: [] };
+
+const useWalkInNotices = (patientId) => {
+    const [state, setState] = useState({ patientId: null, value: NO_NOTICES });
+    useEffect(() => {
+        if (!patientId) return undefined;
+        const controller = new AbortController();
+        const today = clinicToday();
+        getAppointments({ patientId, fromDate: today, pageSize: 100 }, { skipErrorPage: true, signal: controller.signal }).then((result) => {
+            if (result.aborted || controller.signal.aborted) return;
+            setState({ patientId, value: result.success ? walkInNotices(result.data?.items ?? [], today) : NO_NOTICES });
+        });
+        return () => controller.abort();
+    }, [patientId]);
+    return patientId && state.patientId === patientId ? state.value : NO_NOTICES;
+};
+
+const WalkInNotices = ({ notices }) =>
+    notices.items.map((notice) => (
+        <p key={notice.text} role={notice.tone === "alert-danger" ? "alert" : "status"} className={cx("alert", notice.tone)}>
+            {notice.text}
+        </p>
+    ));
+
 const PatientWalkInDialog = ({ doctors, onClose, onSubmit, patient, doctorsStatus, onRetryDoctors }) => {
     const [doctorId, setDoctorId] = useState("");
     const [priority, setPriorityValue] = useState(PRIORITY.NORMAL);
@@ -374,6 +419,7 @@ const PatientWalkInDialog = ({ doctors, onClose, onSubmit, patient, doctorsStatu
         if (alert) alertRef.current?.focus();
     }, [alert]);
 
+    const notices = useWalkInNotices(patient?.id);
     const needsReason = priority > PRIORITY.NORMAL && !reason.trim();
     const chosenDoctor = !doctors.some((d) => String(d.id) === String(doctorId)) ? "" : doctorId;
     const doctorsReady = doctorsStatus === "ready";
@@ -437,6 +483,7 @@ const PatientWalkInDialog = ({ doctors, onClose, onSubmit, patient, doctorsStatu
                         </div>
                     ))}
                 </dl>
+                <WalkInNotices notices={notices} />
                 <div className="field">
                     <label className="label label-required" htmlFor="wi-doctor">
                         {PATIENT_RECORD_TEXT.DOCTOR_LABEL}
@@ -488,7 +535,7 @@ const PatientWalkInDialog = ({ doctors, onClose, onSubmit, patient, doctorsStatu
                     onClose={onClose}
                     submitLabel={PATIENT_RECORD_TEXT.WALK_IN_SUBMIT}
                     busy={sending}
-                    disabled={!doctorsReady || doctors.length === 0 || needsReason}
+                    disabled={!doctorsReady || doctors.length === 0 || needsReason || notices.blocked}
                     closeDisabled={sending}
                     closeLabel={PATIENT_RECORD_TEXT.CANCEL}
                 />
@@ -596,6 +643,7 @@ const NewWalkInDialog = ({ doctors, waiting, onClose, onSubmit }) => {
     const [busy, submit] = useSubmit(onSubmit);
     const lookupRef = useRef(0);
 
+    const notices = useWalkInNotices(found?.id);
     const female = gender === "Female";
     const conditionOptions = female ? [...T.CONDITION_OPTIONS(), ...T.FEMALE_OPTIONS()] : T.CONDITION_OPTIONS();
     const counted = Array.isArray(waiting);
@@ -640,7 +688,7 @@ const NewWalkInDialog = ({ doctors, waiting, onClose, onSubmit }) => {
     const handleSubmit = (event) => {
         event.preventDefault();
         setTried(true);
-        if (Object.values(errors).some(Boolean)) return;
+        if (Object.values(errors).some(Boolean) || notices.blocked) return;
         submit({
             fullName: found ? found.fullName : fullName.trim(),
             phoneNumber: phone.replace(/\s/g, ""),
@@ -691,6 +739,7 @@ const NewWalkInDialog = ({ doctors, waiting, onClose, onSubmit }) => {
                                         {show("phone") ? T.ERR_PHONE : found ? T.PHONE_FOUND(found.fullName, found.patientCode) : found === false ? T.PHONE_NEW : T.PHONE_HINT}
                                     </p>
                                 </div>
+                                {found && <WalkInNotices notices={notices} />}
                                 {found ? (
                                     <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 rounded-lg bg-surface-muted px-3 py-2 text-body-sm">
                                         <dt className="text-muted">{T.FULL_NAME}</dt>
@@ -902,7 +951,7 @@ const NewWalkInDialog = ({ doctors, waiting, onClose, onSubmit }) => {
                         </Section>
                     </div>
                 </div>
-                <DialogActions onClose={onClose} closeLabel={T.CANCEL} submitLabel={T.SUBMIT} busy={busy} closeDisabled={busy} disabled={doctors.length === 0} />
+                <DialogActions onClose={onClose} closeLabel={T.CANCEL} submitLabel={T.SUBMIT} busy={busy} closeDisabled={busy} disabled={doctors.length === 0 || notices.blocked} />
             </form>
         </Modal>
     );

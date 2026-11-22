@@ -1,44 +1,55 @@
 import { FOLLOW_UP_TEXT as TEXT } from "./messages";
-import { addDays, ddmm, weekdayIndex } from "./calendar";
+import { addDays } from "./calendar";
 
 export const FOLLOW_UP_PAGE_SIZE = 10;
 
-export const EMPTY_FILTERS = { keyword: "", due: "", status: "", doctorId: "", page: 1 };
+export const REMIND_LOCK_MS = 4 * 60 * 60 * 1000;
 
-const CONTACT_STATUS = { none: "None", noanswer: "Unreachable", callback: "CallBack", booked: "Booked" };
+export const EMPTY_FILTERS = { keyword: "", due: "", state: "need", doctorId: "", page: 1 };
 
-export const OUTCOME_OF_CHOICE = { noanswer: "Unreachable", callback: "CallBack" };
-
-export const STATUS_CHIPS = {
-    none: [TEXT.STATUS_OPTIONS.none, "badge-neutral"],
-    noanswer: [TEXT.STATUS_OPTIONS.noanswer, "badge-danger"],
-    callback: [TEXT.STATUS_OPTIONS.callback, "badge-info"],
-    booked: [TEXT.STATUS_OPTIONS.booked, "badge-success"],
+export const STATE_CHIPS = {
+    PENDING: [TEXT.STATE_OPTIONS.PENDING, "badge-warning"],
+    CONFIRMED: [TEXT.STATE_OPTIONS.CONFIRMED, "badge-success"],
+    NONE: [TEXT.STATE_OPTIONS.NONE, "badge-neutral"],
+    MISSED: [TEXT.STATE_OPTIONS.MISSED, "badge-danger"],
+    ARRIVED: [TEXT.ARRIVED, "badge-info"],
+    DONE: [TEXT.STATE_OPTIONS.DONE, "badge-success"],
 };
 
-export const shortDay = (key) => `${TEXT.WEEKDAYS_SHORT[weekdayIndex(key)]} ${ddmm(key)}`;
-
-export const isSunday = (key) => weekdayIndex(key) === 6;
-
 export const followUpQuery = (filters, today) => {
-    const query = { keyword: filters.keyword.trim(), doctorId: filters.doctorId, page: filters.page, pageSize: FOLLOW_UP_PAGE_SIZE };
-    if (filters.due === "late") query.toDate = addDays(today, -1);
+    const query = { keyword: filters.keyword.trim(), doctorId: filters.doctorId, state: filters.state, page: filters.page, pageSize: FOLLOW_UP_PAGE_SIZE };
     if (filters.due === "today") Object.assign(query, { fromDate: today, toDate: today });
-    if (filters.due === "week") Object.assign(query, { fromDate: addDays(today, 1), toDate: addDays(today, 7) });
-    if (filters.status) {
-        query.contactStatus = CONTACT_STATUS[filters.status];
-        query.hasAppointment = filters.status === "booked";
-    }
+    if (filters.due === "week") Object.assign(query, { fromDate: today, toDate: addDays(today, 7) });
     return query;
 };
 
-export const hasBooking = (item) => Boolean(item.followUpAppointmentId) && !["CANCELLED", "NO_SHOW"].includes(item.followUpAppointmentStatus);
-
-export const contactStatusOf = (item) => {
-    if (hasBooking(item)) return "booked";
-    if (item.lastContactOutcome === "Unreachable") return "noanswer";
-    if (item.lastContactOutcome === "CallBack") return "callback";
-    return "none";
+export const rowState = (item, today) => {
+    const status = item.followUpAppointmentId ? item.followUpAppointmentStatus : null;
+    if (status === "CHECKED_IN" || status === "IN_SERVICE") return "ARRIVED";
+    if (status === "COMPLETED") return "DONE";
+    if (status === "CONFIRMED") return "CONFIRMED";
+    if (status === "PENDING") return item.followUpAppointmentDate >= today ? "PENDING" : "MISSED";
+    if (status === "NO_SHOW") return "MISSED";
+    return item.followUpDate && item.followUpDate >= today ? "NONE" : "MISSED";
 };
 
-export const isFiltered = (filters) => Boolean(filters.keyword.trim() || filters.due || filters.status || filters.doctorId);
+export const hasLiveAppointment = (state) => state === "PENDING" || state === "CONFIRMED";
+
+const usesAppointment = (item, state) => Boolean(item.followUpAppointmentId) && item.followUpAppointmentStatus !== "CANCELLED" && state !== "NONE";
+
+export const doctorOf = (item, state) => (usesAppointment(item, state) && item.followUpDoctorName) || item.doctorName;
+
+export const dueDateOf = (item, state) => (usesAppointment(item, state) ? item.followUpAppointmentDate : item.followUpDate);
+
+export const slotOf = (item, state) => (usesAppointment(item, state) ? item.followUpTimeSlotStart : null);
+
+export const remindUnlockAt = (item, now = Date.now()) => {
+    if (!item.lastRemindedAt) return null;
+    const until = new Date(item.lastRemindedAt).getTime() + REMIND_LOCK_MS;
+    return until > now ? new Date(until).toISOString() : null;
+};
+
+export const isFiltered = (filters) => Boolean(filters.keyword.trim() || filters.due || filters.state !== EMPTY_FILTERS.state || filters.doctorId);
+
+export const remindedText = (item, last) =>
+    item.reminderCount ? [TEXT.REMIND_COUNT(item.reminderCount), last && TEXT.REMIND_LAST(last.day, last.time)].filter(Boolean).join(" · ") : TEXT.NOT_REMINDED;

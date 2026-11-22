@@ -14,8 +14,6 @@ export const weekdayIndex = (key) => (fromKey(key).getUTCDay() + 6) % 7;
 
 export const mondayOf = (key) => addDays(key, -weekdayIndex(key));
 
-export const isSunday = (key) => weekdayIndex(key) === 6;
-
 export const ddmm = (key) => (key ? `${key.slice(8, 10)}/${key.slice(5, 7)}` : "");
 
 export const dmy = (key) => (key ? `${ddmm(key)}/${key.slice(0, 4)}` : "");

@@ -1,5 +1,6 @@
 import axios from "axios";
 import api from "./api";
+import { APPOINTMENT_ERROR_TEXT } from "@/utils/messages";
 
 // Receptionist workspace calls to oze-clinic-be. Every call returns the ApiResponse body
 // ({ success, message, data, errors }); a business error from the server comes back as success: false.
@@ -9,6 +10,12 @@ export const clinicToday = (offsetDays = 0) => {
     const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" })
         .format(new Date(Date.now() + offsetDays * 86_400_000));
     return parts;
+};
+
+export const appointmentErrorText = (result, fallback) => {
+    const message = String(result?.message ?? "").toLowerCase();
+    const hit = APPOINTMENT_ERROR_TEXT.find(([key]) => message.includes(key));
+    return hit ? hit[1] : (fallback ?? result?.message);
 };
 
 export const PRIORITY = { NORMAL: 0, HIGH: 1, URGENT: 2 };
@@ -44,8 +51,18 @@ export const call = async (request) => {
 };
 
 // ----- appointments (M3, M4) -----
-export const getTodayAppointments = (config = {}) =>
-    call(() => api.get("/api/appointments", { ...config, params: { date: clinicToday(), pageSize: 100 } }));
+const TODAY_PAGE_LIMIT = 20;
+
+export const getTodayAppointments = async (config = {}) => {
+    const items = [];
+    for (let page = 1; page <= TODAY_PAGE_LIMIT; page += 1) {
+        const result = await call(() => api.get("/api/appointments", { ...config, params: { date: clinicToday(), pageNumber: page, pageSize: 100 } }));
+        if (!result.success) return result;
+        items.push(...(result.data?.items ?? []));
+        if (page >= Number(result.data?.totalPages ?? 1)) return { ...result, data: { ...result.data, items } };
+    }
+    return { success: true, data: { items } };
+};
 
 export const confirmAppointment = (id) => call(() => api.post(`/api/appointments/${id}/confirm`));
 
@@ -55,7 +72,10 @@ export const cancelAppointment = (id, reason) => call(() => api.post(`/api/appoi
 
 export const markNoShow = (id, reason) => call(() => api.post(`/api/appointments/${id}/no-show`, { reason: reason || null }));
 
-export const createWalkIn = (request, config = {}) => call(() => api.post("/api/appointments/walk-in", request, config));
+export const createWalkIn = async (request, config = {}) => {
+    const result = await call(() => api.post("/api/appointments/walk-in", request, config));
+    return result.success ? result : { ...result, message: appointmentErrorText(result) };
+};
 
 export const findPatientsByKeyword = (keyword) =>
     call(() => api.get("/api/patients", { params: { searchKeyword: keyword, pageSize: 5 } }));
@@ -120,11 +140,21 @@ export const getDoctorsOnDuty = (date = clinicToday(), config = {}) =>
 
 // ----- lists for the receptionist pages -----
 // Appointments of a date range (or one date), newest filters on the server; pageSize up to 100
-export const getAppointments = ({ fromDate, toDate, date, doctorId, status, keyword, page, pageSize = 100 } = {}, config = {}) =>
+export const getAppointments = ({ fromDate, toDate, date, doctorId, patientId, status, keyword, page, pageSize = 100 } = {}, config = {}) =>
     call(() =>
         api.get("/api/appointments", {
             ...config,
-            params: { fromDate, toDate, date, doctorId: doctorId || undefined, status: status || undefined, searchKeyword: keyword || undefined, pageNumber: page, pageSize },
+            params: {
+                fromDate,
+                toDate,
+                date,
+                doctorId: doctorId || undefined,
+                patientId: patientId || undefined,
+                status: status || undefined,
+                searchKeyword: keyword || undefined,
+                pageNumber: page,
+                pageSize,
+            },
         }),
     );
 
@@ -206,7 +236,7 @@ export const remindPayment = (invoiceId, force = false) => call(() => api.post(`
 export const getPaymentReminders = (invoiceId) => call(() => api.get(`/api/debts/${invoiceId}/reminders`));
 
 // ----- follow-up care -----
-export const getFollowUpList = ({ fromDate, toDate, hasAppointment, keyword, doctorId, contactStatus, page, pageSize = 100 }, config = {}) =>
+export const getFollowUpList = ({ fromDate, toDate, hasAppointment, keyword, doctorId, state, page, pageSize = 100 }, config = {}) =>
     call(() =>
         api.get("/api/examinations/follow-ups", {
             ...config,
@@ -216,7 +246,7 @@ export const getFollowUpList = ({ fromDate, toDate, hasAppointment, keyword, doc
                 hasAppointment,
                 searchKeyword: keyword || undefined,
                 doctorId: doctorId || undefined,
-                contactStatus: contactStatus || undefined,
+                state: state || undefined,
                 pageNumber: page,
                 pageSize,
             },

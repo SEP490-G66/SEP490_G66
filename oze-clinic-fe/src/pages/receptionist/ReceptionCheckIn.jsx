@@ -8,7 +8,7 @@ import RowActions from "@/components/reception-dashboard/RowActions";
 import CheckInDialog from "@/components/reception/CheckInDialog";
 import ServiceCell from "@/components/reception/ServiceCell";
 import { Card, CancelDialog, RescheduleDialog, WalkInDialog } from "@/components/reception/shared";
-import { phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
+import { clinicClock, clockOf, phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
     cancelAppointment,
@@ -27,6 +27,7 @@ import {
     appointmentMenu,
     isDoctorAway,
     isFilteredCheckIn,
+    isLate,
     matchesKeyword,
     serviceNames,
     slotOf,
@@ -42,6 +43,7 @@ const READ = { skipErrorPage: true };
 const DONE_STATES = ["checkedin", "serving", "done", "noshow", "cancelled"];
 const STATUS_OPTIONS = [["", TEXT.ALL_STATUSES], ...STATE_ORDER.map((key) => [key, TEXT.STATES[key][0]])];
 const WIDTHS = ["120px", "", "136px", "180px", "", "150px", "150px"];
+const REFRESH_MS = 20_000;
 
 const ReceptionCheckIn = () => {
     const { state: navState } = useLocation();
@@ -63,7 +65,7 @@ const ReceptionCheckIn = () => {
         let active = true;
         Promise.all([getTodayAppointments(READ), getWaitingList(READ)]).then(([today, queue]) => {
             if (!active) return;
-            setResult({ ok: today.success, items: today.success ? (today.data?.items ?? []) : [] });
+            setResult((prev) => (today.success ? { ok: true, items: today.data?.items ?? [], at: new Date().toISOString() } : { ok: false, items: prev?.items ?? [], at: prev?.at ?? null }));
             setWaiting(queue.success && Array.isArray(queue.data) ? queue.data : null);
         });
         return () => {
@@ -82,6 +84,12 @@ const ReceptionCheckIn = () => {
     }, []);
 
     const reload = useCallback(() => setVersion((v) => v + 1), []);
+
+    useEffect(() => {
+        if (dialog) return undefined;
+        const timer = setInterval(reload, REFRESH_MS);
+        return () => clearInterval(timer);
+    }, [dialog, reload]);
     // request: a function, so a second click while one is running sends nothing
     const act = async (request, successText, next) => {
         if (acting.current) return;
@@ -109,6 +117,7 @@ const ReceptionCheckIn = () => {
 
     const appointments = (result?.items ?? []).filter((a) => a.status !== "PENDING");
     const pendingCount = appointments.filter((a) => stateOf(a) === "notyet").length;
+    const now = clinicClock();
     const checkedInText = (a) => (data) => TEXT.CHECKED_IN(a.patientName, data.queueNumber, data.roomName);
     const startCheckIn = (a) => {
         if (isDoctorAway(a, doctors, doctorsLoaded)) setDialog({ type: "checkIn", item: a });
@@ -187,6 +196,7 @@ const ReceptionCheckIn = () => {
                                 <tr key={a.id} className={cx(done && "text-muted")}>
                                     <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
                                         <span className={done ? "text-muted" : "font-semibold text-ink"}>{slotOf(a) || TEXT.WALK_IN_SLOT}</span>
+                                        {isLate(a, now) && <small className="block font-normal text-caption text-warning">{TEXT.LATE}</small>}
                                     </td>
                                     <td data-primary>
                                         <span className={cx("cell-primary block", done && "font-normal text-body", state === "cancelled" && "line-through")}>{a.patientName}</span>
@@ -310,6 +320,7 @@ const ReceptionCheckIn = () => {
             <Card>
                 {body()}
                 {footer}
+                {result?.at && <p className="px-4 pb-3 text-caption text-muted">{TEXT.UPDATED_AT(clockOf(result.at))}</p>}
             </Card>
 
             {dialog?.type === "checkIn" && (

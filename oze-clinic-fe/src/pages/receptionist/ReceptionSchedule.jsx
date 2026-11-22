@@ -10,12 +10,14 @@ import { clinicClock } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import { clinicToday, getAppointmentsInRange, getAvailableSlots, getBookableServices, getDoctorOptions, getDoctorsOnDuty } from "@/services/receptionService";
 import { addDays, ddmm, dmy, hhmm, mondayOf, weekdayIndex } from "@/utils/calendar";
-import { CELL_DOT, CELL_KEYS, LEGEND, breakBefore, cellKeyOf, currentRow, hasService, rowOf, scheduleRows, slotLabel, slotPhase, slotStep } from "@/utils/appointmentSchedule";
+import { CELL_DOT, CELL_KEYS, breakBefore, cellKeyOf, currentRow, hasService, isLiveAppointment, legendGroups, rowOf, scheduleRows, slotLabel, slotPhase, slotStep } from "@/utils/appointmentSchedule";
 import { SCHEDULE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
+const CLOCK_TICK_MS = 60_000;
+const LEGEND_TITLES = { past: TEXT.LEGEND_PAST, today: TEXT.LEGEND_TODAY, future: TEXT.LEGEND_FUTURE };
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
 const TOO_FAR = "too far in advance";
 
@@ -48,6 +50,11 @@ const ReceptionSchedule = () => {
     const [booking, setBooking] = useState(null);
 
     usePageTitle(TEXT.DOC_TITLE);
+
+    useEffect(() => {
+        const timer = setInterval(() => setClock({ today: clinicToday(), now: clinicClock() }), CLOCK_TICK_MS);
+        return () => clearInterval(timer);
+    }, []);
 
     const requestKey = `${week}|${doctorId}|${reload}`;
 
@@ -90,6 +97,7 @@ const ReceptionSchedule = () => {
     const current = result?.key === requestKey ? result : null;
     const booked = (current?.items ?? result?.items ?? []).filter((a) => a.timeSlotStart);
     const appointments = booked.filter((a) => hasService(a, serviceId));
+    const legend = legendGroups(appointments, today);
     const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
     const dayInfo = current?.days ?? result?.days ?? {};
     const free = Object.values(dayInfo).flatMap((d) => (d.state === "ok" ? d.slots.map(hhmm) : []));
@@ -132,20 +140,25 @@ const ReceptionSchedule = () => {
             closed ? "bg-surface-tint" : day === today && "bg-primary-softer",
             !closed && day === today && phase === "now" && "bg-warning-soft",
         );
+        const slotStart = column === "open" && phase === "future" && !items.some(isLiveAppointment) ? freeSlotAt(day, time) : null;
+        const addButton = (className) =>
+            slotStart && (
+                <button
+                    type="button"
+                    aria-label={TEXT.ADD_LABEL(dayName(day), hhmm(slotStart))}
+                    onClick={() => setBooking({ date: day, slotStart, doctorId: doctorId ? Number(doctorId) : null })}
+                    className={cx(
+                        "grid w-full place-items-center rounded-lg border border-dashed text-title hover:border-border-strong hover:bg-canvas hover:text-primary focus-visible:border-border-strong focus-visible:text-primary",
+                        className,
+                    )}
+                >
+                    +
+                </button>
+            );
         if (!items.length) {
-            const slotStart = column === "open" && phase === "future" ? freeSlotAt(day, time) : null;
             return (
                 <td key={day} className={tdClass}>
-                    {slotStart && (
-                        <button
-                            type="button"
-                            aria-label={TEXT.ADD_LABEL(dayName(day), hhmm(slotStart))}
-                            onClick={() => setBooking({ date: day, slotStart, doctorId: doctorId ? Number(doctorId) : null })}
-                            className="grid h-full min-h-12 w-full place-items-center rounded-lg border border-dashed border-transparent text-title text-transparent hover:border-border-strong hover:bg-canvas hover:text-primary focus-visible:border-border-strong focus-visible:text-primary"
-                        >
-                            +
-                        </button>
-                    )}
+                    {addButton("h-full min-h-12 border-transparent text-transparent")}
                 </td>
             );
         }
@@ -181,6 +194,7 @@ const ReceptionSchedule = () => {
                 >
                     {lines}
                 </button>
+                {addButton("mt-1 h-7 border-border text-muted")}
             </td>
         );
     };
@@ -281,23 +295,21 @@ const ReceptionSchedule = () => {
                         </tbody>
                     </table>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3 text-caption text-muted">
-                    {[
-                        [TEXT.LEGEND_PAST, LEGEND.past],
-                        [TEXT.LEGEND_TODAY, LEGEND.today],
-                        [TEXT.LEGEND_FUTURE, LEGEND.future],
-                    ].map(([title, keys]) => (
-                        <span key={title} className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
-                            <b className="font-semibold text-ink">{title}</b>
-                            {keys.map((key) => (
-                                <span key={key} className="inline-flex items-center gap-1.5">
-                                    <i aria-hidden className={cx("size-2 rounded-full", CELL_DOT[key])} />
-                                    {TEXT.STATUS[key]}
-                                </span>
-                            ))}
-                        </span>
-                    ))}
-                </div>
+                {legend.length > 0 && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3 text-caption text-muted">
+                        {legend.map(([group, keys]) => (
+                            <span key={group} className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
+                                <b className="font-semibold text-ink">{LEGEND_TITLES[group]}</b>
+                                {keys.map((key) => (
+                                    <span key={key} className="inline-flex items-center gap-1.5">
+                                        <i aria-hidden className={cx("size-2 rounded-full", CELL_DOT[key])} />
+                                        {TEXT.STATUS[key]}
+                                    </span>
+                                ))}
+                            </span>
+                        ))}
+                    </div>
+                )}
             </Card>
             {booking && (
                 <BookingDialog

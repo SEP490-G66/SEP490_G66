@@ -35,6 +35,7 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
     const { value: draft, setValue: setDraft, statusText, saveNow } = useAutosave((value) => saveTreatmentDraft(queueId, value), initialDraft, onTreatmentChange);
     const [dialog, setDialog] = useState(null); // { type: "add" | "edit" | "delete", item? }
     const [working, setWorking] = useState(false); // while "Chuyển sang Đơn thuốc" runs
+    const [pickerKey, setPickerKey] = useState(0);
 
     const setItems = (items) => setDraft({ ...draft, items });
 
@@ -65,6 +66,10 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
         setWorking(false);
         if (!response.success) {
             toast.error(response.message ?? GENERIC_ERROR_MESSAGE);
+            if (response.followUpFailed) {
+                setDraft({ ...draft, followUp: null });
+                setPickerKey((n) => n + 1);
+            }
             return;
         }
         onPlanChange(response.data);
@@ -120,7 +125,16 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
             />
             <TreatmentNoteCard value={draft.note} onChange={(note) => setDraft({ ...draft, note })} />
             <SessionInvoiceCard items={draft.items} />
-            {isLastSession && <FollowUpCard value={draft.followUpDate} today={getClinicToday()} onChange={(followUpDate) => setDraft({ ...draft, followUpDate })} />}
+            {isLastSession && (
+                <FollowUpCard
+                    key={pickerKey}
+                    value={draft.followUp}
+                    booked={record.followUp}
+                    doctor={record.doctor}
+                    today={getClinicToday()}
+                    onChange={(followUp) => setDraft({ ...draft, followUp })}
+                />
+            )}
             <StepActionBar status={statusText}>
                 <button type="button" className="btn btn-secondary" disabled={disabled} onClick={saveDraft}>
                     Lưu nháp
