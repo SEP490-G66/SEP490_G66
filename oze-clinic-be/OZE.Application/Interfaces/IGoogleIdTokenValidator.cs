@@ -12,5 +12,8 @@ namespace OZE.Application.Interfaces
     {
         /// <summary>Validates a Google ID token and returns claims, or null when invalid/misconfigured.</summary>
         Task<GoogleIdTokenPayload?> ValidateAsync(string idToken, CancellationToken cancellationToken = default);
+
+        /// <summary>Resolves profile claims from a Google OAuth access token via userinfo, or null when invalid.</summary>
+        Task<GoogleIdTokenPayload?> ResolveAccessTokenAsync(string accessToken, CancellationToken cancellationToken = default);
     }
 }

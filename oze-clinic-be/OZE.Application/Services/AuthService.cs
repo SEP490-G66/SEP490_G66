@@ -520,7 +520,7 @@ namespace OZE.Application.Services
                     ErrorConstants.AuthMessage.GoogleNotConfigured, ErrorConstants.AuthCode.GoogleNotConfigured);
             }
 
-            var payload = await _googleIdTokenValidator.ValidateAsync(request.IdToken);
+            var payload = await ResolveGooglePayloadAsync(request);
             if (payload == null)
             {
                 return ApiResponse<AuthResult>.FailureWithCode(
@@ -607,6 +607,21 @@ namespace OZE.Application.Services
             }
 
             return await IssueAuthResultAsync(user);
+        }
+
+        private async Task<GoogleIdTokenPayload?> ResolveGooglePayloadAsync(GoogleLoginRequest request)
+        {
+            if (!string.IsNullOrWhiteSpace(request.IdToken))
+            {
+                return await _googleIdTokenValidator.ValidateAsync(request.IdToken);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.AccessToken))
+            {
+                return await _googleIdTokenValidator.ResolveAccessTokenAsync(request.AccessToken);
+            }
+
+            return null;
         }
 
         private async Task<ApplicationUser?> CreatePatientFromGoogleAsync(GoogleIdTokenPayload payload, string email)
