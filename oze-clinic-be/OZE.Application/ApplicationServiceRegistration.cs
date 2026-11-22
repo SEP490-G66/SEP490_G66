@@ -121,6 +121,7 @@ namespace OZE.Application
             services.AddHostedService<OZE.Application.BackgroundServices.FollowUpReminderBackgroundService>();
             services.AddHostedService<OZE.Application.BackgroundServices.PaymentReminderBackgroundService>();
             services.AddHostedService<OZE.Application.BackgroundServices.AppointmentReminderBackgroundService>();
+            services.AddHostedService<OZE.Application.BackgroundServices.PendingNoShowBackgroundService>();
             return services;
         }
     }

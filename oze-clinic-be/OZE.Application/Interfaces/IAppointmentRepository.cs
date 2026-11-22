@@ -46,6 +46,8 @@ namespace OZE.Application.Interfaces
         Task<bool> HasAppointmentInServiceAsync(int doctorId, DateOnly date);
         // True when the patient has an appointment of today or later that is not finished yet
         Task<bool> HasUnfinishedAppointmentAsync(int patientId, long? excludeAppointmentId = null);
+        Task<List<Appointment>> GetPatientAppointmentsOnDateAsync(int patientId, DateOnly date);
+        Task<List<long>> MarkPastPendingAsNoShowAsync(DateOnly today, CancellationToken cancellationToken = default);
         Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default);
         Task UpdateAsync(Appointment appointment);
 

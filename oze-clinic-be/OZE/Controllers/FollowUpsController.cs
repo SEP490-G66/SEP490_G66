@@ -47,7 +47,10 @@ namespace OZE.Controllers
         public async Task<ActionResult<ApiResponse<AppointmentResponse>>> ScheduleFollowUpAsync(
             long id, [FromBody] ScheduleFollowUpRequest request, CancellationToken cancellationToken)
         {
-            var result = await _examinationService.ScheduleFollowUpAppointmentAsync(CurrentUserId ?? string.Empty, id, request, cancellationToken);
+            // A follow-up set by the doctor waits for the receptionist to confirm it with the patient
+            var result = IsInRole(RoleConstants.DoctorRole)
+                ? await _examinationService.ScheduleFollowUpAppointmentByDoctorAsync(CurrentUserId ?? string.Empty, id, request, cancellationToken)
+                : await _examinationService.ScheduleFollowUpAppointmentAsync(CurrentUserId ?? string.Empty, id, request, cancellationToken);
             return Ok(ApiResponse<AppointmentResponse>.SuccessResult(result, "Follow-up appointment scheduled successfully"));
         }
 

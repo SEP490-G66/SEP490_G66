@@ -315,7 +315,10 @@ namespace OZE.Controllers
             [FromBody] ScheduleFollowUpRequest request,
             CancellationToken cancellationToken)
         {
-            var result = await _appointmentService.ScheduleFollowUpAsync(id, request, CurrentUserId ?? string.Empty, cancellationToken);
+            // A follow-up set by the doctor waits for the receptionist to confirm it with the patient
+            var result = IsInRole(RoleConstants.DoctorRole)
+                ? await _appointmentService.ScheduleFollowUpByDoctorAsync(id, request, CurrentUserId ?? string.Empty, cancellationToken)
+                : await _appointmentService.ScheduleFollowUpAsync(id, request, CurrentUserId ?? string.Empty, cancellationToken);
             return Ok(ApiResponse<AppointmentResponse>.SuccessResult(result, "Follow-up appointment scheduled successfully"));
         }
 

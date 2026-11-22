@@ -6,6 +6,7 @@ namespace OZE.Common.Constants
         public const string AppointmentCreated = "APPOINTMENT_CREATED";
         public const string AppointmentConfirmed = "APPOINTMENT_CONFIRMED";
         public const string AppointmentCancelled = "APPOINTMENT_CANCELLED";
+        public const string AppointmentAutoNoShow = "APPOINTMENT_AUTO_NO_SHOW";
         public const string AppointmentCheckedIn = "APPOINTMENT_CHECKED_IN";
         public const string AppointmentRescheduled = "APPOINTMENT_RESCHEDULED";
         public const string AppointmentPriorityChanged = "APPOINTMENT_PRIORITY_CHANGED";

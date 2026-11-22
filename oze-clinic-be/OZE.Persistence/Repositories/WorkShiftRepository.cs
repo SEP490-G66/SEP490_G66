@@ -102,14 +102,14 @@ namespace OZE.Persistence.Repositories
 
         public async Task<bool> HasBookedAppointmentsAsync(int staffProfileId, DateOnly scheduleDate, TimeOnly shiftStart, TimeOnly shiftEnd)
         {
-            // An appointment belongs to the shift when its time slot overlaps the shift time
+            // An appointment holds one slot, so it belongs to the shift its start time falls in
             return await context.Appointments.AnyAsync(x =>
                 x.DoctorId == staffProfileId
                 && x.AppointmentDate == scheduleDate
                 && x.Status != AppointmentConstants.CancelledStatus
                 && x.Status != AppointmentConstants.NoShowStatus
-                && x.TimeSlotStart < shiftEnd
-                && shiftStart < x.TimeSlotEnd);
+                && shiftStart <= x.TimeSlotStart
+                && x.TimeSlotStart < shiftEnd);
         }
 
         public async Task<List<StaffSchedule>> GetDoctorShiftsOnDateAsync(DateOnly date)

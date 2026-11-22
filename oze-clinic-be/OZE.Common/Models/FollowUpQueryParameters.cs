@@ -9,6 +9,9 @@ namespace OZE.Common.Models
         public int? DoctorId { get; set; }
         // true: only follow-ups that have an appointment scheduled; false: only those without an appointment scheduled; null: all
         public bool? HasAppointment { get; set; }
+        // need (PENDING + CONFIRMED + NONE), PENDING, CONFIRMED, NONE (no booked time yet), MISSED (the day passed unconfirmed or NO_SHOW),
+        // DONE (arrived or completed); empty: all
+        public string? State { get; set; }
         // Also list follow-ups the patient declined (hidden by default)
         public bool IncludeClosed { get; set; }
         public string? SearchKeyword { get; set; }
