@@ -55,9 +55,10 @@ export const signIn = async ({ identifier, password }) => {
     }
 };
 
-export const signInWithGoogle = async (idToken) => {
+export const signInWithGoogle = async ({ idToken, accessToken } = {}) => {
     try {
-        const response = await api.post("/api/Auth/google-login", { idToken }, AUTH_REQUEST_CONFIG);
+        const body = idToken ? { idToken } : { accessToken };
+        const response = await api.post("/api/Auth/google-login", body, AUTH_REQUEST_CONFIG);
         return completeSignIn(response.data);
     } catch (error) {
         return loginFailure(error.response?.data?.code);

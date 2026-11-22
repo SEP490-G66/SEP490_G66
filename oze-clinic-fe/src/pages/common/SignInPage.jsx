@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { GoogleLogin } from "@react-oauth/google";
 import { toast } from "react-toastify";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import Card from "@/components/ui/Card";
 import { signIn, signInWithGoogle } from "../../services/authService";
 import { GOOGLE_LOGIN_MESSAGES, USER_ROLES } from "../../utils/messages";
@@ -87,24 +87,22 @@ const SignInPage = () => {
         }
     };
 
-    const handleGoogleSuccess = async (credentialResponse) => {
-        if (loading) return;
-        const idToken = credentialResponse?.credential;
-        if (!idToken) {
-            toast.error(GOOGLE_LOGIN_MESSAGES.TOKEN_INVALID);
+    const finishGoogleSignIn = async (result) => {
+        if (result.success) {
+            toast.success("Đăng nhập thành công!");
+            toast.info(GOOGLE_LOGIN_MESSAGES.ADD_PHONE_HINT);
+            navigateAfterSignIn(result.data.role);
             return;
         }
+        toast.error(result.message);
+    };
 
+    const handleGoogleAccessToken = async (accessToken) => {
+        if (loading) return;
         setLoading(true);
         try {
-            const result = await signInWithGoogle(idToken);
-            if (result.success) {
-                toast.success("Đăng nhập thành công!");
-                toast.info(GOOGLE_LOGIN_MESSAGES.ADD_PHONE_HINT);
-                navigateAfterSignIn(result.data.role);
-                return;
-            }
-            toast.error(result.message);
+            const result = await signInWithGoogle({ accessToken });
+            await finishGoogleSignIn(result);
         } finally {
             setLoading(false);
         }
@@ -196,21 +194,11 @@ const SignInPage = () => {
                 <p className="my-4 text-center text-body-sm text-muted">hoặc</p>
 
                 {GOOGLE_CLIENT_ID ? (
-                    // Do not use overflow-hidden here: Google's personalized "Sign in as …" button
-                    // opens an account picker that gets clipped / swallows clicks when the parent clips.
-                    <div className="flex w-full justify-center">
-                        <GoogleLogin
-                            onSuccess={handleGoogleSuccess}
-                            onError={() => toast.error(GOOGLE_LOGIN_MESSAGES.TOKEN_INVALID)}
-                            theme="outline"
-                            size="large"
-                            text="signin_with"
-                            shape="rectangular"
-                            width="380"
-                            locale="vi"
-                            useOneTap={false}
-                        />
-                    </div>
+                    <GoogleSignInButton
+                        disabled={loading}
+                        onAccessToken={handleGoogleAccessToken}
+                        onError={() => toast.error(GOOGLE_LOGIN_MESSAGES.TOKEN_INVALID)}
+                    />
                 ) : (
                     <button type="button" className="btn btn-secondary btn-lg w-full" onClick={handleGoogleNotConfigured}>
                         Đăng nhập bằng Google
