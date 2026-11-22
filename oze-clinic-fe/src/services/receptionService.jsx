@@ -171,9 +171,6 @@ export const getAppointmentsInRange = async ({ fromDate, toDate, doctorId } = {}
     return { success: true, items };
 };
 
-export const recordConfirmCall = (id, { outcome, callBackDate, callBackTime }, config = {}) =>
-    call(() => api.post(`/api/appointments/${id}/confirm-call`, { outcome, callBackDate, callBackTime }, config));
-
 export const getInvoice = (id, config = {}) => call(() => api.get(`/api/invoices/${id}`, config));
 
 export const rejectPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/reject`));
