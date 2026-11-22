@@ -94,15 +94,23 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.OnlyOpenCanBeCancelled);
         }
 
-        // UTCID06 (A): a patient cannot cancel a confirmed appointment online
+        // UTCID06 (N): a patient can cancel a confirmed appointment online before the cutoff
         [Fact]
-        public async Task CancelAppointmentAsync_ShouldThrow_WhenPatientCancelsConfirmed()
+        public async Task CancelAppointmentAsync_ShouldCancel_WhenPatientCancelsConfirmed()
         {
-            Existing(AppointmentConstants.ConfirmedStatus, Today.AddDays(5));
+            var appointment = Existing(AppointmentConstants.ConfirmedStatus, Today.AddDays(5));
 
-            var act = () => _service.CancelAppointmentAsync(Id, Reason(), _patient.UserId, _patient.UserId);
+            var result = await _service.CancelAppointmentAsync(Id, Reason(), _patient.UserId, _patient.UserId);
 
-            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.ConfirmedNeedsReceptionistToCancel);
+            result.Status.Should().Be(AppointmentConstants.CancelledStatus);
+            appointment.CancellationReason.Should().Be("Ban viec");
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(
+                It.Is<IReadOnlyCollection<string>>(roles => roles.Contains(RoleConstants.ReceptionistRole)),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.PatientCancelledTitle),
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyStaffAsync(DoctorId,
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.AppointmentCancelledForDoctorTitle),
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         // UTCID07 (B): less than 24 hours before the visit, a patient cannot cancel online
@@ -156,15 +164,24 @@ namespace OZE.UnitTest.Services.Appointments
             appointment.Status.Should().Be(AppointmentConstants.ConfirmedStatus);
         }
 
-        // UTCID04 (A): a patient cannot move a confirmed appointment online
+        // UTCID04 (N): a patient can move a confirmed appointment online before the cutoff; it goes back to PENDING
         [Fact]
-        public async Task RescheduleAppointmentAsync_ShouldThrow_WhenPatientReschedulesConfirmed()
+        public async Task RescheduleAppointmentAsync_ShouldMoveToPending_WhenPatientReschedulesConfirmed()
         {
-            Existing(AppointmentConstants.ConfirmedStatus, Today.AddDays(5));
+            var appointment = Existing(AppointmentConstants.ConfirmedStatus, Today.AddDays(5));
 
-            var act = () => _service.RescheduleAppointmentAsync(Id, To(new TimeOnly(9, 0)), _patient.UserId);
+            await _service.RescheduleAppointmentAsync(Id, To(new TimeOnly(9, 0)), _patient.UserId);
 
-            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.ConfirmedNeedsReceptionistToReschedule);
+            appointment.AppointmentDate.Should().Be(NewDate);
+            appointment.TimeSlotStart.Should().Be(new TimeOnly(9, 0));
+            appointment.Status.Should().Be(AppointmentConstants.PendingStatus);
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(
+                It.Is<IReadOnlyCollection<string>>(roles => roles.Contains(RoleConstants.ReceptionistRole)),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.PatientRescheduledTitle),
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyStaffAsync(DoctorId,
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.AppointmentMovedAwayTitle),
+                It.IsAny<CancellationToken>()), Times.Once);
         }
 
         // UTCID05 (A): a cancelled appointment cannot be moved
