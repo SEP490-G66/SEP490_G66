@@ -123,6 +123,30 @@ namespace OZE.UnitTest.Services.Appointments
 
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.CancelDeadlinePassed);
         }
+
+        // UTCID08 (B): cutoff 0 means no limit — patient can cancel even when the visit is only 1 hour away
+        [Fact]
+        public async Task CancelAppointmentAsync_ShouldCancel_WhenCutoffZeroAndVisitInOneHour()
+        {
+            _appointmentRepoMock.Setup(r => r.GetConfigValueAsync(ConfigKeyConstants.BookingCancelCutoffHours)).ReturnsAsync("0");
+            var startsAt = ClinicClock.Now.AddHours(1);
+            Existing(AppointmentConstants.PendingStatus, DateOnly.FromDateTime(startsAt), TimeOnly.FromDateTime(startsAt));
+
+            var result = await _service.CancelAppointmentAsync(Id, Reason(), _patient.UserId, _patient.UserId);
+
+            result.Status.Should().Be(AppointmentConstants.CancelledStatus);
+        }
+
+        // UTCID09 (A): after check-in a patient cannot cancel online
+        [Fact]
+        public async Task CancelAppointmentAsync_ShouldThrow_WhenPatientCancelsCheckedIn()
+        {
+            Existing(AppointmentConstants.CheckedInStatus, Today);
+
+            var act = () => _service.CancelAppointmentAsync(Id, Reason(), _patient.UserId, _patient.UserId);
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.OnlyOpenCanBeCancelled);
+        }
     }
 
     // OZ-APPT-13 RescheduleAppointment (UTCID01 is in RescheduleAppointmentTests)
@@ -215,6 +239,21 @@ namespace OZE.UnitTest.Services.Appointments
             var act = () => _service.RescheduleAppointmentAsync(Id, To(new TimeOnly(9, 0)), _patient.UserId);
 
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
+        }
+
+        // UTCID08 (B): cutoff 0 — patient can move a confirmed visit that already started (not checked in)
+        [Fact]
+        public async Task RescheduleAppointmentAsync_ShouldMoveToPending_WhenCutoffZeroAndConfirmedPastStart()
+        {
+            _appointmentRepoMock.Setup(r => r.GetConfigValueAsync(ConfigKeyConstants.BookingCancelCutoffHours)).ReturnsAsync("0");
+            var startedAt = ClinicClock.Now.AddMinutes(-30);
+            var appointment = Existing(AppointmentConstants.ConfirmedStatus, DateOnly.FromDateTime(startedAt), TimeOnly.FromDateTime(startedAt));
+
+            await _service.RescheduleAppointmentAsync(Id, To(new TimeOnly(9, 0)), _patient.UserId);
+
+            appointment.AppointmentDate.Should().Be(NewDate);
+            appointment.TimeSlotStart.Should().Be(new TimeOnly(9, 0));
+            appointment.Status.Should().Be(AppointmentConstants.PendingStatus);
         }
     }
 
