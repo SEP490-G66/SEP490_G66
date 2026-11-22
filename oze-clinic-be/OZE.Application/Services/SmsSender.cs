@@ -33,6 +33,31 @@ namespace OZE.Application.Services
 
         public async Task SendSmsAsync(string toPhoneNumber, string message)
         {
+            var result = await TrySendSmsAsync(toPhoneNumber, message);
+            if (!result.Configured || result.Sent)
+            {
+                return;
+            }
+
+            if (result.HttpStatus is int status && (status < 200 || status > 299))
+            {
+                throw new Exception($"SMS sending failed: HTTP {status}");
+            }
+
+            throw new Exception($"SMS sending failed: {result.CodeResult ?? "unknown"} {result.ErrorMessage}");
+        }
+
+        public async Task<SmsSendResult> TrySendSmsAsync(string toPhoneNumber, string message)
+        {
+            var result = new SmsSendResult
+            {
+                Phone = NormalizeForEsms(toPhoneNumber),
+                Content = message,
+                Brandname = _options.Brandname?.Trim() ?? string.Empty,
+                SmsType = string.IsNullOrWhiteSpace(_options.SmsType) ? "2" : _options.SmsType.Trim(),
+                Sandbox = string.IsNullOrWhiteSpace(_options.Sandbox) ? "1" : _options.Sandbox.Trim()
+            };
+
             if (string.IsNullOrWhiteSpace(_options.ApiKey)
                 || string.IsNullOrWhiteSpace(_options.SecretKey))
             {
@@ -40,61 +65,66 @@ namespace OZE.Application.Services
                     "SMS is not configured. Message to {Phone} was not sent via network. Body: {Message}",
                     toPhoneNumber,
                     message);
-                return;
+                return result;
             }
 
-            var phone = NormalizeForEsms(toPhoneNumber);
-            var smsType = string.IsNullOrWhiteSpace(_options.SmsType) ? "2" : _options.SmsType.Trim();
-            var isUnicode = string.IsNullOrWhiteSpace(_options.IsUnicode) ? "0" : _options.IsUnicode.Trim();
-            var sandbox = string.IsNullOrWhiteSpace(_options.Sandbox) ? "1" : _options.Sandbox.Trim();
-            var brandname = _options.Brandname?.Trim() ?? string.Empty;
-
+            result.Configured = true;
             var payload = new
             {
                 ApiKey = _options.ApiKey.Trim(),
                 SecretKey = _options.SecretKey.Trim(),
-                Phone = phone,
+                Phone = result.Phone,
                 Content = message,
-                Brandname = brandname,
-                SmsType = smsType,
-                IsUnicode = isUnicode,
-                Sandbox = sandbox
+                Brandname = result.Brandname,
+                SmsType = result.SmsType,
+                IsUnicode = string.IsNullOrWhiteSpace(_options.IsUnicode) ? "0" : _options.IsUnicode.Trim(),
+                Sandbox = result.Sandbox
             };
 
-            using var response = await _httpClient.PostAsJsonAsync(SendPath, payload);
-            var body = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError(
-                    "eSMS HTTP {StatusCode} when sending to {Phone}: {Body}",
-                    (int)response.StatusCode,
-                    phone,
-                    body);
-                throw new Exception($"SMS sending failed: HTTP {(int)response.StatusCode}");
-            }
-
-            EsmsSendResponse? result;
+            string body;
             try
             {
-                result = JsonSerializer.Deserialize<EsmsSendResponse>(body, JsonOptions);
+                using var response = await _httpClient.PostAsJsonAsync(SendPath, payload);
+                result.HttpStatus = (int)response.StatusCode;
+                body = await response.Content.ReadAsStringAsync();
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Could not reach eSMS when sending to {Phone}", result.Phone);
+                result.ErrorMessage = "Could not reach eSMS: " + ex.Message;
+                return result;
+            }
+
+            if (result.HttpStatus is < 200 or > 299)
+            {
+                _logger.LogError("eSMS HTTP {StatusCode} when sending to {Phone}: {Body}", result.HttpStatus, result.Phone, body);
+                result.ErrorMessage = body;
+                return result;
+            }
+
+            EsmsSendResponse? answer;
+            try
+            {
+                answer = JsonSerializer.Deserialize<EsmsSendResponse>(body, JsonOptions);
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, "eSMS returned invalid JSON when sending to {Phone}: {Body}", phone, body);
-                throw new Exception("SMS sending failed: invalid response from eSMS");
+                _logger.LogError(ex, "eSMS returned invalid JSON when sending to {Phone}: {Body}", result.Phone, body);
+                result.ErrorMessage = "Invalid response from eSMS: " + body;
+                return result;
             }
 
-            if (result == null || !string.Equals(result.CodeResult, "100", StringComparison.OrdinalIgnoreCase))
+            result.CodeResult = answer?.CodeResult;
+            result.SmsId = answer?.SmsId;
+            result.ErrorMessage = answer?.ErrorMessage;
+            result.Sent = string.Equals(answer?.CodeResult, "100", StringComparison.OrdinalIgnoreCase);
+            if (!result.Sent)
             {
-                var code = result?.CodeResult ?? "unknown";
-                var errorMessage = result?.ErrorMessage ?? body;
-                _logger.LogError(
-                    "Failed to send SMS via eSMS: {Code} {Message}",
-                    code,
-                    errorMessage);
-                throw new Exception($"SMS sending failed: {code} {errorMessage}");
+                result.ErrorMessage ??= body;
+                _logger.LogError("Failed to send SMS via eSMS: {Code} {Message}", result.CodeResult ?? "unknown", result.ErrorMessage);
             }
+
+            return result;
         }
 
         /// <summary>
