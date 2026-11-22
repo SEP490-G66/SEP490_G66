@@ -301,11 +301,10 @@ namespace OZE.Common.Constants
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";
             public const string OnlyOpenCanBeCancelled = "Only an appointment that is pending or confirmed can be cancelled";
-            public const string ConfirmedNeedsReceptionistToCancel = "This appointment is already confirmed. Please call the clinic to cancel it";
             public const string CancelDeadlinePassed = "It is too close to the appointment time to cancel online. Please call the clinic";
             public const string OnlyOpenCanBeRescheduled = "Only an appointment that is pending or confirmed can be rescheduled";
-            public const string ConfirmedNeedsReceptionistToReschedule = "This appointment is already confirmed. Please call the clinic to reschedule it";
-            public const string RescheduleDeadlinePassed = "It is too close to the appointment time to reschedule online. Please call the clinic";            public const string ReasonRequired = "Cancellation reason is required";
+            public const string RescheduleDeadlinePassed = "It is too close to the appointment time to reschedule online. Please call the clinic";
+            public const string ReasonRequired = "Cancellation reason is required";
             public const string OnlyConfirmedCanBeCheckedIn = "Only a confirmed appointment can be checked in";
             public const string CheckInNeedsConfirmation = "This appointment is not confirmed yet. Please confirm it before check-in";
             public const string CheckInWrongDay = "Check-in is only possible on the day of the appointment";
