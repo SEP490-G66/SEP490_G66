@@ -67,6 +67,12 @@ jobs:
           SENDGRID_KEY=${{ secrets.SENDGRID_KEY || '' }}
           SENDER_EMAIL=${{ secrets.SENDER_EMAIL || 'support@oze.com' }}
           SENDER_NAME=${{ secrets.SENDER_NAME || 'OZE Support' }}
+          ESMS_API_KEY=${{ secrets.ESMS_API_KEY || '' }}
+          ESMS_SECRET_KEY=${{ secrets.ESMS_SECRET_KEY || '' }}
+          ESMS_BRANDNAME=${{ secrets.ESMS_BRANDNAME || '' }}
+          ESMS_SMS_TYPE=${{ secrets.ESMS_SMS_TYPE || '2' }}
+          ESMS_IS_UNICODE=${{ secrets.ESMS_IS_UNICODE || '0' }}
+          ESMS_SANDBOX=${{ secrets.ESMS_SANDBOX || '1' }}
           EOF
 
       - name: Deploy application using Docker Compose
