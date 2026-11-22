@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Moq;
 using OZE.Application.Interfaces;
@@ -30,6 +31,9 @@ namespace OZE.UnitTest.Services.Appointments
 
         protected AppointmentQueueTestBase()
         {
+            var userManagerMock = new Mock<UserManager<ApplicationUser>>(
+                Mock.Of<IUserStore<ApplicationUser>>(), null!, null!, null!, null!, null!, null!, null!, null!);
+
             _service = new AppointmentService(
                 _appointmentRepoMock.Object,
                 new Mock<IRegistrationRepository>().Object,
@@ -38,6 +42,7 @@ namespace OZE.UnitTest.Services.Appointments
                 new Mock<IEmailSender>().Object,
                 _auditLogMock.Object,
                 new Mock<ILogger<AppointmentService>>().Object,
+                userManagerMock.Object,
                 _queueServiceMock.Object);
 
             _appointmentRepoMock

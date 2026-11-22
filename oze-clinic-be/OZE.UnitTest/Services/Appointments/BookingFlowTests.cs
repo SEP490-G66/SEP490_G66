@@ -230,6 +230,24 @@ namespace OZE.UnitTest.Services.Appointments
 
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.ServiceInactive);
         }
+
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldThrow_WhenPhoneNotVerified()
+        {
+            _userManagerMock
+                .Setup(m => m.FindByIdAsync(UserId))
+                .ReturnsAsync(new ApplicationUser
+                {
+                    Id = UserId,
+                    PhoneNumber = null,
+                    PhoneNumberConfirmed = false
+                });
+
+            var act = () => _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PhoneNotVerified);
+            _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
+        }
     }
 
     // OZ-APPT-05 CreateWalkIn

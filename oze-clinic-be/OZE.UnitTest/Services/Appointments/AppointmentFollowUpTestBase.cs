@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Moq;
 using OZE.Application.Helpers;
@@ -19,6 +20,7 @@ namespace OZE.UnitTest.Services.Appointments
         protected const int RoomId = 1;
         protected const long OriginalAppointmentId = 100;
         protected const long OriginalExaminationId = 200;
+        protected const string PatientUserId = "user-patient-15";
 
         protected readonly Mock<IAppointmentRepository> _appointmentRepoMock = new();
         protected readonly Mock<IRegistrationRepository> _registrationRepoMock = new();
@@ -28,6 +30,7 @@ namespace OZE.UnitTest.Services.Appointments
         protected readonly Mock<IAuditLogService> _auditLogMock = new();
         protected readonly Mock<ILogger<AppointmentService>> _loggerMock = new();
         protected readonly Mock<INotificationService> _notificationsMock = new();
+        protected readonly Mock<UserManager<ApplicationUser>> _userManagerMock;
         protected readonly AppointmentService _service;
 
         protected readonly Service _generalExamService;
@@ -35,6 +38,9 @@ namespace OZE.UnitTest.Services.Appointments
 
         protected AppointmentFollowUpTestBase()
         {
+            _userManagerMock = new Mock<UserManager<ApplicationUser>>(
+                Mock.Of<IUserStore<ApplicationUser>>(), null!, null!, null!, null!, null!, null!, null!, null!);
+
             _generalExamService = new Service
             {
                 Id = 1,
@@ -51,8 +57,17 @@ namespace OZE.UnitTest.Services.Appointments
                 FullName = "Tran Van C",
                 PatientCode = "BN000015",
                 PhoneNumber = "0987654321",
-                UserId = "user-patient-15"
+                UserId = PatientUserId
             };
+
+            _userManagerMock
+                .Setup(m => m.FindByIdAsync(PatientUserId))
+                .ReturnsAsync(new ApplicationUser
+                {
+                    Id = PatientUserId,
+                    PhoneNumber = "+84987654321",
+                    PhoneNumberConfirmed = true
+                });
 
             _service = new AppointmentService(
                 _appointmentRepoMock.Object,
@@ -62,6 +77,7 @@ namespace OZE.UnitTest.Services.Appointments
                 _emailSenderMock.Object,
                 _auditLogMock.Object,
                 _loggerMock.Object,
+                _userManagerMock.Object,
                 notifications: _notificationsMock.Object);
 
             // Repository default setups
