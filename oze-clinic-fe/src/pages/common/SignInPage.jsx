@@ -196,7 +196,9 @@ const SignInPage = () => {
                 <p className="my-4 text-center text-body-sm text-muted">hoặc</p>
 
                 {GOOGLE_CLIENT_ID ? (
-                    <div className="flex w-full justify-center overflow-hidden">
+                    // Do not use overflow-hidden here: Google's personalized "Sign in as …" button
+                    // opens an account picker that gets clipped / swallows clicks when the parent clips.
+                    <div className="flex w-full justify-center">
                         <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={() => toast.error(GOOGLE_LOGIN_MESSAGES.TOKEN_INVALID)}
