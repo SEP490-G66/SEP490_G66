@@ -17,6 +17,13 @@ namespace OZE.Application.Services
             PropertyNameCaseInsensitive = true
         };
 
+        // eSMS matches field names case-sensitively (ApiKey, SecretKey, ...). PostAsJsonAsync would
+        // camelCase them by default (apiKey), which eSMS answers with 101 "Authorize Failed".
+        private static readonly JsonSerializerOptions RequestJsonOptions = new()
+        {
+            PropertyNamingPolicy = null
+        };
+
         private readonly HttpClient _httpClient;
         private readonly AuthSmsSenderOptions _options;
         private readonly ILogger<SmsSender> _logger;
@@ -84,7 +91,7 @@ namespace OZE.Application.Services
             string body;
             try
             {
-                using var response = await _httpClient.PostAsJsonAsync(SendPath, payload);
+                using var response = await _httpClient.PostAsJsonAsync(SendPath, payload, RequestJsonOptions);
                 result.HttpStatus = (int)response.StatusCode;
                 body = await response.Content.ReadAsStringAsync();
             }
