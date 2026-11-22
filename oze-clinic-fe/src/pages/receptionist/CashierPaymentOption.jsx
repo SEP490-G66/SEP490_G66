@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
@@ -58,6 +58,17 @@ const CashierPaymentOption = () => {
     const [result, setResult] = useState(null);
     const [version, setVersion] = useState(0);
     const [choice, setChoice] = useState(OPTION.PERIODS);
+    // A new plan starts from the default choice, never from the one picked on the previous plan
+    const planKey = `${patientId}|${planId}`;
+    const [choiceFor, setChoiceFor] = useState(planKey);
+    if (choiceFor !== planKey) {
+        setChoiceFor(planKey);
+        setChoice(OPTION.PERIODS);
+    }
+    const planRef = useRef(planKey);
+    useEffect(() => {
+        planRef.current = planKey;
+    }, [planKey]);
 
     usePageTitle(TEXT.OPTION_DOC_TITLE);
 
@@ -75,7 +86,9 @@ const CashierPaymentOption = () => {
     const shown = locked ? plan.option : choice;
 
     const [busy, submit] = useSubmit(async () => {
+        const forPlan = planKey;
         const saved = await choosePaymentOption({ patientId: Number(patientId), planId: Number(planId), option: choice });
+        if (planRef.current !== forPlan) return;
         if (!saved.success) {
             toast.error(saved.message);
             setVersion((v) => v + 1);

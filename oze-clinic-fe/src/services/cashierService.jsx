@@ -78,14 +78,20 @@ const read = () => {
 // Throws when the browser refuses to store; callers turn that into a failed result, never a "saved" message.
 const write = (data) => localStorage.setItem(CASHIER_MOCK_KEY, JSON.stringify(data));
 
+// Saves only when nobody (another tab) saved since `data` was read: rev must still match; then rev moves on.
 const save = (data) => {
     try {
-        write(data);
+        const stored = JSON.parse(localStorage.getItem(CASHIER_MOCK_KEY) ?? "null");
+        if ((stored?.rev ?? 0) !== (data.rev ?? 0)) return false;
+        write({ ...data, rev: (data.rev ?? 0) + 1 });
         return true;
     } catch {
         return false;
     }
 };
+
+// One write at a time across tabs: read, check and save run inside a browser lock when the browser has one
+const exclusive = (fn) => (navigator.locks?.request ? navigator.locks.request(CASHIER_MOCK_KEY, fn) : fn());
 
 const nextId = (data) => {
     data.nextId = (data.nextId ?? 1000) + 1;
@@ -193,14 +199,16 @@ export const choosePaymentOption = async ({ patientId, planId, option }) => {
     const shift = await checkShift();
     if (!shift.success) return shift;
     await wait();
-    const data = read();
-    const plan = ownPlan(data, patientId, planId);
-    if (!plan) return fail(errors.WRONG_PATIENT);
-    if (plan.option !== null) return fail(errors.OPTION_LOCKED);
-    if (!Object.values(OPTION).includes(option)) return fail(errors.BAD_OPTION);
-    plan.option = option;
-    plan.depositRate = option === OPTION.DEPOSIT ? DEPOSIT_RATE : null;
-    return save(data) ? ok(plan, CASHIER_TEXT.OPTION_SAVED) : fail(errors.STORAGE);
+    return exclusive(async () => {
+        const data = read();
+        const plan = ownPlan(data, patientId, planId);
+        if (!plan) return fail(errors.WRONG_PATIENT);
+        if (plan.option !== null) return fail(errors.OPTION_LOCKED);
+        if (!Object.values(OPTION).includes(option)) return fail(errors.BAD_OPTION);
+        plan.option = option;
+        plan.depositRate = option === OPTION.DEPOSIT ? DEPOSIT_RATE : null;
+        return save(data) ? ok(plan, CASHIER_TEXT.OPTION_SAVED) : fail(errors.STORAGE);
+    });
 };
 
 const addReceipt = (data, { patientId, method, ref, note, lines }) => {
@@ -223,27 +231,31 @@ export const receiveDeposit = async ({ patientId, planId, amount, method, ref, n
     const shift = await checkShift();
     if (!shift.success) return shift;
     await wait();
-    const data = read();
-    const plan = ownPlan(data, patientId, planId);
-    if (!plan) return fail(errors.WRONG_PATIENT);
-    if (plan.option !== OPTION.DEPOSIT) return fail(errors.NOT_DEPOSIT);
-    if (!METHODS.includes(method)) return fail(errors.BAD_METHOD);
-    const current = view(data, data.patients.find((p) => p.id === plan.patientId)).plans.find((p) => p.id === plan.id);
-    if (!positive(amount)) return fail(errors.BAD_AMOUNT);
-    if (amount > current.depositToPay) return fail(errors.OVER_CEILING);
-    const receipt = addReceipt(data, { patientId, method, ref, note, lines: [{ kind: LINE.DEPOSIT, planId: plan.id, amount }] });
-    return save(data) ? ok(receipt) : fail(errors.STORAGE);
+    return exclusive(async () => {
+        const data = read();
+        const plan = ownPlan(data, patientId, planId);
+        if (!plan) return fail(errors.WRONG_PATIENT);
+        if (plan.option !== OPTION.DEPOSIT) return fail(errors.NOT_DEPOSIT);
+        if (!METHODS.includes(method)) return fail(errors.BAD_METHOD);
+        const current = view(data, data.patients.find((p) => p.id === plan.patientId)).plans.find((p) => p.id === plan.id);
+        if (!positive(amount)) return fail(errors.BAD_AMOUNT);
+        if (amount > current.depositToPay) return fail(errors.OVER_CEILING);
+        const receipt = addReceipt(data, { patientId, method, ref, note, lines: [{ kind: LINE.DEPOSIT, planId: plan.id, amount }] });
+        return save(data) ? ok(receipt) : fail(errors.STORAGE);
+    });
 };
 
 export const collect = async ({ patientId, lines, method, ref, note }) => {
     const shift = await checkShift();
     if (!shift.success) return shift;
     await wait();
-    const data = read();
-    const error = collectError(data, { patientId: Number(patientId), lines, method }, errors);
-    if (error) return fail(error);
-    const receipt = addReceipt(data, { patientId, method, ref, note, lines: lines.map((line) => ({ ...line })) });
-    return save(data) ? ok(receipt) : fail(errors.STORAGE);
+    return exclusive(async () => {
+        const data = read();
+        const error = collectError(data, { patientId: Number(patientId), lines, method }, errors);
+        if (error) return fail(error);
+        const receipt = addReceipt(data, { patientId, method, ref, note, lines: lines.map((line) => ({ ...line })) });
+        return save(data) ? ok(receipt) : fail(errors.STORAGE);
+    });
 };
 
 // Stands in for the backend's payment confirmation while the data is mock: a PENDING transfer becomes CONFIRMED or REJECTED
@@ -251,11 +263,13 @@ export const setReceiptStatus = async ({ patientId, receiptId, status }) => {
     const shift = await checkShift();
     if (!shift.success) return shift;
     await wait();
-    const data = read();
-    const receipt = data.receipts.find((r) => r.id === Number(receiptId) && r.patientId === Number(patientId));
-    if (!receipt) return fail(errors.NO_RECEIPT);
-    if (receipt.status !== RECEIPT_STATUS.PENDING) return fail(errors.NOT_PENDING);
-    if (![RECEIPT_STATUS.CONFIRMED, RECEIPT_STATUS.REJECTED].includes(status)) return fail(errors.BAD_STATUS);
-    receipt.status = status;
-    return save(data) ? ok(receipt) : fail(errors.STORAGE);
+    return exclusive(async () => {
+        const data = read();
+        const receipt = data.receipts.find((r) => r.id === Number(receiptId) && r.patientId === Number(patientId));
+        if (!receipt) return fail(errors.NO_RECEIPT);
+        if (receipt.status !== RECEIPT_STATUS.PENDING) return fail(errors.NOT_PENDING);
+        if (![RECEIPT_STATUS.CONFIRMED, RECEIPT_STATUS.REJECTED].includes(status)) return fail(errors.BAD_STATUS);
+        receipt.status = status;
+        return save(data) ? ok(receipt) : fail(errors.STORAGE);
+    });
 };

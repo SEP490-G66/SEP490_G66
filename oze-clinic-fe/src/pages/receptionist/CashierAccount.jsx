@@ -38,7 +38,7 @@ const CashierAccount = () => {
                 <h1 className="page-title">{TEXT.ACCOUNT_TITLE}</h1>
                 {p && (
                     <p className="page-description">
-                        <b className="text-ink">{p.name}</b> · <span className="num">{p.code}</span> · <span className="num">{p.phone.replace(/^\+84/, "0")}</span>
+                        <b className="text-ink">{p.name}</b> · <span className="num">{p.code}</span> · <span className="num">{String(p.phone ?? "").replace(/^\+84/, "0")}</span>
                     </p>
                 )}
             </div>

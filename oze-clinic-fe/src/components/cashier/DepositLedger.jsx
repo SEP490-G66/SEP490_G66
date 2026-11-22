@@ -21,7 +21,9 @@ const DepositLedger = ({ plan, receipts, canWrite, onStatus }) => {
                         PT{receipt.id} · {dateTimeText(receipt.createdAt)} · {TEXT.METHODS[receipt.method]}
                     </span>
                     <LabelBadge map={TEXT.RECEIPT_STATUS} value={receipt.status} />
-                    <b className="num ml-auto text-success">+ {money(amount)}</b>
+                    <b className={receipt.status === RECEIPT_STATUS.CONFIRMED ? "num ml-auto text-success" : receipt.status === RECEIPT_STATUS.REJECTED ? "num ml-auto text-muted line-through" : "num ml-auto text-muted"}>
+                        {receipt.status === RECEIPT_STATUS.REJECTED ? money(amount) : `+ ${money(amount)}`}
+                    </b>
                     {receipt.status === RECEIPT_STATUS.PENDING && (
                         <span className="flex w-full justify-end gap-2 pt-1">
                             <button type="button" className="btn btn-secondary h-9" disabled={!canWrite || busy} onClick={() => submit(receipt, RECEIPT_STATUS.REJECTED)}>

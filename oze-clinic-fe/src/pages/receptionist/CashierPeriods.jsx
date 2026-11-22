@@ -11,7 +11,7 @@ import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import { getPlan } from "@/services/cashierService";
 import { ACTION, OPTION } from "@/utils/cashier";
 import { CASHIER_TEXT as TEXT } from "@/utils/messages";
-import { ROUTES, getCashierRoute } from "@/utils/routes";
+import { ROUTES, getCashierOptionRoute, getCashierRoute } from "@/utils/routes";
 
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.PERIODS_TITLE }];
 
@@ -62,6 +62,13 @@ const CashierPeriods = () => {
                 <p className="rounded-xl border border-border bg-canvas px-6 py-10 text-center text-body-sm text-muted">{TEXT.PICK_FIRST}</p>
             ) : !current ? (
                 <div className="skeleton h-48 rounded-xl" />
+            ) : current.success && !current.data.option ? (
+                <div className="alert alert-info flex flex-wrap items-center gap-3">
+                    <span className="flex-1">{TEXT.NOT_CHOSEN_PLAN}</span>
+                    <Link to={getCashierOptionRoute(patientId, planId)} className="btn btn-secondary h-9">
+                        {TEXT.CHOOSE_OPTION}
+                    </Link>
+                </div>
             ) : !plan ? (
                 <LoadError onRetry={() => setVersion((v) => v + 1)} />
             ) : (

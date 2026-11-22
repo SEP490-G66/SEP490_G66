@@ -36,15 +36,23 @@ const CashierPayments = () => {
     const [box, setBox] = useState(q);
     const [result, setResult] = useState(null);
     const [version, setVersion] = useState(0);
-    const { schedule } = useDebounced(300);
+    const { schedule, cancel } = useDebounced(300);
 
     usePageTitle(TEXT.LIST_DOC_TITLE);
 
+    // Reads the URL as it is now, so a search typed a moment ago never brings back filters changed since
     const update = (changes) => {
-        const next = new URLSearchParams(params);
+        const next = new URLSearchParams(window.location.search);
         Object.entries(changes).forEach(([key, value]) => (value ? next.set(key, value) : next.delete(key)));
         setParams(next, { replace: true });
     };
+
+    // Back / Forward change q without typing: keep the box in step with the URL
+    const [shownQ, setShownQ] = useState(q);
+    if (shownQ !== q) {
+        setShownQ(q);
+        if (box.trim() !== q) setBox(q);
+    }
 
     useEffect(() => {
         let active = true;
@@ -119,6 +127,7 @@ const CashierPayments = () => {
                                 type="button"
                                 className="btn btn-secondary mt-4"
                                 onClick={() => {
+                                    cancel();
                                     setBox("");
                                     setParams({}, { replace: true });
                                 }}
@@ -155,7 +164,7 @@ const CashierPayments = () => {
                                                       {p.name}
                                                   </Link>
                                                   <span className="num block text-caption text-muted">
-                                                      {p.code} · {p.phone.replace(/^\+84/, "0")}
+                                                      {p.code} · {String(p.phone ?? "").replace(/^\+84/, "0")}
                                                   </span>
                                               </td>
                                               <td data-label={C.LAST_VISIT} className="num whitespace-nowrap">

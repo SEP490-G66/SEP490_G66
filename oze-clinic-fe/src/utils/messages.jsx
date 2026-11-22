@@ -2366,6 +2366,10 @@ export const CASHIER_TEXT = {
     NO_DEPOSIT_PLAN: "Bệnh nhân không có kế hoạch nào đang ở phương án Đặt cọc.",
     NO_CHOSEN_PLAN: "Bệnh nhân chưa có kế hoạch nào đã chọn phương án.",
     PICK_FIRST: "Chọn bệnh nhân và kế hoạch để xem.",
+    PLAN_LOAD_ERROR: "Không tải được danh sách kế hoạch.",
+    NOT_DEPOSIT_PLAN: "Kế hoạch này không ở phương án Đặt cọc.",
+    NOT_CHOSEN_PLAN: "Kế hoạch này chưa chọn phương án thanh toán.",
+    CHOOSE_OPTION: "Chọn phương án thanh toán",
 
     // Đặt cọc dịch vụ
     DEPOSIT_REQUIRED: "Cọc phải nộp",
@@ -2458,7 +2462,7 @@ export const CASHIER_TEXT = {
         OVER_CEILING: "Số tiền vượt số còn phải thu. Tải lại trang để xem số mới nhất.",
         NOT_PENDING: "Phiếu thu không còn ở trạng thái chờ xác nhận.",
         BAD_STATUS: "Trạng thái phiếu thu không hợp lệ.",
-        STORAGE: "Không lưu được dữ liệu trên trình duyệt. Chưa ghi nhận khoản thu.",
+        STORAGE: "Không lưu được: dữ liệu vừa đổi ở tab khác hoặc trình duyệt chặn lưu. Chưa ghi nhận gì, hãy thử lại.",
         SHIFT_CLOSED: "Chưa mở ca thu ngân.",
         SHIFT_UNKNOWN: "Không kiểm tra được ca thu ngân.",
     },

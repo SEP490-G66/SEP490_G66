@@ -35,14 +35,14 @@ const PlanAccountCard = ({ patientId, plan }) => {
                 <button type="button" className="btn btn-link mr-auto" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((v) => !v)}>
                     {open ? TEXT.HIDE_PERIODS : TEXT.SHOW_PERIODS}
                 </button>
+                <Link to={periodsLink} className="btn btn-secondary h-9">
+                    {TEXT.VIEW_PERIODS}
+                </Link>
                 {plan.action !== ACTION.VIEW && (
-                    <Link to={periodsLink} className="btn btn-secondary h-9">
-                        {TEXT.VIEW_PERIODS}
+                    <Link to={action.to} className="btn btn-primary h-9">
+                        {action.label}
                     </Link>
                 )}
-                <Link to={action.to} className={plan.action === ACTION.VIEW ? "btn btn-secondary h-9" : "btn btn-primary h-9"}>
-                    {action.label}
-                </Link>
             </div>
             {open && (
                 <ul id={listId} className="divide-y divide-border border-t border-border">
@@ -51,7 +51,7 @@ const PlanAccountCard = ({ patientId, plan }) => {
                             <b className="text-ink">{TEXT.PERIOD_LABEL(p.seq)}</b>
                             <span className="num text-muted">{dmy(p.date)}</span>
                             <LabelBadge map={TEXT.PERIOD_STATUS} value={p.status} />
-                            <span className="num ml-auto text-ink">{p.finished ? TEXT.PERIOD_LEFT(money(p.due)) : money(p.amount)}</span>
+                            <span className="num ml-auto text-ink">{TEXT.PERIOD_LEFT(money(p.finished ? p.due : p.amount - p.fullCover))}</span>
                         </li>
                     ))}
                 </ul>

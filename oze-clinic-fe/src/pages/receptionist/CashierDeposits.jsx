@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
@@ -34,6 +34,14 @@ const CashierDeposits = () => {
 
     usePageTitle(TEXT.DEPOSIT_DOC_TITLE);
 
+    // The amount box is filled with what is still owed only when the plan changes or after a deposit is saved,
+    // never when the page just reloads (confirming a receipt, a failed save)
+    const refillAmount = useRef(true);
+    const selection = useRef(`${patientId}|${planId}`);
+    useEffect(() => {
+        selection.current = `${patientId}|${planId}`;
+    }, [patientId, planId]);
+
     const key = `${patientId}|${planId}|${version}`;
     useEffect(() => {
         if (!patientId || !planId) return undefined;
@@ -41,8 +49,11 @@ const CashierDeposits = () => {
         Promise.all([getPlan({ patientId, planId }), getReceipts({ patientId, planId })]).then(([plan, receipts]) => {
             if (!active) return;
             const good = plan.success && plan.data.option === OPTION.DEPOSIT;
-            setData({ key, ok: good && receipts.success, plan: good ? plan.data : null, receipts: receipts.data ?? [] });
-            if (good) setAmount(plan.data.depositToPay);
+            setData({ key, ok: good && receipts.success, wrongOption: plan.success && !good, plan: good ? plan.data : null, receipts: receipts.data ?? [] });
+            if (good && refillAmount.current) {
+                refillAmount.current = false;
+                setAmount(plan.data.depositToPay);
+            }
         });
         return () => {
             active = false;
@@ -59,12 +70,17 @@ const CashierDeposits = () => {
         if (nextPlan) next.set("plan", nextPlan);
         setParams(next, { replace });
         setTried(false);
+        setReference("");
+        setNote("");
+        refillAmount.current = true;
     };
 
     const [busy, submit] = useSubmit(async () => {
         setTried(true);
         if (amount <= 0 || amount > plan.depositToPay) return;
+        const forSelection = `${patientId}|${planId}`;
         const saved = await receiveDeposit({ patientId: Number(patientId), planId: Number(planId), amount, method, ref: reference, note });
+        if (selection.current !== forSelection) return;
         if (!saved.success) {
             toast.error(saved.message);
         } else {
@@ -72,6 +88,7 @@ const CashierDeposits = () => {
             setReference("");
             setNote("");
             setTried(false);
+            refillAmount.current = true;
         }
         setVersion((v) => v + 1);
     });
@@ -93,13 +110,15 @@ const CashierDeposits = () => {
             </div>
             <Card>
                 <div className="px-5 py-4">
-                    <PlanPicker idPrefix="deposit" patientId={patientId} planId={planId} options={[OPTION.DEPOSIT]} emptyText={TEXT.NO_DEPOSIT_PLAN} onChange={pick} />
+                    <PlanPicker idPrefix="deposit" patientId={patientId} planId={planId} options={[OPTION.DEPOSIT]} emptyText={TEXT.NO_DEPOSIT_PLAN} onChange={pick} disabled={busy} />
                 </div>
             </Card>
             {!patientId || !planId ? (
                 <p className="rounded-xl border border-border bg-canvas px-6 py-10 text-center text-body-sm text-muted">{TEXT.PICK_FIRST}</p>
             ) : !current ? (
                 <div className="skeleton h-48 rounded-xl" />
+            ) : current.wrongOption ? (
+                <p className="alert alert-info">{TEXT.NOT_DEPOSIT_PLAN}</p>
             ) : !plan ? (
                 <LoadError onRetry={() => setVersion((v) => v + 1)} />
             ) : (

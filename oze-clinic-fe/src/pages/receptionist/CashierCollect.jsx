@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
@@ -55,6 +55,7 @@ const describerOf = (patient) => (line) => {
 const CashierCollect = () => {
     const [params, setParams] = useSearchParams();
     const patientId = params.get("patient") ?? "";
+    const add = params.get("add") ?? "";
     const lock = useCashShiftLock();
     const [patients, setPatients] = useState(null);
     const [data, setData] = useState(null);
@@ -83,27 +84,43 @@ const CashierCollect = () => {
         Promise.all([getCollectables(patientId), getReceipts({ patientId })]).then(([collectables, receipts]) => {
             if (!active) return;
             setData({ key, ok: collectables.success && receipts.success, collectables: collectables.data, receipts: receipts.data ?? [] });
-            // Lines asked for in ?add= are added once, when the patient's data arrives; Loại follows the first valid one
-            const asked = new URLSearchParams(window.location.search).get("add");
-            if (!asked || !collectables.success) return;
-            const found = targetsOf(collectables.data);
-            const keys = keysFromAdd(asked, collectables.data);
-            if (keys.length) {
-                setLines(keys.map((k) => ({ ...found.get(k), label: labelOf(found.get(k)), amount: found.get(k).ceiling })));
-                setKind(found.get(keys[0]).kind === LINE.VISIT_SERVICE ? KIND.VISIT : KIND.PLAN);
-            }
-            const next = new URLSearchParams(window.location.search);
-            next.delete("add");
-            setParams(next, { replace: true });
         });
         return () => {
             active = false;
         };
-    }, [patientId, key, setParams]);
+    }, [patientId, key]);
 
     const current = data?.key === key ? data : null;
     const collectables = current?.ok ? current.collectables : null;
     const targets = useMemo(() => targetsOf(collectables), [collectables]);
+    const patientView = collectables?.patient;
+    const describe = describerOf(patientView);
+
+    // Lines asked for in ?add= (from Hồ sơ / Theo đợt / Phương án) join the lines already chosen, once each;
+    // Loại follows the first valid one. Unknown or used-up tokens are dropped.
+    const [appliedAdd, setAppliedAdd] = useState("");
+    const addKey = `${patientId}|${add}`;
+    if (!add && appliedAdd) setAppliedAdd("");
+    if (collectables && add && appliedAdd !== addKey) {
+        setAppliedAdd(addKey);
+        const keys = keysFromAdd(add, collectables).filter((k) => !lines.some((l) => l.key === k));
+        if (keys.length) {
+            setLines([...lines, ...keys.map((k) => ({ ...targets.get(k), label: labelOf(targets.get(k)), amount: targets.get(k).ceiling }))]);
+            setKind(targets.get(keys[0]).kind === LINE.VISIT_SERVICE ? KIND.VISIT : KIND.PLAN);
+        }
+    }
+    useEffect(() => {
+        if (!collectables || !add || appliedAdd !== addKey) return;
+        const next = new URLSearchParams(window.location.search);
+        next.delete("add");
+        setParams(next, { replace: true });
+    }, [collectables, add, addKey, appliedAdd, setParams]);
+
+    // The patient on screen now, to drop answers that come back after the receptionist moved on
+    const patientRef = useRef(patientId);
+    useEffect(() => {
+        patientRef.current = patientId;
+    }, [patientId]);
 
     // Ceilings change after each save: keep the lines that can still take money, capped to what is left
     const liveLines = lines
@@ -115,11 +132,16 @@ const CashierCollect = () => {
     const pickPatient = (next) => {
         setLines([]);
         setKind(KIND.VISIT);
+        setReference("");
+        setNote("");
         setParams(next ? { patient: next } : {}, { replace: false });
     };
 
     const [busy, submit] = useSubmit(async () => {
         if (invalid) return;
+        const forPatient = patientId;
+        const name = patientView?.name ?? "";
+        const describeSaved = describerOf(patientView);
         const result = await collect({
             patientId: Number(patientId),
             method,
@@ -133,6 +155,7 @@ const CashierCollect = () => {
                       : { kind: l.kind, planId: l.planId, periodId: l.periodId, amount: l.amount },
             ),
         });
+        if (patientRef.current !== forPatient) return;
         if (!result.success) {
             toast.error(result.message);
             setVersion((v) => v + 1);
@@ -140,7 +163,7 @@ const CashierCollect = () => {
         }
         const total = money(liveLines.reduce((sum, l) => sum + l.amount, 0));
         toast.success(result.data.status === RECEIPT_STATUS.PENDING ? TEXT.COLLECTED_PENDING(total) : TEXT.COLLECTED(total));
-        setSaved(result.data);
+        setSaved({ receipt: result.data, name, describe: describeSaved });
         setLines([]);
         setReference("");
         setNote("");
@@ -154,8 +177,6 @@ const CashierCollect = () => {
         setVersion((v) => v + 1);
     };
 
-    const patientView = collectables?.patient;
-    const describe = describerOf(patientView);
     const nothing = collectables && !collectables.plans.length && !collectables.services.length;
 
     return (
@@ -178,7 +199,7 @@ const CashierCollect = () => {
                             <label htmlFor="collect-patient" className="label">
                                 {TEXT.PATIENT}
                             </label>
-                            <select id="collect-patient" className="input" value={patientId} disabled={!patients} onChange={(e) => pickPatient(e.target.value)}>
+                            <select id="collect-patient" className="input" value={patientId} disabled={!patients || busy} onChange={(e) => pickPatient(e.target.value)}>
                                 <option value="">{TEXT.PICK_PATIENT}</option>
                                 {(patients ?? []).map((p) => (
                                     <option key={p.id} value={p.id}>
@@ -241,11 +262,17 @@ const CashierCollect = () => {
                 </Card>
                 {patientId && (
                     <Card title={TEXT.HISTORY} className="self-start overflow-hidden">
-                        <ReceiptHistory receipts={current?.ok ? current.receipts : null} describe={describe} canWrite={lock.open} onStatus={changeStatus} />
+                        {current && !current.ok ? (
+                            <div className="p-4">
+                                <LoadError onRetry={() => setVersion((v) => v + 1)} />
+                            </div>
+                        ) : (
+                            <ReceiptHistory receipts={current ? current.receipts : null} describe={describe} canWrite={lock.open} onStatus={changeStatus} />
+                        )}
                     </Card>
                 )}
             </div>
-            {saved && <ReceiptView receipt={saved} patientName={patientView?.name ?? ""} describe={describe} onClose={() => setSaved(null)} />}
+            {saved && <ReceiptView receipt={saved.receipt} patientName={saved.name} describe={saved.describe} onClose={() => setSaved(null)} />}
         </div>
     );
 };
