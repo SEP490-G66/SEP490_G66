@@ -149,8 +149,10 @@ const applySlots = (state) => {
 
 const loadContext = (state, result) => {
     if (!result.success) {
-        const unlinked = result.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND;
-        return requestFocus({ ...state, page: { status: unlinked ? "unlinked" : "error", profileLoaded: false } }, [BOOKING_IDS.STATE_TITLE]);
+        let status = "error";
+        if (result.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND) status = "unlinked";
+        else if (result.code === BOOKING_ERROR_CODE.PHONE_NOT_VERIFIED) status = "phone-unverified";
+        return requestFocus({ ...state, page: { status, profileLoaded: false } }, [BOOKING_IDS.STATE_TITLE]);
     }
     const { services, doctors, unfinished } = result.data;
     const empty = !services?.length || !doctors?.length;
@@ -210,6 +212,8 @@ const submitFailed = (state, { result, today, snapshot }) => {
             return requestFocus({ ...base, blockedByServer: true, blockedLoading: true }, [BOOKING_IDS.STATE_TITLE]);
         case BOOKING_ERROR_CODE.PROFILE_NOT_FOUND:
             return requestFocus({ ...base, page: { status: "unlinked", profileLoaded: false } }, [BOOKING_IDS.STATE_TITLE]);
+        case BOOKING_ERROR_CODE.PHONE_NOT_VERIFIED:
+            return requestFocus({ ...base, page: { status: "phone-unverified", profileLoaded: false } }, [BOOKING_IDS.STATE_TITLE]);
         default:
             return requestFocus({ ...base, submitError: result.submitError ?? BOOKING_TEXT.SUBMIT_ERROR }, [BOOKING_IDS.SUBMIT]);
     }
