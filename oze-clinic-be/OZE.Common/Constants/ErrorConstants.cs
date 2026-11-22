@@ -66,6 +66,10 @@ namespace OZE.Common.Constants
             public const string SamePassword = "New password cannot be the same as current password";
             public const string PasswordMismatch = "New password and confirmation password do not match";
             public const string LogoutRequiresToken = "Refresh token or authenticated user is required";
+            public const string GoogleTokenInvalid = "Google sign-in token is invalid or expired.";
+            public const string GoogleEmailNotVerified = "Google email is not verified.";
+            public const string GoogleNotPatient = "Google sign-in is only available for patient accounts.";
+            public const string GoogleNotConfigured = "Google sign-in is not configured.";
         }
 
         // Stable codes for login failures (UC-04). FE matches these instead of English message text.
@@ -74,6 +78,10 @@ namespace OZE.Common.Constants
             public const string InvalidCredentials = "INVALID_CREDENTIALS";
             public const string LockedOut = "LOCKED_OUT";
             public const string AccountDisabled = "ACCOUNT_DISABLED";
+            public const string GoogleTokenInvalid = "GOOGLE_TOKEN_INVALID";
+            public const string GoogleEmailNotVerified = "GOOGLE_EMAIL_NOT_VERIFIED";
+            public const string GoogleNotPatient = "GOOGLE_NOT_PATIENT";
+            public const string GoogleNotConfigured = "GOOGLE_NOT_CONFIGURED";
         }
 
         public static class RoomMessage
@@ -298,6 +306,7 @@ namespace OZE.Common.Constants
             public const string SlotNotAvailable = "This time slot is no longer available. Please choose another time";
             public const string PhoneHasAccount = "This phone number already has an account. Please sign in to book";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
+            public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";
             public const string OnlyOpenCanBeCancelled = "Only an appointment that is pending or confirmed can be cancelled";

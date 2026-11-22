@@ -15,6 +15,7 @@ namespace OZE.Application
         {
             // Configure Options
             services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
+            services.Configure<GoogleAuthSettings>(configuration.GetSection("GoogleAuth"));
             services.Configure<AuthMessageSenderOptions>(configuration.GetSection("AuthMessageSenderOptions"));
             services.Configure<AuthSmsSenderOptions>(configuration.GetSection("AuthSmsSenderOptions"));
             services.Configure<RegisterOtpSettings>(configuration.GetSection("RegisterOtpSettings"));
@@ -43,6 +44,7 @@ namespace OZE.Application
 
             // Register Services
             services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+            services.AddScoped<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddSingleton<IOtpSendLimiter, OtpSendLimiter>();
             services.AddSingleton<IAccessTokenRevocationStore, AccessTokenRevocationStore>();
