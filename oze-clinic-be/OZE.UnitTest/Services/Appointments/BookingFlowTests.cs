@@ -274,6 +274,86 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
+
+        // UTCID08 (N): a returning patient (one COMPLETED visit) is confirmed at once, no call back needed
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldConfirmAtOnce_WhenReturningPatient()
+        {
+            Appointment? saved = null;
+            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
+
+            var result = await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            saved!.Status.Should().Be(AppointmentConstants.ConfirmedStatus);
+            result.Status.Should().Be(AppointmentConstants.ConfirmedStatus);
+        }
+
+        // UTCID09 (N): a patient who has never come to the clinic still waits for the front desk call
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldStayPending_WhenNoCompletedVisit()
+        {
+            Appointment? saved = null;
+            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            saved!.Status.Should().Be(AppointmentConstants.PendingStatus);
+        }
+
+        // UTCID10 (N): a returning patient gets the "confirmed" SMS, not "the receptionist will call to confirm"
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldSendConfirmedSms_WhenReturningPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _smsSenderMock.Verify(s => s.SendSmsAsync(_patient.PhoneNumber!, It.Is<string>(m => m.Contains("has been confirmed"))), Times.Once);
+            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.Is<string>(m => m.Contains("will call to confirm"))), Times.Never);
+        }
+
+        // UTCID11 (N): a new patient is told the request was received and the receptionist will call
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldSendRequestReceivedSms_WhenNewPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _smsSenderMock.Verify(s => s.SendSmsAsync(_patient.PhoneNumber!, It.Is<string>(m => m.Contains("will call to confirm"))), Times.Once);
+        }
+
+        // UTCID12 (N): for a returning patient the receptionists are told no call is needed, and the doctor is told at once
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldNotifyNoCallNeeded_WhenReturningPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _notificationsMock.Verify(n => n.NotifyPatientAsync(_patient.Id,
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.ReturningBookingConfirmedTitle), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.ReturningOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.NewOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+            _notificationsMock.Verify(n => n.NotifyStaffAsync(DoctorId, It.IsAny<NotificationContent>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        // UTCID13 (N): for a new patient the receptionists still get the "call to confirm" task
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldAskReceptionToCall_WhenNewPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.NewOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyStaffAsync(It.IsAny<int?>(), It.IsAny<NotificationContent>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
     }
 
     // OZ-APPT-05 CreateWalkIn

@@ -48,6 +48,8 @@ namespace OZE.Application.Interfaces
         Task<bool> HasUnfinishedAppointmentAsync(int patientId, long? excludeAppointmentId = null);
         // True when an approved or running treatment plan of the patient has a session scheduled for today or later
         Task<bool> HasUpcomingTreatmentSessionAsync(int patientId);
+        // True when the patient has come to the clinic at least once: an appointment of the patient is COMPLETED
+        Task<bool> HasCompletedVisitAsync(int patientId);
         Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default);
         Task UpdateAsync(Appointment appointment);
 
