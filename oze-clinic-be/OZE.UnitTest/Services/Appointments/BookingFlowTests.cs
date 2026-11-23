@@ -160,6 +160,20 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.SlotNotAvailable);
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
+
+        // UTCID06 (A): the walk-in record of this phone has a treatment session scheduled, so one booking at a time
+        [Fact]
+        public async Task BookAsGuestAsync_ShouldThrow_WhenTreatmentSessionScheduled()
+        {
+            _registrationRepoMock.Setup(r => r.FindUnlinkedPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            _appointmentRepoMock.Setup(r => r.HasUnfinishedAppointmentAsync(_patient.Id, null)).ReturnsAsync(false);
+            _appointmentRepoMock.Setup(r => r.HasUpcomingTreatmentSessionAsync(_patient.Id)).ReturnsAsync(true);
+
+            var act = () => _service.BookAsGuestAsync(Guest());
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
+            _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
+        }
     }
 
     // OZ-APPT-04 BookAsPatient
@@ -246,6 +260,18 @@ namespace OZE.UnitTest.Services.Appointments
             var act = () => _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
 
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PhoneNotVerified);
+            _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
+        }
+
+        // UTCID07 (A): the treatment plan of the patient already has a session scheduled, so one booking at a time
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldThrow_WhenTreatmentSessionScheduled()
+        {
+            _appointmentRepoMock.Setup(r => r.HasUpcomingTreatmentSessionAsync(_patient.Id)).ReturnsAsync(true);
+
+            var act = () => _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
     }

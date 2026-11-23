@@ -126,7 +126,7 @@ namespace OZE.Application.Services
                     }
 
                     return patient;
-                });
+                }, selfBooking: true);
 
             await SendBookingNotificationAsync(phone, email, appointment, lines);
             await NotifyNewOnlineBookingAsync(appointment, patient);
@@ -147,7 +147,7 @@ namespace OZE.Application.Services
                     var existing = await _appointmentRepository.GetPatientByUserIdAsync(userId);
                     ConditionGuard.Ensure<NotFoundException>(existing != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
                     return existing!;
-                });
+                }, selfBooking: true);
 
             await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
             await NotifyNewOnlineBookingAsync(appointment, patient);
@@ -248,7 +248,7 @@ namespace OZE.Application.Services
         private async Task<(Appointment Appointment, Patient Patient, AvailableSlotResponse Slot)> CreateBookingAsync(
             List<BookingLine> lines, DateOnly date, TimeOnly slotStart, int? doctorId, string? note,
             string? createdByUserId, Func<Task<Patient>> getPatientAsync, long? excludeAppointmentId = null, long? parentAppointmentId = null,
-            string initialStatus = AppointmentConstants.PendingStatus)
+            string initialStatus = AppointmentConstants.PendingStatus, bool selfBooking = false)
         {
             var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
 
@@ -269,6 +269,14 @@ namespace OZE.Application.Services
                 {
                     ConditionGuard.ThrowIf(await _appointmentRepository.HasUnfinishedAppointmentAsync(patient.Id, excludeAppointmentId),
                         ErrorConstants.AppointmentMessage.PatientHasUnfinishedAppointment);
+
+                    // The clinic keeps one booking at a time: a patient whose treatment plan already has a session
+                    // scheduled cannot book online on top of it; the front desk arranges such visits
+                    if (selfBooking)
+                    {
+                        ConditionGuard.ThrowIf(await _appointmentRepository.HasUpcomingTreatmentSessionAsync(patient.Id),
+                            ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
+                    }
                 }
 
                 var appointment = new Appointment
