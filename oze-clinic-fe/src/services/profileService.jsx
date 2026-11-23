@@ -1,6 +1,6 @@
 import api from "./api";
 import { getMockCurrentUser, updateMockUser } from "../utils/data/mockData";
-import { BACKEND_ROLE_NAMES, CHANGE_PASSWORD_TEXT, PROFILE_MESSAGES, VALIDATION_MESSAGES } from "../utils/messages";
+import { BACKEND_ROLE_NAMES, PROFILE_MESSAGES, VALIDATION_MESSAGES } from "../utils/messages";
 import { invalidMessage } from "../utils/validation";
 import { getSessionRole, updateSessionUserName } from "./sessionStore";
 
@@ -28,7 +28,6 @@ const ERRORS = new Map([
     ["Email is invalid. Please check again.", { field: "email", message: VALIDATION_MESSAGES.EMAIL_INVALID }],
     ["Address is invalid. Please check again.", { field: "address", message: VALIDATION_MESSAGES.ADDRESS_TOO_LONG }],
     ["Phone number is invalid. Please check again.", { field: "phone", message: VALIDATION_MESSAGES.PHONE_INVALID }],
-    ["Incorrect password.", { field: "currentPassword", message: CHANGE_PASSWORD_TEXT.INCORRECT_CURRENT }],
     ["Your account is not linked to a patient record. Please contact the reception desk.", { message: PROFILE_MESSAGES.NOT_LINKED }],
     ["OTP is invalid. Please check again.", { message: invalidMessage("Mã xác minh") }],
     ["OTP has expired. Please update your profile again.", { message: PROFILE_MESSAGES.OTP_EXPIRED }],
@@ -65,6 +64,7 @@ const toProfile = (data) => ({
     birthdate: data.dateOfBirth ?? "",
     gender: GENDER_FROM_BACKEND[data.gender] ?? "",
     phone: (data.phoneNumber ?? "").replace(/^\+84/, "0"),
+    phoneConfirmed: data.phoneNumberConfirmed === true,
     email: data.email ?? "",
     address: data.address ?? "",
     emailConfirmed: data.emailConfirmed,
@@ -121,8 +121,21 @@ export const updateContactInfo = async ({ email, address }, profile) => {
     return { ...result, message: emailChanged ? PROFILE_MESSAGES.EMAIL_LINK_SENT : PROFILE_MESSAGES.UPDATE_SUCCESS };
 };
 
-export const requestPhoneChange = ({ phone, currentPassword }, profile) =>
-    putProfile(toUpdateRequest(profile, { phoneNumber: phone, currentPassword }));
+export const updateIdentityInfo = async ({ fullname, birthdate, gender }, profile) => {
+    const result = await putProfile(
+        toUpdateRequest(profile, {
+            fullName: fullname,
+            dateOfBirth: birthdate || null,
+            gender: GENDER_TO_BACKEND[gender] ?? null,
+        }),
+    );
+    if (!result.success) return result;
+    if (result.data?.fullname) updateSessionUserName(result.data.fullname);
+    return { ...result, message: PROFILE_MESSAGES.UPDATE_SUCCESS };
+};
+
+export const requestPhoneChange = ({ phone }, profile) =>
+    putProfile(toUpdateRequest(profile, { phoneNumber: phone }));
 
 export const verifyProfileOtp = async ({ sessionId, code }) => {
     try {

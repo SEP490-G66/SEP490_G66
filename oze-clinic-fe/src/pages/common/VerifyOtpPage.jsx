@@ -191,7 +191,7 @@ const VerifyOtpPage = () => {
                 <h1 className="auth-title">Nhập mã xác minh (OTP)</h1>
                 <p className="auth-subtitle">
                     {isProfile
-                        ? `Mã xác minh gồm 6 chữ số vừa được gửi đến số điện thoại ${maskedDestination}. Vui lòng nhập mã để xác nhận đổi số điện thoại.`
+                        ? `Mã xác minh gồm 6 chữ số vừa được gửi đến số điện thoại ${maskedDestination}. Vui lòng nhập mã để xác nhận số điện thoại.`
                         : `Mã xác minh gồm 6 chữ số vừa được gửi${maskedDestination ? ` đến ${maskedDestination}` : ""}. Vui lòng nhập mã để tiếp tục.`}
                 </p>
 
