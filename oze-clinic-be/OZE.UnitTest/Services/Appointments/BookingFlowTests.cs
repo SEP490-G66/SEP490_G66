@@ -324,6 +324,36 @@ namespace OZE.UnitTest.Services.Appointments
 
             _smsSenderMock.Verify(s => s.SendSmsAsync(_patient.PhoneNumber!, It.Is<string>(m => m.Contains("will call to confirm"))), Times.Once);
         }
+
+        // UTCID12 (N): for a returning patient the receptionists are told no call is needed, and the doctor is told at once
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldNotifyNoCallNeeded_WhenReturningPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _notificationsMock.Verify(n => n.NotifyPatientAsync(_patient.Id,
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.ReturningBookingConfirmedTitle), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.ReturningOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.NewOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+            _notificationsMock.Verify(n => n.NotifyStaffAsync(DoctorId, It.IsAny<NotificationContent>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        // UTCID13 (N): for a new patient the receptionists still get the "call to confirm" task
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldAskReceptionToCall_WhenNewPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
+                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.NewOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+            _notificationsMock.Verify(n => n.NotifyStaffAsync(It.IsAny<int?>(), It.IsAny<NotificationContent>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
     }
 
     // OZ-APPT-05 CreateWalkIn
