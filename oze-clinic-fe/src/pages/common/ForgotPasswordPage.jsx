@@ -2,81 +2,43 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Card from "@/components/ui/Card";
 import { requestPasswordReset } from "../../services/authService";
-import { VERIFICATION_METHOD, VERIFICATION_METHOD_OPTIONS } from "../../utils/messages";
+import { VERIFICATION_METHOD } from "../../utils/messages";
 import { ROUTES } from "../../utils/routes";
-import { isRequiredEmpty, normalizePhone, requiredMessage, validateEmail, validatePhone } from "../../utils/validation";
-
-const FIELDS = {
-    [VERIFICATION_METHOD.SMS]: {
-        id: "phone",
-        label: "Số điện thoại",
-        type: "tel",
-        inputMode: "numeric",
-        autoComplete: "tel",
-        placeholder: "0912 345 678",
-        validate: (value) => validatePhone(value),
-        normalize: (value) => normalizePhone(value),
-    },
-    [VERIFICATION_METHOD.EMAIL]: {
-        id: "email",
-        label: "Email",
-        type: "email",
-        inputMode: "email",
-        autoComplete: "email",
-        placeholder: "ten@example.com",
-        validate: (value) => (isRequiredEmpty(value) ? requiredMessage("email") : validateEmail(value.trim())),
-        normalize: (value) => value.trim(),
-    },
-};
-
-const EMPTY_VALUES = { [VERIFICATION_METHOD.SMS]: "", [VERIFICATION_METHOD.EMAIL]: "" };
+import { normalizePhone, validatePhone } from "../../utils/validation";
 
 const ForgotPasswordPage = () => {
     const navigate = useNavigate();
     const inputRef = useRef(null);
-    const [method, setMethod] = useState(VERIFICATION_METHOD.SMS);
-    const [values, setValues] = useState(EMPTY_VALUES);
+    const [phone, setPhone] = useState("");
     const [error, setError] = useState();
     const [loading, setLoading] = useState(false);
-    const field = FIELDS[method];
-    const value = values[method];
-    const errorId = `${field.id}-error`;
-
-    const handleValueChange = (event) => {
-        const next = event.target.value;
-        setValues((current) => ({ ...current, [method]: next }));
-        setError(undefined);
-    };
-
-    const handleBlur = (event) => {
-        if (isRequiredEmpty(event.target.value)) return;
-        const fieldError = field.validate(event.target.value);
-        if (fieldError) setError(fieldError);
-    };
-
-    const handleMethodChange = (event) => {
-        setMethod(event.target.value);
-        setError(undefined);
-    };
+    const errorId = "phone-error";
 
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (loading) return;
 
-        const fieldError = field.validate(value);
+        const fieldError = validatePhone(phone);
         setError(fieldError);
         if (fieldError) {
             inputRef.current?.focus();
             return;
         }
 
-        const identifier = field.normalize(value);
+        const identifier = normalizePhone(phone);
         setLoading(true);
         try {
             const result = await requestPasswordReset({ identifier });
             if (result.success) {
                 const { sessionId, maskedDestination } = result.data;
-                navigate(ROUTES.VERIFY_OTP, { state: { identifier, method, sessionId, maskedDestination } });
+                navigate(ROUTES.VERIFY_OTP, {
+                    state: {
+                        identifier,
+                        method: VERIFICATION_METHOD.SMS,
+                        sessionId,
+                        maskedDestination,
+                    },
+                });
                 return;
             }
             setError(result.message);
@@ -91,51 +53,36 @@ const ForgotPasswordPage = () => {
             <Card variant="auth" className="w-full max-w-md">
                 <h1 className="auth-title">Khôi phục tài khoản</h1>
                 <p className="auth-subtitle">
-                    Vui lòng cung cấp thông tin để xác minh tài khoản.
+                    Nhập số điện thoại đã đăng ký để nhận mã OTP qua SMS.
                 </p>
 
                 <form noValidate onSubmit={handleSubmit}>
-                    <fieldset>
-                        <legend className="label">Nhận mã xác minh qua</legend>
-                        <div className="flex flex-wrap gap-x-6">
-                            {VERIFICATION_METHOD_OPTIONS.map((option) => (
-                                <div key={option.value} className="flex h-control items-center gap-2">
-                                    <input
-                                        id={`method-${option.value}`}
-                                        name="method"
-                                        type="radio"
-                                        value={option.value}
-                                        checked={method === option.value}
-                                        onChange={handleMethodChange}
-                                    />
-                                    <label htmlFor={`method-${option.value}`} className="label cursor-pointer">
-                                        {option.label}
-                                    </label>
-                                </div>
-                            ))}
-                        </div>
-                    </fieldset>
-
                     <div className="field mt-4">
-                        <label htmlFor={field.id} className="label label-required">
-                            {field.label}
+                        <label htmlFor="phone" className="label label-required">
+                            Số điện thoại
                         </label>
                         <input
-                            key={field.id}
                             ref={inputRef}
-                            id={field.id}
-                            name={field.id}
-                            type={field.type}
-                            inputMode={field.inputMode}
-                            autoComplete={field.autoComplete}
-                            placeholder={field.placeholder}
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            inputMode="numeric"
+                            autoComplete="tel"
+                            placeholder="0912 345 678"
                             className="input"
                             aria-required="true"
                             aria-invalid={error ? true : undefined}
                             aria-describedby={error ? errorId : undefined}
-                            value={value}
-                            onChange={handleValueChange}
-                            onBlur={handleBlur}
+                            value={phone}
+                            onChange={(event) => {
+                                setPhone(event.target.value);
+                                setError(undefined);
+                            }}
+                            onBlur={(event) => {
+                                if (!event.target.value.trim()) return;
+                                const fieldError = validatePhone(event.target.value);
+                                if (fieldError) setError(fieldError);
+                            }}
                         />
                         {error && (
                             <p id={errorId} className="error-text">
