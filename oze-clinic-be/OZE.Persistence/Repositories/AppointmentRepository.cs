@@ -356,6 +356,19 @@ namespace OZE.Persistence.Repositories
                     && AppointmentConstants.UnfinishedStatuses.Contains(x.Status));
         }
 
+        public async Task<bool> HasUpcomingTreatmentSessionAsync(int patientId)
+        {
+            var today = DateOnly.FromDateTime(ClinicClock.Today);
+            return await _context.TreatmentPlanStages
+                .AnyAsync(s => s.TreatmentPlan.PatientId == patientId
+                    && (s.TreatmentPlan.Status == TreatmentPlanConstants.Approved
+                        || s.TreatmentPlan.Status == TreatmentPlanConstants.InProgress)
+                    && (s.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled
+                        || s.StageStatus == TreatmentPlanConstants.StageStatus.InProgress)
+                    && s.ScheduledDate != null
+                    && s.ScheduledDate >= today);
+        }
+
         public async Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default)
         {
             var query = _context.Appointments
