@@ -49,6 +49,9 @@ namespace OZE.Controllers
             return Ok(ApiResponse<InvoiceResponse>.SuccessResult(invoice, ErrorConstants.InvoiceMessage.InvoiceCreated));
         }
 
+        /// <summary>
+        /// Lấy danh sách hóa đơn phân trang dành cho Lễ tân và Quản lý phòng khám.
+        /// </summary>
         [HttpGet]
         [Authorize(Roles = $"{RoleConstants.ReceptionistRole},{RoleConstants.ClinicManagerRole}")]
         public async Task<ActionResult<ApiResponse<PagedResult<InvoiceSummaryResponse>>>> GetPagedAsync(
@@ -59,6 +62,9 @@ namespace OZE.Controllers
             return Ok(ApiResponse<PagedResult<InvoiceSummaryResponse>>.SuccessResult(result));
         }
 
+        /// <summary>
+        /// Lấy danh sách hóa đơn tóm tắt của bệnh nhân đang đăng nhập.
+        /// </summary>
         [HttpGet("my")]
         [Authorize(Roles = RoleConstants.PatientRole)]
         public async Task<ActionResult<ApiResponse<PagedResult<InvoiceSummaryResponse>>>> GetMyInvoicesAsync(
@@ -97,6 +103,9 @@ namespace OZE.Controllers
             return Ok(ApiResponse<List<PatientInvoiceDetailResponse>>.SuccessResult(result));
         }
 
+        /// <summary>
+        /// Lấy chi tiết thông tin hóa đơn theo Id (có kiểm tra quyền sở hữu đối với bệnh nhân).
+        /// </summary>
         [HttpGet("{id:long}")]
         [Authorize(Roles = $"{RoleConstants.ReceptionistRole},{RoleConstants.ClinicManagerRole},{RoleConstants.PatientRole}")]
         public async Task<ActionResult<ApiResponse<InvoiceResponse>>> GetByIdAsync(
@@ -107,6 +116,9 @@ namespace OZE.Controllers
             return Ok(ApiResponse<InvoiceResponse>.SuccessResult(invoice));
         }
 
+        /// <summary>
+        /// Cập nhật thông tin hóa đơn (áp dụng cho Lễ tân khi cần điều chỉnh chiết khấu hoặc ghi chú).
+        /// </summary>
         [HttpPut("{id:long}")]
         [Authorize(Roles = RoleConstants.ReceptionistRole)]
         public async Task<ActionResult<ApiResponse<InvoiceResponse>>> UpdateAsync(
