@@ -23,9 +23,11 @@ export const ROUTES = {
     CHANGE_PASSWORD: "/change-password",
     DASHBOARD: "/dashboard",
     APPOINTMENTS: "/appointments",
-    MEDICAL_RECORD: "/medical-record",
+    MEDICAL_RECORD: "/medical-history",
     APPOINTMENT_DETAIL: "/appointments/:appointmentId",
-    MEDICAL_RECORD_DETAIL: "/medical-record/:examinationId",
+    MEDICAL_RECORD_DETAIL: "/medical-history/:examinationId",
+    TREATMENT_PLANS: "/treatment-plans",
+    DOCUMENTS: "/documents",
     PAYMENT_DEBTS: "/payments/debts",
     PAYMENT_HISTORY: "/payments/history",
     REFUND_REQUESTS: "/payments/refunds",
@@ -69,7 +71,7 @@ export const ROUTES = {
 export const ROLE_ROUTES = [
     {
         roles: [USER_ROLES.PATIENT],
-        paths: [ROUTES.APPOINTMENTS, ROUTES.BOOK_APPOINTMENT, ROUTES.MEDICAL_RECORD, ROUTES.PAYMENT_DEBTS, ROUTES.PAYMENT_HISTORY, ROUTES.REFUND_REQUESTS]
+        paths: [ROUTES.APPOINTMENTS, ROUTES.BOOK_APPOINTMENT, ROUTES.MEDICAL_RECORD, ROUTES.TREATMENT_PLANS, ROUTES.DOCUMENTS, ROUTES.PAYMENT_DEBTS, ROUTES.PAYMENT_HISTORY, ROUTES.REFUND_REQUESTS]
     },
     {
         roles: [USER_ROLES.DOCTOR],

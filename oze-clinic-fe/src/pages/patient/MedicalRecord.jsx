@@ -93,7 +93,7 @@ const PANELS = {
 };
 
 const LoadingSkeleton = () => (
-    <div role="region" aria-busy="true" aria-label="Đang tải sổ khám bệnh">
+    <div role="region" aria-busy="true" aria-label="Đang tải lịch sử khám">
         <div className="skeleton h-7 w-55" />
         <div className="skeleton mt-2.5 h-4 w-full max-w-105" />
         <div className="skeleton mt-5.5 h-13" />
@@ -248,7 +248,7 @@ const MedicalRecord = () => {
         <div className="page-header">
             <div>
                 <h1 id={RECORD_TITLE_ID} ref={h1Ref} tabIndex={-1} className="page-title outline-none focus-visible:shadow-none">
-                    Sổ khám bệnh
+                    Lịch sử khám
                 </h1>
                 <p className="page-description">Hồ sơ điều trị của bạn tại phòng khám: từng phiếu khám, kế hoạch, phim chụp, tình trạng răng và tiền sử.</p>
             </div>
@@ -260,7 +260,7 @@ const MedicalRecord = () => {
             <>
                 {header}
                 <RecordStateBox
-                    title="Không thể tải sổ khám bệnh"
+                    title="Không thể tải lịch sử khám"
                     text="Đã có lỗi xảy ra, vui lòng thử lại."
                     actionLabel="Thử lại"
                     onAction={retry}
@@ -298,7 +298,7 @@ const MedicalRecord = () => {
             <>
                 {header}
                 <RecordEmptyCard
-                    title="Sổ khám bệnh đang trống"
+                    title="Lịch sử khám đang trống"
                     text="Sau lần khám đầu tiên, phiếu khám, kế hoạch điều trị, đơn thuốc và phim chụp sẽ được lưu ở đây."
                 >
                     <Link to={ROUTES.BOOK_APPOINTMENT} className="btn btn-primary mt-3 h-8 px-3">

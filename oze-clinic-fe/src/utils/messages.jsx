@@ -606,7 +606,7 @@ export const MEDICAL_RECORD_STATUS_GUIDE = [
         title: "Kế hoạch điều trị",
         labels: MEDICAL_RECORD_PLAN_STATUS,
         items: [
-            { key: "proposed", meaning: "Bác sĩ đã lập kế hoạch, bệnh nhân chưa đồng ý.", when: "Bác sĩ lập kế hoạch sau khi khám.", patient: "Đồng ý ngay trên Sổ khám bệnh, hoặc trao đổi với bác sĩ tại phòng khám." },
+            { key: "proposed", meaning: "Bác sĩ đã lập kế hoạch, bệnh nhân chưa đồng ý.", when: "Bác sĩ lập kế hoạch sau khi khám.", patient: "Đồng ý ngay trên trang Lịch sử khám, hoặc trao đổi với bác sĩ tại phòng khám." },
             { key: "active", meaning: "Bệnh nhân đã đồng ý, đang thực hiện các bước.", when: "Bệnh nhân đồng ý kế hoạch.", patient: "Theo dõi bước tiếp theo; chi phí xem ở Công nợ." },
             { key: "paused", meaning: "Tạm ngưng, kế hoạch vẫn giữ.", when: "Bệnh nhân xin tạm ngưng hoặc chờ điều kiện (ví dụ xét nghiệm).", patient: "Liên hệ phòng khám khi muốn tiếp tục." },
             { key: "done", meaning: "Đã làm xong tất cả các bước.", when: "Bác sĩ hoàn tất bước cuối.", patient: "Theo dõi lịch tái khám định kỳ (nếu có)." },
@@ -791,7 +791,7 @@ export const PATIENT_DEBT_TEXT = {
     RECEIPT: "Phiếu",
     RECEIPT_CONTEXT: (date, amount) => `ngày ${date}, ${amount}`,
     NO_PAYMENT: "Chưa có lần thanh toán nào.",
-    VIEW_PLAN: "Xem kế hoạch trong Sổ khám bệnh",
+    VIEW_PLAN: "Xem kế hoạch trong Lịch sử khám",
     REFUNDS_TITLE: "Yêu cầu hoàn tiền",
     ALL_REFUNDS: "Tất cả",
     REFUND_LINK: (code, label) => `Yêu cầu hoàn tiền ${code} · ${label}`,

@@ -252,6 +252,8 @@ const ROLE_PAGES = {
 // Titles of the sidebar pages not built yet (same labels as the sidebar); they show ComingSoonPage inside the layout.
 const COMING_SOON_TITLES = {
     [ROUTES.APPOINTMENTS]: "Lịch hẹn của tôi",
+    [ROUTES.TREATMENT_PLANS]: "Kế hoạch điều trị",
+    [ROUTES.DOCUMENTS]: "Cung cấp tài liệu",
     [ROUTES.DOCTOR_APPOINTMENTS]: "Lịch hẹn khám",
     [ROUTES.DOCTOR_PATIENTS]: "Bệnh nhân",
     [ROUTES.DOCTOR_TREATMENT_PLANS]: "Kế hoạch điều trị",
