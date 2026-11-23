@@ -274,6 +274,33 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
+
+        // UTCID08 (N): a returning patient (one COMPLETED visit) is confirmed at once, no call back needed
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldConfirmAtOnce_WhenReturningPatient()
+        {
+            Appointment? saved = null;
+            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
+
+            var result = await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            saved!.Status.Should().Be(AppointmentConstants.ConfirmedStatus);
+            result.Status.Should().Be(AppointmentConstants.ConfirmedStatus);
+        }
+
+        // UTCID09 (N): a patient who has never come to the clinic still waits for the front desk call
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldStayPending_WhenNoCompletedVisit()
+        {
+            Appointment? saved = null;
+            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            saved!.Status.Should().Be(AppointmentConstants.PendingStatus);
+        }
     }
 
     // OZ-APPT-05 CreateWalkIn
