@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
@@ -72,20 +72,20 @@ namespace OZE.UnitTest.Services.Auth
         }
 
         [Fact]
-        public async Task RegisterAsync_WithEmailMethod_ShouldSendCodeByEmailOnly()
+        public async Task RegisterAsync_WithEmailMethod_ShouldFail()
         {
             // Arrange
             SetupFindByPhone(null);
             SetupFindByEmail(null);
-            SetupIdentityWritesSucceed();
 
             // Act
             var result = await _authService.RegisterAsync(ValidRegisterRequest(VerificationMethodConstants.Email), BaseUrl);
 
-            // Assert
-            result.Success.Should().BeTrue();
-            _emailSenderMock.Verify(e => e.SendRegistrationOtpAsync(Email, "Nguyen Van A", It.IsAny<string>(), It.IsAny<int>()), Times.Once);
-            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            // Assert: OTP registration is SMS-only
+            result.Success.Should().BeFalse();
+            result.Message.Should().Be(ErrorConstants.AuthMessage.VerificationMethodInvalid);
+            VerifyNoAccountSaved();
+            VerifyNoOtpSentAndNoPendingSaved();
         }
 
         [Fact]
@@ -131,8 +131,10 @@ namespace OZE.UnitTest.Services.Auth
             SetupFindByPhone(null);
             SetupFindByEmail(new ApplicationUser { Id = "someone-else", Email = Email });
 
-            // Act
-            var result = await _authService.RegisterAsync(ValidRegisterRequest(VerificationMethodConstants.Email), BaseUrl);
+            // Act — SMS method with an email that already belongs to someone else
+            var request = ValidRegisterRequest(VerificationMethodConstants.Sms);
+            request.Email = Email;
+            var result = await _authService.RegisterAsync(request, BaseUrl);
 
             // Assert
             result.Success.Should().BeFalse();
@@ -220,7 +222,7 @@ namespace OZE.UnitTest.Services.Auth
 
             // Assert
             result.Success.Should().BeFalse();
-            result.Message.Should().Be(ErrorConstants.AuthMessage.EmailRequired);
+            result.Message.Should().Be(ErrorConstants.AuthMessage.VerificationMethodInvalid);
         }
 
         [Fact]

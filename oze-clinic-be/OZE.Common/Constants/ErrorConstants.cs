@@ -39,6 +39,7 @@ namespace OZE.Common.Constants
             public const string PasswordInvalid = "Password is invalid. Please check again.";
             public const string ConfirmPasswordInvalid = "Confirm password is invalid. Please check again.";
             public const string VerificationMethodInvalid = "Verification method is invalid. Please check again.";
+            public const string PasswordResetPhoneOnly = "Password reset is only available via phone number.";
             public const string InvalidOtp = "OTP is invalid. Please check again.";
             public const string InvalidData = "{0} is invalid. Please check again.";
             // MSG10, formatted with the phone number
@@ -712,7 +713,7 @@ namespace OZE.Common.Constants
             public const string ContactRecorded = "Call result has been recorded.";
             public const string InvoiceNotFound = "Invoice not found.";
             public const string NothingOwed = "This invoice has nothing left to pay.";
-            public const string NoContact = "The patient has no phone number or email to send a reminder to.";
+            public const string NoContact = "The patient has no email to send a reminder to.";
             public const string RemindedRecently = "A payment reminder was sent less than 4 hours ago. Send again only if needed.";
             public const string PaymentReminded = "Payment reminder has been sent.";
             public const string SendFailed = "The reminder could not be sent by SMS or email. Try again later or call the patient.";

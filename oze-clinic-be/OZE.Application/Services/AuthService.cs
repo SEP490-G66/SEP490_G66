@@ -21,7 +21,6 @@ namespace OZE.Application.Services
         private readonly IUserRefreshTokenRepository _refreshTokenRepository;
         private readonly IJwtTokenGenerator _jwtTokenGenerator;
         private readonly IUserService _userService;
-        private readonly IEmailSender _emailSender;
         private readonly ISmsSender _smsSender;
         private readonly IPendingRegistrationStore _pendingRegistrationStore;
         private readonly IPasswordResetStore _passwordResetStore;
@@ -42,7 +41,6 @@ namespace OZE.Application.Services
             IUserRefreshTokenRepository refreshTokenRepository,
             IJwtTokenGenerator jwtTokenGenerator,
             IUserService userService,
-            IEmailSender emailSender,
             ISmsSender smsSender,
             IPendingRegistrationStore pendingRegistrationStore,
             IPasswordResetStore passwordResetStore,
@@ -62,7 +60,6 @@ namespace OZE.Application.Services
             _refreshTokenRepository = refreshTokenRepository;
             _jwtTokenGenerator = jwtTokenGenerator;
             _userService = userService;
-            _emailSender = emailSender;
             _smsSender = smsSender;
             _pendingRegistrationStore = pendingRegistrationStore;
             _passwordResetStore = passwordResetStore;
@@ -94,9 +91,10 @@ namespace OZE.Application.Services
                 return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.EmailInvalid);
             }
 
-            if (request.VerificationMethod == VerificationMethodConstants.Email && email == null)
+            // OTP is SMS-only; email is optional contact for later notifications
+            if (!string.Equals(request.VerificationMethod, VerificationMethodConstants.Sms, StringComparison.OrdinalIgnoreCase))
             {
-                return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.EmailRequired);
+                return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.VerificationMethodInvalid);
             }
 
             // An account that never finished OTP verification is reused, so the guest can sign up again.
@@ -122,9 +120,8 @@ namespace OZE.Application.Services
                 }
             }
 
-            // A code goes to this contact: only a few per hour, so codes cannot be guessed sign-up after sign-up
-            _otpSendLimiter?.EnsureCanSend(SecurityConstants.OtpPurposeRegister,
-                request.VerificationMethod == VerificationMethodConstants.Email ? email! : phoneNumber);
+            // A code goes to this phone: only a few per hour, so codes cannot be guessed sign-up after sign-up
+            _otpSendLimiter?.EnsureCanSend(SecurityConstants.OtpPurposeRegister, phoneNumber);
 
             var saved = await _registrationRepository.ExecuteInTransactionAsync(
                 () => SaveUnverifiedUserAsync(user, phoneNumber, email, request.Password),
@@ -141,7 +138,7 @@ namespace OZE.Application.Services
                 SessionId = Guid.NewGuid().ToString("N"),
                 UserId = saved.User.Id,
                 SecurityStamp = saved.User.SecurityStamp ?? string.Empty,
-                VerificationMethod = request.VerificationMethod,
+                VerificationMethod = VerificationMethodConstants.Sms,
                 FullName = request.FullName.Trim(),
                 DateOfBirth = dateOfBirth,
                 Gender = request.Gender,
@@ -183,8 +180,7 @@ namespace OZE.Application.Services
                 return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.OtpExpired);
             }
 
-            _otpSendLimiter?.EnsureCanSend(SecurityConstants.OtpPurposeRegister,
-                pending.VerificationMethod == VerificationMethodConstants.Email ? pending.Email ?? string.Empty : pending.PhoneNumber);
+            _otpSendLimiter?.EnsureCanSend(SecurityConstants.OtpPurposeRegister, pending.PhoneNumber);
 
             // The previous OTP stays valid if the new one cannot be sent.
             var otp = OtpHelper.Generate();
@@ -249,22 +245,6 @@ namespace OZE.Application.Services
                 return activated;
             }
 
-            if (pending.VerificationMethod == VerificationMethodConstants.Sms && user.Email != null)
-            {
-                try
-                {
-                    var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                    var encodedCode = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-                    var callbackUrl = $"{baseUrl}/api/auth/confirm-email?userId={user.Id}&code={encodedCode}";
-                    await _emailSender.SendEmailVerificationAsync(user, callbackUrl);
-                }
-                catch (Exception ex)
-                {
-                    // Account is already created and the phone is verified, so an email failure must not fail the request.
-                    _logger.LogError(ex, "Failed to send confirmation email to {Email} (UserId: {UserId}) after OTP verification", user.Email, user.Id);
-                }
-            }
-
             return activated;
         }
 
@@ -305,35 +285,22 @@ namespace OZE.Application.Services
             var walkInPatients = await _registrationRepository.FindUnlinkedPatientsByPhoneAsync(
                 PhoneNumberHelper.GetLookupVariants(pending.PhoneNumber));
 
-            if (pending.VerificationMethod == VerificationMethodConstants.Sms)
+            // BR-056, BR-058: the record with the same verified phone number is linked instead of creating a new one.
+            if (walkInPatients.Count > 1)
             {
-                // BR-056, BR-058: the record with the same verified phone number is linked instead of creating a new one.
-                if (walkInPatients.Count > 1)
-                {
-                    return ApiResponse.FailureResult(ErrorConstants.AuthMessage.MultiplePatientRecords);
-                }
+                return ApiResponse.FailureResult(ErrorConstants.AuthMessage.MultiplePatientRecords);
+            }
 
-                if (walkInPatients.Count == 1)
-                {
-                    LinkPatient(walkInPatients[0], user, pending);
-                }
-                else
-                {
-                    user.Patient = CreatePatient(pending);
-                }
-
-                user.PhoneNumberConfirmed = true;
+            if (walkInPatients.Count == 1)
+            {
+                LinkPatient(walkInPatients[0], user, pending);
             }
             else
             {
-                // The phone number is not verified, so a matching record is left for the reception desk to link (MSG39).
-                if (walkInPatients.Count == 0)
-                {
-                    user.Patient = CreatePatient(pending);
-                }
-
-                user.EmailConfirmed = true;
+                user.Patient = CreatePatient(pending);
             }
+
+            user.PhoneNumberConfirmed = true;
 
             user.LockoutEnd = null;
             user.AccessFailedCount = 0;
@@ -428,22 +395,14 @@ namespace OZE.Application.Services
         {
             try
             {
-                if (pending.VerificationMethod == VerificationMethodConstants.Email)
-                {
-                    await _emailSender.SendRegistrationOtpAsync(pending.Email!, pending.FullName, otp, OtpExpiresInMinutes);
-                }
-                else
-                {
-                    await _smsSender.SendSmsAsync(
-                        pending.PhoneNumber,
-                        AuthSmsSenderOptions.RenderOtp(_smsOptions.OtpTemplate, AuthSmsSenderOptions.DefaultOtpTemplate, otp, OtpExpiresInMinutes));
-                }
-
+                await _smsSender.SendSmsAsync(
+                    pending.PhoneNumber,
+                    AuthSmsSenderOptions.RenderOtp(_smsOptions.OtpTemplate, AuthSmsSenderOptions.DefaultOtpTemplate, otp, OtpExpiresInMinutes));
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to send registration OTP by {Method} (UserId: {UserId})", pending.VerificationMethod, pending.UserId);
+                _logger.LogError(ex, "Failed to send registration OTP by SMS (UserId: {UserId})", pending.UserId);
                 return false;
             }
         }
@@ -452,37 +411,18 @@ namespace OZE.Application.Services
 
         private int ResendCooldownSeconds => _otpSettings.ResendCooldownSeconds > 0 ? _otpSettings.ResendCooldownSeconds : 60;
 
-        private static string OtpSentMessage(PendingRegistration pending)
-        {
-            return pending.VerificationMethod == VerificationMethodConstants.Email
-                ? ErrorConstants.AuthMessage.OtpSentEmail
-                : ErrorConstants.AuthMessage.OtpSentSms;
-        }
+        private static string OtpSentMessage(PendingRegistration pending) => ErrorConstants.AuthMessage.OtpSentSms;
 
         private RegisterPendingResponse ToPendingResponse(PendingRegistration pending)
         {
             return new RegisterPendingResponse
             {
                 SessionId = pending.SessionId,
-                VerificationMethod = pending.VerificationMethod,
-                MaskedDestination = pending.VerificationMethod == VerificationMethodConstants.Email
-                    ? MaskEmail(pending.Email!)
-                    : PhoneNumberHelper.Mask(pending.PhoneNumber),
+                VerificationMethod = VerificationMethodConstants.Sms,
+                MaskedDestination = PhoneNumberHelper.Mask(pending.PhoneNumber),
                 ExpiresAt = pending.ExpiresAt,
                 ResendAvailableAt = pending.LastSentAt.AddSeconds(ResendCooldownSeconds)
             };
-        }
-
-        private static string MaskEmail(string email)
-        {
-            var atIndex = email.IndexOf('@');
-            if (atIndex <= 1)
-            {
-                return email;
-            }
-
-            var visible = Math.Min(2, atIndex - 1);
-            return email[..visible] + new string('*', atIndex - visible) + email[atIndex..];
         }
 
         public async Task<ApiResponse<AuthResult>> LoginAsync(LoginRequest request)
@@ -883,24 +823,17 @@ namespace OZE.Application.Services
         public async Task<ApiResponse<RegisterPendingResponse>> ForgotPasswordAsync(ForgotPasswordRequest request)
         {
             var identifier = request.Identifier.Trim();
-            var isEmail = identifier.Contains('@');
+            if (identifier.Contains('@'))
+            {
+                return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.PasswordResetPhoneOnly);
+            }
 
-            ApplicationUser? user;
-            string destination;
-            if (isEmail)
+            if (!PhoneNumberHelper.TryNormalize(identifier, out var destination))
             {
-                user = await _userManager.FindByEmailAsync(identifier);
-                destination = identifier;
+                return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.InvalidPhone);
             }
-            else
-            {
-                if (!PhoneNumberHelper.TryNormalize(identifier, out var phone))
-                {
-                    return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.InvalidPhone);
-                }
-                user = await _registrationRepository.FindUserByPhoneAsync(PhoneNumberHelper.GetLookupVariants(phone));
-                destination = phone;
-            }
+
+            var user = await _registrationRepository.FindUserByPhoneAsync(PhoneNumberHelper.GetLookupVariants(destination));
 
             // Counted for every identifier, known or not, so the limit does not tell which accounts exist either
             _otpSendLimiter?.EnsureCanSend(SecurityConstants.OtpPurposePasswordReset, destination);
@@ -910,7 +843,7 @@ namespace OZE.Application.Services
             // the same answer as a real one, and a session that no code opens, so neither the answer nor the next step
             // tells which accounts exist. Staff contacts are set by the manager and count as proved
             if (user == null || await IsPendingRegistrationAsync(user)
-                || await IsUnprovenPatientContactAsync(user, isEmail ? user.EmailConfirmed : user.PhoneNumberConfirmed))
+                || await IsUnprovenPatientContactAsync(user, user.PhoneNumberConfirmed))
             {
                 var decoy = new PasswordResetSession
                 {
@@ -923,8 +856,8 @@ namespace OZE.Application.Services
                 return ApiResponse<RegisterPendingResponse>.SuccessResult(new RegisterPendingResponse
                 {
                     SessionId = decoy.SessionId,
-                    VerificationMethod = isEmail ? VerificationMethodConstants.Email : VerificationMethodConstants.Sms,
-                    MaskedDestination = isEmail ? MaskEmail(destination) : PhoneNumberHelper.Mask(destination),
+                    VerificationMethod = VerificationMethodConstants.Sms,
+                    MaskedDestination = PhoneNumberHelper.Mask(destination),
                     ExpiresAt = decoy.ExpiresAt,
                     ResendAvailableAt = now.AddSeconds(ResendCooldownSeconds)
                 });
@@ -942,16 +875,8 @@ namespace OZE.Application.Services
 
             try
             {
-                if (isEmail)
-                {
-                    await _emailSender.SendEmailAsync(destination, "OZE password reset code",
-                        $"<p>Your password reset code is <b>{otp}</b>.</p><p>It expires in {OtpExpiresInMinutes} minutes.</p>");
-                }
-                else
-                {
-                    await _smsSender.SendSmsAsync(destination,
-                        AuthSmsSenderOptions.RenderOtp(_smsOptions.ResetPasswordOtpTemplate, AuthSmsSenderOptions.DefaultResetPasswordOtpTemplate, otp, OtpExpiresInMinutes));
-                }
+                await _smsSender.SendSmsAsync(destination,
+                    AuthSmsSenderOptions.RenderOtp(_smsOptions.ResetPasswordOtpTemplate, AuthSmsSenderOptions.DefaultResetPasswordOtpTemplate, otp, OtpExpiresInMinutes));
             }
             catch (Exception ex)
             {
@@ -964,8 +889,8 @@ namespace OZE.Application.Services
             return ApiResponse<RegisterPendingResponse>.SuccessResult(new RegisterPendingResponse
             {
                 SessionId = session.SessionId,
-                VerificationMethod = isEmail ? VerificationMethodConstants.Email : VerificationMethodConstants.Sms,
-                MaskedDestination = isEmail ? MaskEmail(destination) : PhoneNumberHelper.Mask(destination),
+                VerificationMethod = VerificationMethodConstants.Sms,
+                MaskedDestination = PhoneNumberHelper.Mask(destination),
                 ExpiresAt = session.ExpiresAt,
                 ResendAvailableAt = now.AddSeconds(ResendCooldownSeconds)
             });
