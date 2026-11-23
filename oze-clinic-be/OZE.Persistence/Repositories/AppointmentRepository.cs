@@ -356,6 +356,12 @@ namespace OZE.Persistence.Repositories
                     && AppointmentConstants.UnfinishedStatuses.Contains(x.Status));
         }
 
+        public async Task<bool> HasCompletedVisitAsync(int patientId)
+        {
+            return await _context.Appointments
+                .AnyAsync(x => x.PatientId == patientId && x.Status == AppointmentConstants.CompletedStatus);
+        }
+
         public async Task<bool> HasUpcomingTreatmentSessionAsync(int patientId)
         {
             var today = DateOnly.FromDateTime(ClinicClock.Today);
