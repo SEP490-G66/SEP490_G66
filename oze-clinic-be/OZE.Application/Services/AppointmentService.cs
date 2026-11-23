@@ -171,7 +171,7 @@ namespace OZE.Application.Services
             {
                 await NotifyNewOnlineBookingAsync(appointment, patient);
             }
-            await LogCreatedAsync(appointment, lines);
+            await LogCreatedAsync(appointment, lines, autoConfirmed: returning);
             return ToResponse(appointment, patient, slot, lines);
         }
 
@@ -1535,11 +1535,14 @@ namespace OZE.Application.Services
                 ErrorConstants.AppointmentMessage.PriorityReasonRequired);
         }
 
-        private Task LogCreatedAsync(Appointment appointment, List<BookingLine> lines) =>
+        // autoConfirmed: a returning patient's online booking that skipped the front desk call, kept so the log shows why
+        // an online booking started as CONFIRMED
+        private Task LogCreatedAsync(Appointment appointment, List<BookingLine> lines, bool autoConfirmed = false) =>
             _auditLogService.LogAsync(AuditConstants.AppointmentCreated, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 newValues: new
                 {
                     appointment.Status,
+                    AutoConfirmed = autoConfirmed,
                     appointment.AppointmentDate,
                     appointment.TimeSlotStart,
                     appointment.TimeSlotEnd,
