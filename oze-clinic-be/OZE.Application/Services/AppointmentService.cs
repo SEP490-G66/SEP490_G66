@@ -126,7 +126,7 @@ namespace OZE.Application.Services
                     }
 
                     return patient;
-                });
+                }, selfBooking: true);
 
             await SendBookingNotificationAsync(phone, email, patient.FullName, appointment, lines);
             await NotifyNewOnlineBookingAsync(appointment, patient);
@@ -140,18 +140,38 @@ namespace OZE.Application.Services
 
             var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
 
-            var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
-                request.DoctorId, request.Note, userId, async () =>
-                {
-                    // The patient comes from the token, never from the request
-                    var existing = await _appointmentRepository.GetPatientByUserIdAsync(userId);
-                    ConditionGuard.Ensure<NotFoundException>(existing != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
-                    return existing!;
-                });
+            // The patient comes from the token, never from the request
+            var existing = await _appointmentRepository.GetPatientByUserIdAsync(userId);
+            ConditionGuard.Ensure<NotFoundException>(existing != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
 
-            await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
-            await NotifyNewOnlineBookingAsync(appointment, patient);
-            await LogCreatedAsync(appointment, lines);
+            // A returning patient (came to the clinic at least once) books with a verified phone, so the front desk
+            // has nothing to check: the booking is CONFIRMED at once. A new patient still waits for the call back
+            var returning = await _appointmentRepository.HasCompletedVisitAsync(existing!.Id);
+            var initialStatus = returning ? AppointmentConstants.ConfirmedStatus : AppointmentConstants.PendingStatus;
+
+            var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
+                request.DoctorId, request.Note, userId, () => Task.FromResult(existing!),
+                initialStatus: initialStatus, selfBooking: true);
+
+            // A confirmed booking must not say "the receptionist will call to confirm"
+            if (returning)
+            {
+                await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
+            }
+            else
+            {
+                await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
+            }
+
+            if (returning)
+            {
+                await NotifyReturningOnlineBookingAsync(appointment, patient);
+            }
+            else
+            {
+                await NotifyNewOnlineBookingAsync(appointment, patient);
+            }
+            await LogCreatedAsync(appointment, lines, autoConfirmed: returning);
             return ToResponse(appointment, patient, slot, lines);
         }
 
@@ -214,14 +234,15 @@ namespace OZE.Application.Services
                     return patient;
                 }, initialStatus: AppointmentConstants.ConfirmedStatus);
 
-            await SendReceptionBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
+            await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
             await NotifyAsync(n => n.NotifyPatientAsync(patient.Id, Content(NotificationConstants.Text.AppointmentBookedByClinicTitle, NotificationConstants.Text.AppointmentBookedByClinicMessage, appointment)));
             await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
         }
 
-        private async Task SendReceptionBookingNotificationAsync(
+        // Email for a booking that is CONFIRMED when it is made (by the receptionist, or by a returning patient)
+        private async Task SendConfirmedBookingNotificationAsync(
             string? phone, string? email, string? patientName, Appointment appointment, List<BookingLine> lines)
         {
             var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
@@ -245,7 +266,7 @@ namespace OZE.Application.Services
         private async Task<(Appointment Appointment, Patient Patient, AvailableSlotResponse Slot)> CreateBookingAsync(
             List<BookingLine> lines, DateOnly date, TimeOnly slotStart, int? doctorId, string? note,
             string? createdByUserId, Func<Task<Patient>> getPatientAsync, long? excludeAppointmentId = null, long? parentAppointmentId = null,
-            string initialStatus = AppointmentConstants.PendingStatus)
+            string initialStatus = AppointmentConstants.PendingStatus, bool selfBooking = false)
         {
             var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
 
@@ -266,6 +287,14 @@ namespace OZE.Application.Services
                 {
                     ConditionGuard.ThrowIf(await _appointmentRepository.HasUnfinishedAppointmentAsync(patient.Id, excludeAppointmentId),
                         ErrorConstants.AppointmentMessage.PatientHasUnfinishedAppointment);
+
+                    // The clinic keeps one booking at a time: a patient whose treatment plan already has a session
+                    // scheduled cannot book online on top of it; the front desk arranges such visits
+                    if (selfBooking)
+                    {
+                        ConditionGuard.ThrowIf(await _appointmentRepository.HasUpcomingTreatmentSessionAsync(patient.Id),
+                            ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
+                    }
                 }
 
                 var appointment = new Appointment
@@ -1506,11 +1535,14 @@ namespace OZE.Application.Services
                 ErrorConstants.AppointmentMessage.PriorityReasonRequired);
         }
 
-        private Task LogCreatedAsync(Appointment appointment, List<BookingLine> lines) =>
+        // autoConfirmed: a returning patient's online booking that skipped the front desk call, kept so the log shows why
+        // an online booking started as CONFIRMED
+        private Task LogCreatedAsync(Appointment appointment, List<BookingLine> lines, bool autoConfirmed = false) =>
             _auditLogService.LogAsync(AuditConstants.AppointmentCreated, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 newValues: new
                 {
                     appointment.Status,
+                    AutoConfirmed = autoConfirmed,
                     appointment.AppointmentDate,
                     appointment.TimeSlotStart,
                     appointment.TimeSlotEnd,
@@ -1539,6 +1571,17 @@ namespace OZE.Application.Services
         private Task NotifyNewOnlineBookingAsync(Appointment appointment, Patient patient) =>
             NotifyAsync(n => n.NotifyRolesAsync(new[] { RoleConstants.ReceptionistRole },
                 Content(NotificationConstants.Text.NewOnlineBookingTitle, NotificationConstants.Text.NewOnlineBookingMessage, appointment, patient.FullName)));
+
+        // A returning patient's online booking is CONFIRMED at once: the patient is told it is confirmed, the
+        // receptionists that no call is needed, and the doctor learns about the visit as for any confirmed booking
+        private async Task NotifyReturningOnlineBookingAsync(Appointment appointment, Patient patient)
+        {
+            await NotifyAsync(n => n.NotifyPatientAsync(patient.Id,
+                Content(NotificationConstants.Text.ReturningBookingConfirmedTitle, NotificationConstants.Text.ReturningBookingConfirmedMessage, appointment)));
+            await NotifyAsync(n => n.NotifyRolesAsync(new[] { RoleConstants.ReceptionistRole },
+                Content(NotificationConstants.Text.ReturningOnlineBookingTitle, NotificationConstants.Text.ReturningOnlineBookingMessage, appointment, patient.FullName)));
+            await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
+        }
 
         // The doctor learns about a visit once it is confirmed
         private Task NotifyDoctorOfNewAppointmentAsync(Appointment appointment, string? patientName) =>

@@ -259,7 +259,7 @@ Chuẩn bị: DB đã áp migration, có dịch vụ, ca bác sĩ, `Booking.Gene
 
 | # | Tình huống | Mong đợi |
 |---|---|---|
-| 1 | Đăng nhập bệnh nhân, đặt lịch slot trống | 200, lịch `PENDING`, `CreatedByUserId` đúng tài khoản |
+| 1 | Đăng nhập bệnh nhân **chưa từng đến khám**, đặt lịch slot trống | 200, lịch `PENDING`, `CreatedByUserId` đúng tài khoản |
 | 2 | Không đăng nhập | 401 |
 | 3 | Đăng nhập bằng vai trò lễ tân hoặc bác sĩ | 403 |
 | 4 | Tài khoản bệnh nhân chưa có hồ sơ | 404 `PatientProfileNotFound` |
@@ -267,6 +267,21 @@ Chuẩn bị: DB đã áp migration, có dịch vụ, ca bác sĩ, `Booking.Gene
 | 6 | Dịch vụ hoặc biến thể không tồn tại hoặc đã tắt | 404 hoặc 400 |
 | 7 | `guest-booking` vẫn chạy như cũ với khách chưa có tài khoản | 200 |
 | 8 | `guest-booking` với số điện thoại đã có tài khoản | 400 `PhoneHasAccount` |
+| 9 | Đăng nhập bệnh nhân **đã có ít nhất 1 lịch `COMPLETED`** (khách quen), đặt lịch | 200, lịch `CONFIRMED` ngay, SMS/email "has been confirmed", lễ tân nhận thông báo "Khách quen đặt lịch mới" |
+| 10 | `guest-booking` với số trùng hồ sơ đã từng khám | 200, lịch vẫn `PENDING` (số của khách chưa xác thực) |
+
+### A11. Khách quen được xác nhận lịch ngay (SCRUM-2013)
+
+Theo xác nhận của phòng khám (bác sĩ Nguyễn Văn Giáp): khách mới cần lễ tân gọi xác thực thông tin, khách quen thì không cần bước đó.
+
+- **Khách quen**: bệnh nhân đã đến khám ít nhất 1 lần, tức là có ít nhất 1 lịch hẹn `COMPLETED` (`IAppointmentRepository.HasCompletedVisitAsync`).
+- **Chỉ áp dụng cho bệnh nhân đăng nhập.** Bệnh nhân đăng nhập luôn có số điện thoại đã xác thực (`EnsurePatientPhoneVerifiedAsync`), nên hệ thống chắc chắn đúng người. Lịch tạo ra ở `CONFIRMED` thay cho `PENDING`.
+- **Guest luôn `PENDING`**, kể cả khi số điện thoại trùng hồ sơ đã từng khám: số của guest không được xác thực, nên số khớp không chứng minh người đặt là chủ hồ sơ.
+- Thông báo khi tự xác nhận:
+  - bệnh nhân nhận SMS/email "has been confirmed" và thông báo trong ứng dụng "Đặt lịch thành công";
+  - lễ tân nhận "Khách quen đặt lịch mới ... không cần gọi lại" thay cho "Gọi bệnh nhân để xác nhận";
+  - bác sĩ được báo lịch mới ngay, như các lịch đã xác nhận khác.
+- Audit log `AppointmentCreated` có thêm trường `AutoConfirmed` (true với lịch khách quen tự xác nhận).
 
 ---
 

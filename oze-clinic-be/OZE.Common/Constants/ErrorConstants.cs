@@ -307,6 +307,7 @@ namespace OZE.Common.Constants
             public const string SlotNotAvailable = "This time slot is no longer available. Please choose another time";
             public const string PhoneHasAccount = "This phone number already has an account. Please sign in to book";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
+            public const string PatientHasScheduledTreatmentSession = "You already have a treatment session scheduled in your treatment plan. Please contact the clinic to change it instead of booking a new appointment";
             public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";
