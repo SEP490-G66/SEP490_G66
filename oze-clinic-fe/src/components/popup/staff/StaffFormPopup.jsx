@@ -71,14 +71,20 @@ const StaffFormPopup = ({ member, onClose, onSaved }) => {
             setErrors(response.errors ?? { form: response.message });
             return;
         }
-        onSaved(response.message);
+        const tempPassword = response.data?.temporaryPassword;
+        const message = tempPassword
+            ? `${response.message} Mật khẩu tạm: ${tempPassword}`
+            : response.message;
+        onSaved(message);
     };
 
     return (
         <Modal
             title={editing ? "Cập nhật tài khoản nhân viên" : "Tạo tài khoản nhân viên"}
             description={
-                editing ? `${member.fullName} · ${member.email}` : "Thông tin đăng nhập và mật khẩu tạm sẽ được gửi qua email của nhân viên."
+                editing
+                    ? `${member.fullName} · ${member.email}`
+                    : "Sau khi tạo, hệ thống sẽ hiện mật khẩu tạm một lần. Nhân viên đăng nhập bằng email và đổi mật khẩu sớm."
             }
             onClose={onClose}
             closeDisabled={saving}
