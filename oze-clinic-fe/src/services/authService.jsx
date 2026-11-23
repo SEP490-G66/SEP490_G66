@@ -92,6 +92,8 @@ const AUTH_MESSAGES = {
     "OTP is invalid. Please check again.": invalidMessage("Mã xác minh"),
     "OTP has been sent to your phone number.": "Mã xác minh đã được gửi đến số điện thoại của bạn.",
     "OTP has been sent to your email.": "Mã xác minh đã được gửi đến email của bạn.",
+    "Verification method is invalid. Please check again.": "Phương thức xác minh không hợp lệ.",
+    "Password reset is only available via phone number.": "Đặt lại mật khẩu chỉ hỗ trợ qua số điện thoại.",
     "Could not send the OTP. Please try again later.": "Không thể gửi mã xác minh. Vui lòng thử lại sau.",
     "OTP has expired. Please register again.": "Mã xác minh đã hết hạn. Vui lòng đăng ký lại.",
     "Please wait before requesting another OTP.": "Vui lòng chờ một lát trước khi yêu cầu mã mới.",

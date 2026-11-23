@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
@@ -86,9 +86,9 @@ namespace OZE.UnitTest.Services.Auth
         }
 
         [Fact]
-        public async Task VerifyOtpAsync_WithEmailCode_ShouldConfirmEmailButNotLinkWalkInRecord()
+        public async Task VerifyOtpAsync_WithLegacyEmailPending_ShouldStillActivateByPhoneRules()
         {
-            // Arrange: the phone was not verified, so a matching walk-in record is left for the reception desk
+            // Arrange: old email-method sessions still activate via phone linking rules (SMS-only registration)
             var account = UnverifiedAccount();
             var walkIn = new Patient { Id = 7, FullName = "Nguyen Van A" };
             SetupPending(NewPending(VerificationMethodConstants.Email));
@@ -101,55 +101,27 @@ namespace OZE.UnitTest.Services.Auth
 
             // Assert
             result.Success.Should().BeTrue();
-            account.EmailConfirmed.Should().BeTrue();
-            account.PhoneNumberConfirmed.Should().BeFalse();
-            walkIn.UserId.Should().BeNull();
-            account.Patient.Should().BeNull();
+            account.PhoneNumberConfirmed.Should().BeTrue();
+            walkIn.UserId.Should().Be(account.Id);
         }
 
         [Fact]
-        public async Task VerifyOtpAsync_WithSmsCodeAndEmail_ShouldSendEmailConfirmationLink()
+        public async Task VerifyOtpAsync_WithSmsCodeAndEmail_ShouldNotSendEmailConfirmationLink()
         {
-            // Arrange: the patient verified by SMS but also gave an email
+            // Arrange: the patient verified by SMS but also gave an email — no confirmation email is sent
             var account = UnverifiedAccount();
             account.Email = Email;
             SetupPending(NewPending());
             SetupUnverifiedAccount(account);
             SetupWalkInPatients();
             SetupIdentityWritesSucceed();
-            _userManagerMock.Setup(m => m.GenerateEmailConfirmationTokenAsync(account)).ReturnsAsync(RawEmailToken);
-
-            // Act
-            await _authService.VerifyOtpAsync(RegisterOtpRequest(CorrectOtp), BaseUrl);
-
-            // Assert: the link points to our API and carries the encoded token
-            _emailSenderMock.Verify(e => e.SendEmailVerificationAsync(
-                account,
-                It.Is<string>(url => url.StartsWith($"{BaseUrl}/api/auth/confirm-email?userId={account.Id}")
-                    && url.Contains(EncodeForLink(RawEmailToken)))),
-                Times.Once);
-        }
-
-        [Fact]
-        public async Task VerifyOtpAsync_WhenConfirmationEmailFails_ShouldStillSucceed()
-        {
-            // Arrange
-            var account = UnverifiedAccount();
-            account.Email = Email;
-            SetupPending(NewPending());
-            SetupUnverifiedAccount(account);
-            SetupWalkInPatients();
-            SetupIdentityWritesSucceed();
-            _userManagerMock.Setup(m => m.GenerateEmailConfirmationTokenAsync(account)).ReturnsAsync(RawEmailToken);
-            _emailSenderMock
-                .Setup(e => e.SendEmailVerificationAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
-                .ThrowsAsync(new Exception("Mail server down"));
 
             // Act
             var result = await _authService.VerifyOtpAsync(RegisterOtpRequest(CorrectOtp), BaseUrl);
 
-            // Assert: the account is already active, an email problem must not undo that
+            // Assert
             result.Success.Should().BeTrue();
+            _emailSenderMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]

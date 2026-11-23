@@ -52,7 +52,6 @@ namespace OZE.UnitTest.Services.Me
                 _registrationRepositoryMock.Object,
                 _pendingProfileUpdateStoreMock.Object,
                 _smsSenderMock.Object,
-                _emailSenderMock.Object,
                 Options.Create(new RegisterOtpSettings()),
                 Mock.Of<ILogger<UserService>>());
         }

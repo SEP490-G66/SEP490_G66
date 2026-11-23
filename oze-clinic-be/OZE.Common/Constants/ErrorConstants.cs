@@ -39,6 +39,7 @@ namespace OZE.Common.Constants
             public const string PasswordInvalid = "Password is invalid. Please check again.";
             public const string ConfirmPasswordInvalid = "Confirm password is invalid. Please check again.";
             public const string VerificationMethodInvalid = "Verification method is invalid. Please check again.";
+            public const string PasswordResetPhoneOnly = "Password reset is only available via phone number.";
             public const string InvalidOtp = "OTP is invalid. Please check again.";
             public const string InvalidData = "{0} is invalid. Please check again.";
             // MSG10, formatted with the phone number
@@ -306,6 +307,7 @@ namespace OZE.Common.Constants
             public const string SlotNotAvailable = "This time slot is no longer available. Please choose another time";
             public const string PhoneHasAccount = "This phone number already has an account. Please sign in to book";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
+            public const string PatientHasScheduledTreatmentSession = "You already have a treatment session scheduled in your treatment plan. Please contact the clinic to change it instead of booking a new appointment";
             public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";
@@ -712,7 +714,7 @@ namespace OZE.Common.Constants
             public const string ContactRecorded = "Call result has been recorded.";
             public const string InvoiceNotFound = "Invoice not found.";
             public const string NothingOwed = "This invoice has nothing left to pay.";
-            public const string NoContact = "The patient has no phone number or email to send a reminder to.";
+            public const string NoContact = "The patient has no email to send a reminder to.";
             public const string RemindedRecently = "A payment reminder was sent less than 4 hours ago. Send again only if needed.";
             public const string PaymentReminded = "Payment reminder has been sent.";
             public const string SendFailed = "The reminder could not be sent by SMS or email. Try again later or call the patient.";

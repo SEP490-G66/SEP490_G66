@@ -90,7 +90,6 @@ namespace OZE.UnitTest.Services.Auth
                 _refreshTokenRepositoryMock.Object,
                 _jwtTokenGeneratorMock.Object,
                 _userServiceMock.Object,
-                _emailSenderMock.Object,
                 _smsSenderMock.Object,
                 _pendingStoreMock.Object,
                 _passwordResetStoreMock.Object,
@@ -345,7 +344,7 @@ namespace OZE.UnitTest.Services.Auth
         protected void VerifyNoOtpSentAndNoPendingSaved()
         {
             _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-            _emailSenderMock.Verify(e => e.SendRegistrationOtpAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+            _emailSenderMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
             _pendingStoreMock.Verify(s => s.Save(It.IsAny<PendingRegistration>(), It.IsAny<TimeSpan>()), Times.Never);
         }
 

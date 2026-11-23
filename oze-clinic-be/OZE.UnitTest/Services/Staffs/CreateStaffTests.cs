@@ -48,9 +48,7 @@ namespace OZE.UnitTest.Services.Staffs
                     It.IsAny<string>()),
                 Times.Once);
             _userManagerMock.Verify(m => m.AddToRoleAsync(It.IsAny<ApplicationUser>(), RoleConstants.DoctorRole), Times.Once);
-            _emailSenderMock.Verify(
-                e => e.SendTemporaryPasswordAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()),
-                Times.Once);
+            result.TemporaryPassword.Should().NotBeNullOrWhiteSpace();
         }
 
         // UTCID02 (N): Create Receptionist clears doctor-only fields
@@ -210,9 +208,7 @@ namespace OZE.UnitTest.Services.Staffs
             // Assert
             var error = await act.Should().ThrowAsync<BadRequestException>();
             error.Which.Message.Should().Be(ErrorConstants.StaffMessage.CreateFailed);
-            _emailSenderMock.Verify(
-                e => e.SendTemporaryPasswordAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()),
-                Times.Never);
+            // Account create failed before a temporary password could be returned
         }
 
         private static CreateStaffRequest ValidDoctorRequest()

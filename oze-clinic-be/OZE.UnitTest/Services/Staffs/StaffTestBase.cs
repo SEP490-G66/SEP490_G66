@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Logging;
 using Moq;
 using OZE.Application.Interfaces;
 using OZE.Application.Services;
@@ -16,7 +15,6 @@ namespace OZE.UnitTest.Services.Staffs
         protected readonly Mock<IStaffRepository> _staffRepositoryMock;
         protected readonly Mock<IRegistrationRepository> _registrationRepositoryMock;
         protected readonly Mock<IUserRefreshTokenRepository> _refreshTokenRepositoryMock;
-        protected readonly Mock<IEmailSender> _emailSenderMock;
         protected readonly StaffService _service;
 
         protected const string ValidUserId = "staff-user-1";
@@ -34,7 +32,6 @@ namespace OZE.UnitTest.Services.Staffs
             _staffRepositoryMock = new Mock<IStaffRepository>();
             _registrationRepositoryMock = new Mock<IRegistrationRepository>();
             _refreshTokenRepositoryMock = new Mock<IUserRefreshTokenRepository>();
-            _emailSenderMock = new Mock<IEmailSender>();
 
             // The transaction just runs the work it is given, whatever its result type
             _registrationRepositoryMock
@@ -45,9 +42,7 @@ namespace OZE.UnitTest.Services.Staffs
                 _userManagerMock.Object,
                 _staffRepositoryMock.Object,
                 _registrationRepositoryMock.Object,
-                _refreshTokenRepositoryMock.Object,
-                _emailSenderMock.Object,
-                Mock.Of<ILogger<StaffService>>());
+                _refreshTokenRepositoryMock.Object);
         }
 
         protected void SetupCreateUniquenessPasses()
@@ -71,9 +66,6 @@ namespace OZE.UnitTest.Services.Staffs
             _userManagerMock
                 .Setup(m => m.AddToRoleAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
                 .ReturnsAsync(IdentityResult.Success);
-            _emailSenderMock
-                .Setup(e => e.SendTemporaryPasswordAsync(It.IsAny<ApplicationUser>(), It.IsAny<string>()))
-                .Returns(Task.CompletedTask);
         }
 
         protected (ApplicationUser User, StaffProfile Staff) SetupExistingStaff(

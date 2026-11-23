@@ -156,6 +156,32 @@ namespace OZE.UnitTest.Services.Me
             _userManagerMock.Verify(m => m.UpdateAsync(It.IsAny<ApplicationUser>()), Times.Never);
         }
 
+        // UTCID13 (N): phone OTP is allowed even when the profile has no date of birth or gender yet
+        [Fact]
+        public async Task UpdateProfileAsync_NewPhoneWithoutDobOrGender_SendsOtp()
+        {
+            var (_, patient) = ArrangeUserAndPatient();
+            patient.DateOfBirth = null;
+            patient.Gender = null;
+            PendingProfileUpdate? saved = null;
+            _pendingProfileUpdateStoreMock
+                .Setup(s => s.Save(It.IsAny<PendingProfileUpdate>(), It.IsAny<TimeSpan>()))
+                .Callback<PendingProfileUpdate, TimeSpan>((u, _) => saved = u);
+
+            var request = ValidUpdateRequest(phone: NewPhoneLocal);
+            request.DateOfBirth = null;
+            request.Gender = null;
+
+            var result = await _userService.UpdateProfileAsync(UserId, request, BaseUrl);
+
+            result.Success.Should().BeTrue();
+            result.Data!.OtpRequired.Should().BeTrue();
+            saved.Should().NotBeNull();
+            saved!.DateOfBirth.Should().BeNull();
+            saved.Gender.Should().BeNull();
+            _smsSenderMock.Verify(s => s.SendSmsAsync(NewPhone, It.IsAny<string>()), Times.Once);
+        }
+
         // UTCID11 (A): the SMS provider fails, so no OTP session is kept
         [Fact]
         public async Task UpdateProfileAsync_SmsFails_ReturnsOtpSendFailed()
@@ -170,19 +196,18 @@ namespace OZE.UnitTest.Services.Me
             _pendingProfileUpdateStoreMock.Verify(s => s.Save(It.IsAny<PendingProfileUpdate>(), It.IsAny<TimeSpan>()), Times.Never);
         }
 
-        // UTCID12 (N): a new email is saved as unconfirmed and a confirmation link is emailed
+        // UTCID12 (N): a new email is saved as unconfirmed; confirmation email is no longer sent
         [Fact]
-        public async Task UpdateProfileAsync_NewEmail_SavesAsUnconfirmedAndSendsConfirmation()
+        public async Task UpdateProfileAsync_NewEmail_SavesAsUnconfirmedWithoutConfirmationEmail()
         {
             var (user, _) = ArrangeUserAndPatient();
-            _userManagerMock.Setup(m => m.GenerateEmailConfirmationTokenAsync(user)).ReturnsAsync("token");
 
             var result = await _userService.UpdateProfileAsync(UserId, ValidUpdateRequest(email: "new@oze.vn"), BaseUrl);
 
             result.Success.Should().BeTrue();
             user.Email.Should().Be("new@oze.vn");
             user.EmailConfirmed.Should().BeFalse();
-            _emailSenderMock.Verify(e => e.SendEmailVerificationAsync(user, It.Is<string>(url => url.StartsWith(BaseUrl))), Times.Once);
+            _emailSenderMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         // UTCID13 (A): Identity refuses to save the account

@@ -635,7 +635,7 @@ namespace OZE.Application.Services
                     var followUpDate = exam.FollowUpDate ?? exam.FollowUpAppointment?.AppointmentDate ?? effectiveTargetDate;
                     var msg = BuildFollowUpMessage(exam, followUpDate);
 
-                    // Gửi đồng thời SMS và Email cho bệnh nhân (non-blocking, parallel)
+                    // Email only (SMS is reserved for OTP)
                     await SendExternalRemindersAsync(exam.Patient, msg, exam.Id);
 
                     lock (syncLock)
@@ -729,49 +729,25 @@ namespace OZE.Application.Services
 
         private async Task SendExternalRemindersAsync(Patient? patient, string message, long examinationId)
         {
-            var tasks = new List<Task>();
-
-            if (_smsSender != null && !string.IsNullOrWhiteSpace(patient?.PhoneNumber))
+            if (_emailSender == null || string.IsNullOrWhiteSpace(patient?.Email))
             {
-                tasks.Add(SendSmsSafeAsync(patient.PhoneNumber, message, examinationId));
+                return;
             }
 
-            if (_emailSender != null && !string.IsNullOrWhiteSpace(patient?.Email))
-            {
-                tasks.Add(SendEmailSafeAsync(patient.Email, message, examinationId));
-            }
-
-            if (tasks.Count > 0)
-            {
-                await Task.WhenAll(tasks);
-            }
-        }
-
-        private async Task SendSmsSafeAsync(string phoneNumber, string message, long examinationId)
-        {
             try
             {
-                await _smsSender!.SendSmsAsync(phoneNumber, message);
+                await _emailSender.SendEmailAsync(
+                    patient.Email,
+                    PatientEmailTemplates.SubjectFollowUpReminder,
+                    PatientEmailTemplates.FollowUpReminder(patient.FullName, message));
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Could not send SMS follow-up reminder for examination {ExaminationId} to {Phone}", examinationId, phoneNumber);
+                _logger?.LogWarning(ex, "Could not send Email follow-up reminder for examination {ExaminationId} to {Email}", examinationId, patient.Email);
             }
         }
 
-        private async Task SendEmailSafeAsync(string email, string message, long examinationId)
-        {
-            try
-            {
-                await _emailSender!.SendEmailAsync(email, "Phòng khám OZE - Nhắc lịch tái khám", message);
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Could not send Email follow-up reminder for examination {ExaminationId} to {Email}", examinationId, email);
-            }
-        }
-
-        // SMS and email at once; returns the text so the same words go to the in-app notification after the save
+        // Email only; returns the text so the same words go to the in-app notification after the save
         private async Task<string> SendFollowUpNotificationsAsync(Examination examination, DateOnly followUpDate)
         {
             var msg = BuildFollowUpMessage(examination, followUpDate);

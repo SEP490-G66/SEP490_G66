@@ -9,8 +9,8 @@ namespace OZE.Common.Models
         // When the profile was last saved before the code was sent; a later save makes this change out of date
         public DateTimeOffset? ProfileUpdatedAt { get; set; }
         public string FullName { get; set; } = string.Empty;
-        public DateOnly DateOfBirth { get; set; }
-        public string Gender { get; set; } = string.Empty;
+        public DateOnly? DateOfBirth { get; set; }
+        public string? Gender { get; set; }
         public string PhoneNumber { get; set; } = string.Empty;
         public string? Email { get; set; }
         public string? Address { get; set; }

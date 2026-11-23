@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
@@ -37,48 +37,16 @@ namespace OZE.UnitTest.Services.Auth
         }
 
         [Fact]
-        public async Task ForgotPasswordAsync_WhenStaffEmailNotConfirmed_ShouldStillSendCode()
+        public async Task ForgotPasswordAsync_WithEmail_ShouldFailPhoneOnly()
         {
-            // Arrange: staff emails are set by the manager and never go through a confirmation link
-            var user = ActiveUser();
-            user.EmailConfirmed = false;
-            SetupFindByEmail(user);
-
             // Act
             var result = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Email });
 
-            // Assert
-            result.Success.Should().BeTrue();
-            _emailSenderMock.Verify(e => e.SendEmailAsync(Email, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
-        }
-
-        [Fact]
-        public async Task ForgotPasswordAsync_WithEmail_ShouldSendCodeByEmailAndSaveSession()
-        {
-            // Arrange
-            var user = ActiveUser();
-            SetupFindByEmail(user);
-            PasswordResetSession? saved = null;
-            _passwordResetStoreMock
-                .Setup(s => s.Save(It.IsAny<PasswordResetSession>(), It.IsAny<TimeSpan>()))
-                .Callback<PasswordResetSession, TimeSpan>((session, _) => saved = session);
-
-            // Act
-            var result = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Email });
-
-            // Assert: the code goes by email only
-            result.Success.Should().BeTrue();
-            result.Data!.VerificationMethod.Should().Be(VerificationMethodConstants.Email);
-            _emailSenderMock.Verify(e => e.SendEmailAsync(Email, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+            // Assert: password reset is SMS-only
+            result.Success.Should().BeFalse();
+            result.Message.Should().Be(ErrorConstants.AuthMessage.PasswordResetPhoneOnly);
+            _emailSenderMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
             _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-
-            // The session belongs to this user, is not verified yet and is returned to the client
-            saved.Should().NotBeNull();
-            saved!.UserId.Should().Be(user.Id);
-            saved.IsOtpVerified.Should().BeFalse();
-            saved.ResetToken.Should().BeNull();
-            saved.OtpHash.Should().NotBeNullOrEmpty();
-            result.Data.SessionId.Should().Be(saved.SessionId);
         }
 
         [Fact]
@@ -102,15 +70,12 @@ namespace OZE.UnitTest.Services.Auth
         public async Task ForgotPasswordAsync_ShouldMaskWhereTheCodeWasSent()
         {
             // Arrange
-            SetupFindByEmail(ActiveUser());
             SetupFindByPhone(ActiveUser());
 
             // Act
-            var byEmail = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Email });
             var byPhone = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Phone });
 
-            // Assert: the full address or number is never sent back
-            byEmail.Data!.MaskedDestination.Should().NotBe(Email).And.Contain("*").And.EndWith("@oze.vn");
+            // Assert: the full number is never sent back
             byPhone.Data!.MaskedDestination.Should().NotBe(NormalizedPhone).And.Contain("*");
         }
 
@@ -135,17 +100,14 @@ namespace OZE.UnitTest.Services.Auth
         }
 
         [Fact]
-        public async Task ForgotPasswordAsync_WithSpacesAroundEmail_ShouldTrim()
+        public async Task ForgotPasswordAsync_WithSpacesAroundEmail_ShouldStillRejectEmail()
         {
-            // Arrange
-            SetupFindByEmail(ActiveUser());
-
             // Act
             var result = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = $"  {Email}  " });
 
             // Assert
-            result.Success.Should().BeTrue();
-            _emailSenderMock.Verify(e => e.SendEmailAsync(Email, It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+            result.Success.Should().BeFalse();
+            result.Message.Should().Be(ErrorConstants.AuthMessage.PasswordResetPhoneOnly);
         }
 
         [Theory]
@@ -166,19 +128,16 @@ namespace OZE.UnitTest.Services.Auth
         }
 
         [Fact]
-        public async Task ForgotPasswordAsync_WhenEmailNotFound_ShouldAnswerLikeAnyAccountWithoutSending()
+        public async Task ForgotPasswordAsync_WhenEmailIdentifier_ShouldFailWithoutSending()
         {
-            // Arrange
-            SetupFindByEmail(null);
-
             // Act
             var result = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Email });
 
             // Assert
-            // The same answer as for a real account, so the endpoint does not tell which accounts exist
-            result.Success.Should().BeTrue();
-            result.Data!.SessionId.Should().NotBeNullOrEmpty();
-            VerifyNothingSentAndNoSessionSaved();
+            result.Success.Should().BeFalse();
+            result.Message.Should().Be(ErrorConstants.AuthMessage.PasswordResetPhoneOnly);
+            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+            _emailSenderMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         [Fact]
@@ -202,11 +161,11 @@ namespace OZE.UnitTest.Services.Auth
         {
             // Arrange: a patient who never finished OTP registration has no password to recover
             var user = PendingRegistrationUser();
-            SetupFindByEmail(user);
+            SetupFindByPhone(user);
             _userManagerMock.Setup(m => m.IsInRoleAsync(user, RoleConstants.PatientRole)).ReturnsAsync(true);
 
             // Act
-            var result = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Email });
+            var result = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Phone });
 
             // Assert
             // The same answer as for a real account, so the endpoint does not tell which accounts exist
@@ -233,22 +192,5 @@ namespace OZE.UnitTest.Services.Auth
             _passwordResetStoreMock.Verify(s => s.Save(It.IsAny<PasswordResetSession>(), It.IsAny<TimeSpan>()), Times.Never);
         }
 
-        [Fact]
-        public async Task ForgotPasswordAsync_WhenEmailFails_ShouldFailWithoutSavingSession()
-        {
-            // Arrange
-            SetupFindByEmail(ActiveUser());
-            _emailSenderMock
-                .Setup(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-                .ThrowsAsync(new Exception("Mail server down"));
-
-            // Act
-            var result = await _authService.ForgotPasswordAsync(new ForgotPasswordRequest { Identifier = Email });
-
-            // Assert
-            result.Success.Should().BeFalse();
-            result.Message.Should().Be(ErrorConstants.AuthMessage.OtpSendFailed);
-            _passwordResetStoreMock.Verify(s => s.Save(It.IsAny<PasswordResetSession>(), It.IsAny<TimeSpan>()), Times.Never);
-        }
     }
 }

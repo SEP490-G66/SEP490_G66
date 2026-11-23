@@ -1,10 +1,13 @@
+using System.Net;
+using System.Text.RegularExpressions;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MimeKit;
+using OZE.Application.Helpers;
 using OZE.Application.Interfaces;
 using OZE.Common.Models;
-using OZE.Domain.Entities;
-using SendGrid;
-using SendGrid.Helpers.Mail;
 
 namespace OZE.Application.Services
 {
@@ -23,68 +26,100 @@ namespace OZE.Application.Services
 
         public async Task SendEmailAsync(string toEmail, string subject, string message)
         {
-            if (string.IsNullOrWhiteSpace(_options.SendGridKey))
+            var result = await TrySendEmailAsync(toEmail, subject, message);
+            if (!result.Configured || result.Sent)
             {
-                _logger.LogWarning("SendGridKey is not configured. Email to {ToEmail} with subject '{Subject}' was not sent via network. Body: {Message}",
-                    toEmail, subject, message);
                 return;
             }
 
-            var client = new SendGridClient(_options.SendGridKey);
-            var from = new EmailAddress(_options.SenderEmail, _options.SenderName);
-            var to = new EmailAddress(toEmail);
-            var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent: message, htmlContent: message);
+            throw new Exception(result.ErrorMessage ?? "Email sending failed.");
+        }
 
-            var response = await client.SendEmailAsync(msg);
-
-            if (!response.IsSuccessStatusCode)
+        public async Task<EmailSendResult> TrySendEmailAsync(string toEmail, string subject, string message)
+        {
+            var result = new EmailSendResult
             {
-                var body = await response.Body.ReadAsStringAsync();
-                _logger.LogError("Failed to send email via SendGrid: {StatusCode}, {Body}", response.StatusCode, body);
-                throw new Exception($"Email sending failed: {response.StatusCode}, {body}");
+                ToEmail = toEmail,
+                Subject = subject
+            };
+
+            if (string.IsNullOrWhiteSpace(_options.Host)
+                || string.IsNullOrWhiteSpace(_options.UserName)
+                || string.IsNullOrWhiteSpace(_options.Password)
+                || string.IsNullOrWhiteSpace(_options.SenderEmail))
+            {
+                _logger.LogWarning(
+                    "Email SMTP is not configured (Host/UserName/Password/SenderEmail). Email to {ToEmail} with subject '{Subject}' was not sent. Body: {Message}",
+                    toEmail, subject, message);
+                return result;
             }
+
+            result.Configured = true;
+
+            var mime = new MimeMessage();
+            mime.From.Add(new MailboxAddress(_options.SenderName, _options.SenderEmail.Trim()));
+            mime.To.Add(MailboxAddress.Parse(toEmail.Trim()));
+            mime.Subject = subject;
+            var isHtml = message.Contains('<') && message.Contains('>');
+            var builder = new BodyBuilder
+            {
+                HtmlBody = isHtml ? message : null,
+                TextBody = isHtml ? HtmlToPlainText(message) : message
+            };
+            TryAttachBrandLogo(builder, message, isHtml);
+            mime.Body = builder.ToMessageBody();
+
+            try
+            {
+                using var client = new SmtpClient();
+                var secure = _options.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
+                await client.ConnectAsync(_options.Host.Trim(), _options.Port > 0 ? _options.Port : 587, secure);
+                await client.AuthenticateAsync(_options.UserName.Trim(), _options.Password);
+                await client.SendAsync(mime);
+                await client.DisconnectAsync(true);
+
+                result.Sent = true;
+                result.HttpStatus = 250;
+                _logger.LogInformation("Email sent via SMTP to {ToEmail} subject '{Subject}'", toEmail, subject);
+            }
+            catch (Exception ex)
+            {
+                result.ErrorMessage = ex.Message;
+                _logger.LogError(ex, "Failed to send email via SMTP to {ToEmail}", toEmail);
+            }
+
+            return result;
         }
 
-        public async Task SendEmailVerificationAsync(ApplicationUser user, string callbackUrl)
+        private void TryAttachBrandLogo(BodyBuilder builder, string message, bool isHtml)
         {
-            var fullName = user.Patient?.FullName ?? user.StaffProfile?.FullName;
-            var greetingName = !string.IsNullOrWhiteSpace(fullName)
-                ? fullName
-                : (user.UserName ?? user.Email);
-            var subject = "Verify your email address";
-            var htmlMessage = $@"
-                <p>Hello {greetingName},</p>
-                <p>Thank you for registering. Please verify your email by clicking the link below:</p>
-                <p><a href='{callbackUrl}'>Verify Email</a></p>
-                <p>If you did not request this, please ignore this email.</p>";
+            if (!isHtml || !message.Contains($"cid:{PatientEmailTemplates.LogoContentId}", StringComparison.Ordinal))
+            {
+                return;
+            }
 
-            await SendEmailAsync(user.Email ?? string.Empty, subject, htmlMessage);
+            var logoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Email", "logo.png");
+            if (!File.Exists(logoPath))
+            {
+                _logger.LogWarning("Email brand logo missing at {LogoPath}; sending HTML without inline image", logoPath);
+                return;
+            }
+
+            var image = builder.LinkedResources.Add(logoPath);
+            image.ContentId = PatientEmailTemplates.LogoContentId;
+            image.ContentDisposition = new ContentDisposition(ContentDisposition.Inline);
         }
 
-        public async Task SendTemporaryPasswordAsync(ApplicationUser user, string temporaryPassword)
+        private static string HtmlToPlainText(string html)
         {
-            var fullName = user.StaffProfile?.FullName ?? user.Patient?.FullName;
-            var greetingName = !string.IsNullOrWhiteSpace(fullName) ? fullName : (user.UserName ?? user.Email);
-            var subject = "Your temporary password";
-            var htmlMessage = $@"
-            <p>Hello {greetingName},</p>
-            <p>Your login email is: <b>{user.Email}</b></p>
-            <p>Your temporary password is: <b>{temporaryPassword}</b></p>
-            <p>Please log in and change your password right away.</p>";
-
-            await SendEmailAsync(user.Email ?? string.Empty, subject, htmlMessage);
+            var text = Regex.Replace(html, "<style[\\s\\S]*?</style>", string.Empty, RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, "<br\\s*/?>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, "</(p|div|tr|h[1-6]|li)>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, "<[^>]+>", string.Empty);
+            text = WebUtility.HtmlDecode(text);
+            text = Regex.Replace(text, "[ \\t]+", " ");
+            text = Regex.Replace(text, "(\\r?\\n){3,}", "\n\n");
+            return text.Trim();
         }
-
-        public async Task SendRegistrationOtpAsync(string toEmail, string fullName, string otp, int expiresInMinutes)
-        {
-            var subject = "Your OZE verification code";
-            var htmlMessage = $@"
-            <p>Hello {fullName},</p>
-            <p>Your verification code is: <b>{otp}</b></p>
-            <p>The code is valid for {expiresInMinutes} minutes.</p>
-            <p>If you did not request this, please ignore this email.</p>";
-
-            await SendEmailAsync(toEmail, subject, htmlMessage);
-        }
-    } 
+    }
 }
