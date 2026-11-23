@@ -29,7 +29,7 @@ const DIALOGS = {
 const pendingWorkText = (week) => {
     const parts = [];
     if (week.summary.unassigned > 0) parts.push(`${week.summary.unassigned} vị trí chưa phân ca`);
-    if (week.summary.needReplacement > 0) parts.push(`${week.summary.needReplacement} ca cần người thay (nghỉ phép)`);
+    if (week.summary.needReplacement > 0) parts.push(`${week.summary.needReplacement} ca cần người thay (nghỉ hoặc vắng)`);
     if (parts.length === 0) return null;
     return `${WEEK_NAMES[week.weekOffset] ?? `Tuần ${week.label}`} còn ${parts.join(" và ")}. Bấm vào ô để phân ca.`;
 };
@@ -55,7 +55,7 @@ const WorkShiftManagement = () => {
     const openCell = (cell) => {
         if (week.editable) {
             if (!cell.staff) setDialog({ type: DIALOGS.ASSIGN, cell });
-            else if (cell.status === SHIFT_STATUSES.LEAVE) setDialog({ type: DIALOGS.REPLACE, cell });
+            else if (cell.status === SHIFT_STATUSES.LEAVE || cell.status === SHIFT_STATUSES.ABSENT) setDialog({ type: DIALOGS.REPLACE, cell });
             else setDialog({ type: DIALOGS.EDIT, cell });
             return;
         }
