@@ -744,11 +744,12 @@ namespace OZE.Persistence.Seed
 
                 // YC000318: examined, filmed, waiting for the doctor's review and back in the doctor's queue
                 // Checked in again, as ImagingRequestService leaves it when the X-ray is ordered, so the doctor can examine others meanwhile
-                var khanh = Open(new Visit { Patient = "BN000133", WalkIn = true, CheckIn = "08:08", Doctor = Khoa, Complaint = "Đau răng hàm dưới bên trái" },
-                    AppointmentConstants.CheckedInStatus);
+                var khanhVisit = new Visit { Patient = "BN000133", WalkIn = true, CheckIn = "08:08", Doctor = Khoa, Complaint = "Đau răng hàm dưới bên trái" };
+                var khanh = Open(khanhVisit, AppointmentConstants.CheckedInStatus);
                 var khanhAt = At(Today, khanh.Time);
+                var khanhExam = NewExamination(khanhVisit, khanh.Appointment, khanh.Shift.StaffProfile, khanhAt.AddMinutes(15));
                 var technician = TechnicianAt(Today, khanh.Time.AddMinutes(25));
-                var request = AddImaging(khanh.Appointment.Examination!, khanh.Shift.StaffProfile, ImagingRequestConstants.Completed, ImagingRequestConstants.Panoramic, "Toàn hàm", khanhAt.AddMinutes(25));
+                var request = AddImaging(khanhExam, khanh.Shift.StaffProfile, ImagingRequestConstants.Completed, ImagingRequestConstants.Panoramic, "Toàn hàm", khanhAt.AddMinutes(25));
                 AddResult(request, technician, "pano_full_adult_01.png", khanhAt.AddMinutes(43), "Pending");
                 AddResult(request, technician, "bw_left_molar_01.png", khanhAt.AddMinutes(44), "Pending");
                 AddQueue(khanh.Appointment, QueueConstants.ImagingType, technician.Room, technician.StaffProfile, khanhAt.AddMinutes(26), QueueConstants.Completed);
@@ -756,11 +757,12 @@ namespace OZE.Persistence.Seed
                     notes: "Đã chụp phim, chờ bác sĩ xem kết quả");
 
                 // YC000314: the film was rejected, the patient waits in the X-ray room for a retake
-                var bao = Open(new Visit { Patient = "BN000117", WalkIn = true, CheckIn = "08:38", Doctor = Khoa, Complaint = "Đau vùng hàm, kiểm tra tổng quát" },
-                    AppointmentConstants.CheckedInStatus);
+                var baoVisit = new Visit { Patient = "BN000117", WalkIn = true, CheckIn = "08:38", Doctor = Khoa, Complaint = "Đau vùng hàm, kiểm tra tổng quát" };
+                var bao = Open(baoVisit, AppointmentConstants.CheckedInStatus);
                 var baoAt = At(Today, bao.Time);
+                var baoExam = NewExamination(baoVisit, bao.Appointment, bao.Shift.StaffProfile, baoAt.AddMinutes(2));
                 technician = TechnicianAt(Today, bao.Time.AddMinutes(5));
-                request = AddImaging(bao.Appointment.Examination!, bao.Shift.StaffProfile, ImagingRequestConstants.InProgress, ImagingRequestConstants.Panoramic, "Toàn hàm", baoAt.AddMinutes(5));
+                request = AddImaging(baoExam, bao.Shift.StaffProfile, ImagingRequestConstants.InProgress, ImagingRequestConstants.Panoramic, "Toàn hàm", baoAt.AddMinutes(5));
                 AddResult(request, technician, "pano_pediatric_01.png", baoAt.AddMinutes(20), "Rejected", bao.Shift.StaffProfile, "Ảnh bị nhoè do bệnh nhân cử động, cần chụp lại.");
                 AddQueue(bao.Appointment, QueueConstants.ImagingType, technician.Room, null, baoAt.AddMinutes(30), QueueConstants.Waiting, notes: "Chụp lại phim toàn cảnh");
 
