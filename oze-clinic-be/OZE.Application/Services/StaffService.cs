@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Logging;
 using OZE.Application.Helpers;
 using OZE.Application.Interfaces;
 using OZE.Application.Middlewares;
@@ -16,23 +15,17 @@ namespace OZE.Application.Services
         private readonly IStaffRepository _staffRepository;
         private readonly IRegistrationRepository _registrationRepository;
         private readonly IUserRefreshTokenRepository _refreshTokenRepository;
-        private readonly IEmailSender _emailSender;
-        private readonly ILogger<StaffService> _logger;
 
         public StaffService(
             UserManager<ApplicationUser> userManager,
             IStaffRepository staffRepository,
             IRegistrationRepository registrationRepository,
-            IUserRefreshTokenRepository refreshTokenRepository,
-            IEmailSender emailSender,
-            ILogger<StaffService> logger)
+            IUserRefreshTokenRepository refreshTokenRepository)
         {
             _userManager = userManager;
             _staffRepository = staffRepository;
             _registrationRepository = registrationRepository;
             _refreshTokenRepository = refreshTokenRepository;
-            _emailSender = emailSender;
-            _logger = logger;
         }
 
         public async Task<List<StaffResponse>> GetStaffListAsync(StaffQueryRequest query)
@@ -82,7 +75,9 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(result.Succeeded,
                 result.Errors.FirstOrDefault()?.Description ?? ErrorConstants.StaffMessage.CreateFailed);
 
-            return ToResponse(user, staff, request.Role);
+            var response = ToResponse(user, staff, request.Role);
+            response.TemporaryPassword = password;
+            return response;
         }
 
         public async Task<StaffResponse> UpdateStaffAsync(string userId, UpdateStaffRequest request, string managerId)
@@ -201,8 +196,8 @@ namespace OZE.Application.Services
             return ToResponse(user, staff, role);
         }
 
-        // The account, its staff profile and its role are created in one transaction, which is rolled back
-        // if the login information cannot be emailed: the staff member would have no way to sign in.
+        // The account, its staff profile and its role are created in one transaction.
+        // Temporary password is not emailed; the staff member sets a password via SMS OTP (forgot password).
         private async Task<IdentityResult> CreateAccountAsync(ApplicationUser user, string role, string password)
         {
             var result = await _userManager.CreateAsync(user, password);
@@ -211,23 +206,7 @@ namespace OZE.Application.Services
                 return result;
             }
 
-            result = await _userManager.AddToRoleAsync(user, role);
-            if (!result.Succeeded)
-            {
-                return result;
-            }
-
-            try
-            {
-                await _emailSender.SendTemporaryPasswordAsync(user, password);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send the login information to {Email} (UserId: {UserId})", user.Email, user.Id);
-                return IdentityResult.Failed(new IdentityError { Description = ErrorConstants.AuthMessage.EmailCantSent });
-            }
-
-            return result;
+            return await _userManager.AddToRoleAsync(user, role);
         }
 
         // Specialization and license number are only kept for doctors.
