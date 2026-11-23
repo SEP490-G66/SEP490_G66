@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using OZE.Application.Helpers;
 using OZE.Application.Interfaces;
 using OZE.Application.Middlewares;
@@ -193,7 +193,7 @@ namespace OZE.Application.Services
         // In-app notifications are optional so unit tests can build the service without them
         private Task NotifyAsync(Func<INotificationService, Task> send) => _notifications == null ? Task.CompletedTask : send(_notifications);
 
-        // Tells each patient by SMS and email; a failed message must not undo the end of the shift, so errors are only logged
+        // In-app only; SMS/email are not used when a shift ends
         private async Task NotifyShiftEndedAsync(string doctorName, List<(Appointment Appointment, bool Waiting)> patients)
         {
             foreach (var (appointment, waiting) in patients)
@@ -204,21 +204,6 @@ namespace OZE.Application.Services
                         appointment.TimeSlotStart?.ToString("HH:mm"), appointment.AppointmentDate.ToString("dd/MM/yyyy"));
                 await NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
                     new NotificationContent(NotificationConstants.Text.AppointmentShiftEndedTitle, message, NotificationConstants.Reference.Appointment, appointment.Id.ToString())));
-                try
-                {
-                    if (_smsSender != null && !string.IsNullOrWhiteSpace(appointment.Patient?.PhoneNumber))
-                    {
-                        await _smsSender.SendSmsAsync(appointment.Patient.PhoneNumber, message);
-                    }
-                    if (_emailSender != null && !string.IsNullOrWhiteSpace(appointment.Patient?.Email))
-                    {
-                        await _emailSender.SendEmailAsync(appointment.Patient.Email, ErrorConstants.DoctorScheduleMessage.ShiftEndedNoticeSubject, message);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "Could not tell the patient of appointment {AppointmentId} that the doctor ended the shift", appointment.Id);
-                }
             }
         }
 
