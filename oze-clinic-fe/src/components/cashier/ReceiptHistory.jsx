@@ -14,7 +14,7 @@ const ReceiptHistory = ({ receipts, describe, canWrite, onStatus }) => {
             {receipts.map((r) => (
                 <li key={r.id} className="space-y-1.5 px-5 py-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <b className="text-body-sm text-ink">PT{r.id}</b>
+                        <b className="text-body-sm text-ink">{r.id}</b>
                         <LabelBadge map={TEXT.RECEIPT_STATUS} value={r.status} />
                     </div>
                     <p className="text-caption text-muted">

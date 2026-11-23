@@ -23,5 +23,7 @@ namespace OZE.Common.Constants
         public const string BookingPendingConfirmHours = "Booking.PendingConfirmHours";
         // A PENDING appointment whose visit starts within this many hours is overdue, however recently it was booked
         public const string BookingPendingVisitSoonHours = "Booking.PendingVisitSoonHours";
+        // Deposit rate in percent (0-100) a plan paid by deposit asks for; copied onto the plan when the option is chosen
+        public const string PaymentDepositRate = "Payment.DepositRate";
     }
 }

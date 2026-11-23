@@ -16,20 +16,27 @@ namespace OZE.Application.Services
         private readonly IMedicalRecordRepository _medicalRecordRepository;
         private readonly IServiceRepository _serviceRepository;
         private readonly INotificationService? _notifications;
+        private readonly ICashierService? _cashier;
 
         public TreatmentPlanService(
             ITreatmentPlanRepository treatmentPlanRepository,
             IStaffRepository staffRepository,
             IMedicalRecordRepository medicalRecordRepository,
             IServiceRepository serviceRepository,
-            INotificationService? notifications = null)
+            INotificationService? notifications = null,
+            ICashierService? cashier = null)
         {
             _treatmentPlanRepository = treatmentPlanRepository;
             _staffRepository = staffRepository;
             _medicalRecordRepository = medicalRecordRepository;
             _serviceRepository = serviceRepository;
             _notifications = notifications;
+            _cashier = cashier;
         }
+
+        // A finished session is linked to its visit and the plan invoice follows its cost (cashier pages). Optional so unit tests can skip it.
+        private Task SessionChangedAsync(TreatmentPlan plan, TreatmentPlanStage stage, int doctorId, CancellationToken cancellationToken) =>
+            _cashier == null ? Task.CompletedTask : _cashier.OnSessionChangedAsync(plan.Id, stage.Id, doctorId, cancellationToken);
 
 
         // In-app notifications are optional so unit tests can build the service without them
@@ -605,6 +612,7 @@ namespace OZE.Application.Services
             }
 
             await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
+            await SessionChangedAsync(plan, stage, doctor.Id, cancellationToken);
             return ToProgressResponse(plan);
         }
 
@@ -668,6 +676,7 @@ namespace OZE.Application.Services
             plan.UpdatedAt = now;
 
             await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
+            await SessionChangedAsync(plan, stage, doctor.Id, cancellationToken);
             return ToProgressResponse(plan);
         }
 

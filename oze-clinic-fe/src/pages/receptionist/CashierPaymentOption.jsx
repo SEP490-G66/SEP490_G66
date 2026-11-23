@@ -8,7 +8,7 @@ import { LabelBadge, LoadError, PageSkeleton, Stat, Stats } from "@/components/c
 import ShiftLockAlert from "@/components/cashier/ShiftLockAlert";
 import useCashShiftLock from "@/components/cashier/useCashShiftLock";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { DEPOSIT_RATE, choosePaymentOption, getPlan } from "@/services/cashierService";
+import { choosePaymentOption, getPlan } from "@/services/cashierService";
 import { OPTION } from "@/utils/cashier";
 import { cx } from "@/utils/cx";
 import { CASHIER_TEXT as TEXT } from "@/utils/messages";
@@ -109,7 +109,9 @@ const CashierPaymentOption = () => {
         { label: TEXT.ACCOUNT_TITLE, href: getCashierAccountRoute(patientId) },
         { label: TEXT.OPTION_TITLE },
     ];
-    const depositAmount = plan ? Math.round(plan.planPrice * (locked ? (plan.depositRate ?? 0) : DEPOSIT_RATE)) : 0;
+    // A chosen plan keeps its own rate; before that the clinic rate of now (Payment.DepositRate) is shown
+    const depositRate = (locked ? plan?.depositRate : plan?.suggestedDepositRate) ?? 0;
+    const depositAmount = plan ? Math.round(plan.planPrice * depositRate) : 0;
 
     return (
         <div className="app-content min-h-full space-y-5">
@@ -172,7 +174,7 @@ const CashierPaymentOption = () => {
                                 {shown === OPTION.DEPOSIT && (
                                     <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-1.5 text-body-sm">
                                         <dt className="text-muted">{TEXT.DEPOSIT_RATE}</dt>
-                                        <dd className="num m-0 text-right text-ink">{Math.round((locked ? plan.depositRate : DEPOSIT_RATE) * 100)}%</dd>
+                                        <dd className="num m-0 text-right text-ink">{Math.round(depositRate * 100)}%</dd>
                                         <dt className="font-semibold text-ink">{TEXT.DEPOSIT_AMOUNT}</dt>
                                         <dd className="num m-0 text-right font-heading text-heading-3 font-bold text-ink">{money(depositAmount)}</dd>
                                     </dl>

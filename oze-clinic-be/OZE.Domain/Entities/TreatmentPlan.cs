@@ -16,6 +16,12 @@ namespace OZE.Domain.Entities
         public string? CancellationReason { get; set; }
         public DateTimeOffset? CancelledAt { get; set; }
         public string? CancelledByUserId { get; set; }
+        // How the patient pays this plan, chosen once by the cashier: FULL | PERIODS | DEPOSIT (null = not chosen yet)
+        public string? PaymentOption { get; set; }
+        // Deposit rate in percent, copied from Payment.DepositRate when DEPOSIT is chosen and kept as it was
+        public decimal? DepositRate { get; set; }
+        public DateTimeOffset? PaymentOptionChosenAt { get; set; }
+        public string? PaymentOptionChosenByUserId { get; set; }
         public byte[] RowVersion { get; set; } = Array.Empty<byte>();
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }

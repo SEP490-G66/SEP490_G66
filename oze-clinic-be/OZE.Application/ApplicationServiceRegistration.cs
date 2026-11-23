@@ -109,6 +109,7 @@ namespace OZE.Application
             services.AddScoped<IScheduleViewService, ScheduleViewService>();
             services.AddScoped<ILeaveRequestService, LeaveRequestService>();
             services.AddScoped<ICashSessionService, CashSessionService>();
+            services.AddScoped<ICashierService, CashierService>();
             services.AddScoped<IFollowUpCareService, FollowUpCareService>();
             services.AddScoped<IDebtService, DebtService>();
             services.AddScoped<IReconciliationService, ReconciliationService>();

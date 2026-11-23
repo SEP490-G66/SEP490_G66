@@ -18,7 +18,7 @@ const DepositLedger = ({ plan, receipts, canWrite, onStatus }) => {
                 <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5 text-body-sm">
                     <span className="text-ink">{TEXT.LEDGER_IN}</span>
                     <span className="text-caption text-muted">
-                        PT{receipt.id} · {dateTimeText(receipt.createdAt)} · {TEXT.METHODS[receipt.method]}
+                        {receipt.id} · {dateTimeText(receipt.createdAt)} · {TEXT.METHODS[receipt.method]}
                     </span>
                     <LabelBadge map={TEXT.RECEIPT_STATUS} value={receipt.status} />
                     <b className={receipt.status === RECEIPT_STATUS.CONFIRMED ? "num ml-auto text-success" : receipt.status === RECEIPT_STATUS.REJECTED ? "num ml-auto text-muted line-through" : "num ml-auto text-muted"}>

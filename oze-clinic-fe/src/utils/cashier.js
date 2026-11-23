@@ -183,6 +183,10 @@ export const computePlan = (plan, receipts) => {
     else if (isFull && fullCeiling > 0) action = ACTION.FULL;
     else if (collectablePeriods.length) action = ACTION.COLLECT;
 
+    const owedDates = finished.filter((p) => (isFull ? p.extraDue : p.due) > 0 && p.date).map((p) => p.date);
+    if (((isFull && fullDue > 0) || (isDeposit && depositOwed > 0)) && plan.optionChosenAt) owedDates.push(plan.optionChosenAt);
+    const owedSince = currentDue > 0 && owedDates.length ? owedDates.sort()[0] : null;
+
     return {
         ...plan,
         periods,
@@ -205,24 +209,27 @@ export const computePlan = (plan, receipts) => {
         hasUnfinished: !allFinished,
         nextPeriod: collectablePeriods[0] ?? null,
         action,
+        owedSince,
     };
 };
 
-// One walk-in (lượt khám lẻ) service: remaining by paid money, ceiling by held money
+// One walk-in visit (lượt khám lẻ): its services are listed one by one, but the money is counted for the whole visit.
+// amount = what the visit costs (its invoice when it has one); remaining by paid money, ceiling by held money.
 export const computeVisit = (visit, receipts) => {
-    const paidLines = linesOf(receipts, PAID).filter((l) => l.kind === LINE.VISIT_SERVICE && l.visitId === visit.id);
-    const heldLines = linesOf(receipts, HELD).filter((l) => l.kind === LINE.VISIT_SERVICE && l.visitId === visit.id);
-    const services = visit.services.map((s) => {
-        const paid = sum(paidLines.filter((l) => l.serviceId === s.id), (l) => l.amount);
-        const heldSum = sum(heldLines.filter((l) => l.serviceId === s.id), (l) => l.amount);
-        return { ...s, paid, remaining: Math.max(0, s.amount - paid), ceiling: Math.max(0, s.amount - heldSum) };
-    });
+    const own = (statuses) => linesOf(receipts, statuses).filter((l) => l.kind === LINE.VISIT_SERVICE && l.visitId === visit.id);
+    const amount = visit.amount ?? sum(visit.services, (s) => s.amount);
+    const paid = sum(own(PAID), (l) => l.amount);
+    const held = sum(own(HELD), (l) => l.amount);
+    const remaining = Math.max(0, amount - paid);
+    const date = visit.startAt.slice(0, 10);
     return {
         ...visit,
-        date: visit.startAt.slice(0, 10),
-        services,
-        remaining: sum(services, (s) => s.remaining),
-        ceiling: sum(services, (s) => s.ceiling),
+        date,
+        amount,
+        paid,
+        remaining,
+        ceiling: Math.max(0, amount - held),
+        owedSince: remaining > 0 && date ? date : null,
     };
 };
 
@@ -248,12 +255,15 @@ export const computePatient = (patient, { plans, visits, receipts }, today) => {
     if (planViews.some((p) => p.hasUnfinished)) statuses.push(PATIENT_STATUS.UPCOMING);
     if (!statuses.length) statuses.push(PATIENT_STATUS.SETTLED);
 
-    // What is still running or owed: plans first, then walk-ins with money left
+    // What is still running or owed: plans by name first, then walk-ins with money left by the services done in them
+    const visitItem = (v) => ({ kind: "visit", label: v.services.map((x) => x.name).filter(Boolean).join(", "), date: v.date });
     const open = [
         ...planViews.filter((p) => p.currentDue > 0 || p.hasUnfinished).map((p) => ({ kind: "plan", label: p.name })),
-        ...visitViews.filter((v) => v.remaining > 0).map((v) => ({ kind: "visit", date: v.date })),
+        ...visitViews.filter((v) => v.remaining > 0).sort((a, b) => b.date.localeCompare(a.date)).map(visitItem),
     ];
     const latestPlan = [...planViews].sort((a, b) => b.id - a.id)[0];
+    const latestVisit = [...visitViews].sort((a, b) => b.date.localeCompare(a.date))[0];
+    const owedDates = [...planViews.filter((p) => p.currentDue > 0), ...visitViews.filter((v) => v.remaining > 0)].map((x) => x.owedSince).filter(Boolean);
 
     return {
         ...patient,
@@ -268,7 +278,9 @@ export const computePatient = (patient, { plans, visits, receipts }, today) => {
         dates: [...new Set([...planViews.flatMap((p) => p.periods.map((x) => x.date)), ...visitViews.map((v) => v.date)])],
         statuses,
         status: statuses[0],
-        open: open.length ? open : latestPlan ? [{ kind: "plan", label: latestPlan.name }] : [],
+        // Nothing left to pay: still say what the patient had done
+        open: open.length ? open : latestPlan ? [{ kind: "plan", label: latestPlan.name }] : latestVisit ? [visitItem(latestVisit)] : [],
+        owedSince: owedDates.length ? owedDates.sort()[0] : null,
     };
 };
 
@@ -310,16 +322,14 @@ export const collectablesOf = (patientView) => {
             ],
         }))
         .filter((p) => p.targets.length);
-    const services = patientView.visits.flatMap((v) =>
-        v.services
-            .filter((s) => s.ceiling > 0)
-            .map((s) => ({ key: `service:${v.id}:${s.id}`, kind: LINE.VISIT_SERVICE, visitId: v.id, serviceId: s.id, name: s.name, startAt: v.startAt, ceiling: s.ceiling })),
-    );
+    // One line per walk-in visit, named by its services
+    const services = patientView.visits
+        .filter((v) => v.ceiling > 0)
+        .map((v) => ({ key: `visit:${v.id}`, kind: LINE.VISIT_SERVICE, visitId: v.id, name: v.services.map((s) => s.name).join(", "), startAt: v.startAt, ceiling: v.ceiling }));
     return { plans, services };
 };
 
 // Keys of the lines asked for in ?add= ("period:12,visit:5,full:3"); unknown or used-up ones are dropped.
-// visit:<id> opens into each of its services that can still take money.
 export const keysFromAdd = (add, collectables) => {
     const known = new Map([...collectables.plans.flatMap((p) => p.targets), ...collectables.services].map((t) => [t.key, t]));
     const keys = [];
@@ -330,11 +340,7 @@ export const keysFromAdd = (add, collectables) => {
         .forEach((token) => {
             const [kind, id] = token.split(":");
             if (!/^\d+$/.test(id ?? "")) return;
-            if (kind === "period" || kind === "full") {
-                if (known.has(token)) keys.push(token);
-            } else if (kind === "visit") {
-                collectables.services.filter((s) => String(s.visitId) === id).forEach((s) => keys.push(s.key));
-            }
+            if ((kind === "period" || kind === "full" || kind === "visit") && known.has(token)) keys.push(token);
         });
     return [...new Set(keys)];
 };
@@ -368,10 +374,8 @@ export const collectError = (data, { patientId, lines, method }, MSG) => {
         } else if (line.kind === LINE.VISIT_SERVICE) {
             const visit = view.visits.find((v) => v.id === line.visitId);
             if (!visit) return MSG.WRONG_PATIENT;
-            const service = visit.services.find((s) => s.id === line.serviceId);
-            if (!service) return MSG.WRONG_PLAN;
-            key = `service:${visit.id}:${service.id}`;
-            ceiling = service.ceiling;
+            key = `visit:${visit.id}`;
+            ceiling = visit.ceiling;
         } else {
             return MSG.BAD_KIND;
         }

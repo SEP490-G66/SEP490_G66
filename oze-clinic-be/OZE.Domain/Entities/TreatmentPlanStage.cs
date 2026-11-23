@@ -14,6 +14,8 @@ namespace OZE.Domain.Entities
         public DateOnly? ScheduledDate { get; set; }
         public DateOnly? ActualDate { get; set; }
         public int? PerformedByDoctorId { get; set; }
+        // The visit in which the doctor did this session, so the cashier does not collect it twice with that visit
+        public long? AppointmentId { get; set; }
         public string? Notes { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
@@ -22,5 +24,6 @@ namespace OZE.Domain.Entities
         public virtual TreatmentPlan TreatmentPlan { get; set; } = null!;
         public virtual Service? Service { get; set; }
         public virtual StaffProfile? PerformedByDoctor { get; set; }
+        public virtual Appointment? Appointment { get; set; }
     }
 }

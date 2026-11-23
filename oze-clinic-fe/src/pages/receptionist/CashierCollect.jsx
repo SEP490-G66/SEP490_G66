@@ -40,8 +40,7 @@ const targetsOf = (collectables) =>
 const describerOf = (patient) => (line) => {
     if (line.kind === LINE.VISIT_SERVICE) {
         const visit = patient?.visits.find((v) => v.id === line.visitId);
-        const service = visit?.services.find((s) => s.id === line.serviceId);
-        return service ? TEXT.LINE_SERVICE(service.name, dateTimeText(visit.startAt)) : TEXT.VISIT_LABEL;
+        return visit ? TEXT.LINE_SERVICE(visit.services.map((s) => s.name).join(", "), dateTimeText(visit.startAt)) : TEXT.VISIT_LABEL;
     }
     const plan = patient?.plans.find((p) => p.id === line.planId);
     const name = plan?.name ?? TEXT.PLAN;
@@ -149,7 +148,7 @@ const CashierCollect = () => {
             note,
             lines: liveLines.map((l) =>
                 l.kind === LINE.VISIT_SERVICE
-                    ? { kind: l.kind, visitId: l.visitId, serviceId: l.serviceId, amount: l.amount }
+                    ? { kind: l.kind, visitId: l.visitId, amount: l.amount }
                     : l.kind === LINE.FULL
                       ? { kind: l.kind, planId: l.planId, amount: l.amount }
                       : { kind: l.kind, planId: l.planId, periodId: l.periodId, amount: l.amount },

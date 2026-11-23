@@ -37,6 +37,14 @@ namespace OZE.Common.Constants
         public const string PaymentConfirmed = "PAYMENT_CONFIRMED";
         public const string PaymentVoided = "PAYMENT_VOIDED";
 
+        // Cashier pages: the receipt code is the entity id of a receipt
+        public const string TreatmentPlanEntity = "TreatmentPlan";
+        public const string ReceiptEntity = "Receipt";
+        public const string PaymentOptionChosen = "PAYMENT_OPTION_CHOSEN";
+        public const string ReceiptRecorded = "RECEIPT_RECORDED";
+        public const string ReceiptConfirmed = "RECEIPT_CONFIRMED";
+        public const string ReceiptRejected = "RECEIPT_REJECTED";
+
         public const string RefundRequested = "REFUND_REQUESTED";
         public const string RefundWorkDoneSet = "REFUND_WORK_DONE_SET";
         public const string RefundApproved = "REFUND_APPROVED";
