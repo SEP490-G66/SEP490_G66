@@ -44,7 +44,7 @@ namespace OZE.Application
 
             // Register Services
             services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-            services.AddScoped<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
+            services.AddHttpClient<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddSingleton<IOtpSendLimiter, OtpSendLimiter>();
             services.AddSingleton<IAccessTokenRevocationStore, AccessTokenRevocationStore>();
