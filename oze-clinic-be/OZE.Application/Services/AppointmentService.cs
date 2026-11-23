@@ -153,7 +153,15 @@ namespace OZE.Application.Services
                 request.DoctorId, request.Note, userId, () => Task.FromResult(existing!),
                 initialStatus: initialStatus, selfBooking: true);
 
-            await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
+            // A confirmed booking must not say "the receptionist will call to confirm"
+            if (returning)
+            {
+                await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
+            }
+            else
+            {
+                await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
+            }
             await NotifyNewOnlineBookingAsync(appointment, patient);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
