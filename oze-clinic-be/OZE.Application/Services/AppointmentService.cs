@@ -128,7 +128,7 @@ namespace OZE.Application.Services
                     return patient;
                 });
 
-            await SendBookingNotificationAsync(phone, email, appointment, lines);
+            await SendBookingNotificationAsync(phone, email, patient.FullName, appointment, lines);
             await NotifyNewOnlineBookingAsync(appointment, patient);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
@@ -149,7 +149,7 @@ namespace OZE.Application.Services
                     return existing!;
                 });
 
-            await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
+            await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
             await NotifyNewOnlineBookingAsync(appointment, patient);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
@@ -214,27 +214,24 @@ namespace OZE.Application.Services
                     return patient;
                 }, initialStatus: AppointmentConstants.ConfirmedStatus);
 
-            await SendReceptionBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
+            await SendReceptionBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
             await NotifyAsync(n => n.NotifyPatientAsync(patient.Id, Content(NotificationConstants.Text.AppointmentBookedByClinicTitle, NotificationConstants.Text.AppointmentBookedByClinicMessage, appointment)));
             await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
         }
 
-        private async Task SendReceptionBookingNotificationAsync(string? phone, string? email, Appointment appointment, List<BookingLine> lines)
+        private async Task SendReceptionBookingNotificationAsync(
+            string? phone, string? email, string? patientName, Appointment appointment, List<BookingLine> lines)
         {
             var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
-            var message = $"OZE Dental: Your appointment for {serviceNames} " +
-                          $"at {appointment.TimeSlotStart:HH\\:mm} on {appointment.AppointmentDate:dd/MM/yyyy} has been confirmed.";
+            var message = PatientEmailTemplates.AppointmentConfirmed(
+                patientName, serviceNames, appointment.AppointmentDate, appointment.TimeSlotStart);
             try
             {
-                if (!string.IsNullOrWhiteSpace(phone))
-                {
-                    await _smsSender.SendSmsAsync(phone, message);
-                }
                 if (!string.IsNullOrWhiteSpace(email))
                 {
-                    await _emailSender.SendEmailAsync(email, "OZE Dental - Appointment confirmed", message);
+                    await _emailSender.SendEmailAsync(email, PatientEmailTemplates.SubjectAppointmentConfirmed, message);
                 }
             }
             catch
@@ -448,18 +445,19 @@ namespace OZE.Application.Services
             var serviceNames = string.Join(", ", appointment.ServiceItems.Select(i => i.Variant == null
                 ? i.Service?.ServiceName
                 : $"{i.Service?.ServiceName} - {i.Variant.VariantName}"));
-            var message = $"OZE Dental: Your appointment for {serviceNames} " +
-                          $"at {appointment.TimeSlotStart:HH\\:mm} on {appointment.AppointmentDate:dd/MM/yyyy} " +
-                          "has been confirmed.";
+            var message = PatientEmailTemplates.AppointmentConfirmed(
+                appointment.Patient?.FullName,
+                serviceNames,
+                appointment.AppointmentDate,
+                appointment.TimeSlotStart);
             try
             {
-                if (!string.IsNullOrWhiteSpace(appointment.Patient?.PhoneNumber))
-                {
-                    await _smsSender.SendSmsAsync(appointment.Patient.PhoneNumber, message);
-                }
                 if (!string.IsNullOrWhiteSpace(appointment.Patient?.Email))
                 {
-                    await _emailSender.SendEmailAsync(appointment.Patient.Email, "OZE Dental - Appointment confirmed", message);
+                    await _emailSender.SendEmailAsync(
+                        appointment.Patient.Email,
+                        PatientEmailTemplates.SubjectAppointmentConfirmed,
+                        message);
                 }
             }
             catch (Exception ex)
@@ -477,21 +475,23 @@ namespace OZE.Application.Services
         }
 
         // A failed notification must not undo the booking, so errors are only logged
-        private async Task SendBookingNotificationAsync(string? phone, string? email, Appointment appointment, List<BookingLine> lines)
+        private async Task SendBookingNotificationAsync(
+            string? phone, string? email, string? patientName, Appointment appointment, List<BookingLine> lines)
         {
             var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
-            var message = $"OZE Dental: Your appointment request for {serviceNames} " +
-                          $"at {appointment.TimeSlotStart:HH\\:mm} on {appointment.AppointmentDate:dd/MM/yyyy} " +
-                          "has been received. The receptionist will call to confirm.";
+            var message = PatientEmailTemplates.AppointmentRequest(
+                patientName,
+                serviceNames,
+                appointment.AppointmentDate,
+                appointment.TimeSlotStart);
             try
             {
-                if (!string.IsNullOrWhiteSpace(phone))
-                {
-                    await _smsSender.SendSmsAsync(phone, message);
-                }
                 if (!string.IsNullOrWhiteSpace(email))
                 {
-                    await _emailSender.SendEmailAsync(email, "OZE Dental - Appointment request", message);
+                    await _emailSender.SendEmailAsync(
+                        email,
+                        PatientEmailTemplates.SubjectAppointmentRequest,
+                        message);
                 }
             }
             catch (Exception ex)

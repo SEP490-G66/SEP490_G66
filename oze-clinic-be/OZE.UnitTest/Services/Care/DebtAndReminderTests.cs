@@ -16,25 +16,25 @@ namespace OZE.UnitTest.Services.Care
     public class DebtAndReminderTests
     {
         private readonly Mock<ICareRepository> _repo = new();
-        private readonly Mock<ISmsSender> _sms = new();
+        private readonly Mock<IEmailSender> _email = new();
         private readonly DebtService _service;
         private readonly DateOnly _today = DateOnly.FromDateTime(ClinicClock.Today);
 
         public DebtAndReminderTests()
         {
-            _service = new DebtService(_repo.Object, new Mock<IAuditLogService>().Object, _sms.Object, null);
+            _service = new DebtService(_repo.Object, new Mock<IAuditLogService>().Object, null, _email.Object);
             _repo.Setup(r => r.GetReminderStatsAsync(It.IsAny<IEnumerable<long>>(), It.IsAny<CancellationToken>()))
                  .ReturnsAsync(new Dictionary<long, (int, DateTimeOffset)>());
             _repo.Setup(r => r.GetStaffNamesAsync(It.IsAny<IEnumerable<string?>>(), It.IsAny<CancellationToken>())).ReturnsAsync(new Dictionary<string, string>());
         }
 
-        private Invoice InvoiceOwing(decimal final, decimal paid, string? phone = "0912345678", params InstallmentPeriod[] periods)
+        private Invoice InvoiceOwing(decimal final, decimal paid, string? email = "bn@oze.vn", params InstallmentPeriod[] periods)
         {
             var invoice = new Invoice
             {
                 Id = 9, InvoiceNumber = "INV-9", PatientId = 1, FinalAmount = final, PaidAmount = paid,
                 PaymentStatus = InvoiceConstants.PartiallyPaid, CreatedAt = DateTimeOffset.UtcNow.AddDays(-10),
-                Patient = new Patient { FullName = "Benh nhan", PhoneNumber = phone }
+                Patient = new Patient { FullName = "Benh nhan", Email = email, PhoneNumber = "0912345678" }
             };
             if (periods.Length > 0)
             {
@@ -70,19 +70,28 @@ namespace OZE.UnitTest.Services.Care
             result.OverdueInvoiceCount.Should().Be(1);
         }
 
-        // UTCID02 (N): a reminder is sent by SMS and recorded with the installment
+        // UTCID02 (N): a reminder is sent by email and recorded with the installment
         [Fact]
-        public async Task Remind_SendsSmsAndRecords()
+        public async Task Remind_SendsEmailAndRecords()
         {
-            InvoiceOwing(1000, 400, "0912345678", new InstallmentPeriod { Id = 3, Sequence = 2, Amount = 300, DueDate = _today.AddDays(2), Status = InstallmentConstants.PeriodPending });
+            InvoiceOwing(1000, 400, "bn@oze.vn", new InstallmentPeriod { Id = 3, Sequence = 2, Amount = 300, DueDate = _today.AddDays(2), Status = InstallmentConstants.PeriodPending });
             PaymentReminder? saved = null;
+            string? emailBody = null;
             _repo.Setup(r => r.AddReminderAsync(It.IsAny<PaymentReminder>(), It.IsAny<CancellationToken>())).Callback<PaymentReminder, CancellationToken>((x, _) => saved = x);
+            _email.Setup(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Callback<string, string, string>((_, _, body) => emailBody = body)
+                .Returns(Task.CompletedTask);
 
             var result = await _service.RemindAsync(9, "lt", new RemindPaymentRequest());
 
-            _sms.Verify(s => s.SendSmsAsync("0912345678", It.Is<string>(m => m.Contains("INV-9") && m.Contains("Kỳ góp 2"))), Times.Once);
+            emailBody.Should().NotBeNullOrEmpty();
+            emailBody.Should().Contain("<!DOCTYPE html>");
+            emailBody.Should().Contain("INV-9");
+            // HtmlEncode turns ó -> &#243; (e.g. góp)
+            emailBody.Should().Contain("g&#243;p 2");
+            _email.Verify(e => e.SendEmailAsync("bn@oze.vn", PatientEmailTemplates.SubjectPaymentReminder, It.IsAny<string>()), Times.Once);
             saved!.InstallmentPeriodId.Should().Be(3);
-            result.Channels.Should().Be("SMS");
+            result.Channels.Should().Be("Email");
         }
 
         // UTCID03 (A): within 4 hours of the last reminder
@@ -113,7 +122,7 @@ namespace OZE.UnitTest.Services.Care
         [Fact]
         public async Task Remind_NoContact_Throws()
         {
-            InvoiceOwing(1000, 0, phone: null);
+            InvoiceOwing(1000, 0, email: null);
 
             var act = () => _service.RemindAsync(9, "lt", new RemindPaymentRequest());
 
@@ -125,7 +134,7 @@ namespace OZE.UnitTest.Services.Care
         public async Task DailyJob_RemindsDueAndRespectsWeeklyOverdue()
         {
             var tomorrow = _today.AddDays(1);
-            Invoice Inv(long id) => new() { Id = id, InvoiceNumber = $"I{id}", FinalAmount = 1000, PaidAmount = 0, PaymentStatus = InvoiceConstants.Unpaid, Patient = new Patient { FullName = "X", PhoneNumber = "09" } };
+            Invoice Inv(long id) => new() { Id = id, InvoiceNumber = $"I{id}", FinalAmount = 1000, PaidAmount = 0, PaymentStatus = InvoiceConstants.Unpaid, Patient = new Patient { FullName = "X", PhoneNumber = "09", Email = "x@oze.vn" } };
             var due = new InstallmentPeriod { Id = 1, Amount = 100, DueDate = tomorrow, Status = InstallmentConstants.PeriodPending, InstallmentPlan = new InstallmentPlan { InvoiceId = 1, Invoice = Inv(1) } };
             var overdue = new InstallmentPeriod { Id = 2, Amount = 100, DueDate = _today.AddDays(-5), Status = InstallmentConstants.PeriodOverdue, InstallmentPlan = new InstallmentPlan { InvoiceId = 2, Invoice = Inv(2) } };
             _repo.Setup(r => r.GetPeriodsToRemindAsync(tomorrow, _today, It.IsAny<CancellationToken>())).ReturnsAsync(new List<InstallmentPeriod> { due, overdue });

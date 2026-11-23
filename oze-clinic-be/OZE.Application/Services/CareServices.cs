@@ -80,7 +80,7 @@ namespace OZE.Application.Services
         };
     }
 
-    // Patient debts and payment reminders (SMS and email). Overdue installments are only reminded, never fined (BR-PAY-08).
+    // Patient debts and payment reminders (email only). Overdue installments are only reminded, never fined (BR-PAY-08).
     public class DebtService : IDebtService
     {
         private readonly ICareRepository _careRepository;
@@ -240,7 +240,7 @@ namespace OZE.Application.Services
         // In-app notifications are optional so unit tests can build the service without them
         private Task NotifyAsync(Func<INotificationService, Task> send) => _notifications == null ? Task.CompletedTask : send(_notifications);
 
-        // The same text as the SMS / email, also in the app for a patient with an account
+        // The same text as the email, also in the app for a patient with an account
         private Task NotifyReminderAsync(Invoice invoice, string message, CancellationToken cancellationToken) =>
             NotifyAsync(n => n.NotifyPatientAsync(invoice.PatientId,
                 new NotificationContent(NotificationConstants.Text.PaymentReminderTitle, message, NotificationConstants.Reference.Invoice, invoice.Id.ToString()), cancellationToken));
@@ -254,29 +254,18 @@ namespace OZE.Application.Services
             CancellationToken cancellationToken)
         {
             var channels = new List<string>();
-            if (_smsSender != null && !string.IsNullOrWhiteSpace(invoice.Patient.PhoneNumber))
-            {
-                try
-                {
-                    await _smsSender.SendSmsAsync(invoice.Patient.PhoneNumber, message);
-                    channels.Add(CareConstants.ChannelSms);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "Payment reminder SMS failed for invoice {InvoiceId}", invoice.Id);
-                }
-            }
-
             if (_emailSender != null && !string.IsNullOrWhiteSpace(invoice.Patient.Email))
             {
                 try
                 {
-                    await _emailSender.SendEmailAsync(invoice.Patient.Email, "Nha khoa OZE - Nhắc thanh toán", message);
+                    await _emailSender.SendEmailAsync(
+                        invoice.Patient.Email,
+                        PatientEmailTemplates.SubjectPaymentReminder,
+                        PatientEmailTemplates.PaymentReminder(invoice.Patient.FullName, message));
                     channels.Add(CareConstants.ChannelEmail);
                 }
                 catch (Exception ex)
                 {
-                    // An email failure must not lose the SMS that already went out
                     _logger?.LogWarning(ex, "Payment reminder email failed for invoice {InvoiceId}", invoice.Id);
                 }
             }
@@ -299,7 +288,7 @@ namespace OZE.Application.Services
         }
 
         private static bool HasContact(Patient? patient) =>
-            !string.IsNullOrWhiteSpace(patient?.PhoneNumber) || !string.IsNullOrWhiteSpace(patient?.Email);
+            !string.IsNullOrWhiteSpace(patient?.Email);
 
         private static InstallmentPeriod? NextOpenPeriod(Invoice invoice, DateOnly today) =>
             invoice.InstallmentPlans
