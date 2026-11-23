@@ -8,9 +8,11 @@ using OZE.Domain.Entities;
 
 namespace OZE.Application.Services
 {
-    // Read-only money views of the signed-in patient. "Due" counts work done and installment periods already due;
-    // "planned" counts plan stages not done yet and periods not due yet, so the patient is never told to pay for
-    // work that has not been done.
+    /// <summary>
+    /// Service xử lý thông tin tài chính chỉ đọc cho bệnh nhân.
+    /// Tính toán các khoản "Đến hạn" (Due) dựa trên công việc đã thực hiện hoặc kỳ trả góp đã đến hạn,
+    /// và "Dự kiến" (Planned) cho các giai đoạn điều trị chưa thực hiện nhằm minh bạch công nợ.
+    /// </summary>
     public class PatientBillingService : IPatientBillingService
     {
         public const string ModeOnce = "ONCE";
@@ -32,6 +34,9 @@ namespace OZE.Application.Services
             _patientRepository = patientRepository;
         }
 
+        /// <summary>
+        /// Lấy danh sách tài khoản công nợ của bệnh nhân theo mã tài khoản người dùng.
+        /// </summary>
         public async Task<List<PatientPaymentAccountResponse>> GetMyAccountsAsync(string userId, CancellationToken cancellationToken = default)
         {
             var invoices = await LoadAsync(userId, cancellationToken);
@@ -39,12 +44,18 @@ namespace OZE.Application.Services
             return invoices.Select(invoice => ToAccount(invoice, today)).ToList();
         }
 
+        /// <summary>
+        /// Lấy danh sách chi tiết các hóa đơn và lịch sử thanh toán của bệnh nhân.
+        /// </summary>
         public async Task<List<PatientInvoiceDetailResponse>> GetMyInvoiceDetailsAsync(string userId, CancellationToken cancellationToken = default)
         {
             var invoices = await LoadAsync(userId, cancellationToken);
             return invoices.Select(ToDetail).ToList();
         }
 
+        /// <summary>
+        /// Tải toàn bộ danh sách hóa đơn khả dụng của bệnh nhân từ cơ sở dữ liệu.
+        /// </summary>
         private async Task<IReadOnlyList<Invoice>> LoadAsync(string userId, CancellationToken cancellationToken)
         {
             var patient = await _patientRepository.GetByUserIdAsync(userId);

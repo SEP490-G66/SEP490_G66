@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OZE.Common.Models
 {
+    /// <summary>Yêu cầu hoàn tiền từ phía nhân viên lễ tân.</summary>
     public class CreateRefundRequest
     {
         [Required]
@@ -11,12 +12,14 @@ namespace OZE.Common.Models
         public long? PaymentId { get; set; }
     }
 
+    /// <summary>Thiết lập chi phí công việc đã hoàn thành để tính tiền hoàn.</summary>
     public class SetWorkDoneAmountRequest
     {
         [Range(0, double.MaxValue)]
         public decimal WorkDoneAmount { get; set; }
     }
 
+    /// <summary>Yêu cầu từ chối hoàn tiền với lý do chi tiết.</summary>
     public class RejectRefundRequest
     {
         [Required]
@@ -24,12 +27,14 @@ namespace OZE.Common.Models
         public string RejectionReason { get; set; } = string.Empty;
     }
 
+    /// <summary>Bộ lọc tìm kiếm các yêu cầu hoàn tiền.</summary>
     public class RefundRequestQueryParameters
     {
         public string? Status { get; set; }
         public long? InvoiceId { get; set; }
     }
 
+    /// <summary>Dữ liệu phản hồi của một yêu cầu hoàn tiền.</summary>
     public class RefundRequestResponse
     {
         public long Id { get; set; }

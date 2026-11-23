@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace OZE.Common.Models
 {
+    /// <summary>Khung giờ ca làm việc áp dụng cho tạo ca hàng loạt.</summary>
     public class BulkWorkShiftSlot
     {
         [Required]
@@ -11,6 +12,7 @@ namespace OZE.Common.Models
         public TimeOnly? ShiftEnd { get; set; }
     }
 
+    /// <summary>Ca làm việc bị bỏ qua trong danh sách duyệt trước (preview).</summary>
     public class BulkSkippedItem
     {
         [Required]
@@ -23,6 +25,7 @@ namespace OZE.Common.Models
         public TimeOnly? ShiftStart { get; set; }
     }
 
+    /// <summary>Yêu cầu tạo ca làm việc hàng loạt cho nhân viên.</summary>
     public class BulkWorkShiftRequest
     {
         [Required]
@@ -57,3 +60,4 @@ namespace OZE.Common.Models
         public List<BulkSkippedItem>? SkippedItems { get; set; }
     }
 }
+
