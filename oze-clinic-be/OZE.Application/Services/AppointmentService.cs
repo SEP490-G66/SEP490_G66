@@ -140,14 +140,18 @@ namespace OZE.Application.Services
 
             var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
 
+            // The patient comes from the token, never from the request
+            var existing = await _appointmentRepository.GetPatientByUserIdAsync(userId);
+            ConditionGuard.Ensure<NotFoundException>(existing != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
+
+            // A returning patient (came to the clinic at least once) books with a verified phone, so the front desk
+            // has nothing to check: the booking is CONFIRMED at once. A new patient still waits for the call back
+            var returning = await _appointmentRepository.HasCompletedVisitAsync(existing!.Id);
+            var initialStatus = returning ? AppointmentConstants.ConfirmedStatus : AppointmentConstants.PendingStatus;
+
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
-                request.DoctorId, request.Note, userId, async () =>
-                {
-                    // The patient comes from the token, never from the request
-                    var existing = await _appointmentRepository.GetPatientByUserIdAsync(userId);
-                    ConditionGuard.Ensure<NotFoundException>(existing != null, ErrorConstants.AppointmentMessage.PatientProfileNotFound);
-                    return existing!;
-                }, selfBooking: true);
+                request.DoctorId, request.Note, userId, () => Task.FromResult(existing!),
+                initialStatus: initialStatus, selfBooking: true);
 
             await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
             await NotifyNewOnlineBookingAsync(appointment, patient);
