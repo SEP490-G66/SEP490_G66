@@ -162,7 +162,15 @@ namespace OZE.Application.Services
             {
                 await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
             }
-            await NotifyNewOnlineBookingAsync(appointment, patient);
+
+            if (returning)
+            {
+                await NotifyReturningOnlineBookingAsync(appointment, patient);
+            }
+            else
+            {
+                await NotifyNewOnlineBookingAsync(appointment, patient);
+            }
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
         }
@@ -1560,6 +1568,17 @@ namespace OZE.Application.Services
         private Task NotifyNewOnlineBookingAsync(Appointment appointment, Patient patient) =>
             NotifyAsync(n => n.NotifyRolesAsync(new[] { RoleConstants.ReceptionistRole },
                 Content(NotificationConstants.Text.NewOnlineBookingTitle, NotificationConstants.Text.NewOnlineBookingMessage, appointment, patient.FullName)));
+
+        // A returning patient's online booking is CONFIRMED at once: the patient is told it is confirmed, the
+        // receptionists that no call is needed, and the doctor learns about the visit as for any confirmed booking
+        private async Task NotifyReturningOnlineBookingAsync(Appointment appointment, Patient patient)
+        {
+            await NotifyAsync(n => n.NotifyPatientAsync(patient.Id,
+                Content(NotificationConstants.Text.ReturningBookingConfirmedTitle, NotificationConstants.Text.ReturningBookingConfirmedMessage, appointment)));
+            await NotifyAsync(n => n.NotifyRolesAsync(new[] { RoleConstants.ReceptionistRole },
+                Content(NotificationConstants.Text.ReturningOnlineBookingTitle, NotificationConstants.Text.ReturningOnlineBookingMessage, appointment, patient.FullName)));
+            await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
+        }
 
         // The doctor learns about a visit once it is confirmed
         private Task NotifyDoctorOfNewAppointmentAsync(Appointment appointment, string? patientName) =>
