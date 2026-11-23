@@ -218,14 +218,15 @@ namespace OZE.Application.Services
                     return patient;
                 }, initialStatus: AppointmentConstants.ConfirmedStatus);
 
-            await SendReceptionBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
+            await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, appointment, lines);
             await NotifyAsync(n => n.NotifyPatientAsync(patient.Id, Content(NotificationConstants.Text.AppointmentBookedByClinicTitle, NotificationConstants.Text.AppointmentBookedByClinicMessage, appointment)));
             await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
         }
 
-        private async Task SendReceptionBookingNotificationAsync(string? phone, string? email, Appointment appointment, List<BookingLine> lines)
+        // SMS/email for a booking that is CONFIRMED when it is made (by the receptionist, or by a returning patient)
+        private async Task SendConfirmedBookingNotificationAsync(string? phone, string? email, Appointment appointment, List<BookingLine> lines)
         {
             var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
             var message = $"OZE Dental: Your appointment for {serviceNames} " +
