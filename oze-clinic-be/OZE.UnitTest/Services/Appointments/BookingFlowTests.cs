@@ -301,6 +301,29 @@ namespace OZE.UnitTest.Services.Appointments
 
             saved!.Status.Should().Be(AppointmentConstants.PendingStatus);
         }
+
+        // UTCID10 (N): a returning patient gets the "confirmed" SMS, not "the receptionist will call to confirm"
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldSendConfirmedSms_WhenReturningPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _smsSenderMock.Verify(s => s.SendSmsAsync(_patient.PhoneNumber!, It.Is<string>(m => m.Contains("has been confirmed"))), Times.Once);
+            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.Is<string>(m => m.Contains("will call to confirm"))), Times.Never);
+        }
+
+        // UTCID11 (N): a new patient is told the request was received and the receptionist will call
+        [Fact]
+        public async Task BookAsPatientAsync_ShouldSendRequestReceivedSms_WhenNewPatient()
+        {
+            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
+
+            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
+
+            _smsSenderMock.Verify(s => s.SendSmsAsync(_patient.PhoneNumber!, It.Is<string>(m => m.Contains("will call to confirm"))), Times.Once);
+        }
     }
 
     // OZ-APPT-05 CreateWalkIn
