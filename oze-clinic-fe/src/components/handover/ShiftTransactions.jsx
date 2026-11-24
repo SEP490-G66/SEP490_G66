@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import LabeledSelect from "@/components/ui/LabeledSelect";
 import { Card } from "@/components/reception/shared";
 import { usePaging } from "@/components/reception/receptionUtils";
@@ -11,10 +12,22 @@ const METHOD_OPTIONS = [["", TEXT.TX_ALL_METHODS], ...Object.entries(TEXT.METHOD
 const ShiftTransactions = ({ transactions }) => {
     const [kind, setKind] = useState("");
     const [method, setMethod] = useState("");
+    const [printing, setPrinting] = useState(false);
     const shown = transactions
         .filter((t) => (!kind || t.kind === kind) && (!method || methodOf(t) === method))
         .sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)));
     const { pageItems, footer, setPage } = usePaging(shown, 10);
+    const rows = printing ? shown : pageItems;
+    useEffect(() => {
+        const before = () => flushSync(() => setPrinting(true));
+        const after = () => setPrinting(false);
+        window.addEventListener("beforeprint", before);
+        window.addEventListener("afterprint", after);
+        return () => {
+            window.removeEventListener("beforeprint", before);
+            window.removeEventListener("afterprint", after);
+        };
+    }, []);
     const dash = <span className="text-muted">—</span>;
     const pick = (setter) => (value) => {
         setter(value);
@@ -30,7 +43,7 @@ const ShiftTransactions = ({ transactions }) => {
                 </span>
             }
             actions={
-                <span className="flex flex-wrap items-end gap-3">
+                <span className="flex flex-wrap items-end gap-3 print:hidden">
                     <LabeledSelect id="hs-kind" label={TEXT.TX_KIND} value={kind} options={KIND_OPTIONS} onChange={pick(setKind)} />
                     <LabeledSelect id="hs-method" label={TEXT.TX_METHOD} value={method} options={METHOD_OPTIONS} onChange={pick(setMethod)} />
                 </span>
@@ -49,7 +62,7 @@ const ShiftTransactions = ({ transactions }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {pageItems.map((t) => {
+                            {rows.map((t) => {
                                 const sign = signOf(t.kind);
                                 return (
                                     <tr key={t.id}>
@@ -80,7 +93,7 @@ const ShiftTransactions = ({ transactions }) => {
             ) : (
                 <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.TX_EMPTY}</p>
             )}
-            {footer}
+            {footer && <div className="print:hidden">{footer}</div>}
         </Card>
     );
 };

@@ -163,8 +163,6 @@ const CashHandover = () => {
                         {items.map((s) => {
                             const open = isOpen(s);
                             const diff = s.difference ?? (s.countedCash != null && s.expectedCash != null ? s.countedCash - s.expectedCash : null);
-                            const diffTransfer =
-                                s.transferDifference ?? (s.countedTransfer != null && s.expectedTransfer != null ? s.countedTransfer - s.expectedTransfer : null);
                             return (
                                 <tr key={s.id}>
                                     <td data-primary>
@@ -190,7 +188,6 @@ const CashHandover = () => {
                                     </td>
                                     <td data-label={TEXT.COLUMNS[6]} className="num text-right">
                                         {open || diff == null ? dash : signedMoney(diff)}
-                                        {!open && Boolean(diffTransfer) && <small className="block text-caption text-muted">{TEXT.TRANSFER_DIFF(signedMoney(diffTransfer))}</small>}
                                     </td>
                                     <td data-label={TEXT.COLUMNS[7]}>
                                         <span className={cx("badge", open ? "badge-success" : "badge-neutral")}>{open ? TEXT.STATUS_LABEL.Open : (TEXT.STATUS_LABEL[s.status] ?? s.status)}</span>

@@ -5,7 +5,7 @@ import { ChevronLeft } from "lucide-react";
 import ShiftClosePanel from "@/components/handover/ShiftClosePanel";
 import ShiftCloseDialog from "@/components/handover/ShiftCloseDialog";
 import ShiftResultPanel from "@/components/handover/ShiftResultPanel";
-import ShiftSummary from "@/components/handover/ShiftSummary";
+import ShiftCashFlow from "@/components/handover/ShiftCashFlow";
 import ShiftTransactions from "@/components/handover/ShiftTransactions";
 import { Card } from "@/components/reception/shared";
 import { clinicClock, report } from "@/components/reception/receptionUtils";
@@ -16,7 +16,7 @@ import { getMyShifts } from "@/services/myScheduleService";
 import { dmy, weekdayIndex } from "@/utils/calendar";
 import { dateKey, isOpen, shiftEndOf, shiftTypeOf, summarize, systemTotals, timeOf, transactionsOf } from "@/utils/cashShift";
 import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
-import { ROUTES } from "@/utils/routes";
+import { ROUTES, getReconciliationRoute } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
@@ -82,7 +82,7 @@ const CashHandoverDetail = () => {
     usePageTitle(session?.code ? `${session.code} – ${TEXT.DOC_TITLE}` : TEXT.DOC_TITLE);
 
     const back = (
-        <Link to={ROUTES.RECEPTION_CASH_HANDOVER} className="inline-flex items-center gap-1 text-label font-semibold text-primary hover:underline">
+        <Link to={ROUTES.RECEPTION_CASH_HANDOVER} className="inline-flex items-center gap-1 text-label font-semibold text-primary hover:underline print:hidden">
             <ChevronLeft className="size-4" aria-hidden="true" />
             {TEXT.BACK}
         </Link>
@@ -122,7 +122,9 @@ const CashHandoverDetail = () => {
     const system = systemTotals(session, summary);
     const day = dateKey(session.openedAt);
     const code = session.code ?? `#${session.id}`;
-    const staleDay = open && mine && day && day < clinicToday() ? dmy(day) : null;
+    const today = clinicToday();
+    const staleDay = open && mine && day && day < today ? dmy(day) : null;
+    const reconLink = getReconciliationRoute(day && day < today ? day : today);
     const meta = [
         [TEXT.META[0], session.openedByName],
         [TEXT.META[1], label],
@@ -148,23 +150,32 @@ const CashHandoverDetail = () => {
                     ))}
                 </dl>
             </Card>
-            <ShiftSummary summary={summary} />
-            {staleDay && <p className="alert alert-warning">{TEXT.STALE_OPEN(staleDay)}</p>}
-            {open && mine ? (
-                <ShiftClosePanel key={key} openingCash={session.openingCash} system={system} onRequestClose={(values, print) => setClosing({ values, print })} />
-            ) : open ? (
-                mineId !== undefined && <p className="alert alert-info">{TEXT.NOT_MINE(session.openedByName)}</p>
-            ) : (
-                <ShiftResultPanel
-                    system={system}
-                    actual={{
-                        cash: session.countedCash == null ? null : Number(session.countedCash),
-                        transfer: session.countedTransfer == null ? null : Number(session.countedTransfer),
-                    }}
-                    notes={session.notes}
-                    onPrint={printSlip}
-                />
-            )}
+            {staleDay && <p className="alert alert-warning print:hidden">{TEXT.STALE_OPEN(staleDay)}</p>}
+            <div className="grid gap-5 lg:grid-cols-2">
+                {open && mine ? (
+                    <ShiftClosePanel
+                        key={key}
+                        className="min-w-0"
+                        openingCash={session.openingCash}
+                        cashNet={summary.net.cash}
+                        system={system}
+                        onRequestClose={(values, print) => setClosing({ values, print })}
+                    />
+                ) : open ? (
+                    <div className="min-w-0">{mineId !== undefined && <p className="alert alert-info">{TEXT.NOT_MINE(session.openedByName)}</p>}</div>
+                ) : (
+                    <ShiftResultPanel
+                        className="min-w-0"
+                        openingCash={session.openingCash}
+                        cashNet={summary.net.cash}
+                        system={system}
+                        countedCash={session.countedCash == null ? null : Number(session.countedCash)}
+                        notes={session.notes}
+                        onPrint={printSlip}
+                    />
+                )}
+                <ShiftCashFlow className="min-w-0" net={summary.net} reconLink={reconLink} />
+            </div>
             <ShiftTransactions transactions={transactions} />
             {closing && (
                 <ShiftCloseDialog
@@ -172,7 +183,7 @@ const CashHandoverDetail = () => {
                     subtitle={[code, session.openedByName, clinicClock()].filter(Boolean).join(" · ")}
                     values={closing.values}
                     system={system}
-                    shiftEnd={day === clinicToday() ? shiftEndOf(session, myShifts) : null}
+                    shiftEnd={day === today ? shiftEndOf(session, myShifts) : null}
                     now={clinicClock()}
                     print={closing.print}
                     warning={staleDay ? TEXT.STALE_OPEN(staleDay) : null}

@@ -25,11 +25,11 @@ export const removeCashExpense = (expenseId) => call(() => api.delete(`/api/cash
 
 // sessionId and the system figures the cashier saw go along so the backend can refuse a close of another session
 // or one whose figures changed meanwhile (proposed, see be-api-requests GC-6 / GC-7).
-export const closeCashSession = ({ sessionId, countedCash, countedTransfer, denominations, notes, expectedCash, expectedTransfer }, config = {}) =>
+export const closeCashSession = ({ sessionId, countedCash, denominations, notes, expectedCash, expectedTransfer }, config = {}) =>
     call(() =>
         api.post(
             "/api/cash-sessions/current/close",
-            { sessionId, countedCash, countedTransfer, denominations: denominations ?? null, notes: notes || null, expectedCash, expectedTransfer },
+            { sessionId, countedCash, denominations: denominations ?? null, notes: notes || null, expectedCash, expectedTransfer },
             config,
         ),
     );

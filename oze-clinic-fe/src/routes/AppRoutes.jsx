@@ -21,6 +21,9 @@ import ChangePasswordPage from "../pages/common/ChangePasswordPage";
 import ComingSoonPage from "../pages/common/ComingSoonPage";
 import ReceptionCheckIn from "../pages/receptionist/ReceptionCheckIn";
 import ReceptionInvoices from "../pages/receptionist/ReceptionInvoices";
+import ReceptionDebts from "../pages/receptionist/ReceptionDebts";
+import ReceptionRefunds from "../pages/receptionist/ReceptionRefunds";
+import ReceptionReconciliation from "../pages/receptionist/ReceptionReconciliation";
 import ReceptionPatients from "../pages/receptionist/ReceptionPatients";
 import ReceptionSchedule from "../pages/receptionist/ReceptionSchedule";
 import ReceptionPatientDetail from "../pages/receptionist/ReceptionPatientDetail";
@@ -29,7 +32,6 @@ import ReceptionConsultations from "../pages/receptionist/ReceptionConsultations
 import DailyReconciliation from "../pages/admin/DailyReconciliation";
 import ReceptionConfirm from "../pages/receptionist/ReceptionConfirm";
 import ReceptionFollowUps from "../pages/receptionist/ReceptionFollowUps";
-import ReceptionPayment from "../pages/receptionist/ReceptionPayment";
 import ReceptionQueue from "../pages/receptionist/ReceptionQueue";
 import CashHandover from "../pages/receptionist/CashHandover";
 import CashHandoverDetail from "../pages/receptionist/CashHandoverDetail";
@@ -168,11 +170,13 @@ const ROLE_PAGES = {
     [ROUTES.RECEPTION_APPOINTMENTS]: <ReceptionConfirm />,
     [ROUTES.RECEPTION_CHECK_IN]: <ReceptionCheckIn />,
     [ROUTES.RECEPTION_SCHEDULE]: <ReceptionSchedule />,
-    [ROUTES.RECEPTION_INVOICES]: <ReceptionPayment />,
+    [ROUTES.RECEPTION_INVOICES]: <Navigate to={ROUTES.RECEPTION_PAYMENTS} replace />,
     [ROUTES.RECEPTION_QUEUE]: <ReceptionQueue />,
     [ROUTES.RECEPTION_FOLLOW_UPS]: <ReceptionFollowUps />,
-    [ROUTES.RECEPTION_DEBTS]: <Navigate to={`${ROUTES.RECEPTION_INVOICE_LIST}?tab=debt`} replace />,
+    [ROUTES.RECEPTION_DEBTS]: <ReceptionDebts />,
     [ROUTES.RECEPTION_INVOICE_LIST]: <ReceptionInvoices />,
+    [ROUTES.RECEPTION_REFUNDS]: <ReceptionRefunds />,
+    [ROUTES.RECEPTION_RECONCILIATION]: <ReceptionReconciliation />,
     [ROUTES.RECEPTION_PAYMENTS]: (
         <Routes>
             <Route index element={<CashierPayments />} />

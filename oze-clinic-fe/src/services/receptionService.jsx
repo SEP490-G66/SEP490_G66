@@ -1,6 +1,6 @@
 import axios from "axios";
 import api from "./api";
-import { APPOINTMENT_ERROR_TEXT } from "@/utils/messages";
+import { APPOINTMENT_ERROR_TEXT, BILLING_TEXT } from "@/utils/messages";
 
 // Receptionist workspace calls to oze-clinic-be. Every call returns the ApiResponse body
 // ({ success, message, data, errors }); a business error from the server comes back as success: false.
@@ -96,30 +96,7 @@ export const getNeedsAttention = () => call(() => api.get("/api/appointments/nee
 export const reassignDoctor = (id, doctorId, reason) => call(() => api.post(`/api/appointments/${id}/reassign-doctor`, { doctorId, reason }));
 
 // ----- cashier (M8) -----
-// Every page of /api/invoices for these filters (a page holds 100). MAX_PAGES stops a runaway loop.
-const MAX_PAGES = 20;
-const allInvoices = async (params, config = {}) => {
-    const items = [];
-    for (let page = 1; page <= MAX_PAGES; page += 1) {
-        const result = await call(() => api.get("/api/invoices", { ...config, params: { ...params, pageNumber: page, pageSize: 100, sortBy: "createdAt", sortDescending: true } }));
-        if (!result.success) return result;
-        items.push(...(result.data?.items ?? []));
-        if (page >= Number(result.data?.totalPages ?? 1)) break;
-    }
-    return { success: true, message: null, errors: null, data: { items } };
-};
-
-// Every invoice still to collect, whatever its age (one call per open status)
-export const getOpenInvoices = async (config = {}) => {
-    const results = await Promise.all(["UNPAID", "PARTIALLY_PAID", "PENDING_CONFIRMATION"].map((paymentStatus) => allInvoices({ paymentStatus }, config)));
-    const failed = results.find((r) => !r.success);
-    if (failed) return failed;
-    return { success: true, message: null, errors: null, data: { items: results.flatMap((r) => r.data.items) } };
-};
-
 export const getInvoices = () => call(() => api.get("/api/invoices", { params: { pageSize: 50, sortBy: "createdAt", sortDescending: true } }));
-
-export const recordPayment = (invoiceId, request, config = {}) => call(() => api.post(`/api/invoices/${invoiceId}/payments`, request, config));
 
 // ----- follow-up (M9, receptionist only) -----
 export const getFollowUps = () =>
@@ -173,19 +150,9 @@ export const getAppointmentsInRange = async ({ fromDate, toDate, doctorId } = {}
 
 export const getInvoice = (id, config = {}) => call(() => api.get(`/api/invoices/${id}`, config));
 
-export const rejectPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/reject`));
-
-export const cancelInvoice = (id, reason) => call(() => api.post(`/api/invoices/${id}/cancel`, { reason }));
-
-export const getCashierRefunds = ({ status, page = 1, pageSize = 10 } = {}, config = {}) =>
-    call(() => api.get("/api/refund-requests", { ...config, params: { status: status || undefined, pageNumber: page, pageSize } }));
+export const getCashierRefunds = ({ status } = {}, config = {}) => call(() => api.get("/api/refund-requests", { ...config, params: { status: status || undefined } }));
 
 export const payoutRefund = (id) => call(() => api.post(`/api/refund-requests/${id}/payout`));
-
-export const rejectRefund = (id, reason) => call(() => api.post(`/api/refund-requests/${id}/reject`, { rejectionReason: reason }));
-
-// A bank or QR payment the receptionist has seen arrive in the account
-export const confirmPayment = (paymentId) => call(() => api.post(`/api/payments/${paymentId}/confirm`));
 
 // Free slots of one doctor on a day for the services of the appointment (ASP.NET reads repeated keys as a list)
 export const getAvailableSlots = ({ date, doctorId, serviceIds = [], variantIds = [] }, config = {}) => {
@@ -199,12 +166,6 @@ export const getAvailableSlots = ({ date, doctorId, serviceIds = [], variantIds 
 export const rescheduleAppointment = (id, { date, slotStart, doctorId, reason }) =>
     call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null, reason: reason || null }));
 
-// ----- invoices from an examination (F-PAY-01) -----
-export const createInvoice = (request, config = {}) => call(() => api.post("/api/invoices", request, config));
-
-// Invoices of every status made since fromDate (all pages), to know which visits already have one
-export const getRecentInvoices = ({ fromDate } = {}, config = {}) => allInvoices({ fromDate }, config);
-
 export const getPaidInvoices = async () => {
     const results = await Promise.all(
         ["PAID", "PARTIALLY_PAID", "PARTIALLY_REFUNDED"].map((paymentStatus) =>
@@ -217,7 +178,12 @@ export const getPaidInvoices = async () => {
 };
 
 // The refund amount is worked out by the system (paid minus work done); the manager approves it
-export const requestRefund = (invoiceId, reason) => call(() => api.post(`/api/invoices/${invoiceId}/refund-requests`, { reason }));
+export const requestRefund = (invoiceId, reason, patientId, config = {}) =>
+    call(() => api.post(`/api/invoices/${invoiceId}/refund-requests`, { reason, patientId }, config));
+
+export const patientRefundableInvoicesUrl = (patientId) => `/api/refund-requests/patients/${patientId}/refundable-invoices`;
+
+export const getPatientRefundableInvoices = (patientId, config = {}) => call(() => api.get(patientRefundableInvoicesUrl(patientId), config));
 
 // ----- patient debts and payment reminders -----
 export const getDebts = ({ keyword, overdueOnly, ageBucket, page = 1, pageSize = 10 } = {}, config = {}) =>
@@ -310,13 +276,14 @@ export const getConsultations = ({ status, keyword, page = 1, pageSize = 10 } = 
 export const handleConsultation = (id, { status, note }) => call(() => api.post(`/api/consultation-requests/${id}/handle`, { status, note: note || null }));
 
 // ----- invoice list and payment history (search by day) -----
-export const searchInvoices = ({ keyword, status, fromDate, toDate, page = 1, pageSize = 15 } = {}, config = {}) =>
-    call(() =>
+export const searchInvoices = async ({ keyword, status, collection, fromDate, toDate, page = 1, pageSize = 15 } = {}, config = {}) => {
+    const result = await call(() =>
         api.get("/api/invoices", {
             ...config,
             params: {
                 searchKeyword: keyword || undefined,
                 paymentStatus: status || undefined,
+                collection: collection || undefined,
                 fromDate: fromDate || undefined,
                 toDate: toDate || undefined,
                 pageNumber: page,
@@ -326,6 +293,9 @@ export const searchInvoices = ({ keyword, status, fromDate, toDate, page = 1, pa
             },
         }),
     );
+    if (!result.success && String(result.message ?? "").startsWith("Collection must be")) return { ...result, message: BILLING_TEXT.COLLECTION_INVALID };
+    return result;
+};
 
 export const getPaymentHistory = ({ keyword, method, status, fromDate, toDate, page = 1, pageSize = 15 } = {}) =>
     call(() =>
