@@ -52,7 +52,7 @@ const Session = ({ label, slots, selected, describedBy, onSelect }) => (
     </>
 );
 
-const BookingSlotGrid = ({ slots, busy, error, selected, warning, warningLive, slotError, onSelect, onRetry }) => {
+const BookingSlotGrid = ({ slots, busy, error, selected, warning, warningLive, slotError, legend = BOOKING_TEXT.SLOT, onSelect, onRetry }) => {
     const renderBody = () => {
         if (busy) {
             return (
@@ -80,7 +80,7 @@ const BookingSlotGrid = ({ slots, busy, error, selected, warning, warningLive, s
     return (
         <fieldset id={BOOKING_IDS.SLOTS} tabIndex={-1} className="mt-7 min-w-0" aria-required="true" aria-busy={busy || undefined} aria-describedby={`${WARNING_ID} ${LIVE_WARNING_ID} ${ERROR_ID}`}>
             <legend className="font-heading text-heading-3 text-ink">
-                {BOOKING_TEXT.SLOT}
+                {legend}
                 <span className="text-danger" aria-hidden="true">
                     {" *"}
                 </span>

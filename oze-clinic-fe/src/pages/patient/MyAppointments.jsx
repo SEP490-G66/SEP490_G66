@@ -181,7 +181,7 @@ const MyAppointments = () => {
         <>
             <div className="page-header">
                 <h1 id={TITLE_ID} className="page-title">
-                    Lịch hẹn của tôi
+                    Lịch hẹn sắp tới
                 </h1>
                 <Link to={ROUTES.BOOK_APPOINTMENT} className="btn btn-primary min-h-11 md:min-h-0">
                     Đặt lịch hẹn

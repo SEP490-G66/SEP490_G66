@@ -140,7 +140,7 @@ const SIDEBAR_MENU = {
             icon: CalendarDays,
             children: [
                 { key: "book-appointment", label: "Đặt lịch khám", to: ROUTES.BOOK_APPOINTMENT },
-                { key: "my-appointments", label: "Lịch hẹn của tôi", to: ROUTES.APPOINTMENTS },
+                { key: "my-appointments", label: "Lịch hẹn sắp tới", to: ROUTES.APPOINTMENTS },
             ],
         },
         {

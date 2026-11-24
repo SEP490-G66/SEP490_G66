@@ -1,5 +1,5 @@
 import api from "./api";
-import { getBookingSlots } from "./bookingService";
+import { getBookingDays, getBookingSlots } from "./bookingService";
 import { call } from "./receptionService";
 import { BOOKING_ERROR_CODE } from "../utils/messages";
 
@@ -99,3 +99,7 @@ const toServiceParams = (appointment) => ({
 
 export const getRescheduleSlots = (appointment, { date, doctorId }) =>
     getBookingSlots({ date, doctorId: doctorId ? Number(doctorId) : null, services: toServiceParams(appointment) });
+
+// Free-slot count per day for the reschedule week view (same data as the booking page).
+export const getRescheduleDays = (appointment, { from, to, doctorId, signal }) =>
+    getBookingDays({ from, to, doctorId: doctorId ? Number(doctorId) : null, services: toServiceParams(appointment), signal });
