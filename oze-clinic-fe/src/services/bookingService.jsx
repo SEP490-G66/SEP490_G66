@@ -1,13 +1,11 @@
 import api from "./api";
 import { call } from "./receptionService";
-import { addDays, getClinicToday, parseDateOnly, toDateOnly } from "../utils/format";
+import { getClinicToday } from "../utils/format";
 import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, GUEST_BOOKING_TEXT } from "../utils/messages";
 
 const READ = { skipErrorPage: true };
 
 const LIST_PARAMS = { indexes: null };
-
-const DAY_REQUESTS_AT_ONCE = 6;
 
 const PAGE_SIZE = 100;
 
@@ -106,27 +104,27 @@ export const getBookingSlots = async ({ date, doctorId, services, signal } = {})
     return result.success ? success(uniqueSlots(listOf(result.data))) : failure();
 };
 
+// Free-slot count of every day from..to in ONE request (GET api/appointments/available-days); the backend reads the
+// shifts and appointments of the whole range at once. days: [{ date, freeSlotCount, isWorkingDay, firstSlotStart }].
 export const getBookingDays = async ({ from, to, doctorId, services, signal } = {}) => {
-    const dates = [];
-    for (let date = from; date <= to; date = toDateOnly(addDays(parseDateOnly(date), 1))) dates.push(date);
-    const days = new Array(dates.length);
-    let next = 0;
-    let broken = false;
-    const worker = async () => {
-        while (next < dates.length && !broken) {
-            const index = next++;
-            const result = await loadSlots(dates[index], doctorId, services, signal);
-            if (result.aborted || result.noResponse || (result.status ?? 0) >= 500) {
-                broken = true;
-                return;
-            }
-            const slots = result.success ? uniqueSlots(listOf(result.data)) : [];
-            days[index] = { date: dates[index], freeSlotCount: slots.length, isWorkingDay: slots.length > 0, firstSlotStart: slots[0]?.slotStart ?? null };
-        }
-    };
-    await Promise.all(Array.from({ length: Math.min(DAY_REQUESTS_AT_ONCE, dates.length) }, worker));
+    const result = await call(() =>
+        api.get("/api/appointments/available-days", {
+            ...READ,
+            signal,
+            paramsSerializer: LIST_PARAMS,
+            params: { From: from, To: to, DoctorId: doctorId ?? undefined, ServiceId: services?.ServiceId, VariantId: services?.VariantId },
+        })
+    );
     if (signal?.aborted) throw abortError();
-    return broken ? failure() : success(days);
+    if (!result.success) return failure();
+    return success(
+        listOf(result.data).map((day) => ({
+            date: day.date,
+            freeSlotCount: Number(day.freeSlotCount) || 0,
+            isWorkingDay: Boolean(day.isWorkingDay),
+            firstSlotStart: day.firstSlotStart ?? null,
+        }))
+    );
 };
 
 const toBooked = (appointment = {}) => ({
@@ -165,7 +163,18 @@ const toUnfinished = (rows, today) => {
     const row = rows
         .filter((item) => item.appointmentDate >= today && UNFINISHED_STATUSES.has(item.status))
         .sort((a, b) => startOf(a).localeCompare(startOf(b)))[0];
-    return row ? { id: row.id, code: row.appointmentCode, date: row.appointmentDate, slotStart: row.timeSlotStart, status: row.status } : null;
+    return row
+        ? {
+              id: row.id,
+              code: row.appointmentCode,
+              date: row.appointmentDate,
+              slotStart: row.timeSlotStart,
+              slotEnd: row.timeSlotEnd ?? null,
+              status: row.status,
+              serviceName: row.serviceName ?? "",
+              doctorName: row.doctorName ?? "",
+          }
+        : null;
 };
 
 const isProfileMissing = (result) => String(result?.message ?? "").toLowerCase().includes(NO_PROFILE);

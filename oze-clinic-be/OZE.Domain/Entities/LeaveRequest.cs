@@ -2,7 +2,7 @@ namespace OZE.Domain.Entities
 {
     // A staff member asks to be off for a day or half a day; the manager approves or rejects it
     public class LeaveRequest
-    {
+    { 
         public long Id { get; set; }
         public int StaffProfileId { get; set; }
         public DateOnly LeaveDate { get; set; }

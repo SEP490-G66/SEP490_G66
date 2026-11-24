@@ -13,7 +13,7 @@ const TreatmentPlanTable = ({ plans = [], offset = 0, loading = false, labelledB
         { key: "name", label: "Dịch vụ", primary: true, render: (plan) => <span className="font-semibold text-ink">{plan.name}</span> },
         { key: "doctorName", label: "Bác sĩ phụ trách" },
         { key: "sessionCount", label: "Số buổi", align: "right" },
-        { key: "payTypeLabel", label: "Hình thức thanh toán" },
+        { key: "payTypeLabel", label: "Hình thức thanh toán", optional: true },
         { key: "createdAt", label: "Ngày lập kế hoạch", render: (plan) => formatDate(plan.createdAt) },
         { key: "status", label: "Trạng thái", render: (plan) => plan.status && <span className={cx("badge", plan.status.badge)}>{plan.status.label}</span> },
         { key: "actions", label: "Thao tác", align: "right", actions: true, render: (plan) => <IconLinkButton icon={Eye} label={`Xem kế hoạch ${plan.name}`} to={getTreatmentPlanRoute(plan.id)} /> },

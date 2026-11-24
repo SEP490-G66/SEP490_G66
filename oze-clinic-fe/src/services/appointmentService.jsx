@@ -53,6 +53,9 @@ const toAppointment = (item) => {
         examinationId: item.examinationId ?? null,
         examinationStatus: item.examinationStatus ?? null,
         queue: Number.isInteger(item.queueNumber) ? { queueNumber: item.queueNumber } : null,
+        notes: item.notes ?? "",
+        createdAt: item.createdAt ?? null,
+        parentAppointmentId: item.parentAppointmentId ?? null,
     };
 };
 

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { CircleAlert } from "lucide-react";
+import ActiveAppointmentNotice from "@/components/booking/ActiveAppointmentNotice";
 import BookingPatientCard from "@/components/booking/BookingPatientCard";
 import BookingSchedule, { BookingLoadingCard, BookingSectionHeading, Hotline, LoadErrorBox } from "@/components/booking/BookingSchedule";
 import BookingStateBox from "@/components/booking/BookingStateBox";
@@ -68,6 +69,7 @@ const BookAppointment = () => {
                 </section>
             );
         }
+        if (page.status === "ready" && blocked) return <ActiveAppointmentNotice unfinished={state.blockedLoading ? null : form.unfinished} />;
         if (page.status === "error" && !page.profileLoaded) {
             return (
                 <section className="card-app">

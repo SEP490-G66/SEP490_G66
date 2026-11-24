@@ -9,7 +9,11 @@ namespace OZE.Application.MappingProfiles
         public BaseMappingObject()
         {
             CreateMap<UserRefreshToken, UserRefreshTokenDTO>().ReverseMap();
-            CreateMap<Service, ServiceDto>().ReverseMap();
+            // Variants are added by hand, only when the manager list asks for them
+            CreateMap<Service, ServiceDto>()
+                .ForMember(dest => dest.Variants, opt => opt.Ignore())
+                .ReverseMap()
+                .ForMember(dest => dest.Variants, opt => opt.Ignore());
             CreateMap<CreateServiceRequest, Service>();
             CreateMap<UpdateServiceRequest, Service>();
             CreateMap<ServiceVariant, ServiceVariantDto>();

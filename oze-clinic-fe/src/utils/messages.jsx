@@ -84,8 +84,6 @@ export const RESET_PASSWORD_REDIRECT_MS = 3000;
 
 export const CLINIC_HOTLINE = { DISPLAY: "0866 866 010", TEL: "0866866010" };
 
-export const CLINIC_HOTLINES_TEXT = "0866.866.010 – 0866.866.108";
-
 export const CLINIC_EMAIL = "nhakhoaoze@gmail.com";
 
 export const CLINIC_ADDRESS = "Số nhà 55-59, tổ 4, quốc lộ 3, Đông Anh, Hà Nội";
@@ -487,45 +485,9 @@ export const MEDICAL_RECORD_STAGE_STATUS = {
     todo: { label: "Chưa đến", badge: "badge-neutral" },
 };
 
-export const MEDICAL_RECORD_TOOTH_STATUS = {
-    condition: { label: "Cần điều trị", badge: "badge-danger" },
-    planned: { label: "Kế hoạch", badge: "badge-danger" },
-    treating: { label: "Đang điều trị", badge: "badge-warning" },
-    done: { label: "Đã điều trị", badge: "badge-info" },
-    watch: { label: "Theo dõi", badge: "badge-neutral" },
-    missing: { label: "Mất răng", badge: "badge-neutral" },
-    healthy: { label: "Lành", badge: "badge-success" },
-    note: { label: "Ghi nhận", badge: "badge-neutral" },
-};
-
 export const MEDICAL_RECORD_FILM_STATUS = { concluded: { label: "Đã có kết luận", badge: "badge-success" } };
 
-export const MEDICAL_RECORD_APPOINTMENT_BADGE = {
-    confirmed: "badge-info",
-    pending: "badge-warning",
-    done: "badge-success",
-    cancelled: "badge-neutral",
-    noshow: "badge-danger",
-    checkedin: "badge-info",
-    inservice: "badge-info",
-};
-
 export const MEDICAL_RECORD_FILM_PLACE = { clinic: "Tại phòng khám", partner: "Trung tâm X-quang liên kết" };
-
-export const MEDICAL_RECORD_TOOTH_KIND = {
-    caries: "Sâu răng",
-    filling: "Trám răng",
-    pulp: "Viêm tủy",
-    rct: "Điều trị tủy",
-    crown: "Mão / bọc sứ",
-    wear: "Mẻ, đổi màu",
-    impacted: "Răng mọc lệch",
-    implant: "Implant",
-    denture: "Hàm giả",
-    missing: "Mất răng",
-    healthy: "Lành",
-    finding: "Bác sĩ ghi nhận",
-};
 
 export const MEDICAL_RECORD_ADDENDUM_TYPE = { Correction: "Đính chính", Addition: "Bổ sung", Clarification: "Làm rõ" };
 
@@ -601,34 +563,6 @@ export const MEDICAL_RECORD_TOOTH_POSITION = [
 
 export const MEDICAL_RECORD_TOOTH_QUADRANT = ["", "hàm trên bên phải", "hàm trên bên trái", "hàm dưới bên trái", "hàm dưới bên phải"];
 
-export const MEDICAL_RECORD_STATUS_GUIDE = [
-    {
-        title: "Kế hoạch điều trị",
-        labels: MEDICAL_RECORD_PLAN_STATUS,
-        items: [
-            { key: "proposed", meaning: "Bác sĩ đã lập kế hoạch, bệnh nhân chưa đồng ý.", when: "Bác sĩ lập kế hoạch sau khi khám.", patient: "Đồng ý ngay trên trang Lịch sử khám, hoặc trao đổi với bác sĩ tại phòng khám." },
-            { key: "active", meaning: "Bệnh nhân đã đồng ý, đang thực hiện các bước.", when: "Bệnh nhân đồng ý kế hoạch.", patient: "Theo dõi bước tiếp theo; chi phí xem ở Công nợ." },
-            { key: "paused", meaning: "Tạm ngưng, kế hoạch vẫn giữ.", when: "Bệnh nhân xin tạm ngưng hoặc chờ điều kiện (ví dụ xét nghiệm).", patient: "Liên hệ phòng khám khi muốn tiếp tục." },
-            { key: "done", meaning: "Đã làm xong tất cả các bước.", when: "Bác sĩ hoàn tất bước cuối.", patient: "Theo dõi lịch tái khám định kỳ (nếu có)." },
-            {
-                key: "stopped",
-                meaning: "Bệnh nhân không tiếp tục kế hoạch.",
-                when: "Phòng khám hủy kế hoạch theo trao đổi với bệnh nhân; các bước chưa làm được hủy.",
-                patient: "Xem chi phí trong Công nợ và Lịch sử thanh toán.",
-            },
-        ],
-    },
-    {
-        title: "Bước điều trị",
-        labels: MEDICAL_RECORD_STAGE_STATUS,
-        items: [
-            { key: "done", meaning: "Bước đã thực hiện.", when: "Bác sĩ hoàn tất bước này.", patient: "—" },
-            { key: "next", meaning: "Bước đang làm hoặc sẽ làm tiếp theo.", when: "Bước trước đó đã làm xong.", patient: "Xem ngày hẹn." },
-            { key: "todo", meaning: "Bước còn lại trong kế hoạch.", when: "—", patient: "—" },
-        ],
-    },
-];
-
 export const PATIENT_DEBT_PAY_TYPE = {
     installment: { label: "Trả góp", badge: "badge-info" },
     step: { label: "Trả theo bước", badge: "badge-warning" },
@@ -651,56 +585,6 @@ export const PATIENT_DEBT_STAGE_STATUS = {
     inProgress: { label: "Đang làm", badge: "badge-info" },
     notStarted: { label: "Chưa làm", badge: "badge-neutral" },
 };
-
-export const PATIENT_DEBT_STATUS_GUIDE = [
-    {
-        title: "Hình thức thanh toán",
-        labels: PATIENT_DEBT_PAY_TYPE,
-        items: [
-            {
-                key: "installment",
-                meaning: "Tổng chi phí chia thành nhiều đợt, mỗi đợt có hạn trả.",
-                when: "Phòng khám và bệnh nhân thống nhất trả góp (ví dụ niềng răng).",
-                patient: "Chuẩn bị tiền trước hạn mỗi đợt; đợt tới hiện ở đầu mục Lịch trả góp.",
-            },
-            {
-                key: "step",
-                meaning: "Kế hoạch nhiều bước, mỗi bước có giá riêng. Tiền đã trả được tính vào các bước đã làm, bước trước trước.",
-                when: "Kế hoạch nhiều bước nhưng không chia đợt (ví dụ điều trị tủy rồi bọc sứ).",
-                patient: "Thanh toán phần các bước đã làm; bước chưa làm nằm ở Dự kiến.",
-            },
-            { key: "once", meaning: "Dịch vụ lẻ, thanh toán một lần theo phiếu sau buổi khám.", when: "Khám, lấy cao răng, trám răng…", patient: "Thanh toán tại quầy sau buổi khám." },
-        ],
-    },
-    {
-        title: "Trạng thái khoản",
-        labels: PATIENT_DEBT_STATUS,
-        items: [
-            { key: "overdue", meaning: "Có đợt trả góp đã qua hạn mà chưa trả.", when: "Qua hạn đợt chưa có xác nhận nhận tiền.", patient: "Thanh toán sớm hoặc gọi phòng khám." },
-            { key: "open", meaning: "Có phần phải trả lúc này: việc đã làm hoặc đợt đã đến hạn mà chưa trả.", when: "Sau buổi làm, hoặc khi đợt trả góp đến hạn.", patient: "Thanh toán tại quầy." },
-            {
-                key: "upcoming",
-                meaning: "Không còn khoản phải trả lúc này, còn phần dự kiến cho bước chưa làm hoặc đợt chưa tới hạn.",
-                when: "Đã trả hết phần đã làm, kế hoạch vẫn đang tiếp tục.",
-                patient: "Không cần làm gì; theo dõi bước hoặc đợt tới.",
-            },
-            { key: "paid", meaning: "Không còn số phải trả.", when: "Lần thanh toán cuối được xác nhận.", patient: "—" },
-        ],
-    },
-    {
-        title: "Bước và đợt",
-        labels: PATIENT_DEBT_STAGE_STATUS,
-        items: [
-            { key: "paid", meaning: "Bước đã làm, hoặc đợt, đã được trả đủ.", when: "Tiền đã trả phủ hết bước hoặc đợt này.", patient: "—" },
-            { key: "partial", meaning: "Bước đã làm, mới được trả một phần.", when: "Tiền đã trả chỉ phủ một phần bước này.", patient: "Trả phần còn thiếu tại quầy." },
-            { key: "unpaid", meaning: "Bước đã làm nhưng chưa được trả.", when: "Sau buổi làm bước này.", patient: "Thanh toán tại quầy." },
-            { key: "overdue", meaning: "Đợt trả góp đã qua hạn mà chưa trả.", when: "Qua hạn đợt.", patient: "Thanh toán sớm hoặc gọi phòng khám." },
-            { key: "later", meaning: "Đợt trả góp chưa tới hạn.", when: "Trước hạn đợt.", patient: "Chuẩn bị tiền trước hạn." },
-            { key: "inProgress", meaning: "Bước đang làm, chưa tính là phải trả.", when: "Bác sĩ đã bắt đầu bước này.", patient: "—" },
-            { key: "notStarted", meaning: "Bước chưa làm, nằm ở Dự kiến.", when: "Bước sau trong kế hoạch.", patient: "—" },
-        ],
-    },
-];
 
 export const PATIENT_DEBT_TEXT = {
     TITLE: "Công nợ & đợt thanh toán",
@@ -836,101 +720,6 @@ export const PAYMENT_HISTORY_STATUS_GUIDE = [
     },
 ];
 
-export const PAYMENT_HISTORY_TEXT = {
-    TITLE: "Lịch sử thanh toán",
-    DESCRIPTION: "Chi phí và các lần thanh toán theo từng hóa đơn.",
-    DOCUMENT_RECEIPT: (no) => `Phiếu khám #${no} – Lịch sử thanh toán`,
-    DOCUMENT_NOT_FOUND: "Không tìm thấy phiếu – Lịch sử thanh toán",
-    LOADING: "Đang tải lịch sử thanh toán",
-    ERROR_TITLE: "Không thể tải lịch sử thanh toán",
-    ERROR_TEXT: "Đã có lỗi xảy ra, vui lòng thử lại.",
-    RETRY: "Thử lại",
-    EMPTY_TITLE: "Chưa có phiếu thanh toán nào",
-    EMPTY_TEXT: "Sau mỗi buổi khám có phát sinh chi phí, phiếu khám chữa bệnh sẽ hiện ở đây.",
-    SUM_NET: "Tổng chi phí (sau giảm giá)",
-    SUM_NET_SUB: (count) => `${count} phiếu`,
-    SUM_PAID: "Đã thanh toán",
-    SUM_PAID_SUB: (count) => `${count} lần thanh toán`,
-    SUM_LEFT: "Còn lại",
-    SUM_LEFT_LINK: "Xem đợt thanh toán sắp tới",
-    SUM_LEFT_LINK_ZERO: "Xem công nợ",
-    SEARCH: "Tìm thủ thuật, chẩn đoán",
-    CLEAR_SEARCH: "Xóa tìm kiếm",
-    FILTER: "Lọc",
-    FILTER_LABEL: "Lọc phiếu thanh toán",
-    FILTER_UNIT: " lựa chọn",
-    STATUS_GROUP: "Trạng thái",
-    MONTH_GROUP: "Tháng",
-    STATUS_HELP: "Trạng thái",
-    SHOWN: (shown, total) => `Hiển thị ${shown}/${total}`,
-    CHIP_STATUS: (label) => `Trạng thái: ${label}`,
-    CLEAR_ALL: "Xóa tất cả",
-    NO_RESULT: "Không có kết quả phù hợp",
-    NO_RESULT_TEXT: "Thử bỏ bớt bộ lọc hoặc đổi từ khóa.",
-    CLEAR_QUERY: "Xóa tìm kiếm và bộ lọc",
-    SORT_NEW: "Mới nhất trước",
-    SORT_OLD: "Cũ nhất trước",
-    SORT_LEFT: "Còn lại nhiều nhất",
-    SORT_NET: "Chi phí lớn nhất",
-    TABLE_CAPTION: "Danh sách phiếu thanh toán",
-    COL_RECEIPT: "Phiếu",
-    COL_COST: "Chi phí",
-    RECEIPT_NO: (no) => `· ${no}`,
-    VIEW: (no) => `Xem phiếu ${no}`,
-    VIEWING: (no) => `Đang xem phiếu ${no}`,
-    VIEW_CONTEXT: (date) => ` ngày ${date}`,
-    COST: "Chi phí",
-    PAID: "Đã trả",
-    LEFT: "Còn lại",
-    PAID_LINE: (amount) => `Đã trả ${amount}`,
-    LEFT_LINE: (amount) => `Còn lại ${amount}`,
-    TOTAL: (count) => `Tổng ${count} phiếu`,
-    RANGE: (from, to, total) => `Hiển thị ${from}–${to} / ${total}`,
-    PAGINATION: "Phân trang danh sách phiếu",
-    RECEIPT_TITLE: (no) => `Phiếu ${no}`,
-    NOT_FOUND_TITLE: "Không tìm thấy phiếu này",
-    NOT_FOUND_TEXT: "Phiếu không tồn tại hoặc bạn không có quyền xem.",
-    NOT_FOUND_STATUS: "Không tìm thấy phiếu này.",
-    SHOW_LATEST: "Xem phiếu mới nhất",
-    CLINIC: "NHA KHOA OZE",
-    CLINIC_MARK: "O",
-    CLINIC_PHONE: (phone) => `ĐT: ${phone}`,
-    PAPER_TITLE: "PHIẾU KHÁM CHỮA BỆNH",
-    PAPER_DATE: "Ngày khám: ",
-    PAPER_PLAN_DATE: "Ngày lập: ",
-    PLAN: "Kế hoạch điều trị",
-    NAME: "Họ tên",
-    BIRTH_GENDER: "Năm sinh · Giới",
-    PHONE: "Điện thoại",
-    ADDRESS: "Địa chỉ",
-    DIAGNOSIS: "Chẩn đoán",
-    REASON: "Lý do khám",
-    REMAIN_ALL: "Tổng chi phí còn lại",
-    COL_PROCEDURE: "Tên thủ thuật",
-    COL_DETAIL: "Nội dung thủ thuật",
-    COL_QUANTITY: "SL",
-    COL_UNIT_PRICE: "Đ.giá",
-    COL_LINE_TOTAL: "T.toán",
-    LINE_META: (quantity, unitPrice) => `SL ${quantity} · Đ.giá ${unitPrice}`,
-    GROSS: "Tổng phải thanh toán",
-    DISCOUNT: "Tổng giảm giá",
-    NET: "Tổng sau giảm giá",
-    PAID_TOTAL: "Đã thanh toán",
-    LEFT_TOTAL: "Còn lại",
-    APPOINTMENT: "LỊCH HẸN",
-    PAYMENTS: "LỊCH SỬ THANH TOÁN",
-    COL_DATE: "Ngày",
-    COL_PAYER: "Người thanh toán",
-    COL_METHOD: "Hình thức",
-    COL_AMOUNT: "Số tiền",
-    PAYER_METHOD: (payer, method) => `${payer} · ${method}`,
-    NO_PAYMENT: "Chưa có lần thanh toán nào cho phiếu này.",
-    DOCTOR_SIGN: "Bác sĩ khám bệnh",
-    FOOT_REVISIT: "Lần sau tái khám quý khách vui lòng mang theo phiếu khám bệnh này.",
-    FOOT_DEPOSIT: "Tiền cọc không hoàn lại. Chỉ quy đổi sang dịch vụ khác.",
-    NO_REFUND: "Không có yêu cầu hoàn tiền nào cho phiếu này.",
-};
-
 export const BOOKING_ERROR_CODE = {
     PROFILE_NOT_FOUND: "PATIENT_PROFILE_NOT_FOUND",
     PHONE_NOT_VERIFIED: "PHONE_NOT_VERIFIED",
@@ -945,7 +734,7 @@ export const BOOKING_ERROR_CODE = {
 export const BOOKING_TEXT = {
     TITLE: "Đặt lịch khám",
     SUCCESS_DOCUMENT_TITLE: "Đặt lịch khám thành công",
-    DESCRIPTION: "Chọn dịch vụ, ngày và ca khám. Lễ tân sẽ xác nhận lịch hẹn qua SMS hoặc email.",
+    DESCRIPTION: "Chọn dịch vụ, ngày và ca khám. Mỗi bệnh nhân chỉ có 1 lịch hẹn tự đặt tại một thời điểm.",
     PATIENT_SECTION: "Thông tin bệnh nhân",
     SCHEDULE_SECTION: "Thông tin lịch khám",
     UPDATE_PROFILE: "Cập nhật hồ sơ",
@@ -1054,7 +843,7 @@ export const BOOKING_TEXT = {
 
 export const REFUND_REQUEST_TEXT = {
     TITLE: "Yêu cầu hoàn tiền",
-    DESCRIPTION: "Các yêu cầu bạn đã gửi và tình trạng xử lý của từng yêu cầu.",
+    DESCRIPTION: "Gửi yêu cầu từ hoá đơn đã thanh toán. Phòng khám xác định số tiền hoàn khi duyệt.",
     DOCUMENT_DETAIL: (code) => `Yêu cầu ${code} – Yêu cầu hoàn tiền`,
     DOCUMENT_NOT_FOUND: "Không tìm thấy yêu cầu – Yêu cầu hoàn tiền",
     LOADING: "Đang tải yêu cầu hoàn tiền",

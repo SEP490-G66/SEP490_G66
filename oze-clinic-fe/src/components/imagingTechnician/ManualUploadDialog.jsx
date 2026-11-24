@@ -22,6 +22,8 @@ const problemOf = (file, extensions, maxMb) => {
 // an invalid file stays in the list, marked, and blocks the upload until it is removed.
 // Reused for other uploads: title, the accepted extensions, the size and count limits (maxFiles: none by default),
 // the word for one file in the hint ("ảnh") and whether there is a note can be changed.
+// children: extra fields shown above the file box (e.g. the document name); validate(): checks them on submit,
+// false keeps the dialog open without sending.
 const ManualUploadDialog = ({
     subtitle,
     title = "Tải ảnh thủ công",
@@ -30,6 +32,8 @@ const ManualUploadDialog = ({
     maxFiles = null,
     fileLabel = "ảnh",
     withNote = true,
+    validate,
+    children,
     onSubmit,
     onClose,
 }) => {
@@ -55,9 +59,11 @@ const ManualUploadDialog = ({
                 className="mt-5 flex flex-col gap-4"
                 onSubmit={(event) => {
                     event.preventDefault();
+                    if (validate && !validate()) return;
                     if (canSubmit && !busy) submit({ files: items.map((item) => item.file), note: withNote ? note.trim() : "" });
                 }}
             >
+                {children}
                 <button
                     type="button"
                     className={cx(

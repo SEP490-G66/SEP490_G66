@@ -15,8 +15,8 @@ const Dash = () => (
 
 // "Lịch sử thanh toán · Hoá đơn" tab (Figma 1243:4177). Rows still owing money are tinted.
 // invoices: [{ id, code, createdAt, content, amount, depositDeducted, remaining, status: { label, badge }, refundable }]
-// invoiceHref(invoice) links the eye button to the invoice detail; onRefund opens RefundRequestCreateModal.
-const InvoiceTable = ({ invoices = [], offset = 0, loading = false, labelledBy, empty = "Chưa có hoá đơn nào.", footer, invoiceHref, onRefund }) => {
+// invoiceHref(invoice) links the eye button to the invoice detail; refundHref(invoice) to the refund request page.
+const InvoiceTable = ({ invoices = [], offset = 0, loading = false, labelledBy, empty = "Chưa có hoá đơn nào.", footer, invoiceHref, refundHref }) => {
     const columns = [
         { key: "stt", label: "STT", hideStack: true, render: (_, index) => offset + index + 1 },
         { key: "code", label: "Mã hoá đơn", primary: true, render: (invoice) => <span className="font-semibold text-ink">{invoice.code}</span> },
@@ -48,7 +48,7 @@ const InvoiceTable = ({ invoices = [], offset = 0, loading = false, labelledBy, 
             render: (invoice) => (
                 <div className="flex justify-end gap-2">
                     <IconLinkButton icon={Eye} label={`Xem hoá đơn ${invoice.code}`} to={invoiceHref(invoice)} />
-                    {invoice.refundable && onRefund && <IconLinkButton icon={Undo2} label={`Yêu cầu hoàn tiền hoá đơn ${invoice.code}`} onClick={() => onRefund(invoice)} />}
+                    {invoice.refundable && refundHref && <IconLinkButton icon={Undo2} label={`Yêu cầu hoàn tiền hoá đơn ${invoice.code}`} to={refundHref(invoice)} />}
                 </div>
             ),
         },

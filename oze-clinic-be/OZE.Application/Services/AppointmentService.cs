@@ -88,6 +88,12 @@ namespace OZE.Application.Services
             return await FindSlotsAsync(lines, request.Date!.Value, request.DoctorId);
         }
 
+        public async Task<List<AvailableDayResponse>> GetAvailableDaysAsync(AvailableDaysRequest request)
+        {
+            var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
+            return await FindDaysAsync(lines, request.From!.Value, request.To!.Value, request.DoctorId);
+        }
+
         public async Task<AppointmentResponse> BookAsGuestAsync(GuestBookingRequest request)
         {
             ConditionGuard.Ensure(PhoneNumberHelper.TryNormalize(request.PhoneNumber, out var phone),
@@ -333,33 +339,100 @@ namespace OZE.Application.Services
         // excludeAppointmentId: the appointment being rescheduled, so it does not block its own new time
         private async Task<List<AvailableSlotResponse>> FindSlotsAsync(List<BookingLine> lines, DateOnly date, int? doctorId, long? excludeAppointmentId = null)
         {
-            var today = DateOnly.FromDateTime(ClinicClock.Today);
-            var maxDaysAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMaxDaysAhead);
-            ConditionGuard.Ensure(date >= today, ErrorConstants.AppointmentMessage.PastDate);
-            ConditionGuard.Ensure(date <= today.AddDays(maxDaysAhead), ErrorConstants.AppointmentMessage.TooFarAhead);
+            var rules = await LoadSlotRulesAsync(lines);
+            ConditionGuard.Ensure(date >= rules.Today, ErrorConstants.AppointmentMessage.PastDate);
+            ConditionGuard.Ensure(date <= rules.LastDay, ErrorConstants.AppointmentMessage.TooFarAhead);
 
-            var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
-            var minHoursAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMinHoursAhead);
-            var earliestStart = ClinicClock.Now.AddHours(minHoursAhead);
-            // Services are done one after another, so the slot must fit their total time
-            var duration = TimeSpan.FromMinutes(lines.Sum(l => l.GetMinutes(slotMinutes)));
-
-            var shifts = await _appointmentRepository.GetDoctorShiftsAsync(date, doctorId);
             // Only shifts in the kind of room the services need (a general treatment room when they ask for none)
-            var requiredRoomType = RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType));
-            shifts = shifts.Where(x => x.Room!.RoomType == requiredRoomType).ToList();
+            var shifts = (await _appointmentRepository.GetDoctorShiftsAsync(date, doctorId))
+                .Where(x => x.Room!.RoomType == rules.RequiredRoomType)
+                .ToList();
 
             var doctorIds = shifts.Select(x => x.StaffProfileId).Distinct().ToList();
             var booked = (await _appointmentRepository.GetActiveAppointmentsAsync(date, doctorIds))
                 .Where(a => a.Id != excludeAppointmentId)
                 .ToList();
 
+            return BuildSlots(date, shifts, booked, rules);
+        }
+
+        // Free-slot count of every day from..to for the booking calendar: the same rules as FindSlotsAsync, but the
+        // config, the services, the shifts and the appointments are read once for the whole range instead of once a day.
+        private async Task<List<AvailableDayResponse>> FindDaysAsync(List<BookingLine> lines, DateOnly from, DateOnly to, int? doctorId, long? excludeAppointmentId = null)
+        {
+            ConditionGuard.Ensure(from <= to, ErrorConstants.AppointmentMessage.DateRangeInvalid);
+            var rules = await LoadSlotRulesAsync(lines);
+            // Days outside the bookable window have no slot: only today..last bookable day is computed
+            var first = from < rules.Today ? rules.Today : from;
+            var last = to > rules.LastDay ? rules.LastDay : to;
+            if (first > last)
+            {
+                return new List<AvailableDayResponse>();
+            }
+            ConditionGuard.Ensure(last.DayNumber - first.DayNumber < AppointmentConstants.AvailableDaysMaxRange,
+                ErrorConstants.AppointmentMessage.DateRangeTooLong);
+
+            var shifts = (await _appointmentRepository.GetDoctorShiftsInRangeAsync(first, last, doctorId))
+                .Where(x => x.Room!.RoomType == rules.RequiredRoomType)
+                .ToList();
+            var doctorIds = shifts.Select(x => x.StaffProfileId).Distinct().ToList();
+            var booked = doctorIds.Count == 0
+                ? new List<Appointment>()
+                : (await _appointmentRepository.GetActiveAppointmentsInRangeAsync(first, last, doctorIds))
+                    .Where(a => a.Id != excludeAppointmentId)
+                    .ToList();
+            var shiftsByDay = shifts.ToLookup(x => x.ScheduleDate);
+            var bookedByDay = booked.ToLookup(x => x.AppointmentDate);
+
+            var days = new List<AvailableDayResponse>();
+            for (var date = first; date <= last; date = date.AddDays(1))
+            {
+                var dayShifts = shiftsByDay[date].ToList();
+                // Several doctors may be free at the same time: the patient sees one slot per start time
+                var starts = BuildSlots(date, dayShifts, bookedByDay[date].ToList(), rules)
+                    .Select(x => x.SlotStart)
+                    .Distinct()
+                    .ToList();
+                days.Add(new AvailableDayResponse
+                {
+                    Date = date,
+                    FreeSlotCount = starts.Count,
+                    IsWorkingDay = dayShifts.Count > 0,
+                    FirstSlotStart = starts.Count > 0 ? starts[0] : null
+                });
+            }
+
+            return days;
+        }
+
+        // What decides the slots, read once per request
+        private sealed record SlotRules(DateOnly Today, DateOnly LastDay, int SlotMinutes, DateTime EarliestStart, TimeSpan Duration, string RequiredRoomType);
+
+        private async Task<SlotRules> LoadSlotRulesAsync(List<BookingLine> lines)
+        {
+            var today = DateOnly.FromDateTime(ClinicClock.Today);
+            var maxDaysAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMaxDaysAhead);
+            var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
+            var minHoursAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMinHoursAhead);
+            return new SlotRules(
+                today,
+                today.AddDays(maxDaysAhead),
+                slotMinutes,
+                ClinicClock.Now.AddHours(minHoursAhead),
+                // Services are done one after another, so the slot must fit their total time
+                TimeSpan.FromMinutes(lines.Sum(l => l.GetMinutes(slotMinutes))),
+                RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)));
+        }
+
+        // The free slots of one day: each slot of each shift that fits the total time, is not taken and is not too soon
+        private static List<AvailableSlotResponse> BuildSlots(DateOnly date, List<StaffSchedule> shifts, List<Appointment> booked, SlotRules rules)
+        {
             var slots = new List<AvailableSlotResponse>();
             foreach (var shift in shifts)
             {
-                for (var start = shift.ShiftStart; ; start = start.AddMinutes(slotMinutes))
+                for (var start = shift.ShiftStart; ; start = start.AddMinutes(rules.SlotMinutes))
                 {
-                    var end = start.Add(duration);
+                    var end = start.Add(rules.Duration);
                     // TimeOnly wraps at midnight, so "end < start" also means past the shift
                     if (end < start || end > shift.ShiftEnd)
                     {
@@ -368,7 +441,7 @@ namespace OZE.Application.Services
 
                     var isTaken = booked.Any(a => a.DoctorId == shift.StaffProfileId
                         && a.TimeSlotStart < end && start < a.TimeSlotEnd);
-                    var isTooSoon = date.ToDateTime(start) < earliestStart;
+                    var isTooSoon = date.ToDateTime(start) < rules.EarliestStart;
 
                     if (!isTaken && !isTooSoon)
                     {

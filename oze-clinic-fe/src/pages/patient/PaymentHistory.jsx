@@ -1,205 +1,182 @@
-import { useRef } from "react";
-import { AlertCircle, Receipt } from "lucide-react";
-import StatusDefinitionDrawer from "@/components/medicalRecord/StatusDefinitionDrawer";
-import PatientDebtRefunds from "@/components/patientDebt/PatientDebtRefunds";
-import UnlinkedProfileCard from "@/components/patientDebt/UnlinkedProfileCard";
-import PaymentHistorySummary from "@/components/paymentHistory/PaymentHistorySummary";
-import PaymentHistoryTable from "@/components/paymentHistory/PaymentHistoryTable";
-import PaymentHistoryToolbar from "@/components/paymentHistory/PaymentHistoryToolbar";
-import PaymentReceipt from "@/components/paymentHistory/PaymentReceipt";
-import usePaymentHistoryNavigation from "@/hooks/usePaymentHistoryNavigation";
-import { PAYMENT_HISTORY_STATUS_GUIDE, PAYMENT_HISTORY_TEXT } from "@/utils/messages";
-import {
-    HISTORY_FILTER_BUTTON_ID,
-    HISTORY_REFUNDS_TITLE_ID,
-    HISTORY_RETRY_ID,
-    HISTORY_SEARCH_ID,
-    HISTORY_SORT_BUTTON_ID,
-    HISTORY_TITLE_ID,
-    countBy,
-    historyMonths,
-    receiptTotals,
-} from "@/utils/paymentHistory";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import AppointmentTabs from "@/components/appointment/AppointmentTabs";
+import InstallmentTable from "@/components/patientDebt/InstallmentTable";
+import InvoiceTable from "@/components/paymentHistory/InvoiceTable";
+import FilterBar, { FILTER_SEARCH_CLASS, FILTER_SELECT_CLASS } from "@/components/ui/FilterBar";
+import FilterSelect from "@/components/ui/FilterSelect";
+import ListFooter from "@/components/ui/ListFooter";
+import PageHeader from "@/components/ui/PageHeader";
+import PageLoadState from "@/components/ui/PageLoadState";
+import SearchInput from "@/components/ui/SearchInput";
+import SortSelect from "@/components/ui/SortSelect";
+import useAsync from "@/hooks/useAsync";
+import usePagedList from "@/hooks/usePagedList";
+import { getMyDebtAccounts, getMyPaymentReceipts } from "@/services/patientBillingService";
+import { norm } from "@/utils/medicalRecord";
+import { BOOKING_ERROR_CODE, PATIENT_DEBT_STATUS, PAYMENT_HISTORY_STATUS } from "@/utils/messages";
+import { ROUTES, getPaymentHistoryRoute } from "@/utils/routes";
 
-const TITLE_CLASS = "page-title outline-none focus-visible:shadow-none";
+const TITLE_ID = "payment-history-title";
+const TAB = { INVOICES: "invoices", INSTALLMENTS: "installments" };
+const TAB_PARAM = "tab";
+const INVOICE_STATUS_OPTIONS = Object.entries(PAYMENT_HISTORY_STATUS).map(([value, meta]) => ({ value, label: meta.label }));
+const DEBT_STATUS_OPTIONS = Object.entries(PATIENT_DEBT_STATUS).map(([value, meta]) => ({ value, label: meta.label }));
+const SORT_OPTIONS = [
+    { value: "new", label: "Ngày lập mới nhất" },
+    { value: "old", label: "Ngày lập cũ nhất" },
+];
 
-const focusById = (id) => document.getElementById(id)?.focus({ preventScroll: true });
+// "16/10/2026" -> "2026-10-16" (the mappers keep display dates; the tables and filters need ISO).
+const toIso = (date) => (/^\d{2}\/\d{2}\/\d{4}$/.test(date ?? "") ? date.split("/").reverse().join("-") : "");
 
-const StateBox = ({ icon: Icon, title, text, children }) => (
-    <section className="card-app p-0">
-        <div className="empty-state">
-            <Icon className="empty-state-icon" aria-hidden="true" />
-            <h2 className="empty-state-title">{title}</h2>
-            <p className="empty-state-text">{text}</p>
-            {children}
-        </div>
-    </section>
-);
-
-const LoadingSkeleton = () => (
-    <section aria-busy="true" aria-label={PAYMENT_HISTORY_TEXT.LOADING}>
-        <div className="mb-4 grid gap-4 md:grid-cols-3">
-            {Array.from({ length: 3 }, (_, index) => (
-                <div key={index} className="card-app px-5 py-4">
-                    <div className="skeleton h-14" />
-                </div>
-            ))}
-        </div>
-        <div className="grid gap-4 xl:grid-cols-9 xl:items-start">
-            <div className="card-app px-5 py-4 xl:col-span-4">
-                <div className="skeleton h-60" />
-            </div>
-            <div className="card-app px-5 py-4 xl:col-span-5">
-                <div className="skeleton h-90" />
-            </div>
-        </div>
-    </section>
-);
-
-const toggleValue = (list, value) => (list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value]);
-
-const liveText = (view, hasData) => {
-    if (!hasData) return "";
-    const hasQuery = Boolean(view.query.q) || view.query.status.length > 0 || view.query.month.length > 0;
-    const listText = view.list.length ? (hasQuery ? PAYMENT_HISTORY_TEXT.SHOWN(view.list.length, view.total) : "") : PAYMENT_HISTORY_TEXT.NO_RESULT;
-    return [view.missing ? PAYMENT_HISTORY_TEXT.NOT_FOUND_STATUS : "", listText].filter(Boolean).join(" ");
+const statusOf = (resource) => {
+    if (resource.loading) return "loading";
+    if (!resource.error && resource.value?.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND) return "unlinked";
+    return resource.error || !resource.value?.success ? "failed" : "ready";
 };
 
-const PaymentHistory = () => {
-    const { load, items, profile, view, ui, setUi, h1Ref, receiptRef, navEventKey, updateList, changePage, showLatest, focusReceipt, retry: reload } = usePaymentHistoryNavigation();
-    const composingAt = useRef(null);
+const toInvoiceRow = (receipt) => ({
+    id: receipt.id,
+    code: receipt.no,
+    createdAt: toIso(receipt.date),
+    content: receipt.title || receipt.lines.map((line) => line.name).join(", "),
+    amount: receipt.net,
+    remaining: receipt.left,
+    statusKey: receipt.status,
+    status: PAYMENT_HISTORY_STATUS[receipt.status],
+    refundable: receipt.paid > 0,
+    search: receipt.search,
+});
 
-    const ready = load.status === "ready";
-    const hasData = ready && items.length > 0;
-    const { query } = view;
-    const months = historyMonths(items);
+const toInstallmentRow = (item) => ({
+    id: item.id,
+    name: item.name,
+    doctorName: item.doctorName,
+    installmentCount: item.stages.length,
+    total: item.total,
+    paid: item.paid,
+    remaining: Math.max(item.total - item.paid, 0),
+    statusKey: item.status,
+    status: PATIENT_DEBT_STATUS[item.status],
+    createdAt: toIso(item.start),
+    search: item.search,
+});
 
-    const closePopover = (openerId) => {
-        setUi({ popover: null });
-        if (openerId) focusById(openerId);
-    };
+const InvoicesTab = ({ receipts }) => {
+    const [search, setSearch] = useState("");
+    const [status, setStatus] = useState("");
+    const [from, setFrom] = useState("");
+    const [to, setTo] = useState("");
+    const keyword = norm(search.trim());
+    const all = receipts.map(toInvoiceRow);
+    const rows = all
+        .filter((row) => (!keyword || row.search.includes(keyword)) && (!status || row.statusKey === status) && (!from || row.createdAt >= from) && (!to || row.createdAt <= to))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
+    const list = usePagedList(rows, { resetKey: `${keyword}|${status}|${from}|${to}` });
 
-    const retry = () => {
-        h1Ref.current?.focus({ preventScroll: true });
-        reload();
-    };
-
-    const handleSearchChange = (event) => {
-        const value = event.target.value;
-        setUi({ searchInput: value });
-        if (!event.nativeEvent.isComposing) updateList({ q: value });
-    };
-
-    const handleCompositionStart = () => {
-        composingAt.current = navEventKey;
-    };
-
-    const handleCompositionEnd = (event) => {
-        const kept = composingAt.current === navEventKey;
-        composingAt.current = null;
-        if (kept) updateList({ q: event.currentTarget.value });
-        else setUi({ searchInput: query.q });
-    };
-
-    const clearSearch = () => {
-        setUi({ searchInput: "" });
-        updateList({ q: "" });
-        focusById(HISTORY_SEARCH_ID);
-    };
-
-    const toggleFilter = (group, value) => updateList({ [group]: toggleValue(query[group], value) });
-
-    const clearFilters = () => {
-        updateList({ status: [], month: [] });
-        closePopover(HISTORY_FILTER_BUTTON_ID);
-    };
-
-    const dismissPopover = (byEscape) => closePopover(byEscape ? (ui.popover === "sort" ? HISTORY_SORT_BUTTON_ID : HISTORY_FILTER_BUTTON_ID) : null);
-
-    const selectSort = (sort) => {
-        updateList({ sort });
-        closePopover(HISTORY_SORT_BUTTON_ID);
-    };
-
-    const removeChip = (group, value, last) => {
-        updateList({ [group]: query[group].filter((entry) => entry !== value) });
-        if (last) focusById(HISTORY_SEARCH_ID);
-    };
-
-    const clearAll = () => {
-        setUi({ searchInput: "", popover: null });
-        updateList({ q: "", status: [], month: [] });
-        focusById(HISTORY_SEARCH_ID);
-    };
-
-    const openDrawer = (event) => {
-        event.currentTarget.focus();
-        setUi({ drawerOpen: true, popover: null });
+    const clear = () => {
+        setSearch("");
+        setStatus("");
+        setFrom("");
+        setTo("");
     };
 
     return (
-        <>
-            <div className="page-header">
-                <div>
-                    <h1 id={HISTORY_TITLE_ID} ref={h1Ref} tabIndex={-1} className={TITLE_CLASS}>
-                        {PAYMENT_HISTORY_TEXT.TITLE}
-                    </h1>
-                    <p className="page-description">{PAYMENT_HISTORY_TEXT.DESCRIPTION}</p>
+        <div className="flex flex-col gap-4">
+            <FilterBar canClear={Boolean(keyword || status || from || to)} onClear={clear}>
+                <SearchInput id="invoice-search" label="Tìm theo mã hoá đơn, nội dung" placeholder="Tìm theo mã hoá đơn, nội dung" value={search} onChange={setSearch} className={FILTER_SEARCH_CLASS} />
+                <FilterSelect id="invoice-status" label="Trạng thái" allLabel="Tất cả trạng thái" options={INVOICE_STATUS_OPTIONS} value={status} onChange={setStatus} className={FILTER_SELECT_CLASS} />
+                <div className="field w-full sm:w-auto">
+                    <label htmlFor="invoice-from" className="label">
+                        Ngày tạo từ
+                    </label>
+                    <input id="invoice-from" type="date" className="input" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} />
                 </div>
+                <div className="field w-full sm:w-auto">
+                    <label htmlFor="invoice-to" className="label">
+                        đến
+                    </label>
+                    <input id="invoice-to" type="date" className="input" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} />
+                </div>
+            </FilterBar>
+            <InvoiceTable
+                invoices={list.rows}
+                offset={list.offset}
+                labelledBy={TITLE_ID}
+                empty={all.length ? "Không có hoá đơn phù hợp." : "Bạn chưa có hoá đơn nào."}
+                footer={list.total > 0 && <ListFooter list={list} label="Phân trang hoá đơn" />}
+                invoiceHref={(invoice) => getPaymentHistoryRoute(invoice.id)}
+                refundHref={() => ROUTES.REFUND_REQUESTS}
+            />
+        </div>
+    );
+};
+
+const InstallmentsTab = ({ items }) => {
+    const [search, setSearch] = useState("");
+    const [status, setStatus] = useState("");
+    const [sort, setSort] = useState("new");
+    const keyword = norm(search.trim());
+    const all = items.filter((item) => item.type !== "once").map(toInstallmentRow);
+    const rows = all
+        .filter((row) => (!keyword || row.search.includes(keyword)) && (!status || row.statusKey === status))
+        .sort((a, b) => (sort === "new" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt)));
+    const list = usePagedList(rows, { resetKey: `${keyword}|${status}|${sort}` });
+
+    const clear = () => {
+        setSearch("");
+        setStatus("");
+        setSort("new");
+    };
+
+    return (
+        <div className="flex flex-col gap-4">
+            <FilterBar canClear={Boolean(keyword || status || sort !== "new")} onClear={clear}>
+                <SearchInput id="installment-search" label="Tìm theo tên dịch vụ, bác sĩ" placeholder="Tìm theo tên dịch vụ, bác sĩ" value={search} onChange={setSearch} className={FILTER_SEARCH_CLASS} />
+                <FilterSelect id="installment-status" label="Trạng thái" allLabel="Tất cả trạng thái" options={DEBT_STATUS_OPTIONS} value={status} onChange={setStatus} className={FILTER_SELECT_CLASS} />
+                <SortSelect id="installment-sort" options={SORT_OPTIONS} value={sort} onChange={setSort} />
+            </FilterBar>
+            <InstallmentTable
+                plans={list.rows}
+                offset={list.offset}
+                labelledBy={TITLE_ID}
+                empty={all.length ? "Không có khoản trả theo đợt phù hợp." : "Bạn chưa có khoản trả theo đợt nào."}
+                footer={list.total > 0 && <ListFooter list={list} label="Phân trang trả theo đợt" />}
+            />
+        </div>
+    );
+};
+
+// "Lịch sử thanh toán" (Figma 1243:4177 / 1244:4233): invoices and plans paid in several instalments.
+const PaymentHistory = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = searchParams.get(TAB_PARAM) === TAB.INSTALLMENTS ? TAB.INSTALLMENTS : TAB.INVOICES;
+    const [version, setVersion] = useState(0);
+    const receiptsState = useAsync(() => getMyPaymentReceipts(), [version]);
+    const accountsState = useAsync(() => getMyDebtAccounts(), [version]);
+    const current = tab === TAB.INVOICES ? receiptsState : accountsState;
+    const status = statusOf(current);
+    const receipts = statusOf(receiptsState) === "ready" ? receiptsState.value.data.items : [];
+    const accounts = statusOf(accountsState) === "ready" ? accountsState.value.data.items : [];
+
+    const tabs = [
+        { key: TAB.INVOICES, label: "Hoá đơn", count: receipts.length },
+        { key: TAB.INSTALLMENTS, label: "Trả theo đợt", count: accounts.filter((item) => item.type !== "once").length },
+    ];
+
+    const selectTab = (key) => setSearchParams(key === TAB.INVOICES ? {} : { [TAB_PARAM]: key }, { replace: true });
+
+    return (
+        <>
+            <PageHeader id={TITLE_ID} title="Lịch sử thanh toán" description="Thanh toán bằng tiền mặt hoặc chuyển khoản tại quầy lễ tân. Lễ tân ghi nhận, bạn xem lại tại đây." />
+            <div className="mb-5">
+                <AppointmentTabs tabs={tabs} selected={tab} onSelect={selectTab} labelledBy={TITLE_ID} idPrefix="payment-history" />
             </div>
-            <p className="sr-only" role="status">
-                {liveText({ ...view, total: items.length }, hasData)}
-            </p>
-            {load.status === "loading" && <LoadingSkeleton />}
-            {load.status === "unlinked" && <UnlinkedProfileCard />}
-            {load.status === "error" && (
-                <StateBox icon={AlertCircle} title={PAYMENT_HISTORY_TEXT.ERROR_TITLE} text={PAYMENT_HISTORY_TEXT.ERROR_TEXT}>
-                    <button id={HISTORY_RETRY_ID} type="button" className="btn btn-secondary mt-3" onClick={retry}>
-                        {PAYMENT_HISTORY_TEXT.RETRY}
-                    </button>
-                </StateBox>
-            )}
-            {ready && !hasData && <StateBox icon={Receipt} title={PAYMENT_HISTORY_TEXT.EMPTY_TITLE} text={PAYMENT_HISTORY_TEXT.EMPTY_TEXT} />}
-            {hasData && (
-                <>
-                    <PaymentHistorySummary totals={receiptTotals(items)} count={items.length} />
-                    <div className="grid gap-4 xl:grid-cols-9 xl:items-start">
-                        <section className="card-app min-w-0 p-0 xl:col-span-4">
-                            <PaymentHistoryToolbar
-                                query={query}
-                                searchInput={ui.searchInput}
-                                popover={ui.popover}
-                                months={months}
-                                statusCounts={countBy(items, "status")}
-                                monthCounts={countBy(items, "month")}
-                                shown={view.list.length}
-                                total={items.length}
-                                onSearchChange={handleSearchChange}
-                                onCompositionStart={handleCompositionStart}
-                                onCompositionEnd={handleCompositionEnd}
-                                onClearSearch={clearSearch}
-                                onTogglePopover={(key) => setUi({ popover: ui.popover === key ? null : key })}
-                                onToggleFilter={toggleFilter}
-                                onClearFilters={clearFilters}
-                                onDoneFilter={() => closePopover(HISTORY_FILTER_BUTTON_ID)}
-                                onDismissPopover={dismissPopover}
-                                onSelectSort={selectSort}
-                                onRemoveChip={removeChip}
-                                onClearAll={clearAll}
-                                onOpenDrawer={openDrawer}
-                            />
-                            <PaymentHistoryTable view={view} onFocusReceipt={focusReceipt} onPageChange={changePage} onClearAll={clearAll} />
-                        </section>
-                        <div className="flex min-w-0 flex-col gap-4 xl:col-span-5">
-                            <PaymentReceipt receipt={view.selected} profile={profile} missing={view.missing} titleRef={receiptRef} onShowLatest={showLatest} />
-                            {view.selected && (
-                                <PatientDebtRefunds item={view.selected} titleId={HISTORY_REFUNDS_TITLE_ID} emptyText={PAYMENT_HISTORY_TEXT.NO_REFUND} />
-                            )}
-                        </div>
-                    </div>
-                </>
-            )}
-            {ui.drawerOpen && <StatusDefinitionDrawer groups={PAYMENT_HISTORY_STATUS_GUIDE} titleClassName="text-muted" onClose={() => setUi({ drawerOpen: false })} />}
+            <div id="payment-history-panel" role="tabpanel" aria-labelledby={`payment-history-tab-${tab}`}>
+                <PageLoadState status={status} onRetry={() => setVersion((value) => value + 1)} />
+                {status === "ready" && (tab === TAB.INVOICES ? <InvoicesTab receipts={receipts} /> : <InstallmentsTab items={accounts} />)}
+            </div>
         </>
     );
 };

@@ -1,24 +1,28 @@
 import { useRef } from "react";
-import { AlertCircle, Inbox, Send } from "lucide-react";
-import StatusDefinitionDrawer from "@/components/medicalRecord/StatusDefinitionDrawer";
+import { AlertCircle, Inbox, Search, Send } from "lucide-react";
 import UnlinkedProfileCard from "@/components/patientDebt/UnlinkedProfileCard";
+import PatientRefundTable from "@/components/refund/PatientRefundTable";
 import RefundRequestCreateModal from "@/components/refund/RefundRequestCreateModal";
 import RefundRequestDetailModal from "@/components/refund/RefundRequestDetailModal";
-import RefundRequestList from "@/components/refund/RefundRequestList";
-import RefundRequestToolbar from "@/components/refund/RefundRequestToolbar";
+import FilterBar, { FILTER_SEARCH_CLASS, FILTER_SELECT_CLASS } from "@/components/ui/FilterBar";
+import FilterSelect from "@/components/ui/FilterSelect";
+import SortSelect from "@/components/ui/SortSelect";
 import useRefundRequestNavigation from "@/hooks/useRefundRequestNavigation";
+import { cx } from "@/utils/cx";
 import { REFUND_REQUEST_TEXT } from "@/utils/messages";
 import {
     REFUND_CREATE_ID,
-    REFUND_FILTER_BUTTON_ID,
+    REFUND_DEFAULT_SORT,
+    REFUND_REQUEST_STATUS_LABELS,
     REFUND_RETRY_ID,
     REFUND_SEARCH_ID,
-    REFUND_SORT_BUTTON_ID,
-    REFUND_STATUS_GROUPS,
+    REFUND_SORTS,
+    REFUND_STATUSES,
     REFUND_TITLE_ID,
-    countByStatus,
     refundLiveText,
 } from "@/utils/refundRequest";
+
+const STATUS_OPTIONS = REFUND_STATUSES.map((status) => ({ value: status, label: REFUND_REQUEST_STATUS_LABELS[status].label }));
 
 const TITLE_CLASS = "page-title outline-none focus-visible:shadow-none";
 
@@ -47,8 +51,6 @@ const LoadingSkeleton = () => (
         ))}
     </section>
 );
-
-const toggleValue = (list, value) => (list.includes(value) ? list.filter((entry) => entry !== value) : [...list, value]);
 
 const RefundRequests = () => {
     const {
@@ -82,11 +84,6 @@ const RefundRequests = () => {
     const hasData = ready && requests.length > 0;
     const { query } = view;
 
-    const closePopover = (openerId) => {
-        setUi({ popover: null });
-        if (openerId) focusById(openerId);
-    };
-
     const retry = () => {
         h1Ref.current?.focus({ preventScroll: true });
         reload();
@@ -102,6 +99,12 @@ const RefundRequests = () => {
         composingAt.current = navEventKey;
     };
 
+    const resetFilters = () => {
+        setUi({ searchInput: "", popover: null });
+        updateList({ q: "", status: [], sort: REFUND_DEFAULT_SORT });
+        focusById(REFUND_SEARCH_ID);
+    };
+
     const handleCompositionEnd = (event) => {
         const kept = composingAt.current === navEventKey;
         composingAt.current = null;
@@ -109,41 +112,6 @@ const RefundRequests = () => {
         else setUi({ searchInput: query.q });
     };
 
-    const clearSearch = () => {
-        setUi({ searchInput: "" });
-        updateList({ q: "" });
-        focusById(REFUND_SEARCH_ID);
-    };
-
-    const toggleFilter = (group, value) => updateList({ [group]: toggleValue(query[group], value) });
-
-    const clearFilters = () => {
-        updateList({ status: [] });
-        closePopover(REFUND_FILTER_BUTTON_ID);
-    };
-
-    const dismissPopover = (byEscape) => closePopover(byEscape ? (ui.popover === "sort" ? REFUND_SORT_BUTTON_ID : REFUND_FILTER_BUTTON_ID) : null);
-
-    const selectSort = (sort) => {
-        updateList({ sort });
-        closePopover(REFUND_SORT_BUTTON_ID);
-    };
-
-    const removeChip = (group, value, last) => {
-        updateList({ [group]: query[group].filter((entry) => entry !== value) });
-        if (last) focusById(REFUND_FILTER_BUTTON_ID);
-    };
-
-    const clearAll = () => {
-        setUi({ searchInput: "", popover: null });
-        updateList({ q: "", status: [] });
-        focusById(REFUND_SEARCH_ID);
-    };
-
-    const openDrawer = (event) => {
-        event.currentTarget.focus();
-        setUi({ drawerOpen: true, popover: null });
-    };
 
     return (
         <>
@@ -175,30 +143,37 @@ const RefundRequests = () => {
             {load.status === "unlinked" && <UnlinkedProfileCard />}
             {ready && !hasData && <StateBox icon={Inbox} title={REFUND_REQUEST_TEXT.EMPTY_TITLE} text={REFUND_REQUEST_TEXT.EMPTY_TEXT} />}
             {hasData && (
-                <section className="card-app min-w-0 p-0">
-                    <RefundRequestToolbar
-                        query={query}
-                        searchInput={ui.searchInput}
-                        popover={ui.popover}
-                        statusCounts={countByStatus(requests)}
-                        shown={view.list.length}
-                        total={requests.length}
-                        onSearchChange={handleSearchChange}
-                        onCompositionStart={handleCompositionStart}
-                        onCompositionEnd={handleCompositionEnd}
-                        onClearSearch={clearSearch}
-                        onTogglePopover={(key) => setUi({ popover: ui.popover === key ? null : key })}
-                        onToggleFilter={toggleFilter}
-                        onClearFilters={clearFilters}
-                        onDoneFilter={() => closePopover(REFUND_FILTER_BUTTON_ID)}
-                        onDismissPopover={dismissPopover}
-                        onSelectSort={selectSort}
-                        onRemoveChip={removeChip}
-                        onClearAll={clearAll}
-                        onOpenDrawer={openDrawer}
-                    />
-                    <RefundRequestList view={view} pickUrl={pickUrl} pickState={pickState} onPageChange={changePage} onClearAll={clearAll} />
-                </section>
+                <div className="flex flex-col gap-4">
+                    <FilterBar canClear={Boolean(query.q || query.status.length || query.sort !== REFUND_DEFAULT_SORT)} onClear={resetFilters}>
+                        <div className={cx("search", FILTER_SEARCH_CLASS)}>
+                            <label htmlFor={REFUND_SEARCH_ID} className="sr-only">
+                                Tìm theo mã yêu cầu, nội dung
+                            </label>
+                            <Search aria-hidden="true" />
+                            <input
+                                id={REFUND_SEARCH_ID}
+                                type="search"
+                                className="input"
+                                placeholder="Tìm theo mã yêu cầu, nội dung"
+                                value={ui.searchInput}
+                                onChange={handleSearchChange}
+                                onCompositionStart={handleCompositionStart}
+                                onCompositionEnd={handleCompositionEnd}
+                            />
+                        </div>
+                        <FilterSelect
+                            id="refund-requests-status"
+                            label="Trạng thái"
+                            allLabel="Tất cả trạng thái"
+                            options={STATUS_OPTIONS}
+                            value={query.status[0] ?? ""}
+                            onChange={(value) => updateList({ status: value ? [value] : [] })}
+                            className={FILTER_SELECT_CLASS}
+                        />
+                        <SortSelect id="refund-requests-sort-select" options={REFUND_SORTS} value={query.sort} onChange={(sort) => updateList({ sort })} />
+                    </FilterBar>
+                    <PatientRefundTable view={view} labelledBy={REFUND_TITLE_ID} pickUrl={pickUrl} pickState={pickState} onPageChange={changePage} />
+                </div>
             )}
             {detailOpen && <RefundRequestDetailModal key={query.request} request={view.selected} code={query.request} closeButtonRef={closeButtonRef} onClose={closeDetail} />}
             {ui.createOpen && (
@@ -212,7 +187,6 @@ const RefundRequests = () => {
                     onClose={closeCreate}
                 />
             )}
-            {ui.drawerOpen && <StatusDefinitionDrawer groups={REFUND_STATUS_GROUPS} titleClassName="text-muted" onClose={() => setUi({ drawerOpen: false })} />}
         </>
     );
 };

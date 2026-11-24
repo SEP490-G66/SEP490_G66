@@ -29,9 +29,6 @@ export const REFUND_STATUS_GROUPS = REFUND_REQUEST_STATUS_GUIDE.map((group) => (
 
 export const REFUND_TITLE_ID = "refund-requests-title";
 export const REFUND_SEARCH_ID = "refund-requests-search";
-export const REFUND_FILTER_BUTTON_ID = "refund-requests-filter";
-export const REFUND_SORT_BUTTON_ID = "refund-requests-sort";
-export const REFUND_STATUS_BUTTON_ID = "refund-requests-status-help";
 export const REFUND_RETRY_ID = "refund-requests-retry";
 export const REFUND_CREATE_ID = "refund-requests-create";
 export const REFUND_INVOICE_ID = "refund-requests-invoice";

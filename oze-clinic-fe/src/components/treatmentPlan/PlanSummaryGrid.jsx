@@ -8,15 +8,17 @@ const Tile = ({ label, children }) => (
     </div>
 );
 
-// Six summary tiles of a treatment plan (Figma: Chi tiết kế hoạch): doctor, pay type, progress (with bar),
-// estimated total, paid (green) and remaining (red while > 0).
+const has = (value) => value !== null && value !== undefined && value !== "";
+
+// Summary tiles of a treatment plan (Figma: Chi tiết kế hoạch): doctor, pay type, progress (with bar),
+// estimated total, paid (green) and remaining (red while > 0). A tile without data is left out.
 // summary: { doctorName, payTypeLabel, completed, total, estimatedTotal, paid, remaining }
 const PlanSummaryGrid = ({ summary }) => {
     const percent = summary.total > 0 ? Math.round((summary.completed / summary.total) * 100) : 0;
     return (
         <div className="card-app grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Tile label="Bác sĩ phụ trách">{summary.doctorName}</Tile>
-            <Tile label="Hình thức thanh toán">{summary.payTypeLabel}</Tile>
+            {has(summary.doctorName) && <Tile label="Bác sĩ phụ trách">{summary.doctorName}</Tile>}
+            {has(summary.payTypeLabel) && <Tile label="Hình thức thanh toán">{summary.payTypeLabel}</Tile>}
             <Tile label="Tiến độ điều trị">
                 <span className="num">
                     {summary.completed}/{summary.total} buổi hoàn thành
@@ -25,15 +27,21 @@ const PlanSummaryGrid = ({ summary }) => {
                     <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
                 </div>
             </Tile>
-            <Tile label="Tổng chi phí dự kiến">
-                <span className="num font-heading text-heading-3">{formatCurrency(summary.estimatedTotal)}</span>
-            </Tile>
-            <Tile label="Đã thanh toán">
-                <span className="num font-heading text-heading-3 text-success">{formatCurrency(summary.paid)}</span>
-            </Tile>
-            <Tile label="Còn lại">
-                <span className={cx("num font-heading text-heading-3", summary.remaining > 0 ? "text-danger" : "text-ink")}>{formatCurrency(summary.remaining)}</span>
-            </Tile>
+            {has(summary.estimatedTotal) && (
+                <Tile label="Tổng chi phí dự kiến">
+                    <span className="num font-heading text-heading-3">{formatCurrency(summary.estimatedTotal)}</span>
+                </Tile>
+            )}
+            {has(summary.paid) && (
+                <Tile label="Đã thanh toán">
+                    <span className="num font-heading text-heading-3 text-success">{formatCurrency(summary.paid)}</span>
+                </Tile>
+            )}
+            {has(summary.remaining) && (
+                <Tile label="Còn lại">
+                    <span className={cx("num font-heading text-heading-3", summary.remaining > 0 ? "text-danger" : "text-ink")}>{formatCurrency(summary.remaining)}</span>
+                </Tile>
+            )}
         </div>
     );
 };

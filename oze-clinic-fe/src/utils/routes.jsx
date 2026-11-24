@@ -128,18 +128,9 @@ export const getArticleDetailRoute = (articleSlug) => generatePath(ROUTES.ARTICL
 
 export const getAppointmentDetailRoute = (appointmentId) => generatePath(ROUTES.APPOINTMENT_DETAIL, { appointmentId: String(appointmentId) });
 
-export const MEDICAL_RECORD_QUERY = { TAB: "tab", PLAN: "plan" };
-export const PAYMENT_HISTORY_QUERY = { INVOICE: "invoice" };
+export const getTreatmentPlanRoute = (planId) => (planId != null ? `${ROUTES.TREATMENT_PLANS}/${planId}` : ROUTES.TREATMENT_PLANS);
 
-export const MEDICAL_RECORD_TABS = { PLAN: "plan", FILM: "film", TEETH: "teeth", HIST: "hist" };
-
-export const getTreatmentPlanRoute = (planId) => {
-    const params = new URLSearchParams({ [MEDICAL_RECORD_QUERY.TAB]: MEDICAL_RECORD_TABS.PLAN });
-    if (planId != null) params.set(MEDICAL_RECORD_QUERY.PLAN, String(planId));
-    return `${ROUTES.MEDICAL_RECORD}?${params}`;
-};
-
-export const getPaymentHistoryRoute = (invoiceId) => `${ROUTES.PAYMENT_HISTORY}?${new URLSearchParams({ [PAYMENT_HISTORY_QUERY.INVOICE]: String(invoiceId) })}`;
+export const getPaymentHistoryRoute = (invoiceId) => `${ROUTES.PAYMENT_HISTORY}/${invoiceId}`;
 
 export const getPaymentDebtDetailRoute = (debtId) => `${ROUTES.PAYMENT_DEBTS}/${debtId}`;
 

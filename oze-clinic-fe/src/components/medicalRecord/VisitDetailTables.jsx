@@ -22,9 +22,9 @@ export const DiagnosisTable = ({ diagnoses = [] }) => (
         rows={diagnoses}
         empty="Chưa có chẩn đoán."
         columns={[
-            { key: "icdCode", label: "Mã ICD", primary: true, render: (row) => <span className="font-semibold text-ink">{row.icdCode}</span> },
-            { key: "teeth", label: "Răng liên quan", render: (row) => row.teeth || "—" },
-            { key: "description", label: "Mô tả", block: true },
+            { key: "icdCode", label: "Mã ICD", optional: true, render: (row) => <span className="font-semibold text-ink">{row.icdCode}</span> },
+            { key: "teeth", label: "Răng liên quan", optional: true },
+            { key: "description", label: "Mô tả", primary: true },
         ]}
     />
 );
@@ -38,9 +38,9 @@ export const TreatmentDoneTable = ({ procedures = [] }) => (
         rows={procedures}
         empty="Chưa có nội dung điều trị."
         columns={[
-            { key: "tooth", label: "Răng", render: (row) => <span className="font-semibold text-ink">{row.tooth || "—"}</span> },
+            { key: "tooth", label: "Răng", optional: true, render: (row) => <span className="font-semibold text-ink">{row.tooth}</span> },
             { key: "content", label: "Nội dung", primary: true },
-            { key: "result", label: "Kết quả", align: "right", render: (row) => <Badge value={row.result} /> },
+            { key: "result", label: "Kết quả", align: "right", optional: true, render: (row) => <Badge value={row.result} /> },
         ]}
     />
 );
@@ -56,7 +56,7 @@ export const PrescriptionTable = ({ prescriptions = [] }) => (
         columns={[
             { key: "name", label: "Thuốc", primary: true, render: (row) => <span className="font-semibold text-ink">{row.name}</span> },
             { key: "usage", label: "Cách dùng", block: true },
-            { key: "quantity", label: "Số lượng", align: "right" },
+            { key: "quantity", label: "Số lượng", align: "right", optional: true },
         ]}
     />
 );

@@ -304,6 +304,8 @@ namespace OZE.Common.Constants
             public const string SlotRequired = "Appointment time slot is required";
             public const string PastDate = "Appointment date cannot be in the past";
             public const string TooFarAhead = "Appointment date is too far in advance";
+            public const string DateRangeInvalid = "From date must be on or before To date.";
+            public const string DateRangeTooLong = "The date range must be at most 62 days.";
             public const string SlotNotAvailable = "This time slot is no longer available. Please choose another time";
             public const string PhoneHasAccount = "This phone number already has an account. Please sign in to book";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
@@ -514,6 +516,25 @@ namespace OZE.Common.Constants
             public const string RequestCreated = "Document request has been sent to the patient.";
             public const string RequestCancelled = "Document request has been cancelled.";
             public const string FilesUploaded = "Documents uploaded.";
+        }
+
+        // Documents the patient uploads without a doctor's request ("Cung cấp tài liệu")
+        public static class ProvidedDocumentMessage
+        {
+            public const string DocumentNameRequired = "Please enter document name.";
+            public const string DocumentNameInvalid = "Document name must be at most 200 characters.";
+            public const string ProviderAddressRequired = "Please enter provider address.";
+            public const string ProviderAddressInvalid = "Provider address must be at most 300 characters.";
+            public const string PerformedOnInFuture = "Performed date cannot be in the future.";
+            public const string UploadFilesRequired = "Please choose at least one file.";
+            public const string UploadTooManyFiles = "You can upload at most 5 files for a document.";
+            public const string UploadFileTypeInvalid = "{0} is not a supported file. Use .pdf, .jpg, .jpeg, .png or .dcm.";
+            public const string UploadFileTooLarge = "{0} is larger than 20 MB.";
+            public const string UploadFileEmpty = "{0} is empty.";
+            public const string DocumentNotFound = "Document not found.";
+            public const string CannotDelete = "You do not have permission to delete this document.";
+            public const string Uploaded = "Document uploaded.";
+            public const string Deleted = "Document deleted.";
         }
 
         // Capturing on the X-ray simulator and reading the stored pictures

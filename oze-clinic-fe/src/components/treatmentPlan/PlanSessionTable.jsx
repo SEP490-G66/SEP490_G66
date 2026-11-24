@@ -23,10 +23,10 @@ const PlanSessionTable = ({ sessions = [], renderAction }) => {
         { key: "order", label: "Buổi", primary: true, render: (session) => <span className="font-semibold text-ink">Buổi {session.order}</span> },
         { key: "content", label: "Nội dung", block: true },
         { key: "date", label: "Ngày", render: (session) => formatDate(session.date) || "Chưa lên lịch" },
-        { key: "doctorName", label: "Bác sĩ phụ trách" },
+        { key: "doctorName", label: "Bác sĩ phụ trách", optional: true },
         { key: "status", label: "Trạng thái", render: (session) => <Badge value={session.status} /> },
-        { key: "amountDue", label: "Số tiền cần thanh toán", align: "right", render: (session) => <AmountCell session={session} /> },
-        { key: "payment", label: "Thanh toán", render: (session) => <Badge value={session.payment} /> },
+        { key: "amountDue", label: "Số tiền cần thanh toán", align: "right", optional: true, render: (session) => <AmountCell session={session} /> },
+        { key: "payment", label: "Thanh toán", optional: true, render: (session) => <Badge value={session.payment} /> },
         ...(renderAction ? [{ key: "actions", label: "Thao tác", align: "right", actions: true, render: renderAction }] : []),
     ];
 

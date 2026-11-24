@@ -3,7 +3,7 @@ import DashboardSection from "@/components/dashboard/DashboardSection";
 import DataTable from "@/components/ui/DataTable";
 import KeyValueList from "@/components/ui/KeyValueList";
 import { cx } from "@/utils/cx";
-import { formatCurrency, formatDate, formatDateTime } from "@/utils/format";
+import { formatCurrency, formatDate } from "@/utils/format";
 import { getPaymentHistoryRoute, getTreatmentPlanRoute } from "@/utils/routes";
 
 const SERVICE_COLUMNS = [
@@ -14,7 +14,7 @@ const SERVICE_COLUMNS = [
         render: (line) => (
             <>
                 <span className="font-semibold text-ink">{line.name}</span>
-                {line.note && <span className="block text-caption text-muted">{line.note}</span>}
+                {line.detail && <span className="block text-caption text-muted">{line.detail}</span>}
             </>
         ),
     },
@@ -24,7 +24,7 @@ const SERVICE_COLUMNS = [
 ];
 
 const PAYMENT_COLUMNS = [
-    { key: "paidAt", label: "Thời gian", primary: true, render: (payment) => formatDateTime(payment.paidAt) },
+    { key: "date", label: "Ngày", primary: true },
     { key: "method", label: "Hình thức" },
     { key: "amount", label: "Số tiền", align: "right", render: (payment) => <span className="font-semibold text-success">{formatCurrency(payment.amount)}</span> },
 ];
@@ -38,7 +38,7 @@ const Line = ({ label, value, strong, className }) => (
 
 // Body of an invoice page (Figma 1243:4434 "Chi tiết hoá đơn · trừ tiền cọc"), under the page header with breadcrumb.
 // invoice: { code, createdAt, createdBy, payTypeLabel, plan: { id, name }, lines: [{ id, name, note, quantity, unitPrice, total }],
-//            subtotal, deposit: { amount, invoice: { id, code } }, total, paid, remaining, payments: [{ id, paidAt, method, amount }] }
+//            subtotal, discount, deposit: { amount, invoice: { id, code } }, total, paid, remaining, payments: [{ key, date, method, amount }] }
 const InvoiceDetail = ({ invoice }) => {
     const info = [
         { label: "Ngày tạo", value: formatDate(invoice.createdAt), tone: "strong" },
@@ -65,9 +65,10 @@ const InvoiceDetail = ({ invoice }) => {
             <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="flex flex-col gap-5">
                     <DashboardSection id="invoice-lines-title" title="Dịch vụ trong hoá đơn">
-                        <DataTable columns={SERVICE_COLUMNS} rows={invoice.lines ?? []} labelledBy="invoice-lines-title" />
+                        <DataTable columns={SERVICE_COLUMNS} rows={invoice.lines ?? []} rowKey="key" labelledBy="invoice-lines-title" />
                         <dl className="flex flex-col gap-2.5 rounded-md bg-surface-tint p-4 text-body-sm">
                             <Line label="Tổng giá trị dịch vụ" value={formatCurrency(invoice.subtotal)} />
+                            {invoice.discount > 0 && <Line label="Giảm giá" value={`− ${formatCurrency(invoice.discount)}`} />}
                             {invoice.deposit?.amount > 0 && (
                                 <div className="flex items-center justify-between gap-4">
                                     <dt className="text-body">
@@ -94,7 +95,7 @@ const InvoiceDetail = ({ invoice }) => {
                     </DashboardSection>
                     <DashboardSection id="invoice-payments-title" title="Giao dịch thanh toán">
                         {invoice.payments?.length > 0 ? (
-                            <DataTable columns={PAYMENT_COLUMNS} rows={invoice.payments} labelledBy="invoice-payments-title" />
+                            <DataTable columns={PAYMENT_COLUMNS} rows={invoice.payments} rowKey="key" labelledBy="invoice-payments-title" />
                         ) : (
                             <div className="rounded-md border border-dashed border-border px-4 py-6 text-center">
                                 <p className="text-title text-ink">Chưa có giao dịch nào</p>

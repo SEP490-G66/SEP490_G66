@@ -13,7 +13,7 @@ const AppointmentInfoCard = ({ appointment, note, bookedAt, doctorAutoAssigned =
         { label: "Ngày khám", value: day },
         { label: "Giờ khám", value: formatTimeRange(appointment.timeSlotStart, appointment.timeSlotEnd) },
         { label: "Dịch vụ", value: appointment.serviceName },
-        { label: "Bác sĩ", value: appointment.doctorName, hint: doctorAutoAssigned ? "(hệ thống tự gán)" : null },
+        { label: "Bác sĩ", value: appointment.doctorName || "Phòng khám sắp xếp", hint: doctorAutoAssigned ? "(hệ thống tự gán)" : null },
         { label: "Ghi chú", value: note },
         { label: "Thời gian đặt", value: bookedAt ? formatDateTime(bookedAt) : null },
     ];
