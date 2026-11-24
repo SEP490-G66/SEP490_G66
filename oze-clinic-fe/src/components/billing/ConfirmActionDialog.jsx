@@ -6,7 +6,7 @@ import { useSubmit } from "@/components/reception/receptionUtils";
 // body: [text, bold, text, bold, …] — every odd piece is drawn bold.
 // reasonLabel: when set, a required reason box is shown and its trimmed text is passed to onSubmit.
 // The dialog cannot be closed while the request is on its way, so a cashier never thinks an action was stopped when it went through.
-const ConfirmActionDialog = ({ title, description, body, submitLabel, closeLabel, danger, reasonLabel, reasonPlaceholder, onClose, onSubmit }) => {
+const ConfirmActionDialog = ({ title, description, body, submitLabel, closeLabel, danger, submitDisabled, reasonLabel, reasonPlaceholder, onClose, onSubmit }) => {
     const reasonId = useId();
     const [reason, setReason] = useState("");
     const [busy, submit] = useSubmit(onSubmit);
@@ -50,7 +50,7 @@ const ConfirmActionDialog = ({ title, description, body, submitLabel, closeLabel
                     submitLabel={submitLabel}
                     danger={danger}
                     busy={busy}
-                    disabled={Boolean(reasonLabel) && !reason.trim()}
+                    disabled={Boolean(submitDisabled) || (Boolean(reasonLabel) && !reason.trim())}
                 />
             </form>
         </Modal>

@@ -224,7 +224,7 @@ const ReceptionistDashboard = () => {
                     </p>
                 </div>
                 <div role="group" aria-label={TEXT.QUICK} className="flex flex-wrap gap-2">
-                    <Link to={ROUTES.RECEPTION_INVOICES} className="btn btn-secondary">
+                    <Link to={ROUTES.RECEPTION_PAYMENTS} className="btn btn-secondary">
                         {TEXT.PAY}
                     </Link>
                     <button type="button" className="btn btn-secondary" onClick={() => navigate(RECEPTION_PATIENT_CREATE_ROUTE)}>

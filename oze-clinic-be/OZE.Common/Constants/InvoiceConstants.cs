@@ -34,5 +34,15 @@ namespace OZE.Common.Constants
             Refunded,
             Cancelled
         };
+
+        // Invoice list filter by money collected (confirmed payments, refunds not subtracted)
+        public static class Collection
+        {
+            public const string Received = "received";
+            public const string Paid = "paid";
+            public const string Partial = "partial";
+
+            public static readonly string[] All = { Received, Paid, Partial };
+        }
     }
 }
