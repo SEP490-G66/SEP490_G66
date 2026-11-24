@@ -13,5 +13,7 @@ namespace OZE.Common.Models
         public bool IsActive { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
+        // Filled only when the list is asked with IncludeVariants; null otherwise
+        public List<ServiceVariantDto>? Variants { get; set; }
     }
 }

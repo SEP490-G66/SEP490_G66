@@ -1960,6 +1960,16 @@ namespace OZE.Persistence.Migrations
                     b.Property<int>("PatientId")
                         .HasColumnType("int");
 
+                    b.Property<DateOnly?>("PerformedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ProviderAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid?>("UploadGroupId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("UploadedByUserId")
                         .HasColumnType("nvarchar(450)");
 
@@ -1967,6 +1977,9 @@ namespace OZE.Persistence.Migrations
 
                     b.HasIndex("DocumentRequestId")
                         .HasDatabaseName("IX_PatientDocuments_DocumentRequestId");
+
+                    b.HasIndex("UploadGroupId")
+                        .HasDatabaseName("IX_PatientDocuments_UploadGroupId");
 
                     b.HasIndex("PatientId", "DocumentType", "CreatedAt")
                         .IsDescending(false, false, true)

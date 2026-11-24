@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import BookingDayStrip from "@/components/booking/BookingDayStrip";
 import BookingServicePicker from "@/components/booking/BookingServicePicker";
 import BookingSlotGrid from "@/components/booking/BookingSlotGrid";
+import BookingSummaryBar from "@/components/booking/BookingSummaryBar";
 import BookingStateBox from "@/components/booking/BookingStateBox";
 import BookingWeekPicker from "@/components/booking/BookingWeekPicker";
 import EarliestSlotBar from "@/components/booking/EarliestSlotBar";
@@ -206,18 +207,15 @@ const BookingSchedule = ({ form }) => {
                                 </p>
                             )}
                         </div>
-                        <div className="mt-7 flex justify-end border-t border-border pt-5">
-                            <button
-                                type="button"
-                                id={BOOKING_IDS.SUBMIT}
-                                className="btn btn-primary min-w-45 max-sm:w-full max-sm:min-w-0"
-                                aria-disabled={locked || undefined}
-                                aria-describedby="booking-submit-error"
-                                onClick={actions.submit}
-                            >
-                                {state.submitting ? BOOKING_TEXT.SUBMITTING : BOOKING_TEXT.SUBMIT}
-                            </button>
-                        </div>
+                        <BookingSummaryBar
+                            date={state.day}
+                            slotStart={state.slot}
+                            serviceCount={state.items.length}
+                            locked={locked}
+                            submitting={state.submitting}
+                            describedBy="booking-submit-error"
+                            onSubmit={actions.submit}
+                        />
                     </>
                 )}
             </>

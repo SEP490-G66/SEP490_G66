@@ -15,6 +15,9 @@ namespace OZE.Application.Interfaces
         // True when the doctor has ended a shift on that date
         Task<bool> HasEndedShiftAsync(int doctorId, DateOnly date);
         Task<List<Appointment>> GetActiveAppointmentsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds);
+        // Same as the two above for every day from..to in one query each (the booking calendar's free-slot counts)
+        Task<List<StaffSchedule>> GetDoctorShiftsInRangeAsync(DateOnly from, DateOnly to, int? doctorId);
+        Task<List<Appointment>> GetActiveAppointmentsInRangeAsync(DateOnly from, DateOnly to, IReadOnlyCollection<int> doctorIds);
         Task<string?> GetConfigValueAsync(string configKey);
         Task AddPatientAsync(Patient patient);
         Task<Patient?> GetPatientByUserIdAsync(string userId);

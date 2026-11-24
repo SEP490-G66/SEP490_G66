@@ -14,6 +14,11 @@ namespace OZE.Application.Interfaces
         Task<PatientDocument?> GetDocumentWithPatientAsync(long documentId, CancellationToken cancellationToken = default);
         Task AddAsync(DocumentRequest request, CancellationToken cancellationToken = default);
         void AddDocuments(IEnumerable<PatientDocument> documents);
+        // Files the patient uploaded without a request ("Cung cấp tài liệu"), newest first
+        Task<List<PatientDocument>> GetProvidedByPatientIdAsync(int patientId, CancellationToken cancellationToken = default);
+        // The files of one such upload with their patient, tracked for removal
+        Task<List<PatientDocument>> GetProvidedGroupAsync(Guid groupId, CancellationToken cancellationToken = default);
+        void RemoveDocuments(IEnumerable<PatientDocument> documents);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 }

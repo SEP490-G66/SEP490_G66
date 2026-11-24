@@ -88,11 +88,14 @@ namespace OZE.Persistence.Repositories
             return false;
         }
 
-        public async Task<List<Appointment>> GetActiveAppointmentsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds)
+        public Task<List<Appointment>> GetActiveAppointmentsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds) =>
+            GetActiveAppointmentsInRangeAsync(date, date, doctorIds);
+
+        public async Task<List<Appointment>> GetActiveAppointmentsInRangeAsync(DateOnly from, DateOnly to, IReadOnlyCollection<int> doctorIds)
         {
             return await _context.Appointments
                 .AsNoTracking()
-                .Where(x => x.AppointmentDate == date
+                .Where(x => x.AppointmentDate >= from && x.AppointmentDate <= to
                     && x.DoctorId != null && doctorIds.Contains(x.DoctorId.Value)
                     && x.Status != AppointmentConstants.CancelledStatus
                     && x.Status != AppointmentConstants.NoShowStatus)
@@ -179,7 +182,9 @@ namespace OZE.Persistence.Repositories
                 .AnyAsync(x => x.StaffProfileId == doctorId && x.ScheduleDate == date && x.ActualEndTime != null);
         }
 
-        public async Task<List<StaffSchedule>> GetDoctorShiftsAsync(DateOnly date, int? doctorId)
+        public Task<List<StaffSchedule>> GetDoctorShiftsAsync(DateOnly date, int? doctorId) => GetDoctorShiftsInRangeAsync(date, date, doctorId);
+
+        public async Task<List<StaffSchedule>> GetDoctorShiftsInRangeAsync(DateOnly from, DateOnly to, int? doctorId)
         {
             // Doctor role ids, joined through Identity tables
             var doctorUserIds = from ur in _context.UserRoles
@@ -191,7 +196,7 @@ namespace OZE.Persistence.Repositories
                 .AsNoTracking()
                 .Include(x => x.StaffProfile)
                 .Include(x => x.Room)
-                .Where(x => x.ScheduleDate == date
+                .Where(x => x.ScheduleDate >= from && x.ScheduleDate <= to
                     && x.IsPresent != false
                     && x.ActualEndTime == null
                     && x.StaffProfile.IsActive
@@ -203,7 +208,7 @@ namespace OZE.Persistence.Repositories
                 shifts = shifts.Where(x => x.StaffProfileId == doctorId);
             }
 
-            return await shifts.OrderBy(x => x.ShiftStart).ToListAsync();
+            return await shifts.OrderBy(x => x.ScheduleDate).ThenBy(x => x.ShiftStart).ToListAsync();
         }
 
         public async Task SaveChangesAsync()

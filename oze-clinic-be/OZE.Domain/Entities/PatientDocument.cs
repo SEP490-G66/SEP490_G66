@@ -13,6 +13,11 @@ namespace OZE.Domain.Entities
         public string? MimeType { get; set; }
         public string? Description { get; set; }
         public string? UploadedByUserId { get; set; }
+        // A document the patient brought from elsewhere ("Cung cấp tài liệu"): every file of one upload shares
+        // UploadGroupId; Description holds the document name, DocumentType is ProvidedDocumentConstants.DocumentType
+        public Guid? UploadGroupId { get; set; }
+        public string? ProviderAddress { get; set; }
+        public DateOnly? PerformedOn { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
 
         public virtual Patient Patient { get; set; } = null!;

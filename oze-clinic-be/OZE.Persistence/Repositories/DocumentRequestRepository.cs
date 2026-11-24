@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OZE.Application.Interfaces;
+using OZE.Common.Constants;
 using OZE.Domain.Entities;
 using OZE.Persistence.DbContexts;
 
@@ -70,6 +71,29 @@ namespace OZE.Persistence.Repositories
         public void AddDocuments(IEnumerable<PatientDocument> documents)
         {
             _context.PatientDocuments.AddRange(documents);
+        }
+
+        public Task<List<PatientDocument>> GetProvidedByPatientIdAsync(int patientId, CancellationToken cancellationToken = default)
+        {
+            return _context.PatientDocuments
+                .AsNoTracking()
+                .Where(x => x.PatientId == patientId && x.UploadGroupId != null && x.DocumentType == ProvidedDocumentConstants.DocumentType)
+                .OrderByDescending(x => x.CreatedAt)
+                .ThenBy(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<PatientDocument>> GetProvidedGroupAsync(Guid groupId, CancellationToken cancellationToken = default)
+        {
+            return _context.PatientDocuments
+                .Include(x => x.Patient)
+                .Where(x => x.UploadGroupId == groupId && x.DocumentType == ProvidedDocumentConstants.DocumentType)
+                .ToListAsync(cancellationToken);
+        }
+
+        public void RemoveDocuments(IEnumerable<PatientDocument> documents)
+        {
+            _context.PatientDocuments.RemoveRange(documents);
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -23,6 +23,8 @@ namespace OZE.Application.Interfaces
 
         // Service variants
         Task<List<ServiceVariant>> GetVariantsByServiceIdAsync(int serviceId, CancellationToken cancellationToken = default);
+        // Every service code, to find the next free one
+        Task<List<string>> GetServiceCodesAsync(CancellationToken cancellationToken = default);
         Task<ServiceVariant?> GetVariantByIdAsync(int serviceId, int variantId, CancellationToken cancellationToken = default);
         Task<bool> VariantCodeExistsAsync(string variantCode, int? excludeId = null, CancellationToken cancellationToken = default);
         // The variant is in an appointment of the given day or later that is not finished yet

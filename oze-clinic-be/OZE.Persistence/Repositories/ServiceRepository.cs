@@ -140,6 +140,11 @@ namespace OZE.Persistence.Repositories
                 _ => parameters.SortDescending ? query.OrderByDescending(s => s.Id) : query.OrderBy(s => s.Id)
             };
 
+            if (parameters.IncludeVariants)
+            {
+                query = query.Include(s => s.Variants).AsSplitQuery();
+            }
+
             var items = await query
                 .Skip((parameters.PageNumber - 1) * parameters.PageSize)
                 .Take(parameters.PageSize)
@@ -186,6 +191,11 @@ namespace OZE.Persistence.Repositories
         {
             _context.Services.Remove(service);
             return Task.CompletedTask;
+        }
+
+        public Task<List<string>> GetServiceCodesAsync(CancellationToken cancellationToken = default)
+        {
+            return _context.Services.AsNoTracking().Select(s => s.ServiceCode).ToListAsync(cancellationToken);
         }
 
         public async Task<List<ServiceVariant>> GetVariantsByServiceIdAsync(int serviceId, CancellationToken cancellationToken = default)
