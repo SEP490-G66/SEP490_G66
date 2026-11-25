@@ -1,32 +1,45 @@
+# Git
 **/.git
 **/.github
+
+# IDE
 **/.vs
 **/.vs_old
 **/.vscode
-**/bin
-**/obj
+**/.idea
 **/*.user
 **/*.suo
-**/*.db
-**/*.log
-Dockerfile*
-docker-compose*.yml
-README.md
-docs/
 
-# Tests are not part of the deployed image
+# Build artifacts
+**/bin
+**/obj
+**/TestResults
+
+# Not needed in the image
 OZE.UnitTest/
 OZE.ProjectBase/
+docs/
 
-# Secrets and local settings
-.env
-.env.*
-!.env.example
-**/appsettings.Development.json
+# Local databases, logs and uploads
+**/*.db
+**/*.log
+**/App_Data
+
+# Environment files and secrets
+**/.env
+**/.env.*
+**/secrets.json
 **/*.pfx
 **/*.pem
 **/*.key
 **/*.crt
+**/appsettings.Development.json
+**/appsettings.Local.json
 
-# Files uploaded while running locally
-**/App_Data
+# Docker configuration
+Dockerfile*
+docker-compose*.yml
+docker-compose*.yaml
+
+# Documentation
+README.md
