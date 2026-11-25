@@ -134,7 +134,7 @@ namespace OZE.Application.Services
                     return patient;
                 }, selfBooking: true);
 
-            await SendBookingNotificationAsync(phone, email, patient.FullName, appointment, lines);
+            await SendBookingEmailAsync(appointment, email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: false);
             await NotifyNewOnlineBookingAsync(appointment, patient);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
@@ -160,14 +160,7 @@ namespace OZE.Application.Services
                 initialStatus: initialStatus, selfBooking: true);
 
             // A confirmed booking must not say "the receptionist will call to confirm"
-            if (returning)
-            {
-                await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
-            }
-            else
-            {
-                await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
-            }
+            await SendBookingEmailAsync(appointment, patient.Email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: returning);
 
             if (returning)
             {
@@ -240,32 +233,47 @@ namespace OZE.Application.Services
                     return patient;
                 }, initialStatus: AppointmentConstants.ConfirmedStatus);
 
-            await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
+            await SendBookingEmailAsync(appointment, patient.Email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: true);
             await NotifyAsync(n => n.NotifyPatientAsync(patient.Id, Content(NotificationConstants.Text.AppointmentBookedByClinicTitle, NotificationConstants.Text.AppointmentBookedByClinicMessage, appointment)));
             await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
         }
 
-        // Email for a booking that is CONFIRMED when it is made (by the receptionist, or by a returning patient)
-        private async Task SendConfirmedBookingNotificationAsync(
-            string? phone, string? email, string? patientName, Appointment appointment, List<BookingLine> lines)
+        // Booking email to the patient: "confirmed" when the visit is CONFIRMED, otherwise "request received, we will call".
+        // The appointment is already saved, so a failed email is only logged and never undoes it
+        private async Task SendBookingEmailAsync(
+            Appointment appointment, string? email, string? patientName, IEnumerable<string?> serviceNames, bool confirmed)
         {
-            var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
-            var message = PatientEmailTemplates.AppointmentConfirmed(
-                patientName, serviceNames, appointment.AppointmentDate, appointment.TimeSlotStart);
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return;
+            }
+
+            var services = string.Join(", ", serviceNames);
+            var message = confirmed
+                ? PatientEmailTemplates.AppointmentConfirmed(patientName, services, appointment.AppointmentDate, appointment.TimeSlotStart)
+                : PatientEmailTemplates.AppointmentRequest(patientName, services, appointment.AppointmentDate, appointment.TimeSlotStart);
+            var subject = confirmed
+                ? PatientEmailTemplates.SubjectAppointmentConfirmed
+                : PatientEmailTemplates.SubjectAppointmentRequest;
             try
             {
-                if (!string.IsNullOrWhiteSpace(email))
-                {
-                    await _emailSender.SendEmailAsync(email, PatientEmailTemplates.SubjectAppointmentConfirmed, message);
-                }
+                await _emailSender.SendEmailAsync(email, subject, message);
             }
-            catch
+            catch (Exception ex)
             {
-                // The booking is saved; a failed message must not undo it
+                _logger.LogWarning(ex, "Could not send the booking email for appointment {AppointmentId}", appointment.Id);
             }
         }
+
+        // Confirmation email for an existing appointment (confirmed by the receptionist, rescheduled, follow-up)
+        private Task SendConfirmationEmailAsync(Appointment appointment) =>
+            SendBookingEmailAsync(appointment, appointment.Patient?.Email, appointment.Patient?.FullName,
+                appointment.ServiceItems.Select(i => i.Variant == null
+                    ? i.Service?.ServiceName
+                    : $"{i.Service?.ServiceName} - {i.Variant.VariantName}"),
+                confirmed: true);
 
         // Re-checks the slot and saves the appointment in one serializable transaction;
         // getPatientAsync runs inside it so a new patient record is saved together with the appointment
@@ -344,12 +352,12 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(date <= rules.LastDay, ErrorConstants.AppointmentMessage.TooFarAhead);
 
             // Only shifts in the kind of room the services need (a general treatment room when they ask for none)
-            var shifts = (await _appointmentRepository.GetDoctorShiftsAsync(date, doctorId))
+            var shifts = (await _appointmentRepository.GetDoctorShiftsInRangeAsync(date, date, doctorId))
                 .Where(x => x.Room!.RoomType == rules.RequiredRoomType)
                 .ToList();
 
             var doctorIds = shifts.Select(x => x.StaffProfileId).Distinct().ToList();
-            var booked = (await _appointmentRepository.GetActiveAppointmentsAsync(date, doctorIds))
+            var booked = (await _appointmentRepository.GetActiveAppointmentsInRangeAsync(date, date, doctorIds))
                 .Where(a => a.Id != excludeAppointmentId)
                 .ToList();
 
@@ -464,7 +472,7 @@ namespace OZE.Application.Services
         private async Task<AvailableSlotResponse> PickLeastBusyAsync(List<AvailableSlotResponse> candidates, DateOnly date)
         {
             var doctorIds = candidates.Select(x => x.DoctorId).Distinct().ToList();
-            var booked = await _appointmentRepository.GetActiveAppointmentsAsync(date, doctorIds);
+            var booked = await _appointmentRepository.GetActiveAppointmentsInRangeAsync(date, date, doctorIds);
 
             return candidates
                 .OrderBy(c => booked.Count(a => a.DoctorId == c.DoctorId))
@@ -541,32 +549,6 @@ namespace OZE.Application.Services
             return value!;
         }
 
-        // A failed notification must not undo the confirmation, so errors are only logged
-        private async Task SendConfirmationNotificationAsync(Appointment appointment)
-        {
-            var serviceNames = string.Join(", ", appointment.ServiceItems.Select(i => i.Variant == null
-                ? i.Service?.ServiceName
-                : $"{i.Service?.ServiceName} - {i.Variant.VariantName}"));
-            var message = PatientEmailTemplates.AppointmentConfirmed(
-                appointment.Patient?.FullName,
-                serviceNames,
-                appointment.AppointmentDate,
-                appointment.TimeSlotStart);
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(appointment.Patient?.Email))
-                {
-                    await _emailSender.SendEmailAsync(
-                        appointment.Patient.Email,
-                        PatientEmailTemplates.SubjectAppointmentConfirmed,
-                        message);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not send the confirmation notification for appointment {AppointmentId}", appointment.Id);
-            }
-        }
 
         private async Task<int> GetIntConfigAsync(string configKey)
         {
@@ -576,31 +558,6 @@ namespace OZE.Application.Services
             return result;
         }
 
-        // A failed notification must not undo the booking, so errors are only logged
-        private async Task SendBookingNotificationAsync(
-            string? phone, string? email, string? patientName, Appointment appointment, List<BookingLine> lines)
-        {
-            var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
-            var message = PatientEmailTemplates.AppointmentRequest(
-                patientName,
-                serviceNames,
-                appointment.AppointmentDate,
-                appointment.TimeSlotStart);
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(email))
-                {
-                    await _emailSender.SendEmailAsync(
-                        email,
-                        PatientEmailTemplates.SubjectAppointmentRequest,
-                        message);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not send the booking notification for appointment {AppointmentId}", appointment.Id);
-            }
-        }
 
         // Same format as AuthService.GeneratePatientCode
         private static string GeneratePatientCode()
@@ -857,7 +814,7 @@ namespace OZE.Application.Services
 
             if (!isPatient)
             {
-                await SendConfirmationNotificationAsync(appointment);
+                await SendConfirmationEmailAsync(appointment);
             }
 
             var patientName = appointment.Patient?.FullName;
@@ -899,7 +856,7 @@ namespace OZE.Application.Services
             await _appointmentRepository.UpdateAsync(appointment);
             await _auditLogService.LogAsync(AuditConstants.AppointmentConfirmed, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 new { Status = oldStatus }, new { appointment.Status });
-            await SendConfirmationNotificationAsync(appointment);
+            await SendConfirmationEmailAsync(appointment);
             await NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
                 Content(NotificationConstants.Text.AppointmentConfirmedTitle, NotificationConstants.Text.AppointmentConfirmedMessage, appointment), cancellationToken));
             await NotifyDoctorOfNewAppointmentAsync(appointment, appointment.Patient?.FullName);
@@ -1265,7 +1222,7 @@ namespace OZE.Application.Services
         // A booked patient belongs to the shift of the booked time even when arriving during an earlier shift.
         private async Task<StaffSchedule?> FindDoctorShiftAsync(int doctorId, DateOnly date, TimeOnly? slot, string requiredRoomType)
         {
-            var shifts = (await _appointmentRepository.GetDoctorShiftsAsync(date, doctorId) ?? new List<StaffSchedule>())
+            var shifts = (await _appointmentRepository.GetDoctorShiftsInRangeAsync(date, date, doctorId) ?? new List<StaffSchedule>())
                 .Where(x => x.Room?.RoomType == requiredRoomType)
                 .ToList();
             var now = TimeOnly.FromDateTime(ClinicClock.Now);
@@ -1741,7 +1698,7 @@ namespace OZE.Application.Services
             originalAppointment.Examination.UpdatedAt = DateTimeOffset.UtcNow;
 
             // Send instant confirmation notification via SMS/Email to patient
-            await SendConfirmationNotificationAsync(appointment);
+            await SendConfirmationEmailAsync(appointment);
 
             await _appointmentRepository.SaveChangesAsync();
             await NotifyAsync(n => n.NotifyPatientAsync(originalAppointment.PatientId,

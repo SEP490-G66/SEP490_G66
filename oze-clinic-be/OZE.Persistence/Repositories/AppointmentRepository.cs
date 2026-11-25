@@ -88,9 +88,6 @@ namespace OZE.Persistence.Repositories
             return false;
         }
 
-        public Task<List<Appointment>> GetActiveAppointmentsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds) =>
-            GetActiveAppointmentsInRangeAsync(date, date, doctorIds);
-
         public async Task<List<Appointment>> GetActiveAppointmentsInRangeAsync(DateOnly from, DateOnly to, IReadOnlyCollection<int> doctorIds)
         {
             return await _context.Appointments
@@ -153,7 +150,6 @@ namespace OZE.Persistence.Repositories
                         .ThenInclude(x => x!.Doctor)
                 .Include(x => x.ParentAppointment)
                     .ThenInclude(x => x!.Examination)
-                .Include(x => x.Examination)
                 .Include(x => x.QueueEntries)
                     .ThenInclude(x => x.Room)
                 .Where(x => x.DoctorId != null && doctorIds.Contains(x.DoctorId.Value)
@@ -181,8 +177,6 @@ namespace OZE.Persistence.Repositories
             return await _context.StaffSchedules
                 .AnyAsync(x => x.StaffProfileId == doctorId && x.ScheduleDate == date && x.ActualEndTime != null);
         }
-
-        public Task<List<StaffSchedule>> GetDoctorShiftsAsync(DateOnly date, int? doctorId) => GetDoctorShiftsInRangeAsync(date, date, doctorId);
 
         public async Task<List<StaffSchedule>> GetDoctorShiftsInRangeAsync(DateOnly from, DateOnly to, int? doctorId)
         {

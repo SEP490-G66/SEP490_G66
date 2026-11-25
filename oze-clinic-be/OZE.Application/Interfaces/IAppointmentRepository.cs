@@ -10,13 +10,11 @@ namespace OZE.Application.Interfaces
 {
     public interface IAppointmentRepository
     {
-        // Shifts still open: a shift the doctor has ended is not offered any more
-        Task<List<StaffSchedule>> GetDoctorShiftsAsync(DateOnly date, int? doctorId);
         // True when the doctor has ended a shift on that date
         Task<bool> HasEndedShiftAsync(int doctorId, DateOnly date);
-        Task<List<Appointment>> GetActiveAppointmentsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds);
-        // Same as the two above for every day from..to in one query each (the booking calendar's free-slot counts)
+        // Doctor shifts still open from..to (pass from = to for one day): a shift the doctor has ended is not offered any more
         Task<List<StaffSchedule>> GetDoctorShiftsInRangeAsync(DateOnly from, DateOnly to, int? doctorId);
+        // Appointments that still hold a slot (not cancelled or no-show) from..to (pass from = to for one day)
         Task<List<Appointment>> GetActiveAppointmentsInRangeAsync(DateOnly from, DateOnly to, IReadOnlyCollection<int> doctorIds);
         Task<string?> GetConfigValueAsync(string configKey);
         Task AddPatientAsync(Patient patient);

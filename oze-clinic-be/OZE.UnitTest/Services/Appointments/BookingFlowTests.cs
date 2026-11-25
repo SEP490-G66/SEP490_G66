@@ -60,7 +60,7 @@ namespace OZE.UnitTest.Services.Appointments
         [Fact]
         public async Task GetAvailableSlotsAsync_ShouldSkipBookedSlot()
         {
-            _appointmentRepoMock.Setup(r => r.GetActiveAppointmentsAsync(Tomorrow, It.IsAny<IReadOnlyCollection<int>>()))
+            _appointmentRepoMock.Setup(r => r.GetActiveAppointmentsInRangeAsync(Tomorrow, Tomorrow, It.IsAny<IReadOnlyCollection<int>>()))
                 .ReturnsAsync(new List<Appointment> { new() { DoctorId = DoctorId, TimeSlotStart = new TimeOnly(8, 30), TimeSlotEnd = new TimeOnly(9, 0) } });
 
             var result = await _service.GetAvailableSlotsAsync(Query(Tomorrow));
@@ -427,7 +427,7 @@ namespace OZE.UnitTest.Services.Appointments
         [Fact]
         public async Task CreateWalkInAsync_ShouldThrow_WhenDoctorHasNoShiftToday()
         {
-            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsAsync(Today, DoctorId)).ReturnsAsync(new List<StaffSchedule>());
+            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsInRangeAsync(Today, Today, DoctorId)).ReturnsAsync(new List<StaffSchedule>());
 
             var act = () => _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
 
