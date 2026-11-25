@@ -105,6 +105,66 @@ export const CONSULTATION_TEXT = {
     SEND_FAILED: "Không gửi được yêu cầu. Vui lòng thử lại hoặc gọi phòng khám.",
 };
 
+export const CONSULTATION_HANDLE_NOTE_MAX_LENGTH = 500;
+
+export const CONSULTATION_RECEPTION_TEXT = {
+    TITLE: "Yêu cầu tư vấn",
+    CRUMB: "Chăm sóc khách hàng",
+    DOC_TITLE: "Yêu cầu tư vấn – OZE",
+    DESCRIPTION: "Khách để lại số điện thoại trên trang web. Gọi lại tư vấn, rồi đặt lịch cho khách.",
+    SEARCH: "Tìm",
+    SEARCH_PLACEHOLDER: "Tên hoặc số điện thoại",
+    STATUS_FILTER: "Trạng thái",
+    STATUS_ALL: "Tất cả",
+    STATUS: { New: "Chưa tư vấn", Contacted: "Đã tư vấn", Booked: "Đã đặt lịch", Closed: "Không liên lạc được" },
+    COLUMNS: { NO: "STT", SENDER: "Người gửi", SENT_AT: "Thời gian gửi", PHONE: "SĐT", STATUS: "Trạng thái", ACTIONS: "Thao tác" },
+    ACTION_CONTACTED: "Đã tư vấn",
+    ACTION_BOOK: "Đặt lịch",
+    MORE: (name) => `Thao tác khác với yêu cầu của ${name}`,
+    MENU_DETAIL: "Xem chi tiết",
+    MENU_CLOSED: "Không liên lạc được",
+    CONTACTED_TITLE: "Xác nhận đã tư vấn",
+    CLOSED_TITLE: "Đánh dấu không liên lạc được",
+    DIALOG_SUBTITLE: (name, phone) => `${name} · ${phone}`,
+    NOTE: "Ghi chú",
+    OPTIONAL: "(không bắt buộc)",
+    CLOSED_NOTE_PLACEHOLDER: "Ví dụ: gọi 3 lần không bắt máy",
+    CLOSED_NOTE_REQUIRED: "Vui lòng nhập ghi chú cho lần gọi này.",
+    CANCEL: "Hủy",
+    CONFIRM: "Xác nhận",
+    CLOSE: "Đóng",
+    DETAIL_TITLE: "Chi tiết yêu cầu tư vấn",
+    DETAIL: {
+        NAME: "Họ tên",
+        PHONE: "Số điện thoại",
+        EMAIL: "Email",
+        NOTE: "Nội dung cần tư vấn",
+        SENT_AT: "Thời gian gửi",
+        STATUS: "Trạng thái",
+        HANDLED: "Xử lý gần nhất",
+        HANDLED_BY: "Người xử lý",
+        HANDLED_AT: "Thời điểm xử lý",
+        HANDLE_NOTE: "Ghi chú của lễ tân",
+    },
+    EMPTY_VALUE: "—",
+    EMPTY_TITLE: "Chưa có yêu cầu tư vấn nào",
+    EMPTY_TEXT: "Khách gửi form \"Đăng ký tư vấn\" ở trang Liên hệ thì yêu cầu hiện ở đây.",
+    EMPTY_FILTERED: "Không có yêu cầu nào khớp bộ lọc.",
+    LOAD_ERROR: "Không tải được danh sách yêu cầu tư vấn.",
+    RETRY: "Thử lại",
+    RANGE: (from, to, total) => `Hiển thị ${from}–${to} trên ${total} yêu cầu`,
+    PAGINATION_LABEL: "Phân trang yêu cầu tư vấn",
+    CONTACTED_DONE: (name) => `Đã ghi nhận đã tư vấn cho ${name}.`,
+    CLOSED_DONE: (name) => `Đã đánh dấu không liên lạc được với ${name}.`,
+    BOOKED_NOTE: (slot, date) => `Đặt lịch ${slot} ngày ${date}`,
+    BOOKED_DONE: (name, time, date) => `Đã đặt lịch cho ${name} lúc ${time} ngày ${date}.`,
+    BOOKED_NOT_SAVED_TITLE: "Chưa cập nhật trạng thái",
+    BOOKED_NOT_SAVED: (name, time, date) => `Đã đặt lịch cho ${name} lúc ${time} ngày ${date}, nhưng chưa cập nhật được trạng thái yêu cầu tư vấn.`,
+    BOOKED_RETRY: "Cập nhật lại",
+    NOT_FOUND: "Không tìm thấy yêu cầu tư vấn này. Danh sách đã được tải lại.",
+    SAVE_FAILED: "Chưa lưu được. Vui lòng thử lại.",
+};
+
 export const CANCEL_REASON_MAX_LENGTH = 500;
 
 export const RESCHEDULE_REASON_MAX_LENGTH = 500;
@@ -1469,7 +1529,7 @@ export const SLOT_PICKER_TEXT = {
 
 export const FOLLOW_UP_TEXT = {
     TITLE: "Nhắc tái khám",
-    CRUMB: "Bệnh nhân",
+    CRUMB: "Chăm sóc khách hàng",
     DOC_TITLE: "Nhắc tái khám – OZE",
     DESCRIPTION: "Bệnh nhân bác sĩ đã hẹn quay lại tái khám",
     NEED_COUNT: (count) => ` · ${count} lượt cần xử lý`,

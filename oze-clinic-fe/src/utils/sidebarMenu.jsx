@@ -4,6 +4,7 @@ import {
     CalendarDays,
     ChartColumn,
     ClipboardList,
+    HeartHandshake,
     History,
     Image,
     Landmark,
@@ -116,6 +117,14 @@ const SIDEBAR_MENU = {
             icon: Users,
             children: [
                 { key: "patient-list", label: "Hồ sơ bệnh nhân", to: ROUTES.RECEPTION_PATIENTS },
+            ],
+        },
+        {
+            key: "customer-care",
+            label: "Chăm sóc khách hàng",
+            icon: HeartHandshake,
+            children: [
+                { key: "consultations", label: "Yêu cầu tư vấn", to: ROUTES.RECEPTION_CONSULTATIONS },
                 { key: "follow-ups", label: "Nhắc tái khám", to: ROUTES.RECEPTION_FOLLOW_UPS },
             ],
         },
