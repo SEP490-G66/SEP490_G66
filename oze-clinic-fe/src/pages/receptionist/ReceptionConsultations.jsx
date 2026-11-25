@@ -39,8 +39,7 @@ const searchKeyword = (value) => {
     const full = subscriberDigits(text);
     if (full) return full;
     const compact = text.replace(/[\s.-]/g, "");
-    const rest = compact.startsWith("+84") ? compact.slice(3) : compact.startsWith("0") ? compact.slice(1) : compact;
-    return rest || compact;
+    return compact.startsWith("+84") ? compact.slice(3) : compact.startsWith("0") ? compact.slice(1) : compact;
 };
 
 const StatusBadge = ({ status }) => <span className={cx("badge", BADGE[status] ?? "badge-neutral")}>{TEXT.STATUS[status] ?? status}</span>;
@@ -83,6 +82,7 @@ const NoteDialog = ({ item, title, required, placeholder, onClose, onSubmit }) =
                         maxLength={NOTE_MAX}
                         placeholder={placeholder}
                         value={note}
+                        aria-required={required || undefined}
                         aria-invalid={Boolean(error) || undefined}
                         aria-describedby={error ? "cs-note-error" : undefined}
                         onChange={(event) => {
@@ -193,6 +193,8 @@ const ReceptionConsultations = () => {
     const [dialog, setDialog] = useState(null);
     const timer = useRef(null);
     const bookedFor = useRef(null);
+    const bookingRun = useRef(0);
+    const openDialog = useRef(null);
 
     usePageTitle(TEXT.DOC_TITLE);
 
@@ -201,7 +203,14 @@ const ReceptionConsultations = () => {
     useEffect(() => {
         let active = true;
         getConsultations({ status: filters.status, keyword: searchKeyword(filters.keyword), page: filters.page, pageSize: PAGE_SIZE }).then((response) => {
-            if (active) setResult({ key: requestKey, ok: response.success, data: response.success ? response.data : null });
+            if (!active) return;
+            const data = response.success ? response.data : null;
+            const lastPage = Number(data?.totalPages ?? 0);
+            if (data && !data.items?.length && filters.page > 1 && lastPage >= 1 && lastPage !== filters.page) {
+                setFilters((f) => (f.page === filters.page ? { ...f, page: lastPage } : f));
+                return;
+            }
+            setResult({ key: requestKey, ok: response.success, data });
         });
         return () => {
             active = false;
@@ -210,13 +219,15 @@ const ReceptionConsultations = () => {
 
     useEffect(() => () => clearTimeout(timer.current), []);
 
+    useEffect(() => {
+        openDialog.current = dialog;
+    }, [dialog]);
+
     const current = result?.key === requestKey ? result : null;
     const items = current?.data?.items ?? [];
     const total = Number(current?.data?.totalCount ?? 0);
     const totalPages = Number(current?.data?.totalPages ?? Math.ceil(total / PAGE_SIZE));
-    const outOfRange = Boolean(current?.ok) && items.length === 0 && filters.page > 1;
-    if (outOfRange) setFilters((f) => ({ ...f, page: Math.max(1, totalPages) }));
-    const status = !current || outOfRange ? "loading" : current.ok ? "ready" : "error";
+    const status = !current ? "loading" : current.ok ? "ready" : "error";
 
     const refresh = () => setReload((n) => n + 1);
     const close = () => setDialog(null);
@@ -224,7 +235,10 @@ const ReceptionConsultations = () => {
     const onSearch = (value) => {
         setSearch(value);
         clearTimeout(timer.current);
-        timer.current = setTimeout(() => setFilters((f) => ({ ...f, keyword: value.trim(), page: 1 })), SEARCH_DELAY_MS);
+        timer.current = setTimeout(() => {
+            const keyword = value.trim();
+            setFilters((f) => (f.keyword === keyword ? f : { ...f, keyword, page: 1 }));
+        }, SEARCH_DELAY_MS);
     };
 
     const open = (type, item) => {
@@ -249,21 +263,28 @@ const ReceptionConsultations = () => {
         toast.error(TEXT.SAVE_FAILED);
     };
 
-    const saveBooked = async (item, booked, retry) => {
+    const saveBooked = async (item, booked, run) => {
         const response = await handleConsultation(item.id, { status: "Booked", note: booked.note });
         refresh();
+        const shown = openDialog.current;
+        const mine = shown?.type === "bookedRetry" && shown.run === run;
+        const free = mine || shown === null;
         if (response.success) {
             toast.success(TEXT.BOOKED_DONE(booked.name, booked.time, booked.date), { role: "status" });
-            close();
+            if (mine) close();
             return;
         }
         if (response.status === 404) {
             toast.error(TEXT.NOT_FOUND);
-            close();
+            if (mine) close();
             return;
         }
-        if (retry) toast.error(TEXT.SAVE_FAILED);
-        setDialog({ type: "bookedRetry", item, booked });
+        if (!free) {
+            toast.error(TEXT.BOOKED_NOT_SAVED(booked.name, booked.time, booked.date));
+            return;
+        }
+        if (mine) toast.error(TEXT.SAVE_FAILED);
+        setDialog({ type: "bookedRetry", item, booked, run });
     };
 
     const onBooked = (item, appointment) => {
@@ -277,7 +298,8 @@ const ReceptionConsultations = () => {
             date,
             note: TEXT.BOOKED_NOTE(slotText(appointment), date),
         };
-        saveBooked(item, booked, false);
+        bookingRun.current += 1;
+        saveBooked(item, booked, bookingRun.current);
     };
 
     const filtered = Boolean(filters.status || filters.keyword);
@@ -440,7 +462,7 @@ const ReceptionConsultations = () => {
                     onBooked={(appointment) => onBooked(item, appointment)}
                 />
             )}
-            {dialog?.type === "bookedRetry" && <BookedRetryDialog booked={dialog.booked} onClose={close} onRetry={() => saveBooked(item, dialog.booked, true)} />}
+            {dialog?.type === "bookedRetry" && <BookedRetryDialog booked={dialog.booked} onClose={close} onRetry={() => saveBooked(item, dialog.booked, dialog.run)} />}
         </div>
     );
 };
