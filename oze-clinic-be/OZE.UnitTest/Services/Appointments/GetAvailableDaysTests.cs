@@ -68,7 +68,8 @@ namespace OZE.UnitTest.Services.Appointments
             result[2].IsWorkingDay.Should().BeFalse();
             _appointmentRepoMock.Verify(r => r.GetDoctorShiftsInRangeAsync(day1, day3, null), Times.Once);
             _appointmentRepoMock.Verify(r => r.GetActiveAppointmentsInRangeAsync(day1, day3, It.IsAny<IReadOnlyCollection<int>>()), Times.Once);
-            _appointmentRepoMock.Verify(r => r.GetDoctorShiftsAsync(It.IsAny<DateOnly>(), It.IsAny<int?>()), Times.Never);
+            // One query for the whole range, no extra per-day query
+            _appointmentRepoMock.Verify(r => r.GetDoctorShiftsInRangeAsync(It.IsAny<DateOnly>(), It.IsAny<DateOnly>(), It.IsAny<int?>()), Times.Once);
         }
 
         [Fact]
