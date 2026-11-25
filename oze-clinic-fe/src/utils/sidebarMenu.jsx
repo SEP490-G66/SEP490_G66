@@ -121,7 +121,7 @@ const SIDEBAR_MENU = {
         },
         {
             key: "customer-care",
-            label: "Chăm sóc khách hàng",
+            label: "CSKH",
             icon: HeartHandshake,
             children: [
                 { key: "consultations", label: "Yêu cầu tư vấn", to: ROUTES.RECEPTION_CONSULTATIONS },
@@ -147,11 +147,16 @@ const SIDEBAR_MENU = {
                 { key: "invoice-list", label: "Hóa đơn", to: ROUTES.RECEPTION_INVOICE_LIST },
                 { key: "debts", label: "Công nợ", to: ROUTES.RECEPTION_DEBTS },
                 { key: "refunds", label: "Hoàn tiền", to: ROUTES.RECEPTION_REFUNDS },
+            ],
+        },
+        {
+            ...WORK_GROUP,
+            children: [
+                ...WORK_GROUP.children,
                 { key: "cash-handover", label: "Phiếu giao ca", to: ROUTES.RECEPTION_CASH_HANDOVER },
                 { key: "reconciliation", label: "Đối soát cuối ngày", to: ROUTES.RECEPTION_RECONCILIATION },
             ],
         },
-        WORK_GROUP,
         ACCOUNT_GROUP,
     ],
     [USER_ROLES.PATIENT]: [
