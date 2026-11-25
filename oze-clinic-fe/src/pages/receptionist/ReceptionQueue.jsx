@@ -33,6 +33,7 @@ import {
 } from "@/utils/queueBoard";
 import { QUEUE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
+import { fitsRoomTypes } from "@/utils/constants/room";
 import { cx } from "@/utils/cx";
 
 const REFRESH_MS = 20_000;
@@ -172,9 +173,10 @@ const ReceptionQueue = () => {
         document.getElementById(`queue-tab-${next}`)?.focus();
     };
 
-    const targetsFor = (fromKey) =>
+    // Only rooms working now, of the kind the patients' services need (the backend refuses any other)
+    const targetsFor = (fromKey, rows = []) =>
         allRooms
-            .filter((r) => r.tab === roomOf.get(fromKey)?.tab && r.key !== fromKey && r.active)
+            .filter((r) => r.tab === roomOf.get(fromKey)?.tab && r.key !== fromKey && r.active && fitsRoomTypes(r.roomTypes, ...rows.map((row) => row.requiredRoomType)))
             .map((r) => ({ ...r, waiting: waitingCount(allRows, r.key) }));
 
     // Rows still waiting in that room now (not the ones seen when the dialog opened)
@@ -471,7 +473,7 @@ const ReceptionQueue = () => {
             {dialog?.type === "move" && (
                 <QueueMoveDialog
                     rows={dialog.rows}
-                    targets={targetsFor(dialog.from)}
+                    targets={targetsFor(dialog.from, liveRows(dialog.rows, dialog.from))}
                     defaultReason={dialog.reason}
                     onClose={() => setDialog(null)}
                     onSubmit={(choice) => moveRows(dialog.rows, dialog.from, choice)}

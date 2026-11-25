@@ -1,5 +1,6 @@
 import { STATUS_LABEL, ddmm, hhmm } from "@/components/reception/receptionUtils";
 import { normalizeText } from "./format";
+import { roomTypesByDoctor } from "./constants/room";
 import { PATIENT_RECORD_TEXT as TEXT } from "./messages";
 import { RECEPTION_PATIENT_QUERY as Q, RECEPTION_PATIENT_TABS } from "./routes";
 
@@ -270,23 +271,24 @@ const shiftEndOf = (shift) => {
 
 export const onDutyDoctors = (shifts, now) => {
     const map = new Map();
-    (shifts ?? [])
-        .filter((s) => (s.status === "Working" || s.status === "NotStarted") && shiftEndOf(s) > now)
-        .forEach((s) => {
-            const rank = SHIFT_RANK[s.status];
-            const known = map.get(s.doctorId);
-            if (known && (known.rank < rank || (known.rank === rank && hhmm(s.shiftStart) > known.start))) return;
-            map.set(s.doctorId, {
-                id: s.doctorId,
-                name: s.doctorName,
-                room: s.roomName,
-                status: s.status,
-                rank,
-                shift: `${hhmm(s.shiftStart)}–${hhmm(s.shiftEnd)}`,
-                start: hhmm(s.shiftStart),
-                end: hhmm(s.shiftEnd),
-            });
+    const open = (shifts ?? []).filter((s) => (s.status === "Working" || s.status === "NotStarted") && shiftEndOf(s) > now);
+    const roomTypesOf = roomTypesByDoctor(open);
+    open.forEach((s) => {
+        const rank = SHIFT_RANK[s.status];
+        const known = map.get(s.doctorId);
+        if (known && (known.rank < rank || (known.rank === rank && hhmm(s.shiftStart) > known.start))) return;
+        map.set(s.doctorId, {
+            id: s.doctorId,
+            name: s.doctorName,
+            room: s.roomName,
+            status: s.status,
+            rank,
+            shift: `${hhmm(s.shiftStart)}–${hhmm(s.shiftEnd)}`,
+            start: hhmm(s.shiftStart),
+            end: hhmm(s.shiftEnd),
+            roomTypes: roomTypesOf.get(s.doctorId) ?? [],
         });
+    });
     return [...map.values()];
 };
 

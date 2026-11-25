@@ -7,6 +7,7 @@ import { PRIORITY_LABEL, STATUS_LABEL, dmy, hhmm, slotText, useSubmit } from "./
 import { cx } from "@/utils/cx";
 import { PATIENT_RECORD_TEXT, RESCHEDULE_TEXT, WALK_IN_TEXT } from "@/utils/messages";
 import { genderOf, phoneDisplay, walkInName } from "@/utils/patientRecord";
+import { ROOM_TYPES, fitsRoomTypes } from "@/utils/constants/room";
 
 // Shared pieces of the receptionist pages: formatting, status labels, page and card frames, and the dialogs.
 
@@ -957,4 +958,8 @@ const NewWalkInDialog = ({ doctors, waiting, onClose, onSubmit }) => {
     );
 };
 
-export const WalkInDialog = ({ patient, ...props }) => (patient ? <PatientWalkInDialog patient={patient} {...props} /> : <NewWalkInDialog {...props} />);
+// A walk-in is booked for the general exam only, so only doctors in a general treatment room can take them
+export const WalkInDialog = ({ patient, doctors = [], ...props }) => {
+    const suitable = doctors.filter((d) => fitsRoomTypes(d.roomTypes, ROOM_TYPES.GENERAL_TREATMENT));
+    return patient ? <PatientWalkInDialog patient={patient} doctors={suitable} {...props} /> : <NewWalkInDialog doctors={suitable} {...props} />;
+};

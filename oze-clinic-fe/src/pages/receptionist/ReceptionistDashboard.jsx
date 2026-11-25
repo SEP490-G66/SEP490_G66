@@ -35,6 +35,7 @@ import { allergiesOf, appointmentMenu, isDoctorAway, isLate as lateAt, matchesKe
 import { confirmStateOf, shortDate, sortByVisit } from "@/utils/confirmAppointments";
 import { CHECK_IN_TEXT, CONFIRM_TEXT, DASHBOARD_TEXT as TEXT, QUEUE_TEXT } from "@/utils/messages";
 import { NO_DOCTOR_KEY, entryRows, examRooms, examRows, orderRows, otherRooms, waitingCount } from "@/utils/queueBoard";
+import { fitsRoomTypes } from "@/utils/constants/room";
 import { RECEPTION_PATIENT_CREATE_ROUTE, ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
@@ -189,7 +190,11 @@ const ReceptionistDashboard = () => {
         return <span className={cx("badge", badge)}>{label}</span>;
     };
 
-    const moveTargets = (room) => rooms.filter((r) => r.tab === room.tab && r.key !== room.key && r.active && !r.off).map((r) => ({ ...r, waiting: waitingCount(rows, r.key) }));
+    // Only rooms working now, of the kind the patients' services need (the backend refuses any other)
+    const moveTargets = (room, picked = []) =>
+        rooms
+            .filter((r) => r.tab === room.tab && r.key !== room.key && r.active && !r.off && fitsRoomTypes(r.roomTypes, ...picked.map((row) => row.requiredRoomType)))
+            .map((r) => ({ ...r, waiting: waitingCount(rows, r.key) }));
 
     const moveRows = async (picked, fromKey, { target, reason }) => {
         // The rows still waiting in that room now, not the ones seen when the dialog opened
@@ -426,7 +431,7 @@ const ReceptionistDashboard = () => {
             {dialog?.type === "move" && (
                 <QueueMoveDialog
                     rows={dialog.rows}
-                    targets={moveTargets(dialog.from)}
+                    targets={moveTargets(dialog.from, dialog.rows)}
                     defaultReason={dialog.reason}
                     onClose={close}
                     onSubmit={(choice) => moveRows(dialog.rows, dialog.from.key, choice)}

@@ -1851,8 +1851,11 @@ export const HANDOVER_TEXT = {
     FLOW_TITLE: "Dòng tiền trong ca",
     FLOW_COLUMNS: ["Kênh", "Thu ròng"],
     REFUNDED_TOTAL: "Tổng đã hoàn",
-    REFUND_NOT_RECORDED: "Chưa ghi nhận vào ca",
-    REFUND_NOTE: "Tiền hoàn đã chi bằng tiền mặt chưa được trừ vào ca. Nếu quỹ thiếu do chi hoàn, ghi rõ ở ghi chú chênh lệch.",
+    REFUND_NOTE: "Tiền hoàn đã chi bằng tiền mặt trong ca đã được trừ vào tiền mặt dự kiến.",
+    SESSION_CHANGED: "Ca này không còn là ca đang mở của bạn. Trang đã được tải lại.",
+    COUNTED_TRANSFER: "Chuyển khoản đã đối chiếu",
+    COUNTED_TRANSFER_HINT: "Không bắt buộc. Tổng chuyển khoản bạn kiểm trên sao kê ngân hàng.",
+    TRANSFER_DIFF: "Chênh lệch chuyển khoản",
     TO_RECON: "Sang đối soát cuối ngày",
     TRANSFER_SYSTEM: "Chuyển khoản (hệ thống)",
 };

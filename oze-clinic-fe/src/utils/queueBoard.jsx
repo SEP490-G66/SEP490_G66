@@ -42,6 +42,8 @@ export const examRooms = (doctors, waiting, serving) => {
             startAt: d.start,
             // Only a doctor working now can take patients; one whose shift has not started is not a move target
             active: d.status === "Working",
+            // Kinds of room the doctor works in today: a patient only moves to a doctor in the kind of room the services need
+            roomTypes: d.roomTypes ?? [],
         }),
     );
     [...waiting, ...serving].forEach((x) => {
@@ -84,7 +86,8 @@ export const examRows = (waiting, serving, entries = []) => {
         number: entryOf.get(a.id)?.queueNumber ?? null,
         state: "serving",
         priority: priorityOf(a.priority),
-        priorityReason: priorityOf(a.priority) > 0 ? (entryOf.get(a.id)?.notes ?? null) : null,
+        priorityReason: priorityOf(a.priority) > 0 ? (entryOf.get(a.id)?.priorityReason ?? entryOf.get(a.id)?.notes ?? null) : null,
+        requiredRoomType: a.requiredRoomType ?? null,
         checkInAt: a.checkInAt,
     }));
     const queue = waiting.map((w, index) => {
@@ -101,11 +104,12 @@ export const examRows = (waiting, serving, entries = []) => {
             allergies: w.patientAllergies ?? [],
             number: entry?.queueNumber ?? null,
             state: entryState(entry?.status) === "called" ? "called" : "waiting",
-            absent: (Number(entry?.skipCount) || 0) > 0,
-            skips: skipsOf(entry ?? {}),
+            absent: Math.max(skipsOf(w), skipsOf(entry ?? {})) > 0,
+            skips: Math.max(skipsOf(w), skipsOf(entry ?? {})),
             examined: Boolean(w.isPriorityReturn),
             priority,
-            priorityReason: priority > 0 ? (entry?.notes ?? null) : null,
+            priorityReason: priority > 0 ? (w.priorityReason ?? entry?.priorityReason ?? entry?.notes ?? null) : null,
+            requiredRoomType: w.requiredRoomType ?? null,
             checkInAt: w.checkInAt,
             order: index,
         };

@@ -14,11 +14,15 @@ const ShiftClosePanel = ({ openingCash, cashNet, system, onRequestClose, classNa
     const [byNote, setByNote] = useState(false);
     const [counts, setCounts] = useState({});
     const [note, setNote] = useState("");
+    const [transfer, setTransfer] = useState("");
     const [errors, setErrors] = useState({});
 
     const actualCash = byNote ? denominationTotal(counts) : parseMoney(cash);
     const diffCash = actualCash == null ? null : actualCash - system.cash;
-    const needsNote = Boolean(diffCash);
+    // Optional: transfers checked on the bank statement
+    const countedTransfer = parseMoney(transfer);
+    const diffTransfer = countedTransfer == null ? null : countedTransfer - system.transfer;
+    const needsNote = Boolean(diffCash) || Boolean(diffTransfer);
     const clear = (key) => setErrors((e) => ({ ...e, [key]: undefined }));
 
     const request = (print) => {
@@ -35,6 +39,7 @@ const ShiftClosePanel = ({ openingCash, cashNet, system, onRequestClose, classNa
             {
                 countedCash: actualCash,
                 denominations: byNote ? Object.fromEntries(DENOMINATIONS.map((d) => [d, Number(counts[d]) || 0])) : null,
+                countedTransfer,
                 notes: note.trim(),
             },
             print,
@@ -103,6 +108,22 @@ const ShiftClosePanel = ({ openingCash, cashNet, system, onRequestClose, classNa
                         <DiffChip value={diffCash} />
                     </MoneyLine>
                 </dl>
+                <div className="field">
+                    <label htmlFor="hc-transfer" className="label">
+                        {TEXT.COUNTED_TRANSFER}
+                    </label>
+                    <MoneyField id="hc-transfer" value={transfer} describedBy="hc-transfer-hint" onChange={setTransfer} />
+                    <p id="hc-transfer-hint" className="help-text">
+                        {TEXT.COUNTED_TRANSFER_HINT}
+                    </p>
+                </div>
+                {countedTransfer != null && (
+                    <dl>
+                        <MoneyLine label={TEXT.TRANSFER_DIFF}>
+                            <DiffChip value={diffTransfer} />
+                        </MoneyLine>
+                    </dl>
+                )}
                 <div className="field">
                     <label htmlFor="hc-note" className={cx("label", needsNote && "label-required")}>
                         {TEXT.NOTE}

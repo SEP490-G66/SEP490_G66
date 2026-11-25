@@ -4,7 +4,7 @@ import { Card } from "@/components/reception/shared";
 import { signedMoney } from "@/utils/cashShift";
 import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
 
-const ShiftCashFlow = ({ net, reconLink, className }) => {
+const ShiftCashFlow = ({ net, refunded = 0, reconLink, className }) => {
     const rows = [
         [TEXT.CASH, net.cash],
         [TEXT.TRANSFER, net.transfer],
@@ -40,7 +40,7 @@ const ShiftCashFlow = ({ net, reconLink, className }) => {
                 <dl className="mt-3 border-t border-border pt-3">
                     <div className="flex items-start justify-between gap-4 py-0.5 text-body-sm">
                         <dt className="text-muted">{TEXT.REFUNDED_TOTAL}</dt>
-                        <dd className="m-0 text-right font-semibold text-warning">{TEXT.REFUND_NOT_RECORDED}</dd>
+                        <dd className="num m-0 text-right font-semibold">{signedMoney(-refunded)}</dd>
                     </div>
                 </dl>
                 <p className="mt-2 text-caption text-muted">{TEXT.REFUND_NOTE}</p>
