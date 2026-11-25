@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { register } from '../../services/authService';
 import { getClinicToday } from '../../utils/format';
-import { PROFILE_LIMITS, VALIDATION_MESSAGES, VERIFICATION_METHOD, VERIFICATION_METHOD_OPTIONS } from '../../utils/messages';
+import { PROFILE_LIMITS, VALIDATION_MESSAGES, VERIFICATION_METHOD } from '../../utils/messages';
 import { ROUTES } from '../../utils/routes';
 import { validatePhone, validatePassword, requiredMessage, isRequiredEmpty, validateEmail, normalizePhone } from '../../utils/validation';
 
@@ -54,9 +54,7 @@ const Register = () => {
     
     const emailErr = validateEmail(values.email);
     if (emailErr) newErrors.email = emailErr;
-    // The OTP can only go to the email when one is given.
-    else if (values.method === VERIFICATION_METHOD.EMAIL && isRequiredEmpty(values.email)) newErrors.email = requiredMessage("email");
-    
+
     // The backend treats a password of only spaces as empty.
     const passErr = isRequiredEmpty(values.password) ? requiredMessage("mật khẩu") : validatePassword(values.password);
     if (passErr) newErrors.password = passErr;
@@ -92,7 +90,7 @@ const Register = () => {
         email: values.email,
         password: values.password,
         confirmPassword: values.confirm_password,
-        method: values.method
+        method: VERIFICATION_METHOD.SMS
       });
 
       if (result.success) {
@@ -102,7 +100,7 @@ const Register = () => {
           state: {
             flow: 'register',
             phone,
-            method: values.method,
+            method: VERIFICATION_METHOD.SMS,
             sessionId: result.data.sessionId,
             maskedDestination: result.data.maskedDestination,
             resendAvailableAt: result.data.resendAvailableAt
@@ -247,28 +245,23 @@ const Register = () => {
               />
             </div>
 
-            <div className="sm:col-span-2">
-              <label className="block text-label text-ink mb-1.5">
-                Nhận mã xác minh qua <span className="text-danger-solid">*</span>
-              </label>
-              <div className="flex items-center gap-6 h-11">
-                {VERIFICATION_METHOD_OPTIONS.map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="radio"
-                      name="method"
-                      value={option.value}
-                      checked={values.method === option.value}
-                      onChange={handleChange}
-                      className="w-4 h-4 text-primary bg-canvas border-border-strong focus:ring-primary focus:ring-offset-1 transition-all"
-                    />
-                    <span className="text-body-sm text-ink group-hover:text-primary transition-colors">{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
+            <p className="sm:col-span-2 text-body-sm text-body">
+              Mã OTP sẽ được gửi qua SMS tới số điện thoại của bạn.
+            </p>
 
           </div>
+
+          <p className="pt-2 text-body-sm text-body">
+            Bằng việc đăng ký, bạn đồng ý với{' '}
+            <Link to={ROUTES.TERMS_OF_USE} className="font-semibold text-primary hover:underline">
+              Điều khoản sử dụng
+            </Link>{' '}
+            và{' '}
+            <Link to={ROUTES.PRIVACY_POLICY} className="font-semibold text-primary hover:underline">
+              Chính sách bảo mật
+            </Link>{' '}
+            của Nha khoa OZE.
+          </p>
 
           <div className="pt-4">
             <Button

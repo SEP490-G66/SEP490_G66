@@ -31,6 +31,17 @@ namespace OZE.Application.Services
             return File.Exists(fullPath) ? await File.ReadAllBytesAsync(fullPath, cancellationToken) : null;
         }
 
+        public Task DeleteAsync(string relativePath, CancellationToken cancellationToken = default)
+        {
+            var fullPath = ToFullPath(relativePath);
+            if (File.Exists(fullPath))
+            {
+                File.Delete(fullPath);
+            }
+
+            return Task.CompletedTask;
+        }
+
         // The full path, refused when it would leave the storage root (for example "../../web.config")
         private string ToFullPath(string relativePath)
         {

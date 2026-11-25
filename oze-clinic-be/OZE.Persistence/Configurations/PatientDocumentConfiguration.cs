@@ -16,6 +16,7 @@ namespace OZE.Persistence.Configurations
             builder.Property(x => x.FilePath).HasMaxLength(1000).IsRequired();
             builder.Property(x => x.MimeType).HasMaxLength(100);
             builder.Property(x => x.Description).HasMaxLength(500);
+            builder.Property(x => x.ProviderAddress).HasMaxLength(300);
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 
             builder.HasOne(x => x.Patient)
@@ -35,6 +36,7 @@ namespace OZE.Persistence.Configurations
                    .OnDelete(DeleteBehavior.NoAction);
 
             builder.HasIndex(x => x.DocumentRequestId).HasDatabaseName("IX_PatientDocuments_DocumentRequestId");
+            builder.HasIndex(x => x.UploadGroupId).HasDatabaseName("IX_PatientDocuments_UploadGroupId");
             builder.HasIndex(x => new { x.PatientId, x.DocumentType, x.CreatedAt })
                    .HasDatabaseName("IX_PatientDocuments_PatientId_Type")
                    .IsDescending(false, false, true);

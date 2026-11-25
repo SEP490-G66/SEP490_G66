@@ -10,11 +10,12 @@ namespace OZE.Application.Interfaces
 {
     public interface IAppointmentRepository
     {
-        // Shifts still open: a shift the doctor has ended is not offered any more
-        Task<List<StaffSchedule>> GetDoctorShiftsAsync(DateOnly date, int? doctorId);
         // True when the doctor has ended a shift on that date
         Task<bool> HasEndedShiftAsync(int doctorId, DateOnly date);
-        Task<List<Appointment>> GetActiveAppointmentsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds);
+        // Doctor shifts still open from..to (pass from = to for one day): a shift the doctor has ended is not offered any more
+        Task<List<StaffSchedule>> GetDoctorShiftsInRangeAsync(DateOnly from, DateOnly to, int? doctorId);
+        // Appointments that still hold a slot (not cancelled or no-show) from..to (pass from = to for one day)
+        Task<List<Appointment>> GetActiveAppointmentsInRangeAsync(DateOnly from, DateOnly to, IReadOnlyCollection<int> doctorIds);
         Task<string?> GetConfigValueAsync(string configKey);
         Task AddPatientAsync(Patient patient);
         Task<Patient?> GetPatientByUserIdAsync(string userId);
@@ -48,6 +49,10 @@ namespace OZE.Application.Interfaces
         Task<bool> HasUnfinishedAppointmentAsync(int patientId, long? excludeAppointmentId = null);
         Task<List<Appointment>> GetPatientAppointmentsOnDateAsync(int patientId, DateOnly date);
         Task<List<long>> MarkPastPendingAsNoShowAsync(DateOnly today, CancellationToken cancellationToken = default);
+        // True when an approved or running treatment plan of the patient has a session scheduled for today or later
+        Task<bool> HasUpcomingTreatmentSessionAsync(int patientId);
+        // True when the patient has come to the clinic at least once: an appointment of the patient is COMPLETED
+        Task<bool> HasCompletedVisitAsync(int patientId);
         Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default);
         Task UpdateAsync(Appointment appointment);
 

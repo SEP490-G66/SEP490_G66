@@ -1,7 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using System.Text;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OZE.Application.Helpers;
@@ -20,10 +18,10 @@ namespace OZE.Application.Services
         private readonly IRegistrationRepository _registrationRepository;
         private readonly IPendingProfileUpdateStore _pendingProfileUpdateStore;
         private readonly ISmsSender _smsSender;
-        private readonly IEmailSender _emailSender;
         private readonly RegisterOtpSettings _otpSettings;
         private readonly ILogger<UserService> _logger;
         private readonly IOtpSendLimiter? _otpSendLimiter;
+        private readonly AuthSmsSenderOptions _smsOptions;
 
         public UserService(
             UserManager<ApplicationUser> userManager,
@@ -31,18 +29,18 @@ namespace OZE.Application.Services
             IRegistrationRepository registrationRepository,
             IPendingProfileUpdateStore pendingProfileUpdateStore,
             ISmsSender smsSender,
-            IEmailSender emailSender,
             IOptions<RegisterOtpSettings> otpOptions,
             ILogger<UserService> logger,
-            IOtpSendLimiter? otpSendLimiter = null)
+            IOtpSendLimiter? otpSendLimiter = null,
+            IOptions<AuthSmsSenderOptions>? smsOptions = null)
         {
             _otpSendLimiter = otpSendLimiter;
+            _smsOptions = smsOptions?.Value ?? new AuthSmsSenderOptions();
             _userManager = userManager;
             _patientRepository = patientRepository;
             _registrationRepository = registrationRepository;
             _pendingProfileUpdateStore = pendingProfileUpdateStore;
             _smsSender = smsSender;
-            _emailSender = emailSender;
             _otpSettings = otpOptions.Value;
             _logger = logger;
         }
@@ -93,16 +91,31 @@ namespace OZE.Application.Services
 
         public async Task<ApiResponse<UpdateProfileResponse>> UpdateProfileAsync(string userId, UpdateProfileRequest request, string baseUrl)
         {
-            if (!PhoneNumberHelper.TryNormalize(request.PhoneNumber, out var phoneNumber))
+            // Empty phone keeps the current account phone later; a non-empty value must be a valid VN mobile.
+            string? requestedPhone = null;
+            if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
             {
-                return ApiResponse<UpdateProfileResponse>.FailureResult(ErrorConstants.AuthMessage.InvalidPhone);
+                if (!PhoneNumberHelper.TryNormalize(request.PhoneNumber, out var normalizedPhone))
+                {
+                    return ApiResponse<UpdateProfileResponse>.FailureResult(ErrorConstants.AuthMessage.InvalidPhone);
+                }
+
+                requestedPhone = normalizedPhone;
             }
 
             // BR-055: the date of birth cannot be in the future. The clinic works in Vietnam time (UTC+7).
-            var dateOfBirth = request.DateOfBirth!.Value;
-            if (dateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)))
+            if (request.DateOfBirth is DateOnly dateOfBirth
+                && dateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)))
             {
                 return ApiResponse<UpdateProfileResponse>.FailureResult(ErrorConstants.AuthMessage.DateOfBirthInvalid);
+            }
+
+            var gender = string.IsNullOrWhiteSpace(request.Gender) ? null : request.Gender.Trim();
+            if (gender != null
+                && !string.Equals(gender, "Male", StringComparison.Ordinal)
+                && !string.Equals(gender, "Female", StringComparison.Ordinal))
+            {
+                return ApiResponse<UpdateProfileResponse>.FailureResult(ErrorConstants.AuthMessage.GenderInvalid);
             }
 
             var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
@@ -123,15 +136,18 @@ namespace OZE.Application.Services
                 return ApiResponse<UpdateProfileResponse>.FailureResult(ErrorConstants.ProfileMessage.PatientNotLinked);
             }
 
+            var phoneNumber = requestedPhone ?? user.PhoneNumber;
+
+            // Null DOB/gender in the request keep the values already on the patient (e.g. phone-only OTP).
             var update = new PendingProfileUpdate
             {
                 UserId = user.Id,
                 SecurityStamp = user.SecurityStamp ?? string.Empty,
                 ProfileUpdatedAt = patient.UpdatedAt,
                 FullName = request.FullName.Trim(),
-                DateOfBirth = dateOfBirth,
-                Gender = request.Gender,
-                PhoneNumber = phoneNumber,
+                DateOfBirth = request.DateOfBirth ?? patient.DateOfBirth,
+                Gender = gender ?? patient.Gender,
+                PhoneNumber = phoneNumber ?? string.Empty,
                 Email = email,
                 Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim()
             };
@@ -335,43 +351,14 @@ namespace OZE.Application.Services
                 return ApiResponse<UserProfileResponse>.FailureResult(ErrorConstants.ProfileMessage.UpdateFailed, errors);
             }
 
-            if (emailChanged && user.Email != null)
-            {
-                await SendEmailConfirmationAsync(user, baseUrl);
-            }
-
             return ApiResponse<UserProfileResponse>.SuccessResult(
                 await ToProfileResponseAsync(user, patient), ErrorConstants.ProfileMessage.ProfileUpdated);
         }
 
-        // A new confirmation link, for a link that expired or was lost (the email must be confirmed to sign in with it)
+        // Email confirmation links are no longer sent; patients sign in with phone OTP verification.
         public async Task<ApiResponse> ResendEmailConfirmationAsync(string userId, string baseUrl)
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null || string.IsNullOrEmpty(user.Email) || user.EmailConfirmed)
-            {
-                return ApiResponse.FailureResult(ErrorConstants.ProfileMessage.NoEmailToConfirm);
-            }
-
-            _otpSendLimiter?.EnsureCanSend(SecurityConstants.OtpPurposeEmailConfirmation, user.Email);
-            await SendEmailConfirmationAsync(user, baseUrl);
-            return ApiResponse.SuccessResult(ErrorConstants.ProfileMessage.ConfirmationEmailSent);
-        }
-
-        private async Task SendEmailConfirmationAsync(ApplicationUser user, string baseUrl)
-        {
-            try
-            {
-                var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-                var encodedCode = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-                var callbackUrl = $"{baseUrl}/api/auth/confirm-email?userId={user.Id}&code={encodedCode}";
-                await _emailSender.SendEmailVerificationAsync(user, callbackUrl);
-            }
-            catch (Exception ex)
-            {
-                // The profile is already saved, so an email failure must not fail the request.
-                _logger.LogError(ex, "Failed to send confirmation email to {Email} (UserId: {UserId}) after profile update", user.Email, user.Id);
-            }
+            return ApiResponse.FailureResult(ErrorConstants.ProfileMessage.NoEmailToConfirm);
         }
 
         private async Task<bool> SendPhoneOtpAsync(PendingProfileUpdate update, string otp)
@@ -380,7 +367,7 @@ namespace OZE.Application.Services
             {
                 await _smsSender.SendSmsAsync(
                     update.PhoneNumber,
-                    $"Ma OTP OZE cua ban la {otp}. Hieu luc {OtpExpiresInMinutes} phut.");
+                    AuthSmsSenderOptions.RenderOtp(_smsOptions.OtpTemplate, AuthSmsSenderOptions.DefaultOtpTemplate, otp, OtpExpiresInMinutes));
                 return true;
             }
             catch (Exception ex)
@@ -399,9 +386,15 @@ namespace OZE.Application.Services
                 : update;
         }
 
-        private static bool IsPhoneChanged(ApplicationUser user, string phoneNumber)
+        private static bool IsPhoneChanged(ApplicationUser user, string? phoneNumber)
         {
-            return user.PhoneNumber == null || !PhoneNumberHelper.GetLookupVariants(phoneNumber).Contains(user.PhoneNumber);
+            if (string.IsNullOrWhiteSpace(phoneNumber))
+            {
+                return false;
+            }
+
+            return user.PhoneNumber == null
+                || !PhoneNumberHelper.GetLookupVariants(phoneNumber).Contains(user.PhoneNumber);
         }
 
         private static bool IsEmailChanged(ApplicationUser user, string? email)
@@ -417,6 +410,7 @@ namespace OZE.Application.Services
                 Email = user.Email ?? string.Empty,
                 FullName = patient?.FullName ?? GetFullName(user.Id),
                 PhoneNumber = user.PhoneNumber ?? patient?.PhoneNumber,
+                PhoneNumberConfirmed = user.PhoneNumberConfirmed,
                 DateOfBirth = patient?.DateOfBirth,
                 Gender = patient?.Gender,
                 Address = patient?.Address,

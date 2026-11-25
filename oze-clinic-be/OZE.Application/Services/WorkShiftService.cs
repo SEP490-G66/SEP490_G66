@@ -484,6 +484,14 @@ namespace OZE.Application.Services
                 ConditionGuard.ThrowIf(roomTaken, ErrorConstants.WorkShiftMessage.RoomOverlap);
             }
 
+            // The absence (a leave approved without a substitute) was the old person's: the new person starts unmarked,
+            // so the shift opens for booking again
+            if (oldStaffId != staff.Id)
+            {
+                shift.IsPresent = null;
+                shift.AbsenceReason = null;
+            }
+
             shift.StaffProfileId = staff.Id;
             shift.RoomId = request.RoomId;
             shift.ScheduleDate = scheduleDate;

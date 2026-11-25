@@ -31,7 +31,7 @@ Hệ thống quản lý phòng khám nha khoa OZE: đặt lịch, tiếp đón, 
 
 **Luồng một request:** GlobalExceptionMiddleware → HTTPS → CORS → JWT Authentication → Authorization (theo role) → validation filter → Controller → Service (qua interface) → Repository → DbContext → SQL Server.
 
-**Công nghệ đi kèm:** ASP.NET Identity, JWT kèm refresh token, SendGrid (email), Twilio (SMS), AutoMapper, OTP lưu tạm trong bộ nhớ (`IMemoryCache`) qua 3 interface (`IPendingRegistrationStore`, `IPasswordResetStore`, `IPendingProfileUpdateStore`), Swagger. **Redis đang có kế hoạch, chưa triển khai.**
+**Công nghệ đi kèm:** ASP.NET Identity, JWT kèm refresh token, SendGrid (email), eSMS (SMS), AutoMapper, OTP lưu tạm trong bộ nhớ (`IMemoryCache`) qua 3 interface (`IPendingRegistrationStore`, `IPasswordResetStore`, `IPendingProfileUpdateStore`), Swagger. **Redis đang có kế hoạch, chưa triển khai.**
 
 **Frontend (repo `oze-clinic-fe`):** React 19, Vite, Tailwind 4, React Router 7, Axios. Trang chia theo vai trò (`admin`, `doctor`, `imagingTechnician`, `patient`, `receptionist`, `common`), có `RequireRole`. Trang bác sĩ, lễ tân, kỹ thuật viên hiện mới là dashboard tạm.
 

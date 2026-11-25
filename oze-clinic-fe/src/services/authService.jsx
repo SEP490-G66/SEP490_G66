@@ -1,5 +1,5 @@
 import api from "./api";
-import { BACKEND_LOGIN_CODES, CHANGE_PASSWORD_TEXT, GENERIC_ERROR_MESSAGE, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
+import { BACKEND_LOGIN_CODES, CHANGE_PASSWORD_TEXT, GENERIC_ERROR_MESSAGE, GOOGLE_LOGIN_MESSAGES, MESSAGES, VALIDATION_MESSAGES, VERIFICATION_METHOD } from "../utils/messages";
 import { getDefaultMockUserId, setMockCurrentUserId } from "../utils/data/mockData";
 import { invalidMessage } from "../utils/validation";
 import { clearSession, getSessionRefreshToken, getSessionToken, isAccessTokenExpired, saveSession, sessionFromAuthResult } from "./sessionStore";
@@ -14,6 +14,10 @@ const loginFailure = (code) => {
     if (code === BACKEND_LOGIN_CODES.INVALID_CREDENTIALS) return failure(MESSAGES.MSG24);
     if (code === BACKEND_LOGIN_CODES.LOCKED_OUT) return failure(MESSAGES.MSG26);
     if (code === BACKEND_LOGIN_CODES.ACCOUNT_DISABLED) return failure(MESSAGES.MSG80);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_TOKEN_INVALID) return failure(GOOGLE_LOGIN_MESSAGES.TOKEN_INVALID);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_EMAIL_NOT_VERIFIED) return failure(GOOGLE_LOGIN_MESSAGES.EMAIL_NOT_VERIFIED);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_NOT_PATIENT) return failure(GOOGLE_LOGIN_MESSAGES.NOT_PATIENT);
+    if (code === BACKEND_LOGIN_CODES.GOOGLE_NOT_CONFIGURED) return failure(GOOGLE_LOGIN_MESSAGES.NOT_CONFIGURED);
     return failure(GENERIC_ERROR_MESSAGE);
 };
 
@@ -51,6 +55,16 @@ export const signIn = async ({ identifier, password }) => {
     }
 };
 
+export const signInWithGoogle = async ({ idToken, accessToken } = {}) => {
+    try {
+        const body = idToken ? { idToken } : { accessToken };
+        const response = await api.post("/api/Auth/google-login", body, AUTH_REQUEST_CONFIG);
+        return completeSignIn(response.data);
+    } catch (error) {
+        return loginFailure(error.response?.data?.code);
+    }
+};
+
 export const signOut = () => {
     const token = getSessionToken();
     const refreshToken = getSessionRefreshToken();
@@ -78,6 +92,8 @@ const AUTH_MESSAGES = {
     "OTP is invalid. Please check again.": invalidMessage("Mã xác minh"),
     "OTP has been sent to your phone number.": "Mã xác minh đã được gửi đến số điện thoại của bạn.",
     "OTP has been sent to your email.": "Mã xác minh đã được gửi đến email của bạn.",
+    "Verification method is invalid. Please check again.": "Phương thức xác minh không hợp lệ.",
+    "Password reset is only available via phone number.": "Đặt lại mật khẩu chỉ hỗ trợ qua số điện thoại.",
     "Could not send the OTP. Please try again later.": "Không thể gửi mã xác minh. Vui lòng thử lại sau.",
     "OTP has expired. Please register again.": "Mã xác minh đã hết hạn. Vui lòng đăng ký lại.",
     "Please wait before requesting another OTP.": "Vui lòng chờ một lát trước khi yêu cầu mã mới.",

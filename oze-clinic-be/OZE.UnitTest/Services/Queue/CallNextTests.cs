@@ -134,6 +134,47 @@ namespace OZE.UnitTest.Services.Queue
             called!.AppointmentId.Should().Be(102);
         }
 
+        // UTCID07 (N): a patient sent to the X-ray is skipped while still in the imaging room, the next patient is called
+        [Fact]
+        public async Task CallNextAsync_ShouldSkipPatientStillAtImaging()
+        {
+            var atXRay = BookedAppointment(101, slot: new TimeOnly(8, 0), checkInAt: At(7, 55));
+            atXRay.Examination = new Examination { Id = 900 };
+            var booked = Entry(2, queueNumber: 2, BookedAppointment(102, slot: new TimeOnly(8, 30), checkInAt: At(8, 25)));
+            var service = CreateQueueService(new[] { Entry(1, queueNumber: 1, atXRay), booked }, atImaging: new long[] { 101 });
+
+            var called = await service.CallNextAsync(QueueConstants.ExaminationType);
+
+            called!.AppointmentId.Should().Be(102);
+        }
+
+        // UTCID08 (B): the only waiting patient is still in the imaging room, so nobody is called
+        [Fact]
+        public async Task CallNextAsync_ShouldReturnNull_WhenOnlyPatientIsAtImaging()
+        {
+            var atXRay = BookedAppointment(101, slot: new TimeOnly(8, 0), checkInAt: At(7, 55));
+            atXRay.Examination = new Examination { Id = 900 };
+            var service = CreateQueueService(new[] { Entry(1, queueNumber: 1, atXRay) }, atImaging: new long[] { 101 });
+
+            var called = await service.CallNextAsync(QueueConstants.ExaminationType);
+
+            called.Should().BeNull();
+        }
+
+        // UTCID09 (N): once the imaging entry is closed, the patient back from the X-ray is called first again
+        [Fact]
+        public async Task CallNextAsync_ShouldCallPatientBackFromXRay_WhenImagingIsDone()
+        {
+            var backFromXRay = BookedAppointment(101, slot: new TimeOnly(8, 0), checkInAt: At(7, 55), priority: 1);
+            backFromXRay.Examination = new Examination { Id = 900 };
+            var booked = Entry(2, queueNumber: 2, BookedAppointment(102, slot: new TimeOnly(8, 30), checkInAt: At(8, 25)));
+            var service = CreateQueueService(new[] { Entry(1, queueNumber: 1, backFromXRay), booked }, atImaging: Array.Empty<long>());
+
+            var called = await service.CallNextAsync(QueueConstants.ExaminationType);
+
+            called!.AppointmentId.Should().Be(101);
+        }
+
         // ===== Shared test data =====
 
         private static readonly DateOnly ClinicToday = DateOnly.FromDateTime(ClinicClock.Today);
@@ -175,12 +216,25 @@ namespace OZE.UnitTest.Services.Queue
         };
 
         // The repository returns the entries in its own order (missed calls, priority, queue number), like the real one
-        private static QueueService CreateQueueService(params QueueEntry[] entries)
+        private static QueueService CreateQueueService(params QueueEntry[] entries) =>
+            CreateQueueService(entries, atImaging: Array.Empty<long>());
+
+        // atImaging: appointments that still have an open entry in today's imaging queue
+        private static QueueService CreateQueueService(QueueEntry[] entries, long[] atImaging)
         {
             var queueRepoMock = new Mock<IQueueRepository>();
             queueRepoMock
                 .Setup(r => r.GetActiveEntriesAsync(QueueConstants.ExaminationType, null, null, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(entries.OrderBy(e => e.SkipCount).ThenByDescending(e => e.Priority).ThenBy(e => e.QueueNumber).ToList());
+            queueRepoMock
+                .Setup(r => r.GetActiveEntriesAsync(QueueConstants.ImagingType, null, null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(atImaging.Select(id => new QueueEntry
+                {
+                    Id = 1000 + id,
+                    AppointmentId = id,
+                    QueueType = QueueConstants.ImagingType,
+                    Status = QueueConstants.Waiting
+                }).ToList());
             queueRepoMock
                 .Setup(r => r.GetConfigValueAsync(ConfigKeyConstants.CheckInLateMinutes, It.IsAny<CancellationToken>()))
                 .ReturnsAsync("15");

@@ -6,24 +6,24 @@
 |---|---|
 | Module | M7 Kế hoạch điều trị |
 | Trạng thái | ✅ Đã có API |
-| Vai trò được dùng | `Doctor`, `Receptionist` |
+| Vai trò được dùng | `Doctor` |
 | API | `POST api/TreatmentPlans/{id}/cancel` |
 | Code chính | `TreatmentPlansController.CancelAsync` → `TreatmentPlanService.CancelAsync` → `TreatmentPlanRepository` |
 
 ## 1. Chức năng này làm gì
 
-Bác sĩ hoặc lễ tân dừng một kế hoạch bệnh nhân đã thấy (`Proposed`, `Approved`, `InProgress`) kèm lý do. Giai đoạn chưa làm chuyển `Cancelled`, giai đoạn đã xong giữ làm lịch sử; lưu người hủy, thời điểm hủy.
+Bác sĩ dừng một kế hoạch bệnh nhân đã thấy (`Proposed`, `Approved`, `InProgress`) kèm lý do. Giai đoạn chưa làm chuyển `Cancelled`, giai đoạn đã xong giữ làm lịch sử; lưu người hủy, thời điểm hủy.
 
 ## 2. Tiền điều kiện
 
-- Role `Doctor` hoặc `Receptionist`. Bác sĩ phải có quyền với kế hoạch (xem F-TP-02 mục 2); lễ tân không bị kiểm.
+- Role `Doctor`. Bác sĩ phải có quyền với kế hoạch (xem F-TP-02 mục 2). Lễ tân không hủy được.
 - Kế hoạch `Proposed`, `Approved` hoặc `InProgress`.
 - Không có giai đoạn nào đang `InProgress`.
 - Có lý do hủy.
 
 ## 3. API
 
-**Request** `POST api/TreatmentPlans/{id:long}/cancel`, quyền `[Authorize(Roles = "Doctor,Receptionist")]`
+**Request** `POST api/TreatmentPlans/{id:long}/cancel`, quyền `[Authorize(Roles = "Doctor")]`
 
 Body `CancelTreatmentPlanRequest`:
 
@@ -82,7 +82,7 @@ Body `CancelTreatmentPlanRequest`:
 ## 8. Kiểm thử
 
 - Test hiện có: Chưa có.
-- Ca cần test: hủy `Approved` → giai đoạn `Scheduled` thành `Cancelled`; hủy `InProgress` có giai đoạn `Completed` → giữ `Completed`; còn giai đoạn `InProgress` → 400; `Draft` → 400; lý do toàn khoảng trắng → 400; lễ tân hủy kế hoạch bệnh nhân bất kỳ; `progressPercent` sau hủy.
+- Ca cần test: hủy `Approved` → giai đoạn `Scheduled` thành `Cancelled`; hủy `InProgress` có giai đoạn `Completed` → giữ `Completed`; còn giai đoạn `InProgress` → 400; `Draft` → 400; lý do toàn khoảng trắng → 400; lễ tân gọi API → 403; `progressPercent` sau hủy.
 
 ## 9. Còn thiếu / câu hỏi mở
 

@@ -88,11 +88,11 @@ namespace OZE.Persistence.Repositories
             return false;
         }
 
-        public async Task<List<Appointment>> GetActiveAppointmentsAsync(DateOnly date, IReadOnlyCollection<int> doctorIds)
+        public async Task<List<Appointment>> GetActiveAppointmentsInRangeAsync(DateOnly from, DateOnly to, IReadOnlyCollection<int> doctorIds)
         {
             return await _context.Appointments
                 .AsNoTracking()
-                .Where(x => x.AppointmentDate == date
+                .Where(x => x.AppointmentDate >= from && x.AppointmentDate <= to
                     && x.DoctorId != null && doctorIds.Contains(x.DoctorId.Value)
                     && x.Status != AppointmentConstants.CancelledStatus
                     && x.Status != AppointmentConstants.NoShowStatus)
@@ -150,7 +150,6 @@ namespace OZE.Persistence.Repositories
                         .ThenInclude(x => x!.Doctor)
                 .Include(x => x.ParentAppointment)
                     .ThenInclude(x => x!.Examination)
-                .Include(x => x.Examination)
                 .Include(x => x.QueueEntries)
                     .ThenInclude(x => x.Room)
                 .Where(x => x.DoctorId != null && doctorIds.Contains(x.DoctorId.Value)
@@ -179,7 +178,7 @@ namespace OZE.Persistence.Repositories
                 .AnyAsync(x => x.StaffProfileId == doctorId && x.ScheduleDate == date && x.ActualEndTime != null);
         }
 
-        public async Task<List<StaffSchedule>> GetDoctorShiftsAsync(DateOnly date, int? doctorId)
+        public async Task<List<StaffSchedule>> GetDoctorShiftsInRangeAsync(DateOnly from, DateOnly to, int? doctorId)
         {
             // Doctor role ids, joined through Identity tables
             var doctorUserIds = from ur in _context.UserRoles
@@ -191,7 +190,7 @@ namespace OZE.Persistence.Repositories
                 .AsNoTracking()
                 .Include(x => x.StaffProfile)
                 .Include(x => x.Room)
-                .Where(x => x.ScheduleDate == date
+                .Where(x => x.ScheduleDate >= from && x.ScheduleDate <= to
                     && x.IsPresent != false
                     && x.ActualEndTime == null
                     && x.StaffProfile.IsActive
@@ -203,7 +202,7 @@ namespace OZE.Persistence.Repositories
                 shifts = shifts.Where(x => x.StaffProfileId == doctorId);
             }
 
-            return await shifts.OrderBy(x => x.ShiftStart).ToListAsync();
+            return await shifts.OrderBy(x => x.ScheduleDate).ThenBy(x => x.ShiftStart).ToListAsync();
         }
 
         public async Task SaveChangesAsync()
@@ -385,6 +384,25 @@ namespace OZE.Persistence.Repositories
                     .SetProperty(x => x.Status, AppointmentConstants.NoShowStatus)
                     .SetProperty(x => x.UpdatedAt, now), cancellationToken);
             return ids;
+        }
+
+        public async Task<bool> HasCompletedVisitAsync(int patientId)
+        {
+            return await _context.Appointments
+                .AnyAsync(x => x.PatientId == patientId && x.Status == AppointmentConstants.CompletedStatus);
+        }
+
+        public async Task<bool> HasUpcomingTreatmentSessionAsync(int patientId)
+        {
+            var today = DateOnly.FromDateTime(ClinicClock.Today);
+            return await _context.TreatmentPlanStages
+                .AnyAsync(s => s.TreatmentPlan.PatientId == patientId
+                    && (s.TreatmentPlan.Status == TreatmentPlanConstants.Approved
+                        || s.TreatmentPlan.Status == TreatmentPlanConstants.InProgress)
+                    && (s.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled
+                        || s.StageStatus == TreatmentPlanConstants.StageStatus.InProgress)
+                    && s.ScheduledDate != null
+                    && s.ScheduledDate >= today);
         }
 
         public async Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default)

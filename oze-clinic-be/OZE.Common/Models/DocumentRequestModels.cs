@@ -1,12 +1,13 @@
 namespace OZE.Common.Models
 {
-    // POST api/examinations/{id}/document-requests
+    /// <summary>Yêu cầu tạo mới đề nghị bổ sung tài liệu khám bệnh.</summary>
     public class CreateDocumentRequest
     {
         public string? DocumentName { get; set; }
         public string? Note { get; set; }
     }
 
+    /// <summary>Dữ liệu phản hồi thông tin yêu cầu bổ sung tài liệu y tế.</summary>
     public class DocumentRequestResponse
     {
         public long Id { get; set; }
@@ -25,7 +26,7 @@ namespace OZE.Common.Models
         public List<DocumentRequestFileResponse> Files { get; set; } = new();
     }
 
-    // A file the patient uploaded for the request
+    /// <summary>Thông tin tệp tin tài liệu do bệnh nhân tải lên.</summary>
     public class DocumentRequestFileResponse
     {
         public long Id { get; set; }
@@ -34,3 +35,4 @@ namespace OZE.Common.Models
         public DateTimeOffset CreatedAt { get; set; }
     }
 }
+

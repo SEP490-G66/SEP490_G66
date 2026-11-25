@@ -36,7 +36,10 @@ const QueueTicket = ({ queue }) => {
     return null;
 };
 
-const NextVisitCard = ({ appointment, isToday = false }) => {
+// source: optional label of where the appointment comes from (Tự đặt / Kế hoạch điều trị / Tái khám).
+// extra: optional second line under the details (e.g. "Buổi 3/3 của kế hoạch …").
+// showDetailLink: false on pages that already are the appointment page (Lịch hẹn sắp tới).
+const NextVisitCard = ({ appointment, isToday = false, source, extra, showDetailLink = true }) => {
     const date = formatDate(appointment.appointmentDate);
     const details = [
         formatTimeRange(appointment.timeSlotStart, appointment.timeSlotEnd),
@@ -61,15 +64,19 @@ const NextVisitCard = ({ appointment, isToday = false }) => {
                             {date && <span className="sr-only"> {date}</span>}
                         </h3>
                         <StatusBadge status={appointment.status} labels={PATIENT_APPOINTMENT_STATUS} />
+                        {source && <span className="badge badge-neutral">{source}</span>}
                     </div>
                     {details && <p className="num mt-1 text-body-sm text-body">{details}</p>}
+                    {extra && <p className="mt-1 text-body-sm text-body">{extra}</p>}
                 </div>
             </div>
             {appointment.status === APPOINTMENT_STATUS.CHECKED_IN && <QueueTicket queue={appointment.queue} />}
-            <Link to={getAppointmentDetailRoute(appointment.id)} className="btn btn-secondary min-h-11 w-full shrink-0 md:min-h-0 md:w-auto">
-                Xem chi tiết
-                {date && <span className="sr-only"> lịch hẹn ngày {date}</span>}
-            </Link>
+            {showDetailLink && (
+                <Link to={getAppointmentDetailRoute(appointment.id)} className="btn btn-secondary min-h-11 w-full shrink-0 md:min-h-0 md:w-auto">
+                    Xem chi tiết
+                    {date && <span className="sr-only"> lịch hẹn ngày {date}</span>}
+                </Link>
+            )}
         </div>
     );
 };

@@ -20,7 +20,7 @@ const RecentVisitsSection = ({ visits = [], loading = false, failed = false }) =
             id={TITLE_ID}
             title="Lần khám gần đây"
             busy={loading}
-            link={loaded && visits.length > 0 && { to: ROUTES.MEDICAL_RECORD, label: "Xem sổ khám bệnh" }}
+            link={loaded && visits.length > 0 && { to: ROUTES.MEDICAL_RECORD, label: "Xem lịch sử khám" }}
             error={!loading && failed && GENERIC_ERROR_MESSAGE}
             empty={loaded && visits.length === 0 && { icon: FileText, text: MESSAGES.MSG38 }}
         >

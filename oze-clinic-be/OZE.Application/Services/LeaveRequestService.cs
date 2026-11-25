@@ -378,10 +378,10 @@ namespace OZE.Application.Services
         private static List<StaffSchedule> InSlot(IEnumerable<StaffSchedule> shifts, string? slot) =>
             shifts.Where(x => slot == null || ScheduleViewService.SlotOf(x.ShiftStart) == slot).ToList();
 
-        // Appointments that start in one of the shifts (an appointment holds one slot from its start)
+        // Appointments whose time slot overlaps one of the shifts
         private static List<Appointment> InShifts(IEnumerable<Appointment> appointments, List<StaffSchedule> shifts) =>
-            appointments.Where(a => a.TimeSlotStart.HasValue
-                && shifts.Any(s => s.ShiftStart <= a.TimeSlotStart.Value && a.TimeSlotStart.Value < s.ShiftEnd)).ToList();
+            appointments.Where(a => a.TimeSlotStart.HasValue && a.TimeSlotEnd.HasValue
+                && shifts.Any(s => a.TimeSlotStart < s.ShiftEnd && s.ShiftStart < a.TimeSlotEnd)).ToList();
 
         private static bool HasStarted(StaffSchedule shift) =>
             shift.ActualStartTime.HasValue || shift.ScheduleDate.ToDateTime(shift.ShiftStart) <= ClinicClock.Now;

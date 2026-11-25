@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import Card from "@/components/ui/Card";
-import { signIn } from "../../services/authService";
-import { USER_ROLES } from "../../utils/messages";
+import { signIn, signInWithGoogle } from "../../services/authService";
+import { GOOGLE_LOGIN_MESSAGES, USER_ROLES } from "../../utils/messages";
 import { ROUTES, getPostLoginRoute } from "../../utils/routes";
 import { isPasswordEmpty, isRequiredEmpty, normalizeIdentifier, requiredMessage, validateIdentifier } from "../../utils/validation";
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
 
 // Sign In only checks that the password is filled; the length rule (validatePassword) belongs to
 // Register / Reset / Change Password.
@@ -26,9 +29,6 @@ const validate = (values) => {
     return errors;
 };
 
-// TODO(spec): Sign in via Google is in FR 2.1 and the mockup but not in the UC-04 flow.
-const handleGoogleSignIn = () => { };
-
 const SignInPage = () => {
     const navigate = useNavigate();
     const { state: locationState } = useLocation();
@@ -37,6 +37,11 @@ const SignInPage = () => {
     const [values, setValues] = useState({ identifier: "", password: "" });
     const [fieldErrors, setFieldErrors] = useState({});
     const [loading, setLoading] = useState(false);
+
+    const navigateAfterSignIn = (role) => {
+        const backToBooking = role === USER_ROLES.PATIENT && locationState?.from === ROUTES.BOOK_APPOINTMENT;
+        navigate(backToBooking ? ROUTES.BOOK_APPOINTMENT : getPostLoginRoute(role), { replace: true });
+    };
 
     const handleChange = (event) => {
         const { name, value } = event.target;
@@ -72,8 +77,7 @@ const SignInPage = () => {
             const result = await signIn({ identifier: normalizeIdentifier(values.identifier), password: values.password });
             if (result.success) {
                 toast.success("Đăng nhập thành công!");
-                const backToBooking = result.data.role === USER_ROLES.PATIENT && locationState?.from === ROUTES.BOOK_APPOINTMENT;
-                navigate(backToBooking ? ROUTES.BOOK_APPOINTMENT : getPostLoginRoute(result.data.role), { replace: true });
+                navigateAfterSignIn(result.data.role);
                 return;
             }
             // TODO(spec): no system message is defined for a failure the API returns without a message.
@@ -81,6 +85,31 @@ const SignInPage = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const finishGoogleSignIn = async (result) => {
+        if (result.success) {
+            toast.success("Đăng nhập thành công!");
+            toast.info(GOOGLE_LOGIN_MESSAGES.ADD_PHONE_HINT);
+            navigateAfterSignIn(result.data.role);
+            return;
+        }
+        toast.error(result.message);
+    };
+
+    const handleGoogleAccessToken = async (accessToken) => {
+        if (loading) return;
+        setLoading(true);
+        try {
+            const result = await signInWithGoogle({ accessToken });
+            await finishGoogleSignIn(result);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleNotConfigured = () => {
+        toast.error(GOOGLE_LOGIN_MESSAGES.NOT_CONFIGURED);
     };
 
     return (
@@ -164,9 +193,17 @@ const SignInPage = () => {
 
                 <p className="my-4 text-center text-body-sm text-muted">hoặc</p>
 
-                <button type="button" className="btn btn-secondary btn-lg w-full" onClick={handleGoogleSignIn}>
-                    Đăng nhập bằng Google
-                </button>
+                {GOOGLE_CLIENT_ID ? (
+                    <GoogleSignInButton
+                        disabled={loading}
+                        onAccessToken={handleGoogleAccessToken}
+                        onError={() => toast.error(GOOGLE_LOGIN_MESSAGES.TOKEN_INVALID)}
+                    />
+                ) : (
+                    <button type="button" className="btn btn-secondary btn-lg w-full" onClick={handleGoogleNotConfigured}>
+                        Đăng nhập bằng Google
+                    </button>
+                )}
 
                 <p className="mt-6 text-center text-body-sm text-body">
                     Chưa có tài khoản?{" "}

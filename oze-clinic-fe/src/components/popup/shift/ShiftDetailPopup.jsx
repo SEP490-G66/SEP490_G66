@@ -43,9 +43,9 @@ const statusRows = (cell) => {
 
 // "Chi tiết ca" popup of an assigned shift: who works, where, and how it went (present, absent, on leave or not started).
 // A shift whose person is on leave shows the leave request's status with a link to the request.
-// onAssign(cell) opens "Chọn người thay" for that shift; pass it only while the shift has not started.
+// onAssign(cell) opens "Chọn người thay" for a shift whose person is on leave or absent; pass it only while the shift has not started.
 const ShiftDetailPopup = ({ cell, onClose, onAssign }) => {
-    const onLeave = cell.status === SHIFT_STATUSES.LEAVE;
+    const needsSubstitute = cell.status === SHIFT_STATUSES.LEAVE || cell.status === SHIFT_STATUSES.ABSENT;
     const rows = [
         { label: "Phòng", value: [cell.room.name, cell.room.floor].filter(Boolean).join(" · ") },
         { label: "Giờ ca", value: <span className="num font-medium">{`${cell.start} – ${cell.end}`}</span> },
@@ -77,7 +77,7 @@ const ShiftDetailPopup = ({ cell, onClose, onAssign }) => {
                 <button type="button" className="btn btn-secondary" onClick={onClose}>
                     Đóng
                 </button>
-                {onLeave && onAssign && (
+                {needsSubstitute && onAssign && (
                     <button type="button" className="btn btn-primary" onClick={() => onAssign(cell)}>
                         Phân ca
                     </button>

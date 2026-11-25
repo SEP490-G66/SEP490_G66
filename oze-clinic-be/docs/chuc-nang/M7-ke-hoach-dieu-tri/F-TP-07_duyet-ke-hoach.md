@@ -6,23 +6,23 @@
 |---|---|
 | Module | M7 Kế hoạch điều trị |
 | Trạng thái | ✅ Đã có API |
-| Vai trò được dùng | `Doctor`, `Receptionist` |
+| Vai trò được dùng | `Doctor` |
 | API | `POST api/TreatmentPlans/{id}/approve` |
 | Code chính | `TreatmentPlansController.ApproveAsync` → `TreatmentPlanService.ApproveAsync` → `TreatmentPlanRepository` |
 
 ## 1. Chức năng này làm gì
 
-Bác sĩ hoặc lễ tân ghi nhận bệnh nhân đã đồng ý kế hoạch: `Proposed` → `Approved`, lưu `ApprovedAt`. Từ đây mới bắt đầu giai đoạn và lập hóa đơn.
+Bác sĩ trao đổi trực tiếp với bệnh nhân, bệnh nhân đồng ý thì bác sĩ ghi nhận lên hệ thống: `Proposed` → `Approved`, lưu `ApprovedAt`. Từ đây mới bắt đầu giai đoạn và lập hóa đơn.
 
 ## 2. Tiền điều kiện
 
-- Role `Doctor` hoặc `Receptionist`.
-- Bác sĩ: có hồ sơ, có quyền với kế hoạch (xem F-TP-02 mục 2). Lễ tân: không kiểm quyền theo bệnh nhân.
+- Role `Doctor`. Lễ tân không ghi nhận được.
+- Bác sĩ có hồ sơ, có quyền với kế hoạch (xem F-TP-02 mục 2).
 - Kế hoạch `Proposed`.
 
 ## 3. API
 
-**Request** `POST api/TreatmentPlans/{id:long}/approve`, quyền `[Authorize(Roles = "Doctor,Receptionist")]`. Không có body.
+**Request** `POST api/TreatmentPlans/{id:long}/approve`, quyền `[Authorize(Roles = "Doctor")]`. Không có body.
 
 **Response thành công** (`ApiResponse<TreatmentPlanProgressResponse>`, HTTP 200, message `"Approve treatment plan success!"`), `status = "Approved"`, `approvedAt` có giá trị.
 
@@ -37,8 +37,8 @@ Bác sĩ hoặc lễ tân ghi nhận bệnh nhân đã đồng ý kế hoạch: 
 
 ## 4. Luồng xử lý trong code
 
-1. Controller truyền `CanViewAll()` (= là lễ tân) — `TreatmentPlansController.cs:109-117`.
-2. `LoadForStatusChangeAsync`: đọc có tracking (404); chỉ `EnsureAccessAsync` khi không phải lễ tân — `TreatmentPlanService.cs:210`, `:260-274`.
+1. Controller chỉ cho role `Doctor` — `TreatmentPlansController.cs:106-117`.
+2. `LoadForStatusChangeAsync`: đọc có tracking (404), rồi `EnsureAccessAsync` kiểm bác sĩ có quyền với kế hoạch — `TreatmentPlanService.cs:210`, `:260-274`.
 3. `Status == "Proposed"` — `TreatmentPlanService.cs:211`.
 4. `Status = "Approved"`, `ApprovedAt = UpdatedAt = UtcNow`, lưu — `TreatmentPlanService.cs:213-218`.
 
@@ -46,7 +46,7 @@ Bác sĩ hoặc lễ tân ghi nhận bệnh nhân đã đồng ý kế hoạch: 
 
 | Mã | Quy tắc | Được kiểm tra ở |
 |---|---|---|
-| BR-TP-06 | `Proposed` → `Approved` (bác sĩ hoặc lễ tân), lưu `ApprovedAt` | `TreatmentPlanService.cs:211-216` |
+| BR-TP-06 | `Proposed` → `Approved` (chỉ bác sĩ), lưu `ApprovedAt` | `TreatmentPlanService.cs:211-216` |
 | BR-C10 | Duyệt đua với sửa → 409 | `RowVersion` của `TreatmentPlans` |
 
 ## 6. Trạng thái và dữ liệu thay đổi
@@ -63,7 +63,7 @@ Bác sĩ hoặc lễ tân ghi nhận bệnh nhân đã đồng ý kế hoạch: 
 ## 8. Kiểm thử
 
 - Test hiện có: Chưa có.
-- Ca cần test: lễ tân duyệt kế hoạch của bất kỳ bệnh nhân; bác sĩ không liên quan → 403; `Draft` → 400; `Approved` → 400.
+- Ca cần test: lễ tân gọi API → 403; bác sĩ không liên quan → 403; `Draft` → 400; `Approved` → 400.
 
 ## 9. Còn thiếu / câu hỏi mở
 

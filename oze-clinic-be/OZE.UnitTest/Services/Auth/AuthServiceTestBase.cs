@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
@@ -36,6 +36,7 @@ namespace OZE.UnitTest.Services.Auth
         protected readonly Mock<ISmsSender> _smsSenderMock;
         protected readonly Mock<IEmailSender> _emailSenderMock;
         protected readonly Mock<IPendingRegistrationStore> _pendingStoreMock;
+        protected readonly Mock<IGoogleIdTokenValidator> _googleIdTokenValidatorMock;
 
         // The real class under test
         protected readonly AuthService _authService;
@@ -62,6 +63,7 @@ namespace OZE.UnitTest.Services.Auth
             _smsSenderMock = new Mock<ISmsSender>();
             _emailSenderMock = new Mock<IEmailSender>();
             _pendingStoreMock = new Mock<IPendingRegistrationStore>();
+            _googleIdTokenValidatorMock = new Mock<IGoogleIdTokenValidator>();
 
             // The transaction just runs the work it is given, whatever its result type
             _registrationRepositoryMock
@@ -80,7 +82,7 @@ namespace OZE.UnitTest.Services.Auth
         }
 
         // Builds the real AuthService with the fakes (".Object" gives the fake itself)
-        protected AuthService CreateService(int jwtExpiresInMinutes)
+        protected AuthService CreateService(int jwtExpiresInMinutes, string? googleClientId = "google-client-id.apps.googleusercontent.com")
         {
             return new AuthService(
                 _userManagerMock.Object,
@@ -88,14 +90,15 @@ namespace OZE.UnitTest.Services.Auth
                 _refreshTokenRepositoryMock.Object,
                 _jwtTokenGeneratorMock.Object,
                 _userServiceMock.Object,
-                _emailSenderMock.Object,
                 _smsSenderMock.Object,
                 _pendingStoreMock.Object,
                 _passwordResetStoreMock.Object,
                 _registrationRepositoryMock.Object,
                 Options.Create(new JwtSettings { ExpiresInMinutes = jwtExpiresInMinutes }),
                 Options.Create(new RegisterOtpSettings()),
-                Mock.Of<ILogger<AuthService>>());
+                Mock.Of<ILogger<AuthService>>(),
+                _googleIdTokenValidatorMock.Object,
+                Options.Create(new GoogleAuthSettings { ClientId = googleClientId ?? string.Empty }));
         }
 
         // A normal, verified user used by most tests
@@ -341,7 +344,7 @@ namespace OZE.UnitTest.Services.Auth
         protected void VerifyNoOtpSentAndNoPendingSaved()
         {
             _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-            _emailSenderMock.Verify(e => e.SendRegistrationOtpAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+            _emailSenderMock.Verify(e => e.SendEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
             _pendingStoreMock.Verify(s => s.Save(It.IsAny<PendingRegistration>(), It.IsAny<TimeSpan>()), Times.Never);
         }
 

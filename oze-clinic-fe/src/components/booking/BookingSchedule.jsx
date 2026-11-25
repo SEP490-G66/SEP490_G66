@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import BookingDayStrip from "@/components/booking/BookingDayStrip";
 import BookingServicePicker from "@/components/booking/BookingServicePicker";
 import BookingSlotGrid from "@/components/booking/BookingSlotGrid";
+import BookingSummaryBar from "@/components/booking/BookingSummaryBar";
 import BookingStateBox from "@/components/booking/BookingStateBox";
 import BookingWeekPicker from "@/components/booking/BookingWeekPicker";
 import EarliestSlotBar from "@/components/booking/EarliestSlotBar";
@@ -10,7 +11,6 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { BOOKING_IDS, dayText } from "@/utils/booking";
 import { formatTime } from "@/utils/format";
 import { BOOKING_TEXT, CLINIC_HOTLINE, PATIENT_APPOINTMENT_STATUS, RECEPTION_BOOKING_TEXT } from "@/utils/messages";
-import { cx } from "@/utils/cx";
 import { ROUTES, getAppointmentDetailRoute } from "@/utils/routes";
 
 const GROUP_LABEL = "mt-7 mb-2.5 block font-heading text-heading-3 text-ink";
@@ -228,23 +228,33 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
                                 </p>
                             )}
                         </div>
-                        <div className="mt-7 flex flex-wrap justify-end gap-3 border-t border-border pt-5">
-                            {staff && (
+                        {staff ? (
+                            <div className="mt-7 flex flex-wrap justify-end gap-3 border-t border-border pt-5">
                                 <button type="button" className="btn btn-secondary max-sm:flex-1" onClick={onCancel}>
                                     {RECEPTION_BOOKING_TEXT.CANCEL}
                                 </button>
-                            )}
-                            <button
-                                type="button"
-                                id={BOOKING_IDS.SUBMIT}
-                                className={cx("btn btn-primary", staff ? "min-w-32 max-sm:flex-1" : "min-w-45 max-sm:w-full max-sm:min-w-0")}
-                                aria-disabled={locked || undefined}
-                                aria-describedby="booking-submit-error"
-                                onClick={actions.submit}
-                            >
-                                {state.submitting ? BOOKING_TEXT.SUBMITTING : staff ? RECEPTION_BOOKING_TEXT.SUBMIT : BOOKING_TEXT.SUBMIT}
-                            </button>
-                        </div>
+                                <button
+                                    type="button"
+                                    id={BOOKING_IDS.SUBMIT}
+                                    className="btn btn-primary min-w-32 max-sm:flex-1"
+                                    aria-disabled={locked || undefined}
+                                    aria-describedby="booking-submit-error"
+                                    onClick={actions.submit}
+                                >
+                                    {state.submitting ? BOOKING_TEXT.SUBMITTING : RECEPTION_BOOKING_TEXT.SUBMIT}
+                                </button>
+                            </div>
+                        ) : (
+                            <BookingSummaryBar
+                                date={state.day}
+                                slotStart={state.slot}
+                                serviceCount={state.items.length}
+                                locked={locked}
+                                submitting={state.submitting}
+                                describedBy="booking-submit-error"
+                                onSubmit={actions.submit}
+                            />
+                        )}
                     </>
                 )}
             </>

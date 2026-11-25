@@ -27,6 +27,10 @@ namespace OZE.Persistence.Repositories
             _context.Invoices.Update(invoice);
         }
 
+        /// <summary>
+        /// Truy vấn danh sách hóa đơn khả dụng của bệnh nhân kèm toàn bộ quan hệ (items, payments, refunds, installments, doctor, diagnoses).
+        /// Sử dụng AsSplitQuery để tối ưu hiệu năng load quan hệ nhiều-nhiều mà không bị cartesian explosion.
+        /// </summary>
         public async Task<IReadOnlyList<Invoice>> GetPatientBillingAsync(int patientId, CancellationToken cancellationToken = default)
         {
             return await _context.Invoices

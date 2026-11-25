@@ -37,7 +37,34 @@ namespace OZE.Application.Services
             CancellationToken cancellationToken = default)
         {
             var pagedServices = await _serviceRepository.GetAllAsync(parameters, cancellationToken);
-            return pagedServices.ToPagedApiResponse<Service, ServiceDto>(_mapper);
+            var response = pagedServices.ToPagedApiResponse<Service, ServiceDto>(_mapper);
+            if (parameters.IncludeVariants && response.Data != null)
+            {
+                // One query for the page and its variants instead of one variants call per service
+                var variantsById = pagedServices.Items.ToDictionary(s => s.Id, s => s.Variants);
+                foreach (var dto in response.Data.Items)
+                {
+                    var variants = variantsById.TryGetValue(dto.Id, out var list) ? list : new List<ServiceVariant>();
+                    dto.Variants = _mapper.Map<List<ServiceVariantDto>>(variants.OrderBy(v => v.DisplayOrder).ThenBy(v => v.Id).ToList());
+                }
+            }
+
+            return response;
+        }
+
+        public async Task<ApiResponse<string>> GetNextServiceCodeAsync(CancellationToken cancellationToken = default)
+        {
+            var highest = 0;
+            foreach (var code in await _serviceRepository.GetServiceCodesAsync(cancellationToken))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(code ?? string.Empty, @"^DV(\d+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var number) && number > highest)
+                {
+                    highest = number;
+                }
+            }
+
+            return ApiResponse<string>.SuccessResult($"DV{highest + 1:D3}");
         }
 
         public async Task<ApiResponse<IReadOnlyList<ServiceDto>>> GetActiveServicesAsync(

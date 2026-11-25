@@ -307,7 +307,7 @@ export const getWeekShifts = async ({ weekStart }) => {
             cells,
             summary: {
                 unassigned: upcoming.filter((cell) => cell.status === SHIFT_STATUSES.UNASSIGNED).length,
-                needReplacement: upcoming.filter((cell) => cell.status === SHIFT_STATUSES.LEAVE).length,
+                needReplacement: upcoming.filter((cell) => cell.status === SHIFT_STATUSES.LEAVE || cell.status === SHIFT_STATUSES.ABSENT).length,
             },
             maintenanceRooms: rooms.maintenance,
         },

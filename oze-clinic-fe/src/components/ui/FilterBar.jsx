@@ -1,7 +1,8 @@
 // Filter row of a list page, laid out the same everywhere: search box, then the dropdowns (the status one last),
 // then "Xoá bộ lọc" while a filter is on. On a phone each box takes the full width.
+// Boxes line up at the bottom, so the dropdowns (named above the box) sit level with the search box.
 const FilterBar = ({ children, canClear = false, onClear }) => (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-end gap-3">
         {children}
         {canClear && (
             <button type="button" className="btn btn-link" onClick={onClear}>

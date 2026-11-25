@@ -1,35 +1,32 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Clock3, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { toast } from "react-toastify";
 import CertificatesCard from "@/components/profile/CertificatesCard";
 import HealthInfoCard from "@/components/profile/HealthInfoCard";
 import Avatar from "@/components/ui/Avatar";
 import FormField from "@/components/ui/FormField";
 import Modal from "@/components/ui/Modal";
-import PasswordInput from "@/components/ui/PasswordInput";
 import useAsync from "@/hooks/useAsync";
 import {
     PROFILE_FEATURES,
-    cancelIdentityRequest,
     getMyProfile,
     requestPhoneChange,
-    submitIdentityRequest,
     updateContactInfo,
+    updateIdentityInfo,
 } from "@/services/profileService";
 import { GENDER_LABELS, PROFILE_LIMITS, PROFILE_MESSAGES, ROLE_LABELS, USER_ROLES, VALIDATION_MESSAGES } from "@/utils/messages";
 import { ROUTES, getErrorRoute } from "@/utils/routes";
-import { isRequiredEmpty, normalizePhone, requiredMessage, validateEmail, validatePhone } from "@/utils/validation";
-
-const REASON_MAX = 300;
+import {
+    isRequiredEmpty,
+    normalizePhone,
+    requiredMessage,
+    validateEmail,
+    validateFullName,
+    validatePhone,
+} from "@/utils/validation";
 
 const PHONE_UNCHANGED = "Số điện thoại mới trùng với số hiện tại.";
-
-const IDENTITY_FIELDS = [
-    { value: "fullname", label: "Họ và tên" },
-    { value: "birthdate", label: "Ngày sinh" },
-    { value: "gender", label: "Giới tính" },
-];
 
 const RELATIONSHIPS = ["Bố", "Mẹ", "Vợ", "Chồng", "Con", "Anh/chị/em", "Khác"];
 
@@ -43,16 +40,6 @@ const formatDate = (value) => (value ? value.split("-").reverse().join("/") : ""
 
 // "2024-05-12" -> "05/2024"
 const formatMonth = (value) => (value ? value.slice(0, 7).split("-").reverse().join("/") : "");
-
-const formatIdentityValue = (field, value) => {
-    if (field === "birthdate") return formatDate(value);
-    if (field === "gender") return GENDER_LABELS[value] ?? value;
-    return value;
-};
-
-const identityLabel = (field) => IDENTITY_FIELDS.find((item) => item.value === field)?.label ?? field;
-
-const lowerFirst = (text) => text.charAt(0).toLowerCase() + text.slice(1);
 
 // Card with a title row (title, optional description, optional action on the right) and a body.
 const SectionCard = ({ id, title, description, action, children }) => (
@@ -79,33 +66,48 @@ const ReadOnlyField = ({ label, value }) => (
 
 // ---------- Identity ----------
 
-const IdentityRequestModal = ({ profile, onClose, onSaved }) => {
-    const [field, setField] = useState("birthdate");
-    const [newValue, setNewValue] = useState(profile.birthdate);
-    const [reason, setReason] = useState("");
+const toIdentityValues = (profile) => ({
+    fullname: profile.fullname ?? "",
+    birthdate: profile.birthdate ?? "",
+    gender: profile.gender ?? "",
+});
+
+const toIdentityRequest = (values) => ({
+    fullname: values.fullname.trim().replace(/\s+/g, " "),
+    birthdate: values.birthdate,
+    gender: values.gender,
+});
+
+const validateIdentity = (request) => {
+    const errors = {};
+    const nameError = validateFullName(request.fullname);
+    if (nameError) errors.fullname = nameError;
+    if (request.birthdate && request.birthdate > today()) errors.birthdate = VALIDATION_MESSAGES.BIRTHDATE_IN_FUTURE;
+    return errors;
+};
+
+const IdentitySection = ({ profile, onChange }) => {
+    const [values, setValues] = useState(() => toIdentityValues(profile));
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
 
-    const changeField = (event) => {
-        setField(event.target.value);
-        setNewValue(profile[event.target.value]);
-        setErrors({});
+    const request = toIdentityRequest(values);
+    const dirty = JSON.stringify(request) !== JSON.stringify(toIdentityRequest(toIdentityValues(profile)));
+
+    const update = (changes, clearErrors) => {
+        setValues((current) => ({ ...current, ...changes }));
+        setErrors((current) => ({ ...current, ...Object.fromEntries(clearErrors.map((key) => [key, undefined])) }));
     };
 
-    const validate = () => {
-        const value = field === "fullname" ? newValue.trim().replace(/\s+/g, " ") : newValue;
-        const nextErrors = {};
-        if (isRequiredEmpty(value)) nextErrors.newValue = requiredMessage(lowerFirst(identityLabel(field)));
-        else if (value === profile[field]) nextErrors.newValue = "Giá trị mới trùng với thông tin hiện tại.";
-        else if (field === "fullname" && value.length > PROFILE_LIMITS.FULL_NAME_MAX) nextErrors.newValue = VALIDATION_MESSAGES.FULL_NAME_TOO_LONG;
-        else if (field === "birthdate" && value > today()) nextErrors.newValue = VALIDATION_MESSAGES.BIRTHDATE_IN_FUTURE;
-        if (isRequiredEmpty(reason)) nextErrors.reason = requiredMessage("lý do");
-        return { value, nextErrors };
+    const handleCancel = () => {
+        setValues(toIdentityValues(profile));
+        setErrors({});
     };
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        const { value, nextErrors } = validate();
+        if (saving) return;
+        const nextErrors = validateIdentity(request);
         setErrors(nextErrors);
         if (Object.keys(nextErrors).length > 0) {
             event.currentTarget.querySelector('[aria-invalid="true"]')?.focus();
@@ -113,42 +115,57 @@ const IdentityRequestModal = ({ profile, onClose, onSaved }) => {
         }
 
         setSaving(true);
-        const result = await submitIdentityRequest({ field, newValue: value, reason: reason.trim() });
+        const result = await updateIdentityInfo(request, profile);
         setSaving(false);
         if (!result.success) {
+            if (result.errors) setErrors(result.errors);
             toast.error(result.message);
             return;
         }
         toast.success(result.message);
-        onSaved(result.data);
-    };
-
-    const valueProps = {
-        id: "identity-newValue",
-        "aria-invalid": Boolean(errors.newValue),
-        "aria-describedby": errors.newValue ? "identity-newValue-error" : undefined,
+        onChange(result.data);
     };
 
     return (
-        <Modal
-            title="Yêu cầu thay đổi thông tin nhận dạng"
-            description="Lễ tân sẽ đối chiếu với giấy tờ tuỳ thân (CCCD) của bạn trước khi duyệt."
-            onClose={onClose}
-            closeDisabled={saving}
+        <SectionCard
+            id="identity-title"
+            title="Thông tin nhận dạng"
+            description="Dùng để xác định đúng bạn khi khám. Bạn có thể tự cập nhật họ tên, ngày sinh và giới tính."
         >
-            <form noValidate onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-                <FormField id="identity-field" label="Thông tin cần đổi" required>
-                    <select id="identity-field" className="input" value={field} onChange={changeField}>
-                        {IDENTITY_FIELDS.map((item) => (
-                            <option key={item.value} value={item.value}>
-                                {item.label}
-                            </option>
-                        ))}
-                    </select>
-                </FormField>
-                <FormField id="identity-newValue" label="Giá trị mới" required error={errors.newValue}>
-                    {field === "gender" ? (
-                        <select {...valueProps} className="input" value={newValue} onChange={(event) => setNewValue(event.target.value)}>
+            <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField id="identity-fullname" label="Họ và tên" required error={errors.fullname}>
+                        <input
+                            id="identity-fullname"
+                            className="input"
+                            maxLength={PROFILE_LIMITS.FULL_NAME_MAX}
+                            aria-invalid={Boolean(errors.fullname)}
+                            aria-describedby={errors.fullname ? "identity-fullname-error" : undefined}
+                            value={values.fullname}
+                            onChange={(event) => update({ fullname: event.target.value }, ["fullname"])}
+                        />
+                    </FormField>
+                    <FormField id="identity-birthdate" label="Ngày sinh" error={errors.birthdate}>
+                        <input
+                            id="identity-birthdate"
+                            type="date"
+                            className="input"
+                            max={today()}
+                            aria-invalid={Boolean(errors.birthdate)}
+                            aria-describedby={errors.birthdate ? "identity-birthdate-error" : undefined}
+                            value={values.birthdate}
+                            onChange={(event) => update({ birthdate: event.target.value }, ["birthdate"])}
+                        />
+                    </FormField>
+                    <FormField id="identity-gender" label="Giới tính" error={errors.gender}>
+                        <select
+                            id="identity-gender"
+                            className="input"
+                            aria-invalid={Boolean(errors.gender)}
+                            aria-describedby={errors.gender ? "identity-gender-error" : undefined}
+                            value={values.gender}
+                            onChange={(event) => update({ gender: event.target.value }, ["gender"])}
+                        >
                             <option value="">Chọn giới tính</option>
                             {Object.entries(GENDER_LABELS).map(([value, label]) => (
                                 <option key={value} value={value}>
@@ -156,123 +173,18 @@ const IdentityRequestModal = ({ profile, onClose, onSaved }) => {
                                 </option>
                             ))}
                         </select>
-                    ) : (
-                        <input
-                            {...valueProps}
-                            type={field === "birthdate" ? "date" : "text"}
-                            className="input"
-                            max={field === "birthdate" ? today() : undefined}
-                            maxLength={field === "fullname" ? PROFILE_LIMITS.FULL_NAME_MAX : undefined}
-                            value={newValue}
-                            onChange={(event) => setNewValue(event.target.value)}
-                        />
-                    )}
-                </FormField>
-                <FormField id="identity-reason" label="Lý do" required error={errors.reason}>
-                    <textarea
-                        id="identity-reason"
-                        className="input"
-                        rows={3}
-                        maxLength={REASON_MAX}
-                        placeholder="VD: Ngày sinh bị nhập sai so với CCCD."
-                        aria-invalid={Boolean(errors.reason)}
-                        aria-describedby={errors.reason ? "identity-reason-error" : undefined}
-                        value={reason}
-                        onChange={(event) => setReason(event.target.value)}
-                    />
-                </FormField>
-                <div className="modal-actions">
-                    <button type="button" className="btn btn-secondary" disabled={saving} onClick={onClose}>
+                    </FormField>
+                </div>
+                <div className="flex justify-end gap-3 border-t border-border pt-5">
+                    <button type="button" className="btn btn-secondary" disabled={!dirty || saving} onClick={handleCancel}>
                         Hủy
                     </button>
-                    <button type="submit" className="btn btn-primary" disabled={saving}>
+                    <button type="submit" className="btn btn-primary" disabled={!dirty || saving}>
                         {saving && <span className="btn-spinner" aria-hidden="true" />}
-                        Gửi yêu cầu
+                        Lưu thay đổi
                     </button>
                 </div>
             </form>
-        </Modal>
-    );
-};
-
-const PendingRequestBanner = ({ request, onCancelled }) => {
-    const [cancelling, setCancelling] = useState(false);
-    const label = identityLabel(request.field);
-
-    const handleCancel = async () => {
-        setCancelling(true);
-        const result = await cancelIdentityRequest();
-        setCancelling(false);
-        if (!result.success) {
-            toast.error(result.message);
-            return;
-        }
-        toast.info(result.message);
-        onCancelled(result.data);
-    };
-
-    return (
-        <div className="alert alert-warning mt-5">
-            <Clock3 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            <div className="flex-1">
-                <p>
-                    Đang chờ duyệt: đổi {lowerFirst(label)}{" "}
-                    <span className="num">{formatIdentityValue(request.field, request.oldValue)}</span> →{" "}
-                    <span className="num font-semibold">{formatIdentityValue(request.field, request.newValue)}</span> (gửi{" "}
-                    <span className="num">{formatDate(request.createdAt)}</span>). {label} hiện tại vẫn được dùng cho đến khi yêu cầu
-                    được duyệt.
-                </p>
-                <button type="button" className="btn btn-link mt-1 text-label disabled:bg-transparent" disabled={cancelling} onClick={handleCancel}>
-                    Huỷ yêu cầu
-                </button>
-            </div>
-        </div>
-    );
-};
-
-const IdentitySection = ({ profile, onChange }) => {
-    const [requesting, setRequesting] = useState(false);
-    const pending = profile.pendingIdentityRequest;
-
-    return (
-        <SectionCard
-            id="identity-title"
-            title="Thông tin nhận dạng"
-            description={
-                PROFILE_FEATURES.identityRequest
-                    ? "Dùng để xác định đúng bạn khi khám. Bạn không tự sửa được; gửi yêu cầu để lễ tân kiểm tra giấy tờ."
-                    : "Dùng để xác định đúng bạn khi khám. Muốn thay đổi, vui lòng liên hệ quầy lễ tân để kiểm tra giấy tờ."
-            }
-            action={
-                PROFILE_FEATURES.identityRequest && (
-                <button
-                    type="button"
-                    className="btn btn-link shrink-0 text-label disabled:bg-transparent disabled:no-underline"
-                    disabled={Boolean(pending)}
-                    title={pending ? "Bạn đang có một yêu cầu chờ duyệt" : undefined}
-                    onClick={() => setRequesting(true)}
-                >
-                    Yêu cầu thay đổi
-                </button>
-                )
-            }
-        >
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <ReadOnlyField label="Họ và tên" value={profile.fullname} />
-                <ReadOnlyField label="Ngày sinh" value={formatDate(profile.birthdate)} />
-                <ReadOnlyField label="Giới tính" value={GENDER_LABELS[profile.gender]} />
-            </div>
-            {PROFILE_FEATURES.identityRequest && pending && <PendingRequestBanner request={pending} onCancelled={onChange} />}
-            {requesting && (
-                <IdentityRequestModal
-                    profile={profile}
-                    onClose={() => setRequesting(false)}
-                    onSaved={(next) => {
-                        setRequesting(false);
-                        onChange(next);
-                    }}
-                />
-            )}
         </SectionCard>
     );
 };
@@ -284,90 +196,6 @@ const goToOtp = (navigate, data) => {
     navigate(ROUTES.PROFILE_VERIFY_OTP, {
         state: { flow: "profile", sessionId: data.sessionId, maskedDestination: data.maskedDestination },
     });
-};
-
-const PhoneChangeModal = ({ profile, onClose }) => {
-    const navigate = useNavigate();
-    const [phone, setPhone] = useState("");
-    const [currentPassword, setCurrentPassword] = useState("");
-    const [errors, setErrors] = useState({});
-    const [saving, setSaving] = useState(false);
-
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-        if (saving) return;
-        const nextErrors = {};
-        const phoneError = validatePhone(phone);
-        if (phoneError) nextErrors.phone = phoneError;
-        else if (normalizePhone(phone) === profile.phone) nextErrors.phone = PHONE_UNCHANGED;
-        if (currentPassword === "") nextErrors.currentPassword = requiredMessage("mật khẩu hiện tại");
-        setErrors(nextErrors);
-        if (nextErrors.phone || nextErrors.currentPassword) {
-            event.currentTarget.querySelector('[aria-invalid="true"]')?.focus();
-            return;
-        }
-
-        setSaving(true);
-        const result = await requestPhoneChange({ phone: normalizePhone(phone), currentPassword }, profile);
-        setSaving(false);
-        if (!result.success) {
-            if (result.errors?.phone || result.errors?.currentPassword) setErrors(result.errors);
-            else toast.error(result.message);
-            return;
-        }
-        goToOtp(navigate, result.data);
-    };
-
-    return (
-        <Modal
-            size="sm"
-            title="Đổi số điện thoại"
-            description="Số mới dùng để đăng nhập và nhận thông báo. Mã OTP sẽ được gửi qua SMS tới số mới. Thay đổi chưa lưu trên trang sẽ không được giữ."
-            onClose={onClose}
-            closeDisabled={saving}
-        >
-            <form noValidate onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
-                <FormField id="new-phone" label="Số điện thoại mới" required error={errors.phone}>
-                    <input
-                        id="new-phone"
-                        type="tel"
-                        inputMode="numeric"
-                        className="input"
-                        placeholder="09xx xxx xxx"
-                        aria-invalid={Boolean(errors.phone)}
-                        aria-describedby={errors.phone ? "new-phone-error" : undefined}
-                        value={phone}
-                        onChange={(event) => {
-                            setPhone(event.target.value);
-                            setErrors((current) => ({ ...current, phone: undefined }));
-                        }}
-                    />
-                </FormField>
-                <FormField id="phone-current-password" label="Mật khẩu hiện tại" required error={errors.currentPassword}>
-                    <PasswordInput
-                        id="phone-current-password"
-                        autoComplete="current-password"
-                        aria-invalid={Boolean(errors.currentPassword)}
-                        aria-describedby={errors.currentPassword ? "phone-current-password-error" : undefined}
-                        value={currentPassword}
-                        onChange={(event) => {
-                            setCurrentPassword(event.target.value);
-                            setErrors((current) => ({ ...current, currentPassword: undefined }));
-                        }}
-                    />
-                </FormField>
-                <div className="modal-actions">
-                    <button type="button" className="btn btn-secondary" disabled={saving} onClick={onClose}>
-                        Hủy
-                    </button>
-                    <button type="submit" className="btn btn-primary" disabled={saving}>
-                        {saving && <span className="btn-spinner" aria-hidden="true" />}
-                        Gửi mã OTP
-                    </button>
-                </div>
-            </form>
-        </Modal>
-    );
 };
 
 const toContactValues = (profile) => ({
@@ -483,10 +311,15 @@ const RemoveEmailModal = ({ saving, onConfirm, onClose }) => (
 );
 
 const ContactSection = ({ profile, onChange }) => {
+    const navigate = useNavigate();
+    const hasPhone = Boolean(profile.phone);
+    const phoneVerified = hasPhone && profile.phoneConfirmed;
     const [values, setValues] = useState(() => toContactValues(profile));
+    const [phoneDraft, setPhoneDraft] = useState(profile.phone || "");
+    const [phoneError, setPhoneError] = useState();
     const [errors, setErrors] = useState({});
     const [saving, setSaving] = useState(false);
-    const [changingPhone, setChangingPhone] = useState(false);
+    const [sendingOtp, setSendingOtp] = useState(false);
     const [confirmingRemoval, setConfirmingRemoval] = useState(false);
 
     const request = toContactRequest(values);
@@ -532,26 +365,71 @@ const ContactSection = ({ profile, onChange }) => {
         save();
     };
 
+    const handlePhoneAction = async () => {
+        if (sendingOtp) return;
+        const nextError = validatePhone(phoneDraft);
+        if (nextError) {
+            setPhoneError(nextError);
+            document.getElementById("contact-phone")?.focus();
+            return;
+        }
+        const normalized = normalizePhone(phoneDraft);
+        if (hasPhone && normalized === profile.phone) {
+            setPhoneError(PHONE_UNCHANGED);
+            document.getElementById("contact-phone")?.focus();
+            return;
+        }
+
+        setSendingOtp(true);
+        const result = await requestPhoneChange({ phone: normalized }, profile);
+        setSendingOtp(false);
+        if (!result.success) {
+            if (result.errors?.phone) setPhoneError(result.errors.phone);
+            else toast.error(result.message);
+            return;
+        }
+        goToOtp(navigate, result.data);
+    };
+
     return (
         <SectionCard
             id="contact-title"
             title="Thông tin liên hệ"
-            description="Bạn có thể tự cập nhật. Đổi số điện thoại cần mật khẩu và mã OTP gửi tới số mới; email mới cần xác nhận qua link gửi tới email đó."
+            description="Bạn có thể tự cập nhật. Số điện thoại mới cần xác minh bằng mã OTP gửi qua SMS; email mới cần xác nhận qua link gửi tới email đó."
         >
             <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-5">
-                <div className="field">
-                    <p className="label label-required">Số điện thoại</p>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                        <p className="input input-readonly num max-w-xs flex-1">{profile.phone}</p>
-                        <button type="button" className="btn btn-link text-label" onClick={() => setChangingPhone(true)}>
-                            Đổi số điện thoại
+                <FormField id="contact-phone" label="Số điện thoại" required error={phoneError}>
+                    <div className="flex flex-wrap items-start gap-3">
+                        <input
+                            id="contact-phone"
+                            type="tel"
+                            inputMode="numeric"
+                            className="input num max-w-xs flex-1"
+                            placeholder="09xx xxx xxx"
+                            aria-invalid={Boolean(phoneError)}
+                            aria-describedby={phoneError ? "contact-phone-error" : "contact-phone-hint"}
+                            value={phoneDraft}
+                            onChange={(event) => {
+                                setPhoneDraft(event.target.value);
+                                setPhoneError(undefined);
+                            }}
+                        />
+                        <button type="button" className="btn btn-primary shrink-0" disabled={sendingOtp} onClick={handlePhoneAction}>
+                            {sendingOtp && <span className="btn-spinner" aria-hidden="true" />}
+                            {hasPhone ? "Đổi số điện thoại" : "Xác minh số điện thoại"}
                         </button>
                     </div>
-                    <p className="flex flex-wrap items-center gap-2 text-caption text-muted">
-                        <span className="badge badge-success">Đã xác minh</span>
-                        Đổi số cần mật khẩu và mã OTP gửi về số mới.
+                    <p id="contact-phone-hint" className="flex flex-wrap items-center gap-2 text-caption text-muted">
+                        {phoneVerified ? (
+                            <span className="badge badge-success">Đã xác minh</span>
+                        ) : (
+                            <span className="badge badge-warning">Chưa xác minh</span>
+                        )}
+                        {hasPhone
+                            ? "Nhập số mới rồi bấm Đổi số điện thoại để nhận OTP."
+                            : "Nhập số điện thoại rồi bấm Xác minh để nhận OTP."}
                     </p>
-                </div>
+                </FormField>
 
                 <FormField id="contact-email" label="Email" error={errors.email}>
                     <input
@@ -614,7 +492,6 @@ const ContactSection = ({ profile, onChange }) => {
                     </button>
                 </div>
             </form>
-            {changingPhone && <PhoneChangeModal profile={profile} onClose={() => setChangingPhone(false)} />}
             {confirmingRemoval && <RemoveEmailModal saving={saving} onConfirm={save} onClose={() => setConfirmingRemoval(false)} />}
         </SectionCard>
     );
@@ -697,10 +574,32 @@ const ProfilePage = () => {
             {header}
             <div className="flex flex-col gap-6">
                 <ProfileSummary profile={profile} isPatient={isPatient} />
-                <IdentitySection profile={profile} onChange={setUpdated} />
+                {isPatient ? (
+                    <IdentitySection
+                        key={`${profile.fullname}|${profile.birthdate}|${profile.gender}`}
+                        profile={profile}
+                        onChange={setUpdated}
+                    />
+                ) : (
+                    <SectionCard
+                        id="identity-title"
+                        title="Thông tin nhận dạng"
+                        description="Thông tin nhân viên do quản lý phòng khám cập nhật."
+                    >
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <ReadOnlyField label="Họ và tên" value={profile.fullname} />
+                            <ReadOnlyField label="Ngày sinh" value={formatDate(profile.birthdate)} />
+                            <ReadOnlyField label="Giới tính" value={GENDER_LABELS[profile.gender]} />
+                        </div>
+                    </SectionCard>
+                )}
                 {/* key: a saved profile resets the form to the stored values. */}
                 {isPatient ? (
-                    <ContactSection key={JSON.stringify(toContactValues(profile))} profile={profile} onChange={setUpdated} />
+                    <ContactSection
+                        key={`${profile.phone}|${profile.phoneConfirmed}|${JSON.stringify(toContactValues(profile))}`}
+                        profile={profile}
+                        onChange={setUpdated}
+                    />
                 ) : (
                     <StaffContactSection profile={profile} />
                 )}

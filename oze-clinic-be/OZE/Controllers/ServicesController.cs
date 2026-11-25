@@ -27,8 +27,20 @@ namespace OZE.Controllers
             [FromQuery] ServiceQueryParameters query,
             CancellationToken cancellationToken)
         {
+            // Variants (also the inactive ones) are only for the manager, like GET {id}/variants
+            query.IncludeVariants = query.IncludeVariants && User.IsInRole(RoleConstants.ClinicManagerRole);
             var result = await _clinicService.GetServicesAsync(query, cancellationToken);
             return Ok(result);
+        }
+
+        /// <summary>
+        /// Next free "DVnnn" code for a new service. Requires ClinicManager role.
+        /// </summary>
+        [HttpGet("next-code")]
+        [Authorize(Roles = RoleConstants.ClinicManagerRole)]
+        public async Task<ActionResult<ApiResponse<string>>> GetNextServiceCodeAsync(CancellationToken cancellationToken)
+        {
+            return Ok(await _clinicService.GetNextServiceCodeAsync(cancellationToken));
         }
 
         /// <summary>

@@ -14,6 +14,15 @@ services:
       - JwtSettings__Issuer=${JWT_ISSUER:-OZEApp}
       - JwtSettings__Audience=${JWT_AUDIENCE:-OZEApi}
       - JwtSettings__ExpiresInMinutes=${JWT_EXPIRES_IN_MINUTES:-60}
+      - GoogleAuth__ClientId=${GOOGLE_CLIENT_ID:-}
       - AuthMessageSenderOptions__SendGridKey=${SENDGRID_KEY:-}
       - AuthMessageSenderOptions__SenderEmail=${SENDER_EMAIL:-support@oze.com}
       - AuthMessageSenderOptions__SenderName=${SENDER_NAME:-OZE Support}
+      - AuthSmsSenderOptions__ApiKey=${ESMS_API_KEY:-}
+      - AuthSmsSenderOptions__SecretKey=${ESMS_SECRET_KEY:-}
+      - AuthSmsSenderOptions__Brandname=${ESMS_BRANDNAME:-}
+      - AuthSmsSenderOptions__SmsType=${ESMS_SMS_TYPE:-2}
+      - AuthSmsSenderOptions__IsUnicode=${ESMS_IS_UNICODE:-0}
+      - AuthSmsSenderOptions__Sandbox=${ESMS_SANDBOX:-1}
+      - AuthSmsSenderOptions__OtpTemplate=${ESMS_OTP_TEMPLATE:-}
+      - AuthSmsSenderOptions__ResetPasswordOtpTemplate=${ESMS_RESET_PASSWORD_OTP_TEMPLATE:-}

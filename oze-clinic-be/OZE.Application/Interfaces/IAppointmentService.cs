@@ -10,6 +10,8 @@ namespace OZE.Application.Interfaces
     {
         Task<List<BookableServiceResponse>> GetBookableServicesAsync();
         Task<List<AvailableSlotResponse>> GetAvailableSlotsAsync(AvailableSlotRequest request);
+        // Free-slot count of every day of a range, in one request (booking calendar)
+        Task<List<AvailableDayResponse>> GetAvailableDaysAsync(AvailableDaysRequest request);
         Task<AppointmentResponse> BookAsGuestAsync(GuestBookingRequest request);
         Task<AppointmentResponse> BookAsPatientAsync(BookingRequest request, string userId);
         Task<AppointmentResponse> BookByReceptionistAsync(ReceptionBookingRequest request, string receptionistUserId);

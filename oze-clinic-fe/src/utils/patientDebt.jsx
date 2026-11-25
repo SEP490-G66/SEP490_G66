@@ -2,8 +2,6 @@ import { formatCurrency, formatDate, getClinicDateTimeParts } from "./format";
 import { norm } from "./medicalRecord";
 import { PATIENT_DEBT_PAY_TYPE, PATIENT_DEBT_STATUS, PATIENT_DEBT_TEXT, PAYMENT_METHOD_LABELS } from "./messages";
 
-export const DEBT_NAV_FLAG = "paymentDebtNav";
-export const DEBT_ID_PATTERN = /^invoice-[1-9]\d*$/;
 export const DEBT_PAGE_SIZE = 5;
 export const DEBT_TYPE_ALL = "all";
 export const DEBT_TYPES = Object.keys(PATIENT_DEBT_PAY_TYPE);
@@ -15,22 +13,9 @@ export const DEBT_SORTS = [
     { value: "new", label: PATIENT_DEBT_TEXT.SORT_NEW },
 ];
 
-export const DEBT_TITLE_ID = "payment-debt-title";
-export const DEBT_SEARCH_ID = "payment-debt-search";
-export const DEBT_FILTER_BUTTON_ID = "payment-debt-filter-button";
-export const DEBT_SORT_BUTTON_ID = "payment-debt-sort-button";
-export const DEBT_STATUS_BUTTON_ID = "payment-debt-status-help";
-export const DEBT_RETRY_ID = "payment-debt-retry";
-
-export const debtOpenSelector = (id) => `[data-debt-open="${id}"]`;
-
 const NO_VALUE = "—";
 const DATE_PATTERN = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 const NO_DATE_KEY = "99999999";
-const STATUS_RANK = { overdue: 0, open: 1, upcoming: 2, paid: 3 };
-const SORT_KEYS = new Set(DEBT_SORTS.map((option) => option.value));
-const PAGE_PATTERN = /^[1-9]\d*$/;
-
 const PAY_TYPE = { ONCE: "once", STEP: "step", INSTALLMENT: "installment" };
 const PERIOD_STATUS = { Paid: "paid", Overdue: "overdue", Pending: "later" };
 const STEP_DONE = "DONE";
@@ -125,6 +110,8 @@ export const toDebtItem = (account) => {
         invoiceId,
         type,
         name: account.name || account.invoiceNumber || NO_VALUE,
+        invoiceNumber: account.invoiceNumber ?? "",
+        doctorName: account.doctorName ?? "",
         sub: subLine(account, type),
         total: toNumber(account.finalAmount),
         paid: toNumber(account.paidAmount),
@@ -151,15 +138,6 @@ export const toDebtItem = (account) => {
     return withSearch({ ...base, lines });
 };
 
-const byId = (a, b) => a.invoiceId - b.invoiceId;
-const byStart = (a, b) => dateKey(a.start).localeCompare(dateKey(b.start));
-
-const COMPARE = {
-    due: (a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || byStart(a, b) || byId(a, b),
-    left: (a, b) => b.due - a.due || STATUS_RANK[a.status] - STATUS_RANK[b.status] || byStart(a, b) || byId(a, b),
-    new: (a, b) => dateKey(b.start).localeCompare(dateKey(a.start)) || b.invoiceId - a.invoiceId,
-};
-
 export const inType = (items, type) => (type === DEBT_TYPE_ALL ? items : items.filter((item) => item.type === type));
 
 export const filterDebts = (items, query) => {
@@ -167,48 +145,7 @@ export const filterDebts = (items, query) => {
     return inType(items, query.type).filter((item) => (!keyword || item.search.includes(keyword)) && (!query.status.length || query.status.includes(item.status)));
 };
 
-export const sortDebts = (items, sort) => [...items].sort(COMPARE[sort] ?? COMPARE[DEBT_DEFAULT_SORT]);
-
-export const countByType = (items) => Object.fromEntries([DEBT_TYPE_ALL, ...DEBT_TYPES].map((type) => [type, inType(items, type).length]));
-
 export const countByStatus = (items, type) => {
     const scoped = inType(items, type);
     return Object.fromEntries(DEBT_STATUSES.map((status) => [status, scoped.filter((item) => item.status === status).length]));
 };
-
-export const readDebtQuery = (searchParams) => {
-    const type = searchParams.get("type");
-    const sort = searchParams.get("sort");
-    const page = searchParams.get("page") ?? "";
-    const status = (searchParams.get("status") ?? "").split(",").filter((value) => DEBT_STATUSES.includes(value));
-    return {
-        type: DEBT_TYPES.includes(type) ? type : DEBT_TYPE_ALL,
-        q: (searchParams.get("q") ?? "").trim(),
-        status: [...new Set(status)],
-        sort: SORT_KEYS.has(sort) ? sort : DEBT_DEFAULT_SORT,
-        page: PAGE_PATTERN.test(page) ? Number(page) : 1,
-    };
-};
-
-export const buildDebtSearch = (query) => {
-    const params = new URLSearchParams();
-    if (query.type !== DEBT_TYPE_ALL) params.set("type", query.type);
-    if (query.q.trim()) params.set("q", query.q.trim());
-    if (query.status.length) params.set("status", query.status.join(","));
-    if (query.sort !== DEBT_DEFAULT_SORT) params.set("sort", query.sort);
-    if (query.page > 1) params.set("page", String(query.page));
-    const search = params.toString().replace(/%2C/g, ",");
-    return search ? `?${search}` : "";
-};
-
-export const pageCount = (total) => Math.max(1, Math.ceil(total / DEBT_PAGE_SIZE));
-
-export const clampPage = (query, total) => ({ ...query, page: Math.min(query.page, pageCount(total)) });
-
-export const debtProgress = (item) => {
-    const unpaid = item.due + item.planned;
-    const percent = item.total > 0 ? Math.min(100, Math.max(0, unpaid > 0 ? Math.floor((item.paid * 100) / item.total) : 100)) : 100;
-    return { percent, cells: Math.floor(percent / 5) };
-};
-
-export const findDebt = (items, id) => (typeof id === "string" && DEBT_ID_PATTERN.test(id) ? (items.find((item) => item.id === id) ?? null) : null);

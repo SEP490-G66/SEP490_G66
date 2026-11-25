@@ -15,15 +15,19 @@ export const ROUTES = {
     SEARCH: "/search",
     ARTICLE_DETAIL: "/articles/:articleSlug",
     CONTACT: "/contact",
+    PRIVACY_POLICY: "/chinh-sach-bao-mat",
+    TERMS_OF_USE: "/dieu-khoan-su-dung",
     BOOK_APPOINTMENT: "/book-appointment",
     PROFILE: "/profile",
     PROFILE_VERIFY_OTP: "/profile/verify-otp",
     CHANGE_PASSWORD: "/change-password",
     DASHBOARD: "/dashboard",
     APPOINTMENTS: "/appointments",
-    MEDICAL_RECORD: "/medical-record",
+    MEDICAL_RECORD: "/medical-history",
     APPOINTMENT_DETAIL: "/appointments/:appointmentId",
-    MEDICAL_RECORD_DETAIL: "/medical-record/:examinationId",
+    MEDICAL_RECORD_DETAIL: "/medical-history/:examinationId",
+    TREATMENT_PLANS: "/treatment-plans",
+    DOCUMENTS: "/documents",
     PAYMENT_DEBTS: "/payments/debts",
     PAYMENT_HISTORY: "/payments/history",
     REFUND_REQUESTS: "/payments/refunds",
@@ -73,7 +77,7 @@ export const ROUTES = {
 export const ROLE_ROUTES = [
     {
         roles: [USER_ROLES.PATIENT],
-        paths: [ROUTES.APPOINTMENTS, ROUTES.BOOK_APPOINTMENT, ROUTES.MEDICAL_RECORD, ROUTES.PAYMENT_DEBTS, ROUTES.PAYMENT_HISTORY, ROUTES.REFUND_REQUESTS]
+        paths: [ROUTES.APPOINTMENTS, ROUTES.BOOK_APPOINTMENT, ROUTES.MEDICAL_RECORD, ROUTES.TREATMENT_PLANS, ROUTES.DOCUMENTS, ROUTES.PAYMENT_DEBTS, ROUTES.PAYMENT_HISTORY, ROUTES.REFUND_REQUESTS]
     },
     {
         roles: [USER_ROLES.DOCTOR],
@@ -130,18 +134,9 @@ export const getArticleDetailRoute = (articleSlug) => generatePath(ROUTES.ARTICL
 
 export const getAppointmentDetailRoute = (appointmentId) => generatePath(ROUTES.APPOINTMENT_DETAIL, { appointmentId: String(appointmentId) });
 
-export const MEDICAL_RECORD_QUERY = { TAB: "tab", PLAN: "plan" };
-export const PAYMENT_HISTORY_QUERY = { INVOICE: "invoice" };
+export const getTreatmentPlanRoute = (planId) => (planId != null ? `${ROUTES.TREATMENT_PLANS}/${planId}` : ROUTES.TREATMENT_PLANS);
 
-export const MEDICAL_RECORD_TABS = { PLAN: "plan", FILM: "film", TEETH: "teeth", HIST: "hist" };
-
-export const getTreatmentPlanRoute = (planId) => {
-    const params = new URLSearchParams({ [MEDICAL_RECORD_QUERY.TAB]: MEDICAL_RECORD_TABS.PLAN });
-    if (planId != null) params.set(MEDICAL_RECORD_QUERY.PLAN, String(planId));
-    return `${ROUTES.MEDICAL_RECORD}?${params}`;
-};
-
-export const getPaymentHistoryRoute = (invoiceId) => `${ROUTES.PAYMENT_HISTORY}?${new URLSearchParams({ [PAYMENT_HISTORY_QUERY.INVOICE]: String(invoiceId) })}`;
+export const getPaymentHistoryRoute = (invoiceId) => `${ROUTES.PAYMENT_HISTORY}/${invoiceId}`;
 
 export const getPaymentDebtDetailRoute = (debtId) => `${ROUTES.PAYMENT_DEBTS}/${debtId}`;
 

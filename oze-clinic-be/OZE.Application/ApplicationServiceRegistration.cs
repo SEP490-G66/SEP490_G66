@@ -15,6 +15,7 @@ namespace OZE.Application
         {
             // Configure Options
             services.Configure<JwtSettings>(configuration.GetSection("JwtSettings"));
+            services.Configure<GoogleAuthSettings>(configuration.GetSection("GoogleAuth"));
             services.Configure<AuthMessageSenderOptions>(configuration.GetSection("AuthMessageSenderOptions"));
             services.Configure<AuthSmsSenderOptions>(configuration.GetSection("AuthSmsSenderOptions"));
             services.Configure<RegisterOtpSettings>(configuration.GetSection("RegisterOtpSettings"));
@@ -43,6 +44,7 @@ namespace OZE.Application
 
             // Register Services
             services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+            services.AddHttpClient<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddSingleton<IOtpSendLimiter, OtpSendLimiter>();
             services.AddSingleton<IAccessTokenRevocationStore, AccessTokenRevocationStore>();
@@ -53,7 +55,10 @@ namespace OZE.Application
             services.AddScoped<IRoleService, RoleService>();
             services.AddScoped<IEmailSender, EmailSender>();
             services.AddScoped<IHomeService, HomeService>();
-            services.AddScoped<ISmsSender, SmsSender>();
+            services.AddHttpClient<ISmsSender, SmsSender>(client =>
+            {
+                client.BaseAddress = new Uri("https://rest.esms.vn/");
+            });
             services.AddScoped<IWorkShipService, WorkShiftService>();
             services.AddScoped<ITreatmentPlanService, TreatmentPlanService>();
             services.AddSingleton<IPendingRegistrationStore, PendingRegistrationStore>();
@@ -66,6 +71,7 @@ namespace OZE.Application
             services.AddScoped<IMedicalRecordService, MedicalRecordService>();
             services.AddScoped<IImagingRequestService, ImagingRequestService>();
             services.AddScoped<IDocumentRequestService, DocumentRequestService>();
+            services.AddScoped<IProvidedDocumentService, ProvidedDocumentService>();
             services.AddScoped<IImagingCaptureService, ImagingCaptureService>();
             services.AddScoped<IImagingHistoryService, ImagingHistoryService>();
             services.AddScoped<IImagingReviewService, ImagingReviewService>();

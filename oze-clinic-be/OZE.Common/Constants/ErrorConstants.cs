@@ -39,6 +39,7 @@ namespace OZE.Common.Constants
             public const string PasswordInvalid = "Password is invalid. Please check again.";
             public const string ConfirmPasswordInvalid = "Confirm password is invalid. Please check again.";
             public const string VerificationMethodInvalid = "Verification method is invalid. Please check again.";
+            public const string PasswordResetPhoneOnly = "Password reset is only available via phone number.";
             public const string InvalidOtp = "OTP is invalid. Please check again.";
             public const string InvalidData = "{0} is invalid. Please check again.";
             // MSG10, formatted with the phone number
@@ -66,6 +67,10 @@ namespace OZE.Common.Constants
             public const string SamePassword = "New password cannot be the same as current password";
             public const string PasswordMismatch = "New password and confirmation password do not match";
             public const string LogoutRequiresToken = "Refresh token or authenticated user is required";
+            public const string GoogleTokenInvalid = "Google sign-in token is invalid or expired.";
+            public const string GoogleEmailNotVerified = "Google email is not verified.";
+            public const string GoogleNotPatient = "Google sign-in is only available for patient accounts.";
+            public const string GoogleNotConfigured = "Google sign-in is not configured.";
         }
 
         // Stable codes for login failures (UC-04). FE matches these instead of English message text.
@@ -74,6 +79,10 @@ namespace OZE.Common.Constants
             public const string InvalidCredentials = "INVALID_CREDENTIALS";
             public const string LockedOut = "LOCKED_OUT";
             public const string AccountDisabled = "ACCOUNT_DISABLED";
+            public const string GoogleTokenInvalid = "GOOGLE_TOKEN_INVALID";
+            public const string GoogleEmailNotVerified = "GOOGLE_EMAIL_NOT_VERIFIED";
+            public const string GoogleNotPatient = "GOOGLE_NOT_PATIENT";
+            public const string GoogleNotConfigured = "GOOGLE_NOT_CONFIGURED";
         }
 
         public static class RoomMessage
@@ -296,19 +305,22 @@ namespace OZE.Common.Constants
             public const string SlotRequired = "Appointment time slot is required";
             public const string PastDate = "Appointment date cannot be in the past";
             public const string TooFarAhead = "Appointment date is too far in advance";
+            public const string DateRangeInvalid = "From date must be on or before To date.";
+            public const string DateRangeTooLong = "The date range must be at most 62 days.";
             public const string SlotNotAvailable = "This time slot is no longer available. Please choose another time";
             public const string PhoneHasAccount = "This phone number already has an account. Please sign in to book";
             public const string WalkInPatientInClinic = "The patient is already being seen today";
             public const string WalkInPatientHasConfirmedToday = "The patient has a confirmed appointment today. Check in that appointment instead";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
+            public const string PatientHasScheduledTreatmentSession = "You already have a treatment session scheduled in your treatment plan. Please contact the clinic to change it instead of booking a new appointment";
+            public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";
             public const string OnlyOpenCanBeCancelled = "Only an appointment that is pending or confirmed can be cancelled";
-            public const string ConfirmedNeedsReceptionistToCancel = "This appointment is already confirmed. Please call the clinic to cancel it";
             public const string CancelDeadlinePassed = "It is too close to the appointment time to cancel online. Please call the clinic";
             public const string OnlyOpenCanBeRescheduled = "Only an appointment that is pending or confirmed can be rescheduled";
-            public const string ConfirmedNeedsReceptionistToReschedule = "This appointment is already confirmed. Please call the clinic to reschedule it";
-            public const string RescheduleDeadlinePassed = "It is too close to the appointment time to reschedule online. Please call the clinic";            public const string ReasonRequired = "Cancellation reason is required";
+            public const string RescheduleDeadlinePassed = "It is too close to the appointment time to reschedule online. Please call the clinic";
+            public const string ReasonRequired = "Cancellation reason is required";
             public const string OnlyConfirmedCanBeCheckedIn = "Only a confirmed appointment can be checked in";
             public const string CheckInNeedsConfirmation = "This appointment is not confirmed yet. Please confirm it before check-in";
             public const string CheckInWrongDay = "Check-in is only possible on the day of the appointment";
@@ -507,6 +519,25 @@ namespace OZE.Common.Constants
             public const string RequestCreated = "Document request has been sent to the patient.";
             public const string RequestCancelled = "Document request has been cancelled.";
             public const string FilesUploaded = "Documents uploaded.";
+        }
+
+        // Documents the patient uploads without a doctor's request ("Cung cấp tài liệu")
+        public static class ProvidedDocumentMessage
+        {
+            public const string DocumentNameRequired = "Please enter document name.";
+            public const string DocumentNameInvalid = "Document name must be at most 200 characters.";
+            public const string ProviderAddressRequired = "Please enter provider address.";
+            public const string ProviderAddressInvalid = "Provider address must be at most 300 characters.";
+            public const string PerformedOnInFuture = "Performed date cannot be in the future.";
+            public const string UploadFilesRequired = "Please choose at least one file.";
+            public const string UploadTooManyFiles = "You can upload at most 5 files for a document.";
+            public const string UploadFileTypeInvalid = "{0} is not a supported file. Use .pdf, .jpg, .jpeg, .png or .dcm.";
+            public const string UploadFileTooLarge = "{0} is larger than 20 MB.";
+            public const string UploadFileEmpty = "{0} is empty.";
+            public const string DocumentNotFound = "Document not found.";
+            public const string CannotDelete = "You do not have permission to delete this document.";
+            public const string Uploaded = "Document uploaded.";
+            public const string Deleted = "Document deleted.";
         }
 
         // Capturing on the X-ray simulator and reading the stored pictures
@@ -709,7 +740,7 @@ namespace OZE.Common.Constants
             public const string ContactRecorded = "Call result has been recorded.";
             public const string InvoiceNotFound = "Invoice not found.";
             public const string NothingOwed = "This invoice has nothing left to pay.";
-            public const string NoContact = "The patient has no phone number or email to send a reminder to.";
+            public const string NoContact = "The patient has no email to send a reminder to.";
             public const string RemindedRecently = "A payment reminder was sent less than 4 hours ago. Send again only if needed.";
             public const string PaymentReminded = "Payment reminder has been sent.";
             public const string SendFailed = "The reminder could not be sent by SMS or email. Try again later or call the patient.";

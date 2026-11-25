@@ -58,6 +58,7 @@ const toMember = (item) => ({
     specialization: item.specialization ?? "",
     licenseNumber: item.licenseNumber ?? "",
     status: item.isActive ? ACCOUNT_STATUSES.ACTIVE : ACCOUNT_STATUSES.LOCKED,
+    temporaryPassword: item.temporaryPassword ?? undefined,
 });
 
 // Specialization and license number are only kept for doctors (the backend drops them for other roles).

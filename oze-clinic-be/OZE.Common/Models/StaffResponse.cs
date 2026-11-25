@@ -14,5 +14,10 @@ namespace OZE.Common.Models
         public DateOnly? HireDate { get; set; }
         public bool IsActive { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
+
+        /// <summary>
+        /// One-time temporary password returned only when creating staff (not emailed).
+        /// </summary>
+        public string? TemporaryPassword { get; set; }
     }
 }

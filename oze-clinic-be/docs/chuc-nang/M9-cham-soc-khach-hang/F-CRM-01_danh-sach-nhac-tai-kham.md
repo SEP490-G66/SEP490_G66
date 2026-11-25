@@ -103,7 +103,7 @@ Chưa có code. Luồng đề xuất:
 - Ca kiểm thử trọng tâm:
   - Bác sĩ chỉ định ngày tái khám hợp lệ trong tương lai.
   - Phân quyền: Chỉ lễ tân hoặc bác sĩ phụ trách mới có quyền gửi nhắc nhở hoặc đặt lịch tái khám.
-  - Xử lý gửi đồng thời đa kênh (In-App notification, SMS qua Twilio/mock, Email qua SMTP) non-blocking.
+  - Xử lý gửi đồng thời đa kênh (In-App notification, SMS qua eSMS/mock, Email qua SMTP) non-blocking.
   - Xử lý tự động qua `FollowUpReminderBackgroundService` chạy nền hằng ngày lúc 08:00 (giờ VN).
 
 ## 9. Còn thiếu / câu hỏi mở

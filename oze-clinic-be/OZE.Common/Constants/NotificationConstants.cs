@@ -35,6 +35,9 @@ namespace OZE.Common.Constants
             public const string AppointmentConfirmedMessage = "Lịch hẹn của bạn lúc {0} ngày {1} đã được phòng khám xác nhận.";
             public const string AppointmentBookedByClinicTitle = "Phòng khám đã đặt lịch cho bạn";
             public const string AppointmentBookedByClinicMessage = "Bạn có lịch hẹn lúc {0} ngày {1}. Lịch đã được xác nhận.";
+            // A returning patient books online and the booking is confirmed without a call back
+            public const string ReturningBookingConfirmedTitle = "Đặt lịch thành công";
+            public const string ReturningBookingConfirmedMessage = "Lịch hẹn của bạn lúc {0} ngày {1} đã được xác nhận. Hẹn gặp bạn tại phòng khám.";
             public const string AppointmentRescheduledTitle = "Lịch hẹn đã được đổi";
             public const string AppointmentRescheduledMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1}.";
             public const string AppointmentRescheduledWithDoctorMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1} với {2}.";
@@ -80,6 +83,9 @@ namespace OZE.Common.Constants
             // Receptionist
             public const string NewOnlineBookingTitle = "Có lịch đặt mới chờ xác nhận";
             public const string NewOnlineBookingMessage = "{0} đặt lịch lúc {1} ngày {2}. Gọi bệnh nhân để xác nhận.";
+            // A returning patient's online booking is already confirmed, so nobody needs to call
+            public const string ReturningOnlineBookingTitle = "Khách quen đặt lịch mới";
+            public const string ReturningOnlineBookingMessage = "{0} (khách quen) đặt lịch lúc {1} ngày {2}. Lịch đã tự xác nhận, không cần gọi lại.";
             public const string PatientRescheduledTitle = "Bệnh nhân đổi lịch, chờ xác nhận lại";
             public const string PatientRescheduledMessage = "{0} đổi lịch sang {1} ngày {2}. Gọi bệnh nhân để xác nhận lại.";
             public const string PatientCancelledTitle = "Bệnh nhân tự hủy lịch";

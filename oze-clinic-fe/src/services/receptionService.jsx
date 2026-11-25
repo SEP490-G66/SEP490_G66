@@ -265,10 +265,6 @@ export const getPatientInvoices = (patientId, query = { pageSize: 50 }, config =
 export const getPatientTreatmentPlans = (patientId, query = {}, config = {}) =>
     call(() => api.get(`/api/patients/${patientId}/treatment-plans`, { ...config, params: query }));
 
-export const getTreatmentPlan = (planId, config = {}) => call(() => api.get(`/api/TreatmentPlans/${planId}`, config));
-
-export const approveTreatmentPlan = (planId, config = {}) => call(() => api.post(`/api/TreatmentPlans/${planId}/approve`, undefined, config));
-
 // ----- consultation requests from the public site -----
 export const getConsultations = ({ status, keyword, page = 1, pageSize = 10 } = {}) =>
     call(() => api.get("/api/consultation-requests", { params: { status: status || undefined, searchKeyword: keyword || undefined, pageNumber: page, pageSize } }));
