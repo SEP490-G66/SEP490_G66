@@ -27,6 +27,9 @@ services:
       - AuthSmsSenderOptions__OtpTemplate=${ESMS_OTP_TEMPLATE:-}
       - AuthSmsSenderOptions__ResetPasswordOtpTemplate=${ESMS_RESET_PASSWORD_OTP_TEMPLATE:-}
       - ImagingStorage__RootPath=/app/data/imaging
+      - ReverseProxy__UseHttpsRedirection=${REVERSE_PROXY_USE_HTTPS_REDIRECTION:-true}
+      - ReverseProxy__KnownProxies__0=${REVERSE_PROXY_KNOWN_PROXIES_0:-}
+      - Cors__AllowedOrigins__0=${CORS_ALLOWED_ORIGINS_0:-}
     volumes:
       - oze-imaging:/app/data/imaging
 

@@ -78,8 +78,8 @@ namespace OZE.Controllers
         /// </summary>
         [Authorize(Roles = RoleConstants.DentalImagingTechnicianRole)]
         [HttpPost("imaging-requests/{id:long}/results")]
-        [RequestSizeLimit(ImagingRequestConstants.UploadMaxFiles * ImagingRequestConstants.UploadMaxFileBytes)]
-        [RequestFormLimits(MultipartBodyLengthLimit = ImagingRequestConstants.UploadMaxFiles * ImagingRequestConstants.UploadMaxFileBytes)]
+        [RequestSizeLimit(ImagingRequestConstants.UploadMaxRequestBytes)]
+        [RequestFormLimits(MultipartBodyLengthLimit = ImagingRequestConstants.UploadMaxRequestBytes)]
         public async Task<ActionResult<ApiResponse<List<ImagingCaptureImageResponse>>>> UploadAsync(
             long id,
             [FromForm] List<IFormFile> files,

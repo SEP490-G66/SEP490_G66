@@ -1,5 +1,7 @@
-    using System.Text;
+using System.Net;
+using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -23,6 +25,10 @@ var builder = WebApplication.CreateBuilder(args);
 // and optional, so servers that take their settings from environment variables run without it
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
+const string CorsPolicyName = "ConfiguredCors";
+// Vite / Playwright local frontend origins (used only when Cors:AllowedOrigins is empty in Development)
+var developmentCorsOrigins = new[] { "http://localhost:5173", "https://localhost:5173" };
+
 // 1. Add Services
 // Keep the "Async" suffix in action names, so CreatedAtAction(nameof(GetXxxAsync)) finds the action
 builder.Services.AddControllers(options => options.SuppressAsyncSuffixInActionNames = false);
@@ -32,14 +38,68 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddApplication(builder.Configuration);
 
-// 3. Configure CORS
+// Reverse proxy + CORS settings (env: ReverseProxy__*, Cors__AllowedOrigins__*)
+builder.Services.Configure<ReverseProxySettings>(builder.Configuration.GetSection(ReverseProxySettings.SectionName));
+builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(CorsSettings.SectionName));
+
+var reverseProxySettings = builder.Configuration.GetSection(ReverseProxySettings.SectionName).Get<ReverseProxySettings>()
+    ?? new ReverseProxySettings();
+var corsSettings = builder.Configuration.GetSection(CorsSettings.SectionName).Get<CorsSettings>()
+    ?? new CorsSettings();
+
+// Trust only loopback defaults plus explicitly configured proxies; do not clear KnownProxies / KnownIPNetworks
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+
+    foreach (var proxy in reverseProxySettings.KnownProxies)
+    {
+        if (string.IsNullOrWhiteSpace(proxy))
+        {
+            continue;
+        }
+
+        if (!IPAddress.TryParse(proxy.Trim(), out var address))
+        {
+            throw new InvalidOperationException($"ReverseProxy:KnownProxies contains an invalid IP address: '{proxy}'");
+        }
+
+        if (!options.KnownProxies.Contains(address))
+        {
+            options.KnownProxies.Add(address);
+        }
+    }
+});
+
+// 3. Configure CORS (explicit origins; never AllowAnyOrigin + AllowCredentials)
+var configuredOrigins = (corsSettings.AllowedOrigins ?? Array.Empty<string>())
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim())
+    .Distinct(StringComparer.Ordinal)
+    .ToArray();
+
+if (configuredOrigins.Length == 0)
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        configuredOrigins = developmentCorsOrigins;
+    }
+    else
+    {
+        throw new InvalidOperationException(
+            "Cors:AllowedOrigins must be configured with at least one origin outside Development");
+    }
+}
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy(CorsPolicyName, policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        // Frontend SignalR uses accessTokenFactory with withCredentials: false — no cookies required
+        policy.WithOrigins(configuredOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
@@ -184,6 +244,9 @@ using (var scope = app.Services.CreateScope())
 }
 
 // 8. Pipeline Configuration
+// Forwarded headers must run before HTTPS redirection, CORS, rate limiting, and auth so scheme/client IP are correct
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -193,15 +256,12 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
-
-// Behind a reverse proxy on this machine, the address of the caller comes from X-Forwarded-For (used by the rate limiter)
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+if (reverseProxySettings.UseHttpsRedirection)
 {
-    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-});
+    app.UseHttpsRedirection();
+}
 
-app.UseCors("AllowAll");
+app.UseCors(CorsPolicyName);
 
 app.UseRateLimiter();
 
@@ -209,6 +269,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<OZE.Hubs.NotificationHub>(OZE.Hubs.NotificationHub.Path);
+app.MapHub<OZE.Hubs.NotificationHub>(OZE.Hubs.NotificationHub.Path)
+    .RequireCors(CorsPolicyName);
 
 app.Run();

@@ -29,6 +29,8 @@ namespace OZE.Common.Constants
         public static readonly string[] UploadExtensions = { ".png", ".jpg", ".jpeg", ".dcm" };
         public const int UploadMaxFiles = 10;
         public const long UploadMaxFileBytes = 20 * 1024 * 1024;
+        // Whole multipart body: the largest valid upload plus 1 MB for the form boundaries and headers
+        public const long UploadMaxRequestBytes = UploadMaxFiles * UploadMaxFileBytes + 1024 * 1024;
         public const string UploadFolderPrefix = "manual";
         public const string DicomMimeType = "application/dicom";
 
