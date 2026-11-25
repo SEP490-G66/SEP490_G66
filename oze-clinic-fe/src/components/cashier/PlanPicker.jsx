@@ -1,20 +1,15 @@
 import { useEffect, useState } from "react";
+import PatientPicker from "@/components/billing/PatientPicker";
 import { getPatientOptions, getPlanOptions } from "@/services/cashierService";
-import { CASHIER_TEXT as TEXT } from "@/utils/messages";
+import { CASHIER_PATIENT_OPTION_LIMIT, CASHIER_TEXT as TEXT } from "@/utils/messages";
+
+const trimKeyword = (text) => text.trim();
 
 // Bệnh nhân + Kế hoạch điều trị selects of Đặt cọc / Theo đợt. options: which payment options count (null = any chosen).
 // The chosen ids live in the URL (the page passes them in); a single matching plan is picked by itself.
 const PlanPicker = ({ idPrefix, patientId, planId, options, emptyText, onChange, reloadKey, disabled }) => {
-    const [patients, setPatients] = useState(null);
-    const [plans, setPlans] = useState({ forPatient: null, items: [], failed: false });
-
-    useEffect(() => {
-        let active = true;
-        getPatientOptions().then((result) => active && setPatients(result.success ? result.data : { failed: true }));
-        return () => {
-            active = false;
-        };
-    }, []);
+    const [picked, setPicked] = useState(null);
+    const [plans, setPlans] = useState({ forPatient: null, patient: null, items: [], failed: false });
 
     const optionsKey = options?.join(",") ?? "";
     useEffect(() => {
@@ -22,8 +17,8 @@ const PlanPicker = ({ idPrefix, patientId, planId, options, emptyText, onChange,
         let active = true;
         getPlanOptions({ patientId, options: optionsKey ? optionsKey.split(",") : null }).then((result) => {
             if (!active) return;
-            const items = result.success ? result.data : [];
-            setPlans({ forPatient: patientId, items, failed: !result.success });
+            const items = result.success ? result.data.plans : [];
+            setPlans({ forPatient: patientId, patient: result.success ? result.data.patient : null, items, failed: !result.success });
             if (!planId && items.length === 1) onChange({ patientId, planId: String(items[0].id) }, true);
         });
         return () => {
@@ -35,29 +30,33 @@ const PlanPicker = ({ idPrefix, patientId, planId, options, emptyText, onChange,
 
     const loadedPlans = plans.forPatient === patientId ? plans.items : null;
     const plansFailed = plans.forPatient === patientId && plans.failed;
-    const patientList = Array.isArray(patients) ? patients : [];
+    const loadedPatient = plans.forPatient === patientId ? plans.patient : null;
+    const patient = !patientId
+        ? null
+        : picked && String(picked.id) === patientId
+          ? picked
+          : (loadedPatient ?? { id: patientId, fullName: plansFailed ? TEXT.DASH : TEXT.PATIENT_LOADING });
+
+    const pickPatient = (next) => {
+        setPicked(next);
+        onChange({ patientId: next ? String(next.id) : "", planId: "" });
+    };
 
     return (
         <div className="grid gap-4 md:grid-cols-2">
-            <div className="field">
-                <label htmlFor={`${idPrefix}-patient`} className="label">
-                    {TEXT.PATIENT}
-                </label>
-                <select
-                    id={`${idPrefix}-patient`}
-                    className="input"
-                    value={patientId ?? ""}
-                    disabled={!patients || disabled}
-                    onChange={(e) => onChange({ patientId: e.target.value, planId: "" })}
-                >
-                    <option value="">{TEXT.PICK_PATIENT}</option>
-                    {patientList.map((p) => (
-                        <option key={p.id} value={p.id}>
-                            {p.name} · {p.code}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            <PatientPicker
+                inputId={`${idPrefix}-patient`}
+                value={patient}
+                onChange={pickPatient}
+                disabled={disabled}
+                search={getPatientOptions}
+                normalize={trimKeyword}
+                label={TEXT.PATIENT}
+                required={false}
+                placeholder={TEXT.PATIENT_PLACEHOLDER}
+                limit={CASHIER_PATIENT_OPTION_LIMIT}
+                limitText={TEXT.PATIENT_NARROW}
+            />
             <div className="field">
                 <label htmlFor={`${idPrefix}-plan`} className="label">
                     {TEXT.PLAN}
@@ -76,7 +75,7 @@ const PlanPicker = ({ idPrefix, patientId, planId, options, emptyText, onChange,
                         </option>
                     ))}
                 </select>
-                {plansFailed || patients?.failed ? (
+                {plansFailed ? (
                     <p className="error-text" role="alert">
                         {TEXT.PLAN_LOAD_ERROR}
                     </p>

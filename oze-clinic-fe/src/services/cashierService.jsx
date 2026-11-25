@@ -138,16 +138,20 @@ export const getPaymentAccount = async (patientId) => {
 };
 
 // Patients for the pickers of Đặt cọc / Theo đợt / Ghi nhận
-export const getPatientOptions = async () => {
-    const result = await request(() => api.get("/api/cashier/patients/options"));
-    return result.success ? ok(result.data.map(({ id, code, name }) => ({ id, code, name }))) : result;
+export const getPatientOptions = async (search, config = {}) => {
+    const result = await request(() => api.get("/api/cashier/patients/options", { params: { search }, skipErrorPage: true, ...config }));
+    return result.success ? ok({ items: result.data.map(({ id, code, name, phone }) => ({ id, patientCode: code, fullName: name, phoneNumber: phone })) }) : result;
 };
 
 // Plans of one patient that the page may work on: options = which payment options count
 export const getPlanOptions = async ({ patientId, options }) => {
     const loaded = await loadAccount(patientId);
     if (!loaded.success) return loaded;
-    return ok(viewOf(loaded.data).plans.filter((p) => p.option !== null && (!options || options.includes(p.option))));
+    const view = viewOf(loaded.data);
+    return ok({
+        patient: { id: view.id, patientCode: view.code, fullName: view.name, phoneNumber: view.phone },
+        plans: view.plans.filter((p) => p.option !== null && (!options || options.includes(p.option))),
+    });
 };
 
 // One plan worked out; suggestedDepositRate is the clinic rate a plan not chosen yet would get

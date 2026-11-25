@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
+import BackLink from "@/components/navigation/BackLink";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import { money } from "@/components/reception/receptionUtils";
 import { LoadError, PageSkeleton, Stat, Stats } from "@/components/cashier/cashierUi";
@@ -8,11 +9,13 @@ import VisitAccountCard from "@/components/cashier/VisitAccountCard";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import { getPaymentAccount } from "@/services/cashierService";
 import { CASHIER_TEXT as TEXT } from "@/utils/messages";
+import { safeListSearch } from "@/utils/patientRecord";
 import { ROUTES } from "@/utils/routes";
 
 // Hồ sơ thanh toán: what one patient owes, plan by plan, and walk-ins still owing; each card has its next step
 const CashierAccount = () => {
     const { patientId } = useParams();
+    const location = useLocation();
     const [result, setResult] = useState(null);
     const [version, setVersion] = useState(0);
 
@@ -28,13 +31,21 @@ const CashierAccount = () => {
 
     const loading = result?.key !== `${patientId}|${version}`;
     const p = !loading && result?.success ? result.data : null;
-    const crumbs = [{ label: TEXT.CRUMB }, { label: TEXT.LIST_TITLE, href: ROUTES.RECEPTION_PAYMENTS }, { label: p?.name ?? TEXT.ACCOUNT_TITLE }];
+    const from = location.state?.from;
+    const listSearch = safeListSearch(location.state?.listSearch);
+    const fromDebts = from === ROUTES.RECEPTION_DEBTS;
+    const listHref = `${ROUTES.RECEPTION_PAYMENTS}${from === ROUTES.RECEPTION_PAYMENTS ? listSearch : ""}`;
+    const back = fromDebts ? { to: `${ROUTES.RECEPTION_DEBTS}${listSearch}`, label: TEXT.BACK_DEBTS_LABEL } : { to: listHref, label: TEXT.BACK_LIST_LABEL };
+    const crumbs = [{ label: TEXT.CRUMB }, { label: TEXT.LIST_TITLE, href: listHref }, { label: p?.name ?? TEXT.ACCOUNT_TITLE }];
     const owingVisits = p?.visits.filter((v) => v.remaining > 0) ?? [];
 
     return (
         <div className="app-content min-h-full space-y-5">
             <div>
-                <Breadcrumb items={crumbs} className="mb-2" />
+                <div className="mb-2 flex items-center gap-3">
+                    <BackLink to={back.to} label={back.label} />
+                    <Breadcrumb items={crumbs} className="min-w-0 flex-wrap wrap-anywhere" />
+                </div>
                 <h1 className="page-title">{TEXT.ACCOUNT_TITLE}</h1>
                 {p && (
                     <p className="page-description">

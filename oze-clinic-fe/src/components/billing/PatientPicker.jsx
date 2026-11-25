@@ -14,35 +14,52 @@ const detailOf = (patient) =>
         .filter(Boolean)
         .join(" · ");
 
-const PatientPicker = ({ inputId, value, onChange, disabled, error, errorId }) => {
+const searchPatients = (keyword, config) => getPatients({ keyword, page: 1, pageSize: PAGE_SIZE }, config);
+
+const PatientPicker = ({
+    inputId,
+    value,
+    onChange,
+    disabled,
+    error,
+    errorId,
+    search = searchPatients,
+    normalize = searchKeywordOf,
+    label = TEXT.PATIENT,
+    required = true,
+    placeholder = TEXT.PATIENT_PLACEHOLDER,
+    limit,
+    limitText,
+}) => {
     const listId = useId();
     const inputRef = useRef(null);
+    const listRef = useRef(null);
     const changeRef = useRef(null);
     const focusAfter = useRef(null);
     const [text, setText] = useState("");
     const [retry, setRetry] = useState(0);
-    const [search, setSearch] = useState(null);
+    const [found, setFound] = useState(null);
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(0);
 
-    const keyword = text.trim() ? searchKeywordOf(text) : "";
+    const keyword = text.trim() ? normalize(text) : "";
     const key = `${keyword}|${retry}`;
 
     useEffect(() => {
         if (!keyword) return undefined;
         const controller = new AbortController();
         const timer = setTimeout(() => {
-            getPatients({ keyword, page: 1, pageSize: PAGE_SIZE }, { skipErrorPage: true, signal: controller.signal }).then((response) => {
+            search(keyword, { skipErrorPage: true, signal: controller.signal }).then((response) => {
                 if (controller.signal.aborted || response.aborted) return;
                 const items = response.success && Array.isArray(response.data?.items) ? response.data.items : [];
-                setSearch({ key, ok: response.success, items, total: response.success ? Number(response.data?.totalCount ?? items.length) : 0 });
+                setFound({ key, ok: response.success, items, total: response.success ? Number(response.data?.totalCount ?? items.length) : 0 });
             });
         }, DEBOUNCE_MS);
         return () => {
             clearTimeout(timer);
             controller.abort();
         };
-    }, [keyword, key]);
+    }, [keyword, key, search]);
 
     useEffect(() => {
         const target = focusAfter.current;
@@ -51,11 +68,26 @@ const PatientPicker = ({ inputId, value, onChange, disabled, error, errorId }) =
         (target === "change" ? changeRef : inputRef).current?.focus();
     }, [value]);
 
-    const current = keyword && search?.key === key ? search : null;
+    const current = keyword && found?.key === key ? found : null;
     const items = current?.ok ? current.items : [];
     const more = current?.ok ? Math.max(0, current.total - items.length) : 0;
     const shown = open && Boolean(keyword);
     const activeIndex = Math.min(active, Math.max(0, items.length - 1));
+    const capped = Boolean(limit && limitText && current?.ok && items.length >= limit);
+
+    useEffect(() => {
+        if (listRef.current) listRef.current.scrollTop = 0;
+    }, [found]);
+
+    useEffect(() => {
+        const list = listRef.current;
+        const item = shown ? list?.children[activeIndex] : null;
+        if (!item) return;
+        const top = item.offsetTop;
+        const bottom = top + item.offsetHeight;
+        if (top < list.scrollTop) list.scrollTop = top;
+        else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+    }, [shown, activeIndex, found]);
 
     const pick = (patient) => {
         focusAfter.current = "change";
@@ -90,7 +122,7 @@ const PatientPicker = ({ inputId, value, onChange, disabled, error, errorId }) =
     if (value) {
         return (
             <div className="field">
-                <span className="label label-required">{TEXT.PATIENT}</span>
+                <span className={cx("label", required && "label-required")}>{label}</span>
                 <div className="flex items-start gap-3 rounded-lg border border-primary bg-primary-soft px-3 py-2.5">
                     <div className="min-w-0 flex-1">
                         <p className="font-semibold text-ink">{value.fullName}</p>
@@ -115,8 +147,8 @@ const PatientPicker = ({ inputId, value, onChange, disabled, error, errorId }) =
 
     return (
         <div className="field">
-            <label htmlFor={inputId} className="label label-required">
-                {TEXT.PATIENT}
+            <label htmlFor={inputId} className={cx("label", required && "label-required")}>
+                {label}
             </label>
             <div className="search">
                 <Search aria-hidden="true" />
@@ -125,7 +157,7 @@ const PatientPicker = ({ inputId, value, onChange, disabled, error, errorId }) =
                     id={inputId}
                     type="search"
                     className={cx("input", error && "input-error")}
-                    placeholder={TEXT.PATIENT_PLACEHOLDER}
+                    placeholder={placeholder}
                     autoComplete="off"
                     role="combobox"
                     aria-expanded={shown && items.length > 0}
@@ -160,7 +192,7 @@ const PatientPicker = ({ inputId, value, onChange, disabled, error, errorId }) =
                 </div>
             )}
             {shown && current?.ok && !items.length && <p className="help-text">{TEXT.PATIENT_NONE}</p>}
-            <ul id={listId} role="listbox" aria-label={TEXT.PATIENT_RESULTS} className={cx("mt-1 divide-y divide-border overflow-hidden rounded-lg border border-border", !(shown && items.length) && "hidden")}>
+            <ul ref={listRef} id={listId} role="listbox" aria-label={TEXT.PATIENT_RESULTS} className={cx("relative mt-1 max-h-72 divide-y divide-border overflow-y-auto rounded-lg border border-border", !(shown && items.length) && "hidden")}>
                 {shown &&
                     items.map((patient, index) => (
                         <li
@@ -178,6 +210,7 @@ const PatientPicker = ({ inputId, value, onChange, disabled, error, errorId }) =
                     ))}
             </ul>
             {shown && more > 0 && <p className="help-text">{TEXT.PATIENT_MORE(more)}</p>}
+            {shown && capped && <p className="help-text">{limitText}</p>}
         </div>
     );
 };

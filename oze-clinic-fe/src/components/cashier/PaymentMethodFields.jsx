@@ -1,10 +1,9 @@
 import SegmentedControl from "@/components/ui/SegmentedControl";
-import { METHOD, METHODS } from "@/utils/cashier";
+import { METHOD, PAY_METHODS } from "@/utils/cashier";
 import { CASHIER_TEXT as TEXT } from "@/utils/messages";
 
-const OPTIONS = METHODS.map((value) => ({ value, label: TEXT.METHODS[value] }));
+const OPTIONS = PAY_METHODS.map((value) => ({ value, label: TEXT.METHODS[value] }));
 
-// Method (Tiền mặt / Chuyển khoản / Quét QR), the bank reference when not cash, and a note
 const PaymentMethodFields = ({ idPrefix, method, onMethod, reference, onReference, note, onNote }) => (
     <div className="grid gap-4 md:grid-cols-2">
         <div className="field md:col-span-2">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import BackLink from "@/components/navigation/BackLink";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import { Card } from "@/components/reception/shared";
 import { money, dmy, useSubmit } from "@/components/reception/receptionUtils";
@@ -116,7 +117,10 @@ const CashierPaymentOption = () => {
     return (
         <div className="app-content min-h-full space-y-5">
             <div>
-                <Breadcrumb items={crumbs} className="mb-2" />
+                <div className="mb-2 flex items-center gap-3">
+                    <BackLink to={getCashierAccountRoute(patientId)} label={TEXT.BACK_ACCOUNT_LABEL} />
+                    <Breadcrumb items={crumbs} className="min-w-0 flex-wrap wrap-anywhere" />
+                </div>
                 <h1 className="page-title">{TEXT.OPTION_TITLE}</h1>
                 {plan && <p className="page-description">{plan.name}</p>}
             </div>

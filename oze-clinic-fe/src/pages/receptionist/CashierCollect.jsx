@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import PatientPicker from "@/components/billing/PatientPicker";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import { Card } from "@/components/reception/shared";
 import { money, dmy, useSubmit } from "@/components/reception/receptionUtils";
@@ -17,7 +18,9 @@ import useCashShiftLock from "@/components/cashier/useCashShiftLock";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import { collect, getCollectables, getPatientOptions, getReceipts, setReceiptStatus } from "@/services/cashierService";
 import { COLLECT_KIND as KIND, LINE, METHOD, RECEIPT_STATUS, keysFromAdd } from "@/utils/cashier";
-import { CASHIER_TEXT as TEXT } from "@/utils/messages";
+import { CASHIER_PATIENT_OPTION_LIMIT, CASHIER_TEXT as TEXT } from "@/utils/messages";
+
+const trimKeyword = (text) => text.trim();
 
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.COLLECT_TITLE }];
 
@@ -56,7 +59,7 @@ const CashierCollect = () => {
     const patientId = params.get("patient") ?? "";
     const add = params.get("add") ?? "";
     const lock = useCashShiftLock();
-    const [patients, setPatients] = useState(null);
+    const [picked, setPicked] = useState(null);
     const [data, setData] = useState(null);
     const [version, setVersion] = useState(0);
     const [kind, setKind] = useState(KIND.VISIT);
@@ -67,14 +70,6 @@ const CashierCollect = () => {
     const [saved, setSaved] = useState(null);
 
     usePageTitle(TEXT.COLLECT_DOC_TITLE);
-
-    useEffect(() => {
-        let active = true;
-        getPatientOptions().then((result) => active && setPatients(result.success ? result.data : []));
-        return () => {
-            active = false;
-        };
-    }, []);
 
     const key = `${patientId}|${version}`;
     useEffect(() => {
@@ -94,6 +89,13 @@ const CashierCollect = () => {
     const targets = useMemo(() => targetsOf(collectables), [collectables]);
     const patientView = collectables?.patient;
     const describe = describerOf(patientView);
+    const patientValue = !patientId
+        ? null
+        : picked && String(picked.id) === patientId
+          ? picked
+          : patientView
+            ? { id: patientView.id, patientCode: patientView.code, fullName: patientView.name, phoneNumber: patientView.phone }
+            : { id: patientId, fullName: current ? TEXT.DASH : TEXT.PATIENT_LOADING };
 
     // Lines asked for in ?add= (from Hồ sơ / Theo đợt / Phương án) join the lines already chosen, once each;
     // Loại follows the first valid one. Unknown or used-up tokens are dropped.
@@ -129,11 +131,12 @@ const CashierCollect = () => {
     const invalid = !liveLines.length || liveLines.some((l) => lineError(l));
 
     const pickPatient = (next) => {
+        setPicked(next);
         setLines([]);
         setKind(KIND.VISIT);
         setReference("");
         setNote("");
-        setParams(next ? { patient: next } : {}, { replace: false });
+        setParams(next ? { patient: String(next.id) } : {}, { replace: false });
     };
 
     const [busy, submit] = useSubmit(async () => {
@@ -194,18 +197,20 @@ const CashierCollect = () => {
                             submit();
                         }}
                     >
-                        <div className="field max-w-xl">
-                            <label htmlFor="collect-patient" className="label">
-                                {TEXT.PATIENT}
-                            </label>
-                            <select id="collect-patient" className="input" value={patientId} disabled={!patients || busy} onChange={(e) => pickPatient(e.target.value)}>
-                                <option value="">{TEXT.PICK_PATIENT}</option>
-                                {(patients ?? []).map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.name} · {p.code}
-                                    </option>
-                                ))}
-                            </select>
+                        <div className="max-w-xl">
+                            <PatientPicker
+                                inputId="collect-patient"
+                                value={patientValue}
+                                onChange={pickPatient}
+                                disabled={busy}
+                                search={getPatientOptions}
+                                normalize={trimKeyword}
+                                label={TEXT.PATIENT}
+                                required={false}
+                                placeholder={TEXT.PATIENT_PLACEHOLDER}
+                                limit={CASHIER_PATIENT_OPTION_LIMIT}
+                                limitText={TEXT.PATIENT_NARROW}
+                            />
                         </div>
                         {!patientId ? null : !current ? (
                             <div className="skeleton h-40 rounded-lg" />

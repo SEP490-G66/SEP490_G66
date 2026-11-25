@@ -1294,6 +1294,8 @@ export const PATIENT_RECORD_TEXT = {
     NOT_FOUND: "Không tìm thấy hồ sơ",
     NOT_FOUND_TEXT: "Hồ sơ không tồn tại hoặc đã bị xóa.",
     BACK_TO_LIST: "Về danh sách bệnh nhân",
+    BACK_LIST_LABEL: "Quay lại danh sách bệnh nhân",
+    BACK_DETAIL_LABEL: "Quay lại hồ sơ bệnh nhân",
     LOAD_ERROR: "Không tải được hồ sơ bệnh nhân.",
     EDIT: "Sửa hồ sơ",
     WALK_IN: "Tiếp nhận",
@@ -1960,7 +1962,8 @@ export const HANDOVER_TEXT = {
     TITLE: "Phiếu giao ca",
     DOC_TITLE: "Phiếu giao ca – OZE",
     CRUMB: "Quản lý tài chính",
-    BACK: "Phiếu giao ca",
+    BACK_LABEL: "Quay lại danh sách phiếu giao ca",
+    LOADING_CRUMB: "Đang tải",
     OPEN_SHIFT: "Mở ca",
     CLOSE_SHIFT: (label) => `Đóng ${label.toLowerCase()}`,
     SHIFT: { Morning: "Ca sáng", Afternoon: "Ca chiều" },
@@ -2286,6 +2289,8 @@ export const BILLING_TEXT = {
 };
 
 // Cashier pages: Thanh toán, Hồ sơ thanh toán, Phương án thanh toán, Đặt cọc dịch vụ, Thanh toán theo đợt, Ghi nhận thu tiền
+export const CASHIER_PATIENT_OPTION_LIMIT = 20;
+
 export const CASHIER_TEXT = {
     CRUMB: "Thu ngân",
     LIST_TITLE: "Danh sách thanh toán",
@@ -2293,6 +2298,9 @@ export const CASHIER_TEXT = {
     ACCOUNT_TITLE: "Hồ sơ thanh toán",
     ACCOUNT_DOC_TITLE: "Hồ sơ thanh toán – OZE",
     OPTION_TITLE: "Phương án thanh toán",
+    BACK_LIST_LABEL: "Quay lại danh sách thanh toán",
+    BACK_DEBTS_LABEL: "Quay lại công nợ",
+    BACK_ACCOUNT_LABEL: "Quay lại hồ sơ thanh toán",
     OPTION_DOC_TITLE: "Phương án thanh toán – OZE",
     DEPOSIT_TITLE: "Đặt cọc dịch vụ",
     DEPOSIT_DOC_TITLE: "Đặt cọc dịch vụ – OZE",
@@ -2413,6 +2421,9 @@ export const CASHIER_TEXT = {
     PATIENT: "Bệnh nhân",
     PLAN: "Kế hoạch điều trị",
     PICK_PATIENT: "Chọn bệnh nhân",
+    PATIENT_PLACEHOLDER: "Tên, mã bệnh nhân hoặc số điện thoại",
+    PATIENT_NARROW: "Chỉ hiện 20 bệnh nhân đầu tiên. Gõ thêm để thu hẹp.",
+    PATIENT_LOADING: "Đang tải…",
     PICK_PLAN: "Chọn kế hoạch",
     NO_DEPOSIT_PLAN: "Bệnh nhân không có kế hoạch nào đang ở phương án Đặt cọc.",
     NO_CHOSEN_PLAN: "Bệnh nhân chưa có kế hoạch nào đã chọn phương án.",
@@ -2466,7 +2477,7 @@ export const CASHIER_TEXT = {
     PERIOD_TARGET: (seq, date, amount) => `Đợt ${seq} · ${date} · còn ${amount}`,
     SERVICE_TARGET: (name, when, amount) => `${name} · ${when} · còn ${amount}`,
     CHOSEN: "Dịch vụ đã chọn",
-    CHOSEN_EMPTY: "Chưa có dịch vụ nào. Chọn dịch vụ ở trên rồi bấm \"Thêm dịch vụ\".",
+    CHOSEN_EMPTY: "Chưa có dịch vụ nào. Chọn dịch vụ ở trên rồi bấm nút +.",
     LINE_FULL: (plan) => `${plan} · Thu toàn bộ`,
     LINE_PERIOD: (plan, seq, date) => `${plan} · Đợt ${seq} · ${date}`,
     LINE_SERVICE: (name, when) => `${name} · ${when}`,

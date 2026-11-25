@@ -108,8 +108,8 @@ const CollectItemPicker = ({ idPrefix, collectables, chosenKeys, kind, onKind, o
                     ))}
                 </select>
             </div>
-            <button type="button" className="btn btn-secondary sm:justify-self-start 2xl:justify-self-auto" disabled={disabled || !ready} onClick={add}>
-                <Plus className="size-4" aria-hidden="true" /> {TEXT.ADD}
+            <button type="button" className="btn btn-secondary btn-icon justify-self-start" aria-label={TEXT.ADD} title={TEXT.ADD} disabled={disabled || !ready} onClick={add}>
+                <Plus className="size-4" aria-hidden="true" />
             </button>
         </div>
     );

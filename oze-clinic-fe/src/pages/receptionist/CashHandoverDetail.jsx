@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { ChevronLeft } from "lucide-react";
+import BackLink from "@/components/navigation/BackLink";
+import Breadcrumb from "@/components/navigation/Breadcrumb";
 import ShiftClosePanel from "@/components/handover/ShiftClosePanel";
 import ShiftCloseDialog from "@/components/handover/ShiftCloseDialog";
 import ShiftResultPanel from "@/components/handover/ShiftResultPanel";
@@ -81,11 +82,16 @@ const CashHandoverDetail = () => {
     }, [session]);
     usePageTitle(session?.code ? `${session.code} – ${TEXT.DOC_TITLE}` : TEXT.DOC_TITLE);
 
+    const crumbs = [
+        { label: TEXT.CRUMB },
+        { label: TEXT.TITLE, href: ROUTES.RECEPTION_CASH_HANDOVER },
+        { label: session ? (session.code ?? `#${session.id}`) : loaded ? `#${sessionId}` : TEXT.LOADING_CRUMB },
+    ];
     const back = (
-        <Link to={ROUTES.RECEPTION_CASH_HANDOVER} className="inline-flex items-center gap-1 text-label font-semibold text-primary hover:underline print:hidden">
-            <ChevronLeft className="size-4" aria-hidden="true" />
-            {TEXT.BACK}
-        </Link>
+        <div className="flex items-center gap-3 print:hidden">
+            <BackLink to={ROUTES.RECEPTION_CASH_HANDOVER} label={TEXT.BACK_LABEL} />
+            <Breadcrumb items={crumbs} className="min-w-0 flex-wrap wrap-anywhere" />
+        </div>
     );
 
     // Anything not loaded for this exact id and reload is never shown, so a previous session's figures cannot be acted on.

@@ -10,7 +10,7 @@ import { getDebtPatients } from "@/services/cashierService";
 import { clinicToday } from "@/services/receptionService";
 import { debtAgeTone } from "@/utils/billing";
 import { BILLING_TEXT as TEXT, CASHIER_TEXT as CT } from "@/utils/messages";
-import { getCashierAccountRoute } from "@/utils/routes";
+import { ROUTES, getCashierAccountRoute } from "@/utils/routes";
 
 const CRUMBS = [{ label: TEXT.FINANCE_CRUMB }, { label: TEXT.DEBTS_TITLE }];
 const COLUMNS = TEXT.DEBT_PATIENT_COLUMNS;
@@ -41,6 +41,7 @@ const servicesText = (patient) => {
 
 const ReceptionDebts = () => {
     const [params, setParams] = useSearchParams();
+    const accountState = { from: ROUTES.RECEPTION_DEBTS, listSearch: `?${params}` };
     const q = params.get("q") ?? "";
     const rawAge = params.get("age");
     const age = AGES.includes(rawAge) ? rawAge : "";
@@ -272,7 +273,7 @@ const ReceptionDebts = () => {
                                                       {money(p.owed)}
                                                   </td>
                                                   <td data-actions className="whitespace-nowrap text-right">
-                                                      <Link to={getCashierAccountRoute(p.id)} className="btn btn-primary h-8 px-2.5">
+                                                      <Link to={getCashierAccountRoute(p.id)} state={accountState} className="btn btn-primary h-8 px-2.5">
                                                           {TEXT.COLLECT}
                                                       </Link>
                                                   </td>

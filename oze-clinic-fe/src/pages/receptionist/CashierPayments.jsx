@@ -9,7 +9,7 @@ import { useDebounced, usePageTitle } from "@/hooks/usePatientRecordNav";
 import { getPaymentPatients } from "@/services/cashierService";
 import { PATIENT_STATUS_ORDER } from "@/utils/cashier";
 import { CASHIER_TEXT as TEXT } from "@/utils/messages";
-import { getCashierAccountRoute } from "@/utils/routes";
+import { ROUTES, getCashierAccountRoute } from "@/utils/routes";
 
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.LIST_TITLE }];
 const DAYS = ["all", "today", "custom"];
@@ -38,6 +38,7 @@ const servicesText = (patient) => {
 const CashierPayments = () => {
     const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
+    const accountState = { from: ROUTES.RECEPTION_PAYMENTS, listSearch: `?${params}` };
     const q = params.get("q") ?? "";
     const rawDay = params.get("day");
     const day = DAYS.includes(rawDay) ? rawDay : DEFAULT_DAY;
@@ -234,13 +235,14 @@ const CashierPayments = () => {
                                               </tr>
                                           ))
                                         : rows.map((p, index) => (
-                                              <tr key={p.id} className="cursor-pointer" onClick={() => navigate(getCashierAccountRoute(p.id))}>
+                                              <tr key={p.id} className="cursor-pointer" onClick={() => navigate(getCashierAccountRoute(p.id), { state: accountState })}>
                                                   <td data-label={C.NO} data-hide-stack className="num text-right text-muted">
                                                       {firstNo + index}
                                                   </td>
                                                   <td data-primary>
                                                       <Link
                                                           to={getCashierAccountRoute(p.id)}
+                                                          state={accountState}
                                                           className="whitespace-nowrap font-semibold text-ink hover:text-primary"
                                                           onClick={(e) => e.stopPropagation()}
                                                       >
