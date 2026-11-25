@@ -61,6 +61,8 @@ namespace OZE.Application.Helpers
                 FollowUpAppointmentDate = x.FollowUpAppointment?.AppointmentDate,
                 FollowUpTimeSlotStart = x.FollowUpAppointment?.TimeSlotStart,
                 FollowUpAppointmentStatus = x.FollowUpAppointment?.Status,
+                FollowUpDoctorId = x.FollowUpAppointment?.DoctorId,
+                FollowUpDoctorName = x.FollowUpAppointment?.Doctor?.FullName,
                 LastRemindedAt = x.FollowUpRemindedAt,
                 ReminderCount = x.FollowUpReminderCount,
                 IsRecall = x.FollowUpIsRecall,

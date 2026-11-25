@@ -220,6 +220,7 @@ namespace OZE.Common.Constants
             public const string MustBePositive = "Value must be greater than 0.";
             public const string InvalidBool = "Value must be true or false.";
             public const string InvalidDecimal = "Value must be a number.";
+            public const string InvalidPercent = "Value must be a percentage from 0 to 100.";
             public const string InvalidJson = "Value must be valid JSON.";
             public const string InvalidTime = "Value must be a time in HH:mm format.";
             public const string WorkTimeOrder = "Opening time must be earlier than closing time.";
@@ -304,8 +305,12 @@ namespace OZE.Common.Constants
             public const string SlotRequired = "Appointment time slot is required";
             public const string PastDate = "Appointment date cannot be in the past";
             public const string TooFarAhead = "Appointment date is too far in advance";
+            public const string DateRangeInvalid = "From date must be on or before To date.";
+            public const string DateRangeTooLong = "The date range must be at most 62 days.";
             public const string SlotNotAvailable = "This time slot is no longer available. Please choose another time";
             public const string PhoneHasAccount = "This phone number already has an account. Please sign in to book";
+            public const string WalkInPatientInClinic = "The patient is already being seen today";
+            public const string WalkInPatientHasConfirmedToday = "The patient has a confirmed appointment today. Check in that appointment instead";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
             public const string PatientHasScheduledTreatmentSession = "You already have a treatment session scheduled in your treatment plan. Please contact the clinic to change it instead of booking a new appointment";
             public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
@@ -327,6 +332,7 @@ namespace OZE.Common.Constants
             public const string ReassignAlreadyExamined = "This patient was already seen by the doctor and stays with that doctor";
             public const string ReassignWrongDay = "A patient can only be moved to another doctor on the day of the appointment";
             public const string ReassignSameDoctor = "The patient is already with this doctor";
+            public const string ReassignReasonRequired = "Please enter why the patient is moved to another doctor";
             public const string DoctorNoSuitableShiftToday = "The doctor has no shift today in a room that suits these services";
             public const string DoctorProfileNotFound = "No doctor profile is linked to this account";
             public const string PriorityInvalid = "Priority must be 0 (normal), 1 (high) or 2 (urgent)";
@@ -516,6 +522,25 @@ namespace OZE.Common.Constants
             public const string FilesUploaded = "Documents uploaded.";
         }
 
+        // Documents the patient uploads without a doctor's request ("Cung cấp tài liệu")
+        public static class ProvidedDocumentMessage
+        {
+            public const string DocumentNameRequired = "Please enter document name.";
+            public const string DocumentNameInvalid = "Document name must be at most 200 characters.";
+            public const string ProviderAddressRequired = "Please enter provider address.";
+            public const string ProviderAddressInvalid = "Provider address must be at most 300 characters.";
+            public const string PerformedOnInFuture = "Performed date cannot be in the future.";
+            public const string UploadFilesRequired = "Please choose at least one file.";
+            public const string UploadTooManyFiles = "You can upload at most 5 files for a document.";
+            public const string UploadFileTypeInvalid = "{0} is not a supported file. Use .pdf, .jpg, .jpeg, .png or .dcm.";
+            public const string UploadFileTooLarge = "{0} is larger than 20 MB.";
+            public const string UploadFileEmpty = "{0} is empty.";
+            public const string DocumentNotFound = "Document not found.";
+            public const string CannotDelete = "You do not have permission to delete this document.";
+            public const string Uploaded = "Document uploaded.";
+            public const string Deleted = "Document deleted.";
+        }
+
         // Capturing on the X-ray simulator and reading the stored pictures
         public static class ImagingCaptureMessage
         {
@@ -585,6 +610,7 @@ namespace OZE.Common.Constants
             public const string InvoiceUpdateEmpty = "Please provide notes, discount, or items to update.";
             public const string InvoiceConcurrencyConflict = "Invoice was modified by another user. Please reload and try again.";
             public const string AccessDenied = "You do not have access to this invoice.";
+            public const string CollectionInvalid = "Collection must be received, paid or partial.";
         }
 
         public static class PaymentMessage
@@ -608,6 +634,7 @@ namespace OZE.Common.Constants
             public const string InstallmentPeriodInvalid = "Installment period is invalid for this invoice.";
             public const string AccessDenied = "You do not have access to this payment.";
             public const string ConcurrencyConflict = "Payment data was modified by another user. Please reload and try again.";
+            public const string ConfirmAtCashier = "This payment belongs to a cashier receipt. Confirm it on the cashier screen.";
         }
 
         public static class RefundMessage
@@ -740,10 +767,49 @@ namespace OZE.Common.Constants
             public const string CountedCashInvalid = "Counted cash cannot be negative.";
             public const string DifferenceNoteRequired = "The counted cash differs from the expected cash. Please explain in the notes.";
             public const string HandoverInvalid = "The person receiving the hand-over must be another active receptionist.";
+            public const string StatusInvalid = "Status must be Open or Closed.";
+            // {0} receptionist, {1} opened at (clinic time)
+            public const string AnotherSessionOpen = "{0} still has a cash session open since {1}. It must be closed before a new one is opened.";
+            public const string SessionChanged = "This is not your open cash session any more. Reload the page.";
+            public const string FiguresChanged = "The system figures changed while you were counting. Reload and count again.";
+            public const string DenominationsInvalid = "Each banknote must be a valid face value with a count from 0 to 9999.";
+            public const string DenominationsMismatch = "The banknote count does not add up to the counted cash.";
+            public const string TransferNoteRequired = "The checked transfers differ from the confirmed transfers. Please explain in the notes.";
+            public const string NoPreviousSession = "No cash session was closed earlier today.";
             public const string Opened = "Cash session has been opened.";
             public const string ExpenseAdded = "Expense has been recorded.";
             public const string ExpenseRemoved = "Expense has been removed.";
             public const string Closed = "Cash session has been closed and handed over.";
+        }
+
+        // Cashier pages (Thanh toán, Đặt cọc, Theo đợt, Ghi nhận thu tiền)
+        public static class CashierMessage
+        {
+            public const string PatientNotFound = "Patient not found.";
+            public const string PlanNotFound = "Treatment plan not found.";
+            public const string PlanNotOpen = "This treatment plan is not agreed yet or is closed.";
+            public const string OptionInvalid = "Payment option must be FULL, PERIODS or DEPOSIT.";
+            public const string OptionLocked = "The payment option of this plan has already been chosen and cannot be changed.";
+            public const string OptionNotChosen = "Choose the payment option of the plan first.";
+            public const string NoLines = "Add at least one item to the receipt.";
+            public const string AmountInvalid = "Amount must be a whole number greater than 0.";
+            public const string KindInvalid = "Unknown receipt line.";
+            public const string WrongPatient = "An item of the receipt does not belong to this patient.";
+            public const string WrongPlan = "The treatment session does not belong to this plan.";
+            public const string NotDepositPlan = "This plan is not paid by deposit.";
+            public const string NotFullPlan = "This plan is not paid in full.";
+            public const string NotCollectable = "This treatment session cannot take money now.";
+            public const string OverCeiling = "The amount is more than what is still owed.";
+            public const string ReceiptNotFound = "Receipt not found.";
+            public const string ReceiptNotPending = "Only a receipt waiting for confirmation can be confirmed or rejected.";
+            public const string VisitHasNoServices = "This visit has no service to collect.";
+            public const string ReceiptCodeFailed = "Could not create a receipt code. Please try again.";
+            public const string OptionSaved = "Payment option has been saved.";
+            public const string ReceiptSaved = "Receipt has been recorded.";
+            public const string ReceiptConfirmed = "Receipt has been confirmed.";
+            public const string ReceiptRejected = "Receipt has been rejected.";
+            public const string DebtAgeInvalid = "Debt age must be lt7, 7to30 or gt30.";
+            public const string DebtDateRangeInvalid = "From date must be on or before to date.";
         }
 
         public static class PaymentWarningMessage

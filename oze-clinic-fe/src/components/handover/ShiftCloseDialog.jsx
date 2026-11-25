@@ -5,10 +5,9 @@ import DiffChip from "./DiffChip";
 import MoneyLine from "./MoneyLine";
 import { HANDOVER_TEXT as TEXT } from "@/utils/messages";
 
-// warning: shown above the lock note, e.g. when the session was opened on an earlier day
 const ShiftCloseDialog = ({ label, subtitle, values, system, shiftEnd, now, print, warning, onClose, onSubmit }) => {
     const [busy, submit] = useSubmit(onSubmit);
-    const { countedCash: cash, countedTransfer: transfer } = values;
+    const cash = values.countedCash;
     return (
         <Modal title={TEXT.CONFIRM_CLOSE(label)} description={subtitle} onClose={onClose} closeDisabled={busy}>
             <form
@@ -19,19 +18,13 @@ const ShiftCloseDialog = ({ label, subtitle, values, system, shiftEnd, now, prin
                 }}
             >
                 <dl className="rounded-lg bg-surface-tint px-4 py-3">
-                    <MoneyLine label={TEXT.ACTUAL}>
+                    <MoneyLine label={TEXT.EXPECTED_CASH}>{money(system.cash)}</MoneyLine>
+                    <MoneyLine label={TEXT.ACTUAL_CASH} strong>
                         <span className="inline-flex items-center gap-2">
                             {money(cash)} <DiffChip value={cash - system.cash} />
                         </span>
                     </MoneyLine>
-                    <MoneyLine label={TEXT.ACTUAL_TRANSFER}>
-                        <span className="inline-flex items-center gap-2">
-                            {money(transfer)} <DiffChip value={transfer - system.transfer} />
-                        </span>
-                    </MoneyLine>
-                    <MoneyLine label={TEXT.END_TOTAL} strong>
-                        {money(cash + transfer)}
-                    </MoneyLine>
+                    <MoneyLine label={TEXT.TRANSFER_SYSTEM}>{money(system.transfer)}</MoneyLine>
                 </dl>
                 {warning && <p className="alert alert-warning">{warning}</p>}
                 {shiftEnd && now < shiftEnd && <p className="alert alert-warning">{TEXT.NOT_ENDED(shiftEnd)}</p>}

@@ -95,6 +95,8 @@ namespace OZE.Application.Services
                 case "Decimal":
                     ConditionGuard.Ensure(decimal.TryParse(trimmed, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount),
                         ErrorConstants.SystemConfigMessage.InvalidDecimal);
+                    ConditionGuard.ThrowIf(config.ConfigKey == ConfigKeyConstants.PaymentDepositRate && (amount < 0 || amount > 100),
+                        ErrorConstants.SystemConfigMessage.InvalidPercent);
                     return amount.ToString(CultureInfo.InvariantCulture);
 
                 case "Json":

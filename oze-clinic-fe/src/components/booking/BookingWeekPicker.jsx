@@ -78,7 +78,7 @@ const Calendar = ({ weekStart, bounds, today, month, onMonth, onWeek }) => {
     );
 };
 
-const BookingWeekPicker = ({ weekStart, bounds, today, calendar, onToggle, onMonth, onWeek, onClose, onPrev, onThisWeek, onNext }) => {
+const BookingWeekPicker = ({ weekStart, bounds, today, calendar, label = BOOKING_TEXT.DAY, onToggle, onMonth, onWeek, onClose, onPrev, onThisWeek, onNext }) => {
     const boxRef = useRef(null);
     const open = calendar.open;
 
@@ -105,7 +105,7 @@ const BookingWeekPicker = ({ weekStart, bounds, today, calendar, onToggle, onMon
     return (
         <>
             <span id="booking-day-label" className="mt-7 mb-2.5 block font-heading text-heading-3 text-ink">
-                {BOOKING_TEXT.DAY}
+                {label}
                 <span className="text-danger" aria-hidden="true">
                     {" *"}
                 </span>

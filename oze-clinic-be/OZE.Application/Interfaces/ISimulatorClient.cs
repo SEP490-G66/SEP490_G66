@@ -18,5 +18,7 @@ namespace OZE.Application.Interfaces
         Task SaveAsync(string relativePath, byte[] data, CancellationToken cancellationToken = default);
         // Null when the file is not there
         Task<byte[]?> ReadAsync(string relativePath, CancellationToken cancellationToken = default);
+        // Does nothing when the file is not there
+        Task DeleteAsync(string relativePath, CancellationToken cancellationToken = default);
     }
 }

@@ -10,6 +10,8 @@ namespace OZE.Application.Interfaces
     {
         Task<List<BookableServiceResponse>> GetBookableServicesAsync();
         Task<List<AvailableSlotResponse>> GetAvailableSlotsAsync(AvailableSlotRequest request);
+        // Free-slot count of every day of a range, in one request (booking calendar)
+        Task<List<AvailableDayResponse>> GetAvailableDaysAsync(AvailableDaysRequest request);
         Task<AppointmentResponse> BookAsGuestAsync(GuestBookingRequest request);
         Task<AppointmentResponse> BookAsPatientAsync(BookingRequest request, string userId);
         Task<AppointmentResponse> BookByReceptionistAsync(ReceptionBookingRequest request, string receptionistUserId);
@@ -49,5 +51,6 @@ namespace OZE.Application.Interfaces
         // The doctor completes the visit, locking the examination and marking the appointment completed
         Task<AppointmentResponse> CompleteExaminationAsync(long id, string doctorUserId, CancellationToken cancellationToken = default);
         Task<AppointmentResponse> ScheduleFollowUpAsync(long appointmentId, ScheduleFollowUpRequest request, string userId, CancellationToken cancellationToken = default);
+        Task<AppointmentResponse> ScheduleFollowUpByDoctorAsync(long appointmentId, ScheduleFollowUpRequest request, string doctorUserId, CancellationToken cancellationToken = default);
     }
 }

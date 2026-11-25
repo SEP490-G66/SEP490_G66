@@ -34,6 +34,7 @@ namespace OZE.Application.Services
             var date = query.Date ?? DateOnly.FromDateTime(ClinicClock.Today);
             var shifts = await _workShiftRepository.GetDoctorShiftsOnDateAsync(date);
             var leaves = await _leaveRequestRepository.GetApprovedOnDateAsync(date, cancellationToken);
+            var waiting = await _workShiftRepository.CountWaitingByDoctorAsync(date, cancellationToken) ?? new Dictionary<int, int>();
 
             return shifts.Select(shift => new DoctorOnDutyResponse
             {
@@ -44,11 +45,14 @@ namespace OZE.Application.Services
                 ShiftId = shift.Id,
                 RoomId = shift.RoomId,
                 RoomName = shift.Room?.RoomName,
+                RoomType = shift.Room?.RoomType,
+                WaitingCount = waiting.GetValueOrDefault(shift.StaffProfileId),
                 ShiftStart = shift.ShiftStart,
                 ShiftEnd = shift.ShiftEnd,
                 ActualStartTime = shift.ActualStartTime,
                 ActualEndTime = shift.ActualEndTime,
-                Status = DutyStatusOf(shift, leaves)
+                Status = DutyStatusOf(shift, leaves),
+                AbsenceReason = shift.AbsenceReason
             }).ToList();
         }
 

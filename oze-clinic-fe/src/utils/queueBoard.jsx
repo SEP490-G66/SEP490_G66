@@ -15,7 +15,7 @@ const priorityOf = (value) => {
     return [0, 1, 2].includes(p) ? p : 0;
 };
 
-const skipsOf = (x) => Math.max(Number(x.skipCount) || 0, x.absentWhenCalled ? 1 : 0);
+const skipsOf = (x) => Number(x.skipCount) || 0;
 
 const TAB_OF_TYPE = { Imaging: "xq", Treatment: "tp" };
 
@@ -25,7 +25,7 @@ const entryState = (status) => ENTRY_STATE[String(status ?? "").toUpperCase()] ?
 
 const ENDED = ["Ended", "OnLeave"];
 
-const isCalled = (w) => w.status === "CALLED" || w.queueStatus === "Called" || Boolean(w.calledAt);
+const EXAM_TYPE = "Examination";
 
 export const examRooms = (doctors, waiting, serving) => {
     const map = new Map();
@@ -37,11 +37,13 @@ export const examRooms = (doctors, waiting, serving) => {
             name: d.room,
             staff: d.name,
             ended: ENDED.includes(d.status),
-            endAt: d.end,
+            endAt: d.endedAt ?? d.end,
             off: d.status === "NotStarted",
             startAt: d.start,
             // Only a doctor working now can take patients; one whose shift has not started is not a move target
             active: d.status === "Working",
+            // Kinds of room the doctor works in today: a patient only moves to a doctor in the kind of room the services need
+            roomTypes: d.roomTypes ?? [],
         }),
     );
     [...waiting, ...serving].forEach((x) => {
@@ -70,7 +72,8 @@ export const otherRooms = (entries) => {
     return [...map.values()].sort((a, b) => String(a.name ?? "~").localeCompare(String(b.name ?? "~"), "vi", { numeric: true }));
 };
 
-export const examRows = (waiting, serving) => {
+export const examRows = (waiting, serving, entries = []) => {
+    const entryOf = new Map(entries.filter((e) => e.queueType === EXAM_TYPE).map((e) => [e.appointmentId, e]));
     const inRoom = serving.map((a) => ({
         key: `s${a.id}`,
         kind: "exam",
@@ -80,28 +83,37 @@ export const examRows = (waiting, serving) => {
         patientCode: a.patientCode,
         patientPhoneNumber: a.patientPhoneNumber,
         allergies: a.patientAllergies ?? [],
+        number: entryOf.get(a.id)?.queueNumber ?? null,
         state: "serving",
         priority: priorityOf(a.priority),
-        priorityReason: a.priorityReason ?? null,
+        priorityReason: priorityOf(a.priority) > 0 ? (entryOf.get(a.id)?.priorityReason ?? entryOf.get(a.id)?.notes ?? null) : null,
+        requiredRoomType: a.requiredRoomType ?? null,
         checkInAt: a.checkInAt,
     }));
-    const queue = waiting.map((w, index) => ({
-        key: `w${w.appointmentId}`,
-        kind: "exam",
-        appointmentId: w.appointmentId,
-        roomKey: w.doctorId ? String(w.doctorId) : NO_DOCTOR_KEY,
-        patientName: w.patientName,
-        patientCode: w.patientCode,
-        patientPhoneNumber: w.patientPhoneNumber,
-        allergies: w.patientAllergies ?? [],
-        state: isCalled(w) ? "called" : "waiting",
-        absent: Boolean(w.absentWhenCalled),
-        skips: skipsOf(w),
-        priority: priorityOf(w.priority),
-        priorityReason: w.priorityReason ?? null,
-        checkInAt: w.checkInAt,
-        order: index,
-    }));
+    const queue = waiting.map((w, index) => {
+        const entry = entryOf.get(w.appointmentId);
+        const priority = priorityOf(w.priority);
+        return {
+            key: `w${w.appointmentId}`,
+            kind: "exam",
+            appointmentId: w.appointmentId,
+            roomKey: w.doctorId ? String(w.doctorId) : NO_DOCTOR_KEY,
+            patientName: w.patientName,
+            patientCode: w.patientCode,
+            patientPhoneNumber: w.patientPhoneNumber,
+            allergies: w.patientAllergies ?? [],
+            number: entry?.queueNumber ?? null,
+            state: entryState(entry?.status) === "called" ? "called" : "waiting",
+            absent: Math.max(skipsOf(w), skipsOf(entry ?? {})) > 0,
+            skips: Math.max(skipsOf(w), skipsOf(entry ?? {})),
+            examined: Boolean(w.isPriorityReturn),
+            priority,
+            priorityReason: priority > 0 ? (w.priorityReason ?? entry?.priorityReason ?? entry?.notes ?? null) : null,
+            requiredRoomType: w.requiredRoomType ?? null,
+            checkInAt: w.checkInAt,
+            order: index,
+        };
+    });
     return [...inRoom, ...queue];
 };
 
@@ -118,8 +130,9 @@ export const entryRows = (entries) =>
             patientCode: e.patientCode,
             patientPhoneNumber: e.patientPhoneNumber,
             allergies: e.patientAllergies ?? [],
+            number: e.queueNumber ?? null,
             state: entryState(e.status),
-            absent: Boolean(e.absentWhenCalled),
+            absent: (Number(e.skipCount) || 0) > 0,
             skips: skipsOf(e),
             priority: priorityOf(e.priority),
             priorityReason: e.priorityReason ?? null,
@@ -139,16 +152,16 @@ export const orderRows = (rows, rooms) => {
     );
     const seen = new Map();
     return sorted.map((row) => {
-        if (row.state === "serving") return { ...row, position: null };
+        if (row.state === "serving") return { ...row, position: row.number ?? null };
         const position = (seen.get(row.roomKey) ?? 0) + 1;
         seen.set(row.roomKey, position);
-        return { ...row, position };
+        return { ...row, position: row.number ?? position };
     });
 };
 
 export const waitingCount = (rows, roomKey) => rows.filter((r) => r.roomKey === roomKey && r.state !== "serving").length;
 
-// Missed the call ABSENT_LIMIT times: the receptionist keeps them in the queue or lets them leave
+// Missed the call ABSENT_LIMIT times: the receptionist asks whether the patient still waits
 export const needsDecision = (row) => row.state !== "serving" && (row.skips ?? 0) >= ABSENT_LIMIT;
 
 export const matchesQueue = (row, filters) => {

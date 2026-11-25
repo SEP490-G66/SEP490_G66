@@ -65,6 +65,8 @@ namespace OZE.Persistence.Seed
             if (seedSampleData)
             {
                 await SampleDataSeeder.SeedAsync(serviceProvider);
+                // TEMPORARY: patients BNTN01..09 with plans, visits and receipts for the cashier pages
+                await CashierDemoSeeder.SeedAsync(serviceProvider);
             }
         }
     }

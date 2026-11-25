@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import LabeledSelect from "@/components/ui/LabeledSelect";
-import ConfirmActionDialog from "@/components/billing/ConfirmActionDialog";
 import KpiTile from "@/components/reception-dashboard/KpiTile";
 import OverviewTable from "@/components/reception-dashboard/OverviewTable";
 import RoomCard from "@/components/reception-dashboard/RoomCard";
@@ -11,7 +10,6 @@ import TodoList from "@/components/reception-dashboard/TodoList";
 import BookingDialog from "@/components/reception/BookingDialog";
 import CheckInDialog from "@/components/reception/CheckInDialog";
 import ConfirmAppointmentDialog from "@/components/reception/ConfirmAppointmentDialog";
-import ConfirmCallDialog from "@/components/reception/ConfirmCallDialog";
 import QueueMoveDialog from "@/components/reception/QueueMoveDialog";
 import RevenueChart from "@/components/reception/RevenueChart";
 import ServiceCell from "@/components/reception/ServiceCell";
@@ -19,8 +17,6 @@ import { Card, CancelDialog, RescheduleDialog, WalkInDialog } from "@/components
 import { clinicClock, phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
-    callAppointment,
-    callQueueEntry,
     cancelAppointment,
     checkInAppointment,
     clinicToday,
@@ -31,25 +27,22 @@ import {
     getQueueEntries,
     getTodayAppointments,
     getWaitingList,
-    markNoShow,
-    moveQueueEntry,
     reassignDoctor,
-    recordConfirmCall,
-    rescheduleAppointment,
 } from "@/services/receptionService";
 import { getMyShifts } from "@/services/myScheduleService";
-import { addDays, ddmm, hhmm, isSunday } from "@/utils/calendar";
-import { allergiesOf, appointmentMenu, isLate as lateAt, matchesKeyword, serviceNames, slotOf, stateOf } from "@/utils/checkIn";
-import { callBackText, confirmStateOf, shortDate, sortByVisit } from "@/utils/confirmAppointments";
+import { addDays, ddmm, hhmm } from "@/utils/calendar";
+import { allergiesOf, appointmentMenu, isDoctorAway, isLate as lateAt, matchesKeyword, serviceNames, slotOf, stateOf } from "@/utils/checkIn";
+import { confirmStateOf, shortDate, sortByVisit } from "@/utils/confirmAppointments";
 import { CHECK_IN_TEXT, CONFIRM_TEXT, DASHBOARD_TEXT as TEXT, QUEUE_TEXT } from "@/utils/messages";
 import { NO_DOCTOR_KEY, entryRows, examRooms, examRows, orderRows, otherRooms, waitingCount } from "@/utils/queueBoard";
+import { fitsRoomTypes } from "@/utils/constants/room";
 import { RECEPTION_PATIENT_CREATE_ROUTE, ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
 const PER_PAGE = 5;
 const READ = { skipErrorPage: true };
 const EMPTY_CI = { keyword: "", state: "notyet", slot: "", doctor: "" };
-const EMPTY_CF = { keyword: "", day: "", doctor: "", status: "" };
+const EMPTY_CF = { keyword: "", day: "", doctor: "" };
 const list = (r) => (r.success ? (Array.isArray(r.data) ? r.data : (r.data?.items ?? [])) : []);
 
 const loadOverview = async (today, signal) => {
@@ -109,11 +102,13 @@ const ReceptionistDashboard = () => {
 
     const serving = todays.filter((a) => a.status === "IN_SERVICE");
     const rooms = [...examRooms(doctors, data?.waiting ?? [], serving), ...otherRooms(data?.entries ?? [])];
-    const rows = orderRows([...examRows(data?.waiting ?? [], serving), ...entryRows(data?.entries ?? [])], rooms);
+    const rows = orderRows([...examRows(data?.waiting ?? [], serving, data?.entries ?? []), ...entryRows(data?.entries ?? [])], rooms);
     const roomOf = new Map(rooms.map((r) => [r.key, r]));
     const byTab = (state, tab) => rows.filter((r) => state(r) && roomOf.get(r.roomKey)?.tab === tab).length;
     const isWaiting = (r) => r.state !== "serving";
     const isServing = (r) => r.state === "serving";
+    const examined = new Set((data?.waiting ?? []).filter((w) => w.isPriorityReturn).map((w) => w.appointmentId));
+    const canMove = (r) => r.kind === "exam" && r.state !== "serving" && !examined.has(r.appointmentId);
     const laterOf = (room) => todays.filter((a) => a.doctorId === room.doctorId && stateOf(a) === "notyet").length;
 
     const live = todays.filter((a) => a.status !== "CANCELLED");
@@ -134,8 +129,7 @@ const ReceptionistDashboard = () => {
             (a) =>
                 matchesKeyword(a, cf.keyword) &&
                 (!cf.day || a.appointmentDate === cf.day) &&
-                (!cf.doctor || String(a.doctorId) === cf.doctor) &&
-                (!cf.status || confirmStateOf(a) === cf.status),
+                (!cf.doctor || String(a.doctorId) === cf.doctor),
         ),
     );
     const cfPaging = usePaging(cfRows, PER_PAGE);
@@ -156,23 +150,28 @@ const ReceptionistDashboard = () => {
             .filter(([k]) => k !== "notyet")
             .map(([k, [label]]) => [k, label]),
     ];
-    const dayOptions = [["", TEXT.ALL_DAYS], ...[1, 2, 3, 4, 5, 6, 7].map((i) => addDays(today, i)).filter((k) => !isSunday(k)).map((k) => [k, shortDate(k)])];
-    const cfStatusOptions = [["", TEXT.ALL_STATUSES], ...["pending", "callback", "noanswer"].map((k) => [k, CONFIRM_TEXT.STATES[k][0]])];
+    const dayOptions = [["", TEXT.ALL_DAYS], ...[1, 2, 3, 4, 5, 6, 7].map((i) => addDays(today, i)).map((k) => [k, shortDate(k)])];
 
-    const callbackToday = needConfirm.filter((a) => a.confirmCallOutcome === "CallBack" && String(a.confirmCallBackAt ?? "").startsWith(today)).length;
-    const newOnes = needConfirm.filter((a) => !a.confirmCallOutcome).length;
     const endedLeft = rooms.filter((r) => r.ended).reduce((sum, r) => sum + waitingCount(rows, r.key) + laterOf(r), 0);
     const todo = [
         { key: "late", count: late, to: ROUTES.RECEPTION_CHECK_IN },
-        { key: "callback", count: callbackToday, to: ROUTES.RECEPTION_APPOINTMENTS, state: { status: "callback" } },
-        { key: "pending", count: newOnes, to: ROUTES.RECEPTION_APPOINTMENTS, state: { status: "pending" } },
+        { key: "pending", count: needConfirm.length, to: ROUTES.RECEPTION_APPOINTMENTS, state: { status: "pending" } },
         { key: "ended", count: endedLeft, to: ROUTES.RECEPTION_QUEUE },
         { key: "followUp", count: data?.followUps ?? 0, to: ROUTES.RECEPTION_FOLLOW_UPS },
     ];
 
-    const menuFor = (a) => {
-        const isToday = a.appointmentDate === today;
-        return appointmentMenu(a, { isToday, late: isToday && isLate(a), open: (type) => () => setDialog({ type, item: a }) });
+    const menuFor = (a) => appointmentMenu(a, { open: (type) => () => setDialog({ type, item: a }) });
+    const checkedInText = (a) => (data) => CHECK_IN_TEXT.CHECKED_IN(a.patientName, data.queueNumber, data.roomName);
+    const actWith = async (request, successText) => {
+        const result = await request;
+        if (report(result, successText(result.data ?? {}))) {
+            setDialog(null);
+            reload();
+        }
+    };
+    const startCheckIn = (a) => {
+        if (isDoctorAway(a, doctors, doctorsLoaded)) setDialog({ type: "checkIn", item: a });
+        else actWith(checkInAppointment(a.id), checkedInText(a));
     };
 
     const patientCell = (a) => {
@@ -187,28 +186,19 @@ const ReceptionistDashboard = () => {
     };
 
     const confirmCell = (a) => {
-        const state = confirmStateOf(a);
-        const [label, badge] = CONFIRM_TEXT.STATES[state];
-        const when = state === "callback" ? callBackText(a) : null;
-        return (
-            <>
-                <span className={cx("badge", badge)}>{label}</span>
-                {when && <small className="block pt-0.5 text-caption text-muted">{CONFIRM_TEXT.CALL_BACK_AT(when)}</small>}
-            </>
-        );
+        const [label, badge] = CONFIRM_TEXT.STATES[confirmStateOf(a)];
+        return <span className={cx("badge", badge)}>{label}</span>;
     };
 
-    const callNext = async (room, next) => {
-        const again = next.state === "called";
-        const result = next.kind === "exam" ? await callAppointment(next.appointmentId) : await callQueueEntry(next.entryId);
-        if (report(result, TEXT.CALLED(again, String(next.position).padStart(2, "0"), next.patientName, room.name))) reload();
-    };
-
-    const moveTargets = (room) => rooms.filter((r) => r.tab === room.tab && r.key !== room.key && r.active && !r.off).map((r) => ({ ...r, waiting: waitingCount(rows, r.key) }));
+    // Only rooms working now, of the kind the patients' services need (the backend refuses any other)
+    const moveTargets = (room, picked = []) =>
+        rooms
+            .filter((r) => r.tab === room.tab && r.key !== room.key && r.active && !r.off && fitsRoomTypes(r.roomTypes, ...picked.map((row) => row.requiredRoomType)))
+            .map((r) => ({ ...r, waiting: waitingCount(rows, r.key) }));
 
     const moveRows = async (picked, fromKey, { target, reason }) => {
         // The rows still waiting in that room now, not the ones seen when the dialog opened
-        const moving = rows.filter((r) => r.roomKey === fromKey && r.state !== "serving" && picked.some((p) => p.key === r.key || picked.length > 1));
+        const moving = rows.filter((r) => r.roomKey === fromKey && canMove(r) && picked.some((p) => p.key === r.key || picked.length > 1));
         if (!moving.length) {
             toast.info(QUEUE_TEXT.MOVE_NOTHING);
             setDialog(null);
@@ -217,8 +207,7 @@ const ReceptionistDashboard = () => {
         }
         const failures = [];
         for (const row of moving) {
-            const result =
-                row.kind === "exam" ? await reassignDoctor(row.appointmentId, target.doctorId, reason) : await moveQueueEntry(row.entryId, target.roomId, reason);
+            const result = await reassignDoctor(row.appointmentId, target.doctorId, reason);
             if (!result.success) failures.push(`${row.patientName}: ${result.message}`);
         }
         const label = [target.name, target.staff].filter(Boolean).join(" · ");
@@ -240,7 +229,7 @@ const ReceptionistDashboard = () => {
                     </p>
                 </div>
                 <div role="group" aria-label={TEXT.QUICK} className="flex flex-wrap gap-2">
-                    <Link to={ROUTES.RECEPTION_INVOICES} className="btn btn-secondary">
+                    <Link to={ROUTES.RECEPTION_PAYMENTS} className="btn btn-secondary">
                         {TEXT.PAY}
                     </Link>
                     <button type="button" className="btn btn-secondary" onClick={() => navigate(RECEPTION_PATIENT_CREATE_ROUTE)}>
@@ -325,7 +314,7 @@ const ReceptionistDashboard = () => {
                             <td data-label={TEXT.CHECK_IN_COLUMNS[4]} className="min-w-36">
                                 {row.doctorName ?? CHECK_IN_TEXT.NO_DOCTOR}
                                 {state === "notyet" && doctorById.get(row.doctorId)?.status === "Ended" && (
-                                    <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ENDED(doctorById.get(row.doctorId).end)}</small>
+                                    <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ENDED(doctorById.get(row.doctorId).endedAt ?? doctorById.get(row.doctorId).end)}</small>
                                 )}
                                 {state === "notyet" && doctorById.get(row.doctorId)?.status === "OnLeave" && (
                                     <small className="block text-caption text-danger">{CHECK_IN_TEXT.DOCTOR_ON_LEAVE}</small>
@@ -336,7 +325,11 @@ const ReceptionistDashboard = () => {
                                 {state === "notyet" && (
                                     <RowActions
                                         name={row.patientName}
-                                        primary={{ label: CHECK_IN_TEXT.CHECK_IN, onClick: () => setDialog({ type: "checkIn", item: row }) }}
+                                        primary={
+                                            row.status === "PENDING"
+                                                ? { label: CONFIRM_TEXT.CONFIRM, onClick: () => setDialog({ type: "confirm", item: row }) }
+                                                : { label: CHECK_IN_TEXT.CHECK_IN, onClick: () => startCheckIn(row) }
+                                        }
                                         items={menuFor(row)}
                                     />
                                 )}
@@ -355,7 +348,7 @@ const ReceptionistDashboard = () => {
                                 room={room}
                                 rows={rows.filter((r) => r.roomKey === room.key)}
                                 later={room.ended ? laterOf(room) : 0}
-                                onCall={callNext}
+                                canMove={canMove}
                                 onMoveAll={(from, moving) => setDialog({ type: "move", from, rows: moving, reason: QUEUE_TEXT.MOVE_REASON_ENDED(from.staff) })}
                             />
                         ))}
@@ -376,13 +369,12 @@ const ReceptionistDashboard = () => {
                     <>
                         <LabeledSelect id="dcf-day" label={TEXT.APPOINTMENT_DAY} value={cf.day} options={dayOptions} onChange={setCfFilter("day")} />
                         <LabeledSelect id="dcf-doctor" label={TEXT.DOCTOR} value={cf.doctor} options={doctorOptions} onChange={setCfFilter("doctor")} />
-                        <LabeledSelect id="dcf-status" label={TEXT.STATUS} value={cf.status} options={cfStatusOptions} onChange={setCfFilter("status")} />
                     </>
                 }
                 columns={TEXT.CONFIRM_COLUMNS}
                 paging={cfPaging}
                 loading={!data}
-                empty={cf.keyword || cf.day || cf.doctor || cf.status ? TEXT.EMPTY_FILTERED : TEXT.CONFIRM_EMPTY}
+                empty={cf.keyword || cf.day || cf.doctor ? TEXT.EMPTY_FILTERED : TEXT.CONFIRM_EMPTY}
                 renderRow={(row) => (
                     <tr key={row.id}>
                         <td data-label={TEXT.CONFIRM_COLUMNS[0]} className="whitespace-nowrap">
@@ -417,54 +409,36 @@ const ReceptionistDashboard = () => {
                 <CheckInDialog
                     appointment={a}
                     doctors={doctors}
-                    doctorsLoaded={doctorsLoaded}
                     waiting={data?.waitingOk ? data.waiting : null}
                     onClose={close}
                     onReschedule={() => setDialog({ type: "reschedule", item: a })}
-                    onSubmit={(v) => act(checkInAppointment(a.id, v), CHECK_IN_TEXT.CHECKED_IN(a.patientName, v.room, v.doctorId ? doctorById.get(v.doctorId)?.name : null))}
+                    onCancel={() => setDialog({ type: "cancel", item: a })}
+                    onSubmit={(v) => actWith(checkInAppointment(a.id, v), checkedInText(a))}
                 />
             )}
             {dialog?.type === "confirm" && <ConfirmAppointmentDialog appointment={a} onClose={close} onSubmit={() => act(confirmAppointment(a.id), CONFIRM_TEXT.CONFIRMED(a.patientName))} />}
-            {dialog?.type === "call" && (
-                <ConfirmCallDialog
+            {dialog?.type === "reschedule" && (
+                <RescheduleDialog
                     appointment={a}
-                    today={today}
                     onClose={close}
-                    onSubmit={(v) => {
-                        const when = `${ddmm(v.callBackDate)} ${v.callBackTime}`;
-                        return act(
-                            recordConfirmCall(a.id, v),
-                            v.outcome === "CallBack" ? CONFIRM_TEXT.WILL_CALL_BACK(a.patientName, when) : CONFIRM_TEXT.NO_ANSWER(a.patientName, when),
-                        );
+                    onDone={() => {
+                        setDialog(null);
+                        reload();
                     }}
                 />
-            )}
-            {dialog?.type === "noShow" && (
-                <ConfirmActionDialog
-                    title={TEXT.NO_SHOW_TITLE}
-                    description={TEXT.NO_SHOW_SUB(a.patientName, hhmm(a.timeSlotStart))}
-                    body={TEXT.NO_SHOW_BODY(slotOf(a), a.doctorName)}
-                    closeLabel={CONFIRM_TEXT.CLOSE}
-                    submitLabel={TEXT.ACT_NO_SHOW}
-                    onClose={close}
-                    onSubmit={() => act(markNoShow(a.id), TEXT.NO_SHOW_DONE(a.patientName))}
-                />
-            )}
-            {dialog?.type === "reschedule" && (
-                <RescheduleDialog appointment={a} onClose={close} onSubmit={(v) => act(rescheduleAppointment(a.id, v), CONFIRM_TEXT.RESCHEDULED(a.patientName))} />
             )}
             {dialog?.type === "cancel" && <CancelDialog appointment={a} onClose={close} onSubmit={(reason) => act(cancelAppointment(a.id, reason), CONFIRM_TEXT.CANCELLED(a.patientName))} />}
             {dialog?.type === "move" && (
                 <QueueMoveDialog
                     rows={dialog.rows}
-                    targets={moveTargets(dialog.from)}
+                    targets={moveTargets(dialog.from, dialog.rows)}
                     defaultReason={dialog.reason}
                     onClose={close}
                     onSubmit={(choice) => moveRows(dialog.rows, dialog.from.key, choice)}
                 />
             )}
             {dialog?.type === "walkIn" && (
-                <WalkInDialog doctors={available} onClose={close} onSubmit={(request) => act(createWalkIn(request), CHECK_IN_TEXT.WALKED_IN(request.fullName))} />
+                <WalkInDialog doctors={available} waiting={data?.waitingOk ? data.waiting : null} onClose={close} onSubmit={(request) => act(createWalkIn(request), CHECK_IN_TEXT.WALKED_IN(request.fullName))} />
             )}
             {dialog?.type === "book" && (
                 <BookingDialog

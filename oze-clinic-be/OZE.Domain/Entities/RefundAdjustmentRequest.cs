@@ -15,6 +15,8 @@ namespace OZE.Domain.Entities
         public DateTimeOffset? ApprovedAt { get; set; }
         public string? RejectionReason { get; set; }
         public DateTimeOffset? ProcessedAt { get; set; }
+        // The receptionist who paid the refund out, so it is counted in that person's cash session
+        public string? ProcessedByUserId { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
 

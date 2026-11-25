@@ -231,6 +231,7 @@ namespace OZE.Persistence.Seed
             ("Clinic.WorkStartTime", "08:00", "String", "Giờ mở cửa"),
             ("Clinic.WorkEndTime", "17:00", "String", "Giờ đóng cửa"),
             (ConfigKeyConstants.SlotDurationMinutes, "30", "Int", "Độ dài một khung giờ hẹn (phút)"),
+            (ConfigKeyConstants.PaymentDepositRate, "30", "Decimal", "Tỉ lệ đặt cọc khi chọn phương án đặt cọc (%)"),
         };
 
         // Patients of the mocks, one record per person (the mocks gave some of them different codes on different screens).

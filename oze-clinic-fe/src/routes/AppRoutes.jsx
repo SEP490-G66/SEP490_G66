@@ -23,6 +23,9 @@ import ChangePasswordPage from "../pages/common/ChangePasswordPage";
 import ComingSoonPage from "../pages/common/ComingSoonPage";
 import ReceptionCheckIn from "../pages/receptionist/ReceptionCheckIn";
 import ReceptionInvoices from "../pages/receptionist/ReceptionInvoices";
+import ReceptionDebts from "../pages/receptionist/ReceptionDebts";
+import ReceptionRefunds from "../pages/receptionist/ReceptionRefunds";
+import ReceptionReconciliation from "../pages/receptionist/ReceptionReconciliation";
 import ReceptionPatients from "../pages/receptionist/ReceptionPatients";
 import ReceptionSchedule from "../pages/receptionist/ReceptionSchedule";
 import ReceptionPatientDetail from "../pages/receptionist/ReceptionPatientDetail";
@@ -31,16 +34,26 @@ import ReceptionConsultations from "../pages/receptionist/ReceptionConsultations
 import DailyReconciliation from "../pages/admin/DailyReconciliation";
 import ReceptionConfirm from "../pages/receptionist/ReceptionConfirm";
 import ReceptionFollowUps from "../pages/receptionist/ReceptionFollowUps";
-import ReceptionPayment from "../pages/receptionist/ReceptionPayment";
 import ReceptionQueue from "../pages/receptionist/ReceptionQueue";
 import CashHandover from "../pages/receptionist/CashHandover";
 import CashHandoverDetail from "../pages/receptionist/CashHandoverDetail";
+import CashierPayments from "../pages/receptionist/CashierPayments";
+import CashierAccount from "../pages/receptionist/CashierAccount";
+import CashierPaymentOption from "../pages/receptionist/CashierPaymentOption";
+import CashierDeposits from "../pages/receptionist/CashierDeposits";
+import CashierPeriods from "../pages/receptionist/CashierPeriods";
+import CashierCollect from "../pages/receptionist/CashierCollect";
 import WorkSchedule from "../pages/common/WorkSchedule";
 import MyAppointments from "../pages/patient/MyAppointments";
 import AppointmentDetail from "../pages/patient/AppointmentDetail";
-import MedicalRecord from "../pages/patient/MedicalRecord";
+import MedicalHistory from "../pages/patient/MedicalHistory";
+import VisitDetail from "../pages/patient/VisitDetail";
+import TreatmentPlans from "../pages/patient/TreatmentPlans";
+import TreatmentPlanDetail from "../pages/patient/TreatmentPlanDetail";
+import PatientDocuments from "../pages/patient/PatientDocuments";
 import BookAppointment from "../pages/patient/BookAppointment";
-import PaymentDebts from "../pages/patient/PaymentDebts";
+import InstallmentDetail from "../pages/patient/InstallmentDetail";
+import InvoiceDetailPage from "../pages/patient/InvoiceDetailPage";
 import PaymentHistory from "../pages/patient/PaymentHistory";
 import RefundRequests from "../pages/patient/RefundRequests";
 import AuditLogManagement from "../pages/admin/AuditLogManagement";
@@ -172,11 +185,24 @@ const ROLE_PAGES = {
     [ROUTES.RECEPTION_APPOINTMENTS]: <ReceptionConfirm />,
     [ROUTES.RECEPTION_CHECK_IN]: <ReceptionCheckIn />,
     [ROUTES.RECEPTION_SCHEDULE]: <ReceptionSchedule />,
-    [ROUTES.RECEPTION_INVOICES]: <ReceptionPayment />,
+    [ROUTES.RECEPTION_INVOICES]: <Navigate to={ROUTES.RECEPTION_PAYMENTS} replace />,
     [ROUTES.RECEPTION_QUEUE]: <ReceptionQueue />,
     [ROUTES.RECEPTION_FOLLOW_UPS]: <ReceptionFollowUps />,
-    [ROUTES.RECEPTION_DEBTS]: <Navigate to={`${ROUTES.RECEPTION_INVOICE_LIST}?tab=debt`} replace />,
+    [ROUTES.RECEPTION_DEBTS]: <ReceptionDebts />,
     [ROUTES.RECEPTION_INVOICE_LIST]: <ReceptionInvoices />,
+    [ROUTES.RECEPTION_REFUNDS]: <ReceptionRefunds />,
+    [ROUTES.RECEPTION_RECONCILIATION]: <ReceptionReconciliation />,
+    [ROUTES.RECEPTION_PAYMENTS]: (
+        <Routes>
+            <Route index element={<CashierPayments />} />
+            <Route path=":patientId" element={<CashierAccount />} />
+            <Route path=":patientId/plans/:planId/option" element={<CashierPaymentOption />} />
+            <Route path="*" element={NOT_FOUND} />
+        </Routes>
+    ),
+    [ROUTES.RECEPTION_DEPOSITS]: <CashierDeposits />,
+    [ROUTES.RECEPTION_PERIODS]: <CashierPeriods />,
+    [ROUTES.RECEPTION_COLLECT]: <CashierCollect />,
     [ROUTES.RECEPTION_PATIENTS]: (
         <Routes>
             <Route index element={<ReceptionPatients />} />
@@ -210,19 +236,31 @@ const ROLE_PAGES = {
     ),
     [ROUTES.MEDICAL_RECORD]: (
         <Routes>
-            <Route path=":examinationId?" element={<MedicalRecord />} />
+            <Route index element={<MedicalHistory />} />
+            <Route path=":examinationId" element={<VisitDetail />} />
             <Route path="*" element={NOT_FOUND} />
         </Routes>
     ),
+    [ROUTES.TREATMENT_PLANS]: (
+        <Routes>
+            <Route index element={<TreatmentPlans />} />
+            <Route path=":planId" element={<TreatmentPlanDetail />} />
+            <Route path="*" element={NOT_FOUND} />
+        </Routes>
+    ),
+    [ROUTES.DOCUMENTS]: <PatientDocuments />,
+    // Plans paid in instalments now live in the "Trả theo đợt" tab of Lịch sử thanh toán; the detail keeps this path.
     [ROUTES.PAYMENT_DEBTS]: (
         <Routes>
-            <Route path=":debtId?" element={<PaymentDebts />} />
+            <Route index element={<Navigate to={`${ROUTES.PAYMENT_HISTORY}?tab=installments`} replace />} />
+            <Route path=":debtId" element={<InstallmentDetail />} />
             <Route path="*" element={NOT_FOUND} />
         </Routes>
     ),
     [ROUTES.PAYMENT_HISTORY]: (
         <Routes>
             <Route index element={<PaymentHistory />} />
+            <Route path=":invoiceId" element={<InvoiceDetailPage />} />
             <Route path="*" element={NOT_FOUND} />
         </Routes>
     ),
@@ -251,7 +289,7 @@ const ROLE_PAGES = {
 
 // Titles of the sidebar pages not built yet (same labels as the sidebar); they show ComingSoonPage inside the layout.
 const COMING_SOON_TITLES = {
-    [ROUTES.APPOINTMENTS]: "Lịch hẹn của tôi",
+    [ROUTES.APPOINTMENTS]: "Lịch hẹn sắp tới",
     [ROUTES.DOCTOR_APPOINTMENTS]: "Lịch hẹn khám",
     [ROUTES.DOCTOR_PATIENTS]: "Bệnh nhân",
     [ROUTES.DOCTOR_TREATMENT_PLANS]: "Kế hoạch điều trị",

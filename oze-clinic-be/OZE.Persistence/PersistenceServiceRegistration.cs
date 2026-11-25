@@ -63,6 +63,7 @@ namespace OZE.Persistence
             services.AddScoped<IInvoiceReportRepository, InvoiceReportRepository>();
             services.AddScoped<ILeaveRequestRepository, LeaveRequestRepository>();
             services.AddScoped<ICashSessionRepository, CashSessionRepository>();
+            services.AddScoped<ICashierRepository, CashierRepository>();
             services.AddScoped<ICareRepository, CareRepository>();
             services.AddScoped<IConsultationRepository, ConsultationRepository>();
 

@@ -23,13 +23,16 @@ export const addCashExpense = ({ amount, category, description }) =>
 
 export const removeCashExpense = (expenseId) => call(() => api.delete(`/api/cash-sessions/current/expenses/${expenseId}`));
 
+// Codes of a refused close (409): another session, or the system figures changed while counting
+export const CLOSE_CONFLICT = { SESSION_CHANGED: "SESSION_CHANGED", FIGURES_CHANGED: "FIGURES_CHANGED" };
+
 // sessionId and the system figures the cashier saw go along so the backend can refuse a close of another session
-// or one whose figures changed meanwhile (proposed, see be-api-requests GC-6 / GC-7).
+// or one whose figures changed meanwhile.
 export const closeCashSession = ({ sessionId, countedCash, countedTransfer, denominations, notes, expectedCash, expectedTransfer }, config = {}) =>
     call(() =>
         api.post(
             "/api/cash-sessions/current/close",
-            { sessionId, countedCash, countedTransfer, denominations: denominations ?? null, notes: notes || null, expectedCash, expectedTransfer },
+            { sessionId, countedCash, countedTransfer: countedTransfer ?? null, denominations: denominations ?? null, notes: notes || null, expectedCash, expectedTransfer },
             config,
         ),
     );

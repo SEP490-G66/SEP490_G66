@@ -12,6 +12,8 @@ namespace OZE.Domain.Entities
         public string Status { get; set; } = "PENDING";
         // Waiting-list priority, set by the receptionist: 0 normal, 1 high, 2 urgent
         public int Priority { get; set; }
+        // Why the patient is above normal priority; staff only, never shown to the patient. Null at normal priority
+        public string? PriorityReason { get; set; }
         public DateTimeOffset? CheckInAt { get; set; }
         public string? Notes { get; set; }
         public string? CancellationReason { get; set; }

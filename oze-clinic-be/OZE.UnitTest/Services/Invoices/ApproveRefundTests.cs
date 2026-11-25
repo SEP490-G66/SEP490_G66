@@ -50,14 +50,15 @@ namespace OZE.UnitTest.Services.Invoices
                 .Returns((Func<Task<RefundRequestResponse>> action, CancellationToken _) => action());
         }
 
-        // UTCID01 (N): the paid amount less the work done is refunded and the invoice is partly refunded
+        // UTCID01 (N): the paid amount less the work done is refunded and the invoice is partly refunded;
+        // the request waits as Approved until the receptionist pays it out
         [Fact]
         public async Task ApproveAsync_ShouldRefundPaidLessWorkDone()
         {
             var result = await _service.ApproveAsync(60, "manager-user");
 
             result.Amount.Should().Be(250000);
-            _request.Status.Should().Be(PaymentConstants.RefundRequestStatus.Processed);
+            _request.Status.Should().Be(PaymentConstants.RefundRequestStatus.Approved);
             _request.ApprovedByUserId.Should().Be("manager-user");
             _invoice.PaidAmount.Should().Be(150000);
             _invoice.PaymentStatus.Should().Be(InvoiceConstants.PartiallyRefunded);
@@ -73,6 +74,19 @@ namespace OZE.UnitTest.Services.Invoices
 
             result.Amount.Should().Be(400000);
             _invoice.PaymentStatus.Should().Be(InvoiceConstants.Refunded);
+        }
+
+        // UTCID07 (N): paying an approved refund out records who paid, so it is counted in that receptionist's cash session
+        [Fact]
+        public async Task PayoutAsync_ShouldRecordWhoPaidOut()
+        {
+            _request.Status = PaymentConstants.RefundRequestStatus.Approved;
+
+            await _service.PayoutAsync(60, "receptionist-user");
+
+            _request.Status.Should().Be(PaymentConstants.RefundRequestStatus.Processed);
+            _request.ProcessedByUserId.Should().Be("receptionist-user");
+            _request.ProcessedAt.Should().NotBeNull();
         }
 
         // UTCID03 (A): the request does not exist

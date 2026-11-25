@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppointmentTabs from "@/components/appointment/AppointmentTabs";
+import BackLink from "@/components/navigation/BackLink";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import BookingDialog from "@/components/reception/BookingDialog";
 import PatientAppointmentsTab from "@/components/reception/PatientAppointmentsTab";
@@ -8,7 +9,6 @@ import PatientInfoTab from "@/components/reception/PatientInfoTab";
 import PatientInvoicesTab from "@/components/reception/PatientInvoicesTab";
 import PatientPlansTab from "@/components/reception/PatientPlansTab";
 import PatientSummaryCard from "@/components/reception/PatientSummaryCard";
-import PlanApproveDialog from "@/components/reception/PlanApproveDialog";
 import WalkInMismatchDialog from "@/components/reception/WalkInMismatchDialog";
 import { Card, EmptyState, WalkInDialog } from "@/components/reception/shared";
 import { clinicClock, ddmm, hhmm, money } from "@/components/reception/receptionUtils";
@@ -32,7 +32,6 @@ import {
     checkInTimeText,
     invoiceLabels,
     onDutyDoctors,
-    planApproveButtonId,
     readPatientId,
     readTab,
     safeListSearch,
@@ -385,21 +384,19 @@ const ReceptionPatientDetail = () => {
         setReload((n) => n + 1);
     };
 
-    const onPlanResolved = useCallback(() => {
-        const current = latest.current.dialog;
-        if (current?.type === "plan") pendingFocus.current = { key: current.key, target: planApproveButtonId(current.plan.id), waitTab: true };
-        setDialog(null);
-        session.close();
-        setSeq((s) => ({ ...s, [TABS.PLANS]: s[TABS.PLANS] + 1 }));
-    }, [session]);
-
     const listHref = `${ROUTES.RECEPTION_PATIENTS}${safeListSearch(location.state?.listSearch)}`;
     const crumbs = [{ label: TEXT.TITLE, href: listHref }, { label: patient?.fullName ?? (notFound ? TEXT.NOT_FOUND : TEXT.LOADING) }];
+    const backBar = (className) => (
+        <div className={className ? `flex items-center gap-3 ${className}` : "flex items-center gap-3"}>
+            <BackLink to={listHref} label={TEXT.BACK_LIST_LABEL} />
+            <Breadcrumb items={crumbs} className="min-w-0 flex-wrap wrap-anywhere" />
+        </div>
+    );
 
     if (notFound) {
         return (
             <div className="app-content min-h-full">
-                <Breadcrumb items={crumbs} className="mb-2" />
+                {backBar("mb-2")}
                 <section className="rounded-xl border border-border bg-canvas p-8 text-center">
                     <h1 ref={h1Ref} tabIndex={-1} className="page-title outline-none">
                         {TEXT.NOT_FOUND}
@@ -446,7 +443,7 @@ const ReceptionPatientDetail = () => {
 
     return (
         <div className="app-content min-h-full space-y-4">
-            <Breadcrumb items={crumbs} />
+            {backBar()}
             {patientError ? (
                 <>
                     <h1 ref={h1Ref} tabIndex={-1} className="page-title outline-none">
@@ -492,7 +489,7 @@ const ReceptionPatientDetail = () => {
                                 </button>
                             </div>
                         ) : tab === TABS.PLANS ? (
-                            <PatientPlansTab items={currentTab.items} onApprove={(plan) => openDialog("plan", { plan })} />
+                            <PatientPlansTab items={currentTab.items} />
                         ) : tab === TABS.APPOINTMENTS ? (
                             <Card>
                                 <PatientAppointmentsTab items={currentTab.items} hasMore={currentTab.hasMore} more={more[tab] ?? {}} onMore={loadMore} />
@@ -527,14 +524,6 @@ const ReceptionPatientDetail = () => {
                     onPatientGone={onPatientGone}
                     readConfig={BOOKING_READ}
                     writeConfig={BOOKING_WRITE}
-                />
-            )}
-            {patient && shownDialog?.type === "plan" && (
-                <PlanApproveDialog
-                    plan={shownDialog.plan}
-                    owner={shownDialog.owner}
-                    onClose={() => closeDialog({ target: planApproveButtonId(shownDialog.plan.id) })}
-                    onResolved={onPlanResolved}
                 />
             )}
             {shownDialog?.type === "mismatch" && (

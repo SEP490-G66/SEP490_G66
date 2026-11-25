@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import Pagination from "@/components/ui/Pagination";
 import { PRIORITY, getDoctorsOnDuty } from "@/services/receptionService";
+import { roomTypesByDoctor } from "@/utils/constants/room";
 
 // Formatting, status labels and hooks shared by the receptionist pages.
 
@@ -142,9 +143,15 @@ export const useDoctorsOnDuty = (refreshKey = 0) => {
                 shift: `${hhmm(s.shiftStart)}–${hhmm(s.shiftEnd)}`,
                 start: hhmm(s.shiftStart),
                 end: hhmm(s.shiftEnd),
+                endedAt: s.actualEndTime ? hhmm(s.actualEndTime) : null,
+                absenceReason: s.absenceReason ?? null,
+                // Patients checked in with this doctor and not examined yet (same on every shift of the doctor)
+                waiting: Number(s.waitingCount) || 0,
             });
         });
-        const doctors = [...map.values()];
+        // Kinds of room each doctor still works in today (shifts not ended, not on leave, not over)
+        const roomTypesOf = roomTypesByDoctor(shifts.filter((s) => (s.status === "Working" || s.status === "NotStarted") && hhmm(s.shiftEnd) > now));
+        const doctors = [...map.values()].map((d) => ({ ...d, roomTypes: roomTypesOf.get(d.id) ?? [] }));
         return { doctors, loaded, available: doctors.filter((d) => d.status === "Working" || d.status === "NotStarted") };
     }, [shifts, loaded]);
 };

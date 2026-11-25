@@ -18,7 +18,7 @@ const styleOf = ({ selected, isToday, enabled }) => {
     return enabled ? DAY_STYLES.free : DAY_STYLES.disabled;
 };
 
-const BookingDayStrip = ({ weekStart, today, days, busy, error, selected, info, onSelect, onRetry }) => {
+const BookingDayStrip = ({ weekStart, today, days, busy, error, selected, info, getStatus, onSelect, onRetry }) => {
     const stripRef = useRef(null);
 
     useLayoutEffect(() => {
@@ -47,7 +47,7 @@ const BookingDayStrip = ({ weekStart, today, days, busy, error, selected, info, 
                     className={cx("mt-3.5 grid grid-cols-7 gap-2 max-sm:flex max-sm:overflow-x-auto max-sm:pb-1", busy && "opacity-60")}
                 >
                     {weekDates(weekStart).map((date) => {
-                        const status = dayStatus(date, today, days);
+                        const status = getStatus ? getStatus(date) : dayStatus(date, today, days);
                         const isToday = date === today;
                         const enabled = status.kind === "free";
                         const style = styleOf({ selected: date === selected, isToday, enabled });

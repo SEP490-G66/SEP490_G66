@@ -88,11 +88,12 @@ Thành công có người: HTTP 200, `data` = `QueueEntryResponse`, message `"Nu
 
 **3.1 GET** `QueuesController.cs:35-45` → `QueueService.cs:113-121`: lấy danh sách trên, map với `includePatientDetails = isStaff`; che tên bằng `MaskName` (`QueueService.cs:260-264`: chữ cái đầu mỗi từ + `***`).
 
-**3.2 call-next** `QueuesController.cs:51-65` → `QueueService.CallNextAsync` (`QueueService.cs:123-161`):
-1. `:130-137` nếu là bác sĩ và `queueType == Examination`: lấy `StaffProfile.Id` (không có → 404), xác định `offDuty` (`IsOffDutyAsync`, `QueueRepository.cs:131-138`: không có ca hôm nay đã `ActualStartTime` và chưa `ActualEndTime`).
-2. `:139` lấy danh sách theo thứ tự trên.
-3. `:141-158` duyệt các bản ghi `WAITING` (nếu `offDuty` thì chỉ những bản ghi mà lịch đã có `Examination`), thử `TryMarkCalledAsync` (`QueueRepository.cs:107-117`: một câu `UPDATE ... WHERE Id = @id AND Status = 'WAITING'` đặt `CALLED`, `CalledAt`, `RoomId = roomId ?? RoomId`). Thất bại (người khác vừa gọi) thì thử người tiếp theo.
-4. `:160` không ai → null.
+**3.2 call-next** `QueuesController.cs:51-65` → `QueueService.CallNextAsync` (`QueueService.cs:127-175`):
+1. `:133-141` nếu là bác sĩ và `queueType == Examination`: lấy `StaffProfile.Id` (không có → 404), xác định `offDuty` (`IsOffDutyAsync`, `QueueRepository.cs:131-138`: không có ca hôm nay đã `ActualStartTime` và chưa `ActualEndTime`).
+2. `:143-144` lấy danh sách theo thứ tự trên.
+3. `:145` riêng hàng `Examination`: lấy các lịch còn bản ghi `Imaging` đang mở hôm nay (`GetAppointmentsAtImagingAsync`, `:261-271`), tức bệnh nhân bác sĩ đã gửi đi chụp phim và chưa có kết quả.
+4. `:148-172` duyệt các bản ghi `WAITING`, **bỏ qua bệnh nhân còn ở phòng chụp** (bước 3) và nếu `offDuty` thì chỉ những bản ghi mà lịch đã có `Examination`; thử `TryMarkCalledAsync` (`QueueRepository.cs:107-117`: một câu `UPDATE ... WHERE Id = @id AND Status = 'WAITING'` đặt `CALLED`, `CalledAt`, `RoomId = roomId ?? RoomId`). Thất bại (người khác vừa gọi) thì thử người tiếp theo. Khi chụp xong, bản ghi `Imaging` đóng lại, bệnh nhân được gọi lại bình thường (lên đầu nhờ `Urgent` và nhóm "quay lại sau chụp phim"). Đã sửa 24/11/2026: trước đó `call-next` có thể gọi nhầm bệnh nhân đang ở phòng chụp.
+5. `:174` không ai → null.
 
 **3.3 call** `QueuesController.cs:71-80` → `QueueService.CallAsync` (`QueueService.cs:163-198`):
 1. `:169-170` tải bản ghi (`GetByIdAsync`), không có → 404.

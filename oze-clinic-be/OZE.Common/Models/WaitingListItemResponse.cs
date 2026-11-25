@@ -20,6 +20,15 @@ namespace OZE.Common.Models
         public string? RoomName { get; set; }
         // 0 normal, 1 high, 2 urgent; a higher level is seen first
         public int Priority { get; set; }
+        // The kind of room the services need; moving to another doctor needs a shift in such a room
+        public string RequiredRoomType { get; set; } = string.Empty;
+        // Why the patient is above normal priority (staff screens only)
+        public string? PriorityReason { get; set; }
+        public string? PatientPhoneNumber { get; set; }
+        // Active allergies of the patient, so the desk and the doctor are warned
+        public List<string> PatientAllergies { get; set; } = new();
+        // Times the patient was called and did not come
+        public int SkipCount { get; set; }
         // A booked patient who checked in after the allowed delay; a walk-in is never "late"
         public bool IsLate { get; set; }
         // True if the patient has finished imaging and returned to the doctor's priority queue

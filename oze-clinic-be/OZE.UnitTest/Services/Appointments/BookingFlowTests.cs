@@ -60,7 +60,7 @@ namespace OZE.UnitTest.Services.Appointments
         [Fact]
         public async Task GetAvailableSlotsAsync_ShouldSkipBookedSlot()
         {
-            _appointmentRepoMock.Setup(r => r.GetActiveAppointmentsAsync(Tomorrow, It.IsAny<IReadOnlyCollection<int>>()))
+            _appointmentRepoMock.Setup(r => r.GetActiveAppointmentsInRangeAsync(Tomorrow, Tomorrow, It.IsAny<IReadOnlyCollection<int>>()))
                 .ReturnsAsync(new List<Appointment> { new() { DoctorId = DoctorId, TimeSlotStart = new TimeOnly(8, 30), TimeSlotEnd = new TimeOnly(9, 0) } });
 
             var result = await _service.GetAvailableSlotsAsync(Query(Tomorrow));
@@ -302,27 +302,31 @@ namespace OZE.UnitTest.Services.Appointments
             saved!.Status.Should().Be(AppointmentConstants.PendingStatus);
         }
 
-        // UTCID10 (N): a returning patient gets the "confirmed" SMS, not "the receptionist will call to confirm"
+        // UTCID10 (N): a returning patient gets the "confirmed" email, not "the receptionist will call to confirm" (no SMS any more)
         [Fact]
-        public async Task BookAsPatientAsync_ShouldSendConfirmedSms_WhenReturningPatient()
+        public async Task BookAsPatientAsync_ShouldSendConfirmedEmail_WhenReturningPatient()
         {
+            _patient.Email = "benhnhan@oze.vn";
             _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
 
             await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
 
-            _smsSenderMock.Verify(s => s.SendSmsAsync(_patient.PhoneNumber!, It.Is<string>(m => m.Contains("has been confirmed"))), Times.Once);
-            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.Is<string>(m => m.Contains("will call to confirm"))), Times.Never);
+            _emailSenderMock.Verify(s => s.SendEmailAsync(_patient.Email, PatientEmailTemplates.SubjectAppointmentConfirmed, It.IsAny<string>()), Times.Once);
+            _emailSenderMock.Verify(s => s.SendEmailAsync(It.IsAny<string>(), PatientEmailTemplates.SubjectAppointmentRequest, It.IsAny<string>()), Times.Never);
+            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
-        // UTCID11 (N): a new patient is told the request was received and the receptionist will call
+        // UTCID11 (N): a new patient is told by email that the request was received and the receptionist will call
         [Fact]
-        public async Task BookAsPatientAsync_ShouldSendRequestReceivedSms_WhenNewPatient()
+        public async Task BookAsPatientAsync_ShouldSendRequestReceivedEmail_WhenNewPatient()
         {
+            _patient.Email = "benhnhan@oze.vn";
             _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
 
             await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
 
-            _smsSenderMock.Verify(s => s.SendSmsAsync(_patient.PhoneNumber!, It.Is<string>(m => m.Contains("will call to confirm"))), Times.Once);
+            _emailSenderMock.Verify(s => s.SendEmailAsync(_patient.Email, PatientEmailTemplates.SubjectAppointmentRequest, It.IsAny<string>()), Times.Once);
+            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
         // UTCID12 (N): for a returning patient the receptionists are told no call is needed, and the doctor is told at once
@@ -402,16 +406,17 @@ namespace OZE.UnitTest.Services.Appointments
             _appointmentRepoMock.Verify(r => r.AddPatientAsync(It.IsAny<Patient>()), Times.Never);
         }
 
-        // UTCID03 (A): the existing patient still has an unfinished appointment
+        // UTCID03 (A): the existing patient is already in the clinic today (a booking on another day does not block a walk-in)
         [Fact]
-        public async Task CreateWalkInAsync_ShouldThrow_WhenPatientHasUnfinishedAppointment()
+        public async Task CreateWalkInAsync_ShouldThrow_WhenPatientAlreadyInClinicToday()
         {
             _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
-            _appointmentRepoMock.Setup(r => r.HasUnfinishedAppointmentAsync(_patient.Id, null)).ReturnsAsync(true);
+            _appointmentRepoMock.Setup(r => r.GetPatientAppointmentsOnDateAsync(_patient.Id, Today))
+                .ReturnsAsync(new List<Appointment> { new() { Id = 1, PatientId = _patient.Id, AppointmentDate = Today, Status = AppointmentConstants.CheckedInStatus } });
 
             var act = () => _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
 
-            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasUnfinishedAppointment);
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.WalkInPatientInClinic);
         }
 
         // UTCID04 (A): the phone number is not valid
@@ -427,7 +432,7 @@ namespace OZE.UnitTest.Services.Appointments
         [Fact]
         public async Task CreateWalkInAsync_ShouldThrow_WhenDoctorHasNoShiftToday()
         {
-            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsAsync(Today, DoctorId)).ReturnsAsync(new List<StaffSchedule>());
+            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsInRangeAsync(Today, Today, DoctorId)).ReturnsAsync(new List<StaffSchedule>());
 
             var act = () => _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
 

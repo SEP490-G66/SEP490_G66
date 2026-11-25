@@ -11,5 +11,7 @@ namespace OZE.Common.Models
         // Clinic days (Vietnam time) of the invoice's creation, both inclusive
         public DateOnly? FromDate { get; set; }
         public DateOnly? ToDate { get; set; }
+        // received | paid | partial: by money collected, refunds not subtracted
+        public string? Collection { get; set; }
     }
 }

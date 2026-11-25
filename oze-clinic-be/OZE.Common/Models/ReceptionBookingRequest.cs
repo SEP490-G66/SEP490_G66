@@ -16,5 +16,13 @@ namespace OZE.Common.Models
 
         [MaxLength(256)]
         public string? Email { get; set; }
+
+        // Optional; saved only when a new patient record is created
+        public string? Gender { get; set; }
+
+        public DateOnly? DateOfBirth { get; set; }
+
+        [MaxLength(255)]
+        public string? Address { get; set; }
     }
 }

@@ -143,6 +143,11 @@ namespace OZE.Application.Services
             InvoiceQueryParameters parameters,
             CancellationToken cancellationToken = default)
         {
+            var collection = parameters.Collection?.Trim().ToLowerInvariant();
+            ConditionGuard.ThrowIf(
+                !string.IsNullOrEmpty(collection) && !InvoiceConstants.Collection.All.Contains(collection),
+                ErrorConstants.InvoiceMessage.CollectionInvalid);
+
             var page = await _invoiceRepository.GetPagedAsync(parameters, cancellationToken);
             var items = page.Items.Select(ToSummary).ToList();
             return new PagedResult<InvoiceSummaryResponse>(items, page.TotalCount, page.PageNumber, page.PageSize);
@@ -433,6 +438,7 @@ namespace OZE.Application.Services
                 InvoiceNumber = invoice.InvoiceNumber,
                 PatientId = invoice.PatientId,
                 PatientName = invoice.Patient?.FullName,
+                PatientPhoneNumber = invoice.Patient?.PhoneNumber,
                 AppointmentId = invoice.AppointmentId,
                 TreatmentPlanId = invoice.TreatmentPlanId,
                 TotalAmount = invoice.TotalAmount,
@@ -441,9 +447,23 @@ namespace OZE.Application.Services
                 PaidAmount = invoice.PaidAmount,
                 RemainingAmount = remaining,
                 PaymentStatus = invoice.PaymentStatus,
+                CollectedAmount = InvoiceMoneyHelper.GetConfirmedSum(invoice),
+                CollectionStatus = CollectionStatusOf(invoice),
                 CreatedAt = invoice.CreatedAt,
                 CancelledAt = invoice.CancelledAt
             };
+        }
+
+        // By money collected only: UNPAID when nothing confirmed, PAID when confirmed covers the final amount
+        public static string CollectionStatusOf(Invoice invoice)
+        {
+            var collected = InvoiceMoneyHelper.GetConfirmedSum(invoice);
+            if (collected <= 0)
+            {
+                return InvoiceConstants.Unpaid;
+            }
+
+            return collected >= invoice.FinalAmount ? InvoiceConstants.Paid : InvoiceConstants.PartiallyPaid;
         }
 
         private static InvoiceResponse ToResponse(Invoice invoice, string? patientName = null)
@@ -463,6 +483,8 @@ namespace OZE.Application.Services
                 PaidAmount = invoice.PaidAmount,
                 RemainingAmount = remaining,
                 PaymentStatus = invoice.PaymentStatus,
+                CollectedAmount = InvoiceMoneyHelper.GetConfirmedSum(invoice),
+                CollectionStatus = CollectionStatusOf(invoice),
                 Notes = invoice.Notes,
                 CreatedAt = invoice.CreatedAt,
                 CreatedByUserId = invoice.CreatedByUserId,
@@ -492,6 +514,7 @@ namespace OZE.Application.Services
                         PaymentStatus = x.PaymentStatus,
                         Purpose = x.Purpose,
                         TransactionReference = x.TransactionReference,
+                        ReceiptCode = x.ReceiptCode,
                         CreatedAt = x.CreatedAt,
                         PaidAt = x.PaidAt
                     })

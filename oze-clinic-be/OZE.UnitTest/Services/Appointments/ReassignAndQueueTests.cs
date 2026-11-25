@@ -20,16 +20,16 @@ namespace OZE.UnitTest.Services.Appointments
         public ReassignDoctorTests()
         {
             var room = new Room { Id = 2, RoomName = "Phong kham 2", RoomType = RoomTypeConstants.GeneralTreatment };
-            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsAsync(Today, NewDoctorId)).ReturnsAsync(new List<StaffSchedule>
+            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsInRangeAsync(Today, Today, NewDoctorId)).ReturnsAsync(new List<StaffSchedule>
             {
                 new() { Id = 2, StaffProfileId = NewDoctorId, ScheduleDate = Today, ShiftStart = TimeOnly.MinValue, ShiftEnd = TimeOnly.MaxValue,
                     Room = room, RoomId = room.Id, StaffProfile = new StaffProfile { Id = NewDoctorId, FullName = "BS. Tran Van C" } }
             });
-            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsAsync(Today, 11)).ReturnsAsync(new List<StaffSchedule>());
+            _appointmentRepoMock.Setup(r => r.GetDoctorShiftsInRangeAsync(Today, Today, 11)).ReturnsAsync(new List<StaffSchedule>());
             _appointmentRepoMock.Setup(r => r.HasEndedShiftAsync(11, Today)).ReturnsAsync(false);
         }
 
-        private static ReassignDoctorRequest To(int doctorId) => new() { DoctorId = doctorId };
+        private static ReassignDoctorRequest To(int doctorId) => new() { DoctorId = doctorId, Reason = "Bac si ban dau co viec dot xuat" };
 
         // UTCID01 (N): a waiting patient moves to another doctor who has a shift now, into that doctor's room
         [Fact]

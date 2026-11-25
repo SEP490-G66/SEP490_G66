@@ -23,9 +23,11 @@ export const ROUTES = {
     CHANGE_PASSWORD: "/change-password",
     DASHBOARD: "/dashboard",
     APPOINTMENTS: "/appointments",
-    MEDICAL_RECORD: "/medical-record",
+    MEDICAL_RECORD: "/medical-history",
     APPOINTMENT_DETAIL: "/appointments/:appointmentId",
-    MEDICAL_RECORD_DETAIL: "/medical-record/:examinationId",
+    MEDICAL_RECORD_DETAIL: "/medical-history/:examinationId",
+    TREATMENT_PLANS: "/treatment-plans",
+    DOCUMENTS: "/documents",
     PAYMENT_DEBTS: "/payments/debts",
     PAYMENT_HISTORY: "/payments/history",
     REFUND_REQUESTS: "/payments/refunds",
@@ -51,6 +53,12 @@ export const ROUTES = {
     RECEPTION_FOLLOW_UPS: "/reception/follow-ups",
     RECEPTION_DEBTS: "/reception/debts",
     RECEPTION_INVOICE_LIST: "/reception/invoice-list",
+    RECEPTION_PAYMENTS: "/reception/payments",
+    RECEPTION_DEPOSITS: "/reception/deposits",
+    RECEPTION_PERIODS: "/reception/periods",
+    RECEPTION_COLLECT: "/reception/collect",
+    RECEPTION_REFUNDS: "/reception/refunds",
+    RECEPTION_RECONCILIATION: "/reception/reconciliation",
     ADMIN_STAFF: "/admin/staff",
     ADMIN_ROLES: "/admin/roles",
     ADMIN_ROOMS: "/admin/rooms",
@@ -69,7 +77,7 @@ export const ROUTES = {
 export const ROLE_ROUTES = [
     {
         roles: [USER_ROLES.PATIENT],
-        paths: [ROUTES.APPOINTMENTS, ROUTES.BOOK_APPOINTMENT, ROUTES.MEDICAL_RECORD, ROUTES.PAYMENT_DEBTS, ROUTES.PAYMENT_HISTORY, ROUTES.REFUND_REQUESTS]
+        paths: [ROUTES.APPOINTMENTS, ROUTES.BOOK_APPOINTMENT, ROUTES.MEDICAL_RECORD, ROUTES.TREATMENT_PLANS, ROUTES.DOCUMENTS, ROUTES.PAYMENT_DEBTS, ROUTES.PAYMENT_HISTORY, ROUTES.REFUND_REQUESTS]
     },
     {
         roles: [USER_ROLES.DOCTOR],
@@ -88,7 +96,7 @@ export const ROLE_ROUTES = [
     },
     {
         roles: [USER_ROLES.RECEPTIONIST],
-        paths: [ROUTES.RECEPTION_SCHEDULE, ROUTES.RECEPTION_APPOINTMENTS, ROUTES.RECEPTION_CHECK_IN, ROUTES.RECEPTION_PATIENTS, ROUTES.RECEPTION_CONSULTATIONS, ROUTES.RECEPTION_INVOICES, ROUTES.RECEPTION_CASH_HANDOVER, ROUTES.RECEPTION_QUEUE, ROUTES.RECEPTION_FOLLOW_UPS, ROUTES.RECEPTION_DEBTS, ROUTES.RECEPTION_INVOICE_LIST]
+        paths: [ROUTES.RECEPTION_SCHEDULE, ROUTES.RECEPTION_APPOINTMENTS, ROUTES.RECEPTION_CHECK_IN, ROUTES.RECEPTION_PATIENTS, ROUTES.RECEPTION_CONSULTATIONS, ROUTES.RECEPTION_INVOICES, ROUTES.RECEPTION_CASH_HANDOVER, ROUTES.RECEPTION_QUEUE, ROUTES.RECEPTION_FOLLOW_UPS, ROUTES.RECEPTION_DEBTS, ROUTES.RECEPTION_INVOICE_LIST, ROUTES.RECEPTION_PAYMENTS, ROUTES.RECEPTION_DEPOSITS, ROUTES.RECEPTION_PERIODS, ROUTES.RECEPTION_COLLECT, ROUTES.RECEPTION_REFUNDS, ROUTES.RECEPTION_RECONCILIATION]
     },
     {
         roles: [USER_ROLES.CLINIC_MANAGER],
@@ -126,18 +134,9 @@ export const getArticleDetailRoute = (articleSlug) => generatePath(ROUTES.ARTICL
 
 export const getAppointmentDetailRoute = (appointmentId) => generatePath(ROUTES.APPOINTMENT_DETAIL, { appointmentId: String(appointmentId) });
 
-export const MEDICAL_RECORD_QUERY = { TAB: "tab", PLAN: "plan" };
-export const PAYMENT_HISTORY_QUERY = { INVOICE: "invoice" };
+export const getTreatmentPlanRoute = (planId) => (planId != null ? `${ROUTES.TREATMENT_PLANS}/${planId}` : ROUTES.TREATMENT_PLANS);
 
-export const MEDICAL_RECORD_TABS = { PLAN: "plan", FILM: "film", TEETH: "teeth", HIST: "hist" };
-
-export const getTreatmentPlanRoute = (planId) => {
-    const params = new URLSearchParams({ [MEDICAL_RECORD_QUERY.TAB]: MEDICAL_RECORD_TABS.PLAN });
-    if (planId != null) params.set(MEDICAL_RECORD_QUERY.PLAN, String(planId));
-    return `${ROUTES.MEDICAL_RECORD}?${params}`;
-};
-
-export const getPaymentHistoryRoute = (invoiceId) => `${ROUTES.PAYMENT_HISTORY}?${new URLSearchParams({ [PAYMENT_HISTORY_QUERY.INVOICE]: String(invoiceId) })}`;
+export const getPaymentHistoryRoute = (invoiceId) => `${ROUTES.PAYMENT_HISTORY}/${invoiceId}`;
 
 export const getPaymentDebtDetailRoute = (debtId) => `${ROUTES.PAYMENT_DEBTS}/${debtId}`;
 
@@ -156,6 +155,10 @@ const RECEPTION_CASH_HANDOVER_DETAIL = `${ROUTES.RECEPTION_CASH_HANDOVER}/:sessi
 
 export const getCashHandoverRoute = (sessionId) => generatePath(RECEPTION_CASH_HANDOVER_DETAIL, { sessionId: String(sessionId) });
 
+export const RECONCILIATION_DATE_PARAM = "date";
+
+export const getReconciliationRoute = (date) => (date ? `${ROUTES.RECEPTION_RECONCILIATION}?${new URLSearchParams({ [RECONCILIATION_DATE_PARAM]: date })}` : ROUTES.RECEPTION_RECONCILIATION);
+
 export const RECEPTION_PATIENT_CREATE_ROUTE = `${ROUTES.RECEPTION_PATIENTS}/new`;
 
 const RECEPTION_PATIENT_DETAIL = `${ROUTES.RECEPTION_PATIENTS}/:patientId`;
@@ -173,3 +176,21 @@ export const getReceptionPatientRoute = (patientId, tab) => {
 };
 
 export const getReceptionPatientEditRoute = (patientId) => generatePath(RECEPTION_PATIENT_EDIT, { patientId: String(patientId) });
+
+// Cashier pages: the patient's payment record and the payment option of one plan are nested under Thanh toán;
+// the other pages keep the patient / plan / lines to add in the query string.
+const CASHIER_ACCOUNT = `${ROUTES.RECEPTION_PAYMENTS}/:patientId`;
+const CASHIER_OPTION = `${ROUTES.RECEPTION_PAYMENTS}/:patientId/plans/:planId/option`;
+
+export const getCashierAccountRoute = (patientId) => generatePath(CASHIER_ACCOUNT, { patientId: String(patientId) });
+
+export const getCashierOptionRoute = (patientId, planId) => generatePath(CASHIER_OPTION, { patientId: String(patientId), planId: String(planId) });
+
+export const getCashierRoute = (path, { patient, plan, add } = {}) => {
+    const query = new URLSearchParams();
+    if (patient) query.set("patient", String(patient));
+    if (plan) query.set("plan", String(plan));
+    if (add) query.set("add", add);
+    const text = query.toString();
+    return text ? `${path}?${text}` : path;
+};

@@ -40,6 +40,8 @@ namespace OZE.Common.Constants
             public const string ReturningBookingConfirmedMessage = "Lịch hẹn của bạn lúc {0} ngày {1} đã được xác nhận. Hẹn gặp bạn tại phòng khám.";
             public const string AppointmentRescheduledTitle = "Lịch hẹn đã được đổi";
             public const string AppointmentRescheduledMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1}.";
+            public const string AppointmentRescheduledWithDoctorMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1} với {2}.";
+            public const string AppointmentRescheduledReasonSuffix = " Lý do: {0}";
             public const string AppointmentCancelledTitle = "Lịch hẹn đã bị hủy";
             public const string AppointmentCancelledMessage = "Lịch hẹn lúc {0} ngày {1} đã bị hủy. Lý do: {2}";
             public const string AppointmentShiftEndedTitle = "Lịch hẹn cần đổi giờ";
@@ -50,6 +52,8 @@ namespace OZE.Common.Constants
             public const string PaymentReminderTitle = "Nhắc thanh toán";
             public const string FollowUpScheduledTitle = "Lịch hẹn tái khám";
             public const string FollowUpScheduledMessage = "Bạn có lịch hẹn tái khám lúc {0} ngày {1}.";
+            public const string FollowUpProposedTitle = "Bác sĩ hẹn tái khám";
+            public const string FollowUpProposedMessage = "Bác sĩ đã hẹn bạn tái khám lúc {0} ngày {1}. Phòng khám sẽ liên hệ để xác nhận lịch.";
             public const string FollowUpReminderTitle = "Nhắc lịch tái khám";
             public const string YourTurnTitle = "Đến lượt bạn";
             public const string YourTurnMessage = "Số {0}, mời bạn vào {1}.";
@@ -61,6 +65,8 @@ namespace OZE.Common.Constants
             public const string CheckedInWithPlaceMessage = "Số thứ tự của bạn là {0}. Khám với {1}.";
             public const string MovedToDoctorTitle = "Bạn được chuyển bác sĩ";
             public const string MovedToDoctorMessage = "Bạn được chuyển sang khám với {0}. Số thứ tự của bạn vẫn là {1}.";
+            // {0} doctor and room, {1} queue number, {2} reason
+            public const string MovedToDoctorWithReasonMessage = "Bạn được chuyển sang khám với {0}. Lý do: {2}. Số thứ tự của bạn vẫn là {1}.";
             public const string AppointmentReminderTitle = "Nhắc lịch hẹn ngày mai";
             public const string AppointmentReminderMessage = "Bạn có lịch hẹn lúc {0} ngày {1} tại Nha khoa OZE.";
             public const string ExaminationCompletedTitle = "Đã có phiếu khám";

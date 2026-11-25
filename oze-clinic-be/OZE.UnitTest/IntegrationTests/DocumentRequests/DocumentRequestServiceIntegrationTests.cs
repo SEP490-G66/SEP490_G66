@@ -42,6 +42,12 @@ namespace OZE.UnitTest.IntegrationTests.DocumentRequests
 
             public Task<byte[]?> ReadAsync(string relativePath, CancellationToken cancellationToken = default) =>
                 Task.FromResult(Files.TryGetValue(relativePath, out var data) ? data : null);
+
+            public Task DeleteAsync(string relativePath, CancellationToken cancellationToken = default)
+            {
+                Files.Remove(relativePath);
+                return Task.CompletedTask;
+            }
         }
 
         private async Task SeedAsync()

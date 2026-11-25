@@ -44,6 +44,11 @@ namespace OZE.Persistence.Repositories
                 sessions = sessions.Where(x => x.OpenedByUserId == openedByUserId);
             }
 
+            if (!string.IsNullOrWhiteSpace(query.Status))
+            {
+                sessions = sessions.Where(x => x.Status == query.Status);
+            }
+
             var offset = TimeSpan.FromHours(ClinicTimeConstants.UtcOffsetHours);
             if (query.FromDate.HasValue)
             {
@@ -107,6 +112,66 @@ namespace OZE.Persistence.Repositories
                     Amount = x.Amount,
                     PaidAt = x.PaidAt
                 })
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<CashSessionRefundItem>> GetRefundsPaidOutByAsync(
+            string userId,
+            DateTimeOffset from,
+            DateTimeOffset to,
+            CancellationToken cancellationToken = default)
+        {
+            return _context.RefundAdjustmentRequests
+                .AsNoTracking()
+                .Where(x => x.ProcessedByUserId == userId
+                    && x.RequestType == PaymentConstants.RefundRequestType.Refund
+                    && x.Status == PaymentConstants.RefundRequestStatus.Processed
+                    && x.ProcessedAt != null
+                    && x.ProcessedAt >= from
+                    && x.ProcessedAt < to)
+                .OrderBy(x => x.ProcessedAt)
+                .Select(x => new CashSessionRefundItem
+                {
+                    RefundRequestId = x.Id,
+                    InvoiceId = x.InvoiceId,
+                    InvoiceNumber = x.Invoice.InvoiceNumber,
+                    PatientName = x.Invoice.Patient.FullName,
+                    Amount = x.Amount,
+                    PaidOutAt = x.ProcessedAt
+                })
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<CashSession?> GetOpenOfOthersAsync(string userId, CancellationToken cancellationToken = default)
+        {
+            return _context.CashSessions
+                .AsNoTracking()
+                .Where(x => x.Status == CashSessionConstants.Open && x.OpenedByUserId != userId)
+                .OrderBy(x => x.OpenedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public Task<CashSession?> GetLatestClosedAsync(
+            DateTimeOffset from,
+            DateTimeOffset to,
+            CancellationToken cancellationToken = default)
+        {
+            return _context.CashSessions
+                .AsNoTracking()
+                .Where(x => x.Status == CashSessionConstants.Closed
+                    && x.ClosedAt != null
+                    && x.ClosedAt >= from
+                    && x.ClosedAt < to)
+                .OrderByDescending(x => x.ClosedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        public Task<List<StaffSchedule>> GetShiftsOfUserAsync(string userId, DateOnly date, CancellationToken cancellationToken = default)
+        {
+            return _context.StaffSchedules
+                .AsNoTracking()
+                .Where(x => x.ScheduleDate == date && x.StaffProfile.UserId == userId)
+                .OrderBy(x => x.ShiftStart)
                 .ToListAsync(cancellationToken);
         }
 

@@ -88,6 +88,12 @@ namespace OZE.Application.Services
             return await FindSlotsAsync(lines, request.Date!.Value, request.DoctorId);
         }
 
+        public async Task<List<AvailableDayResponse>> GetAvailableDaysAsync(AvailableDaysRequest request)
+        {
+            var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
+            return await FindDaysAsync(lines, request.From!.Value, request.To!.Value, request.DoctorId);
+        }
+
         public async Task<AppointmentResponse> BookAsGuestAsync(GuestBookingRequest request)
         {
             ConditionGuard.Ensure(PhoneNumberHelper.TryNormalize(request.PhoneNumber, out var phone),
@@ -128,7 +134,7 @@ namespace OZE.Application.Services
                     return patient;
                 }, selfBooking: true);
 
-            await SendBookingNotificationAsync(phone, email, patient.FullName, appointment, lines);
+            await SendBookingEmailAsync(appointment, email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: false);
             await NotifyNewOnlineBookingAsync(appointment, patient);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
@@ -154,14 +160,7 @@ namespace OZE.Application.Services
                 initialStatus: initialStatus, selfBooking: true);
 
             // A confirmed booking must not say "the receptionist will call to confirm"
-            if (returning)
-            {
-                await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
-            }
-            else
-            {
-                await SendBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
-            }
+            await SendBookingEmailAsync(appointment, patient.Email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: returning);
 
             if (returning)
             {
@@ -196,6 +195,12 @@ namespace OZE.Application.Services
                 ConditionGuard.ThrowIf(email != null && !new EmailAddressAttribute().IsValid(email), ErrorConstants.AuthMessage.EmailInvalid);
             }
 
+            // Basic details for a new record; an existing record is never overwritten
+            ConditionGuard.Ensure(PatientConstants.Gender.TryNormalize(request.Gender, out var gender), ErrorConstants.PatientMessage.InvalidGender);
+            ConditionGuard.Ensure(request.DateOfBirth == null || request.DateOfBirth.Value <= DateOnly.FromDateTime(ClinicClock.Today),
+                ErrorConstants.PatientMessage.InvalidDateOfBirth);
+            var address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
+
             var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
                 request.DoctorId, request.Note, receptionistUserId, async () =>
@@ -226,6 +231,9 @@ namespace OZE.Application.Services
                             FullName = request.FullName!.Trim(),
                             PhoneNumber = phone,
                             Email = email,
+                            Gender = gender,
+                            DateOfBirth = request.DateOfBirth,
+                            Address = address,
                             CreatedAt = DateTimeOffset.UtcNow
                         };
                         await _appointmentRepository.AddPatientAsync(patient);
@@ -234,32 +242,47 @@ namespace OZE.Application.Services
                     return patient;
                 }, initialStatus: AppointmentConstants.ConfirmedStatus);
 
-            await SendConfirmedBookingNotificationAsync(patient.PhoneNumber, patient.Email, patient.FullName, appointment, lines);
+            await SendBookingEmailAsync(appointment, patient.Email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: true);
             await NotifyAsync(n => n.NotifyPatientAsync(patient.Id, Content(NotificationConstants.Text.AppointmentBookedByClinicTitle, NotificationConstants.Text.AppointmentBookedByClinicMessage, appointment)));
             await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
             await LogCreatedAsync(appointment, lines);
             return ToResponse(appointment, patient, slot, lines);
         }
 
-        // Email for a booking that is CONFIRMED when it is made (by the receptionist, or by a returning patient)
-        private async Task SendConfirmedBookingNotificationAsync(
-            string? phone, string? email, string? patientName, Appointment appointment, List<BookingLine> lines)
+        // Booking email to the patient: "confirmed" when the visit is CONFIRMED, otherwise "request received, we will call".
+        // The appointment is already saved, so a failed email is only logged and never undoes it
+        private async Task SendBookingEmailAsync(
+            Appointment appointment, string? email, string? patientName, IEnumerable<string?> serviceNames, bool confirmed)
         {
-            var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
-            var message = PatientEmailTemplates.AppointmentConfirmed(
-                patientName, serviceNames, appointment.AppointmentDate, appointment.TimeSlotStart);
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return;
+            }
+
+            var services = string.Join(", ", serviceNames);
+            var message = confirmed
+                ? PatientEmailTemplates.AppointmentConfirmed(patientName, services, appointment.AppointmentDate, appointment.TimeSlotStart)
+                : PatientEmailTemplates.AppointmentRequest(patientName, services, appointment.AppointmentDate, appointment.TimeSlotStart);
+            var subject = confirmed
+                ? PatientEmailTemplates.SubjectAppointmentConfirmed
+                : PatientEmailTemplates.SubjectAppointmentRequest;
             try
             {
-                if (!string.IsNullOrWhiteSpace(email))
-                {
-                    await _emailSender.SendEmailAsync(email, PatientEmailTemplates.SubjectAppointmentConfirmed, message);
-                }
+                await _emailSender.SendEmailAsync(email, subject, message);
             }
-            catch
+            catch (Exception ex)
             {
-                // The booking is saved; a failed message must not undo it
+                _logger.LogWarning(ex, "Could not send the booking email for appointment {AppointmentId}", appointment.Id);
             }
         }
+
+        // Confirmation email for an existing appointment (confirmed by the receptionist, rescheduled, follow-up)
+        private Task SendConfirmationEmailAsync(Appointment appointment) =>
+            SendBookingEmailAsync(appointment, appointment.Patient?.Email, appointment.Patient?.FullName,
+                appointment.ServiceItems.Select(i => i.Variant == null
+                    ? i.Service?.ServiceName
+                    : $"{i.Service?.ServiceName} - {i.Variant.VariantName}"),
+                confirmed: true);
 
         // Re-checks the slot and saves the appointment in one serializable transaction;
         // getPatientAsync runs inside it so a new patient record is saved together with the appointment
@@ -333,33 +356,100 @@ namespace OZE.Application.Services
         // excludeAppointmentId: the appointment being rescheduled, so it does not block its own new time
         private async Task<List<AvailableSlotResponse>> FindSlotsAsync(List<BookingLine> lines, DateOnly date, int? doctorId, long? excludeAppointmentId = null)
         {
-            var today = DateOnly.FromDateTime(ClinicClock.Today);
-            var maxDaysAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMaxDaysAhead);
-            ConditionGuard.Ensure(date >= today, ErrorConstants.AppointmentMessage.PastDate);
-            ConditionGuard.Ensure(date <= today.AddDays(maxDaysAhead), ErrorConstants.AppointmentMessage.TooFarAhead);
+            var rules = await LoadSlotRulesAsync(lines);
+            ConditionGuard.Ensure(date >= rules.Today, ErrorConstants.AppointmentMessage.PastDate);
+            ConditionGuard.Ensure(date <= rules.LastDay, ErrorConstants.AppointmentMessage.TooFarAhead);
 
-            var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
-            var minHoursAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMinHoursAhead);
-            var earliestStart = ClinicClock.Now.AddHours(minHoursAhead);
-            // Services are done one after another, so the slot must fit their total time
-            var duration = TimeSpan.FromMinutes(lines.Sum(l => l.GetMinutes(slotMinutes)));
-
-            var shifts = await _appointmentRepository.GetDoctorShiftsAsync(date, doctorId);
             // Only shifts in the kind of room the services need (a general treatment room when they ask for none)
-            var requiredRoomType = RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType));
-            shifts = shifts.Where(x => x.Room!.RoomType == requiredRoomType).ToList();
+            var shifts = (await _appointmentRepository.GetDoctorShiftsInRangeAsync(date, date, doctorId))
+                .Where(x => x.Room!.RoomType == rules.RequiredRoomType)
+                .ToList();
 
             var doctorIds = shifts.Select(x => x.StaffProfileId).Distinct().ToList();
-            var booked = (await _appointmentRepository.GetActiveAppointmentsAsync(date, doctorIds))
+            var booked = (await _appointmentRepository.GetActiveAppointmentsInRangeAsync(date, date, doctorIds))
                 .Where(a => a.Id != excludeAppointmentId)
                 .ToList();
 
+            return BuildSlots(date, shifts, booked, rules);
+        }
+
+        // Free-slot count of every day from..to for the booking calendar: the same rules as FindSlotsAsync, but the
+        // config, the services, the shifts and the appointments are read once for the whole range instead of once a day.
+        private async Task<List<AvailableDayResponse>> FindDaysAsync(List<BookingLine> lines, DateOnly from, DateOnly to, int? doctorId, long? excludeAppointmentId = null)
+        {
+            ConditionGuard.Ensure(from <= to, ErrorConstants.AppointmentMessage.DateRangeInvalid);
+            var rules = await LoadSlotRulesAsync(lines);
+            // Days outside the bookable window have no slot: only today..last bookable day is computed
+            var first = from < rules.Today ? rules.Today : from;
+            var last = to > rules.LastDay ? rules.LastDay : to;
+            if (first > last)
+            {
+                return new List<AvailableDayResponse>();
+            }
+            ConditionGuard.Ensure(last.DayNumber - first.DayNumber < AppointmentConstants.AvailableDaysMaxRange,
+                ErrorConstants.AppointmentMessage.DateRangeTooLong);
+
+            var shifts = (await _appointmentRepository.GetDoctorShiftsInRangeAsync(first, last, doctorId))
+                .Where(x => x.Room!.RoomType == rules.RequiredRoomType)
+                .ToList();
+            var doctorIds = shifts.Select(x => x.StaffProfileId).Distinct().ToList();
+            var booked = doctorIds.Count == 0
+                ? new List<Appointment>()
+                : (await _appointmentRepository.GetActiveAppointmentsInRangeAsync(first, last, doctorIds))
+                    .Where(a => a.Id != excludeAppointmentId)
+                    .ToList();
+            var shiftsByDay = shifts.ToLookup(x => x.ScheduleDate);
+            var bookedByDay = booked.ToLookup(x => x.AppointmentDate);
+
+            var days = new List<AvailableDayResponse>();
+            for (var date = first; date <= last; date = date.AddDays(1))
+            {
+                var dayShifts = shiftsByDay[date].ToList();
+                // Several doctors may be free at the same time: the patient sees one slot per start time
+                var starts = BuildSlots(date, dayShifts, bookedByDay[date].ToList(), rules)
+                    .Select(x => x.SlotStart)
+                    .Distinct()
+                    .ToList();
+                days.Add(new AvailableDayResponse
+                {
+                    Date = date,
+                    FreeSlotCount = starts.Count,
+                    IsWorkingDay = dayShifts.Count > 0,
+                    FirstSlotStart = starts.Count > 0 ? starts[0] : null
+                });
+            }
+
+            return days;
+        }
+
+        // What decides the slots, read once per request
+        private sealed record SlotRules(DateOnly Today, DateOnly LastDay, int SlotMinutes, DateTime EarliestStart, TimeSpan Duration, string RequiredRoomType);
+
+        private async Task<SlotRules> LoadSlotRulesAsync(List<BookingLine> lines)
+        {
+            var today = DateOnly.FromDateTime(ClinicClock.Today);
+            var maxDaysAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMaxDaysAhead);
+            var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
+            var minHoursAhead = await GetIntConfigAsync(ConfigKeyConstants.BookingMinHoursAhead);
+            return new SlotRules(
+                today,
+                today.AddDays(maxDaysAhead),
+                slotMinutes,
+                ClinicClock.Now.AddHours(minHoursAhead),
+                // Services are done one after another, so the slot must fit their total time
+                TimeSpan.FromMinutes(lines.Sum(l => l.GetMinutes(slotMinutes))),
+                RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)));
+        }
+
+        // The free slots of one day: each slot of each shift that fits the total time, is not taken and is not too soon
+        private static List<AvailableSlotResponse> BuildSlots(DateOnly date, List<StaffSchedule> shifts, List<Appointment> booked, SlotRules rules)
+        {
             var slots = new List<AvailableSlotResponse>();
             foreach (var shift in shifts)
             {
-                for (var start = shift.ShiftStart; ; start = start.AddMinutes(slotMinutes))
+                for (var start = shift.ShiftStart; ; start = start.AddMinutes(rules.SlotMinutes))
                 {
-                    var end = start.Add(duration);
+                    var end = start.Add(rules.Duration);
                     // TimeOnly wraps at midnight, so "end < start" also means past the shift
                     if (end < start || end > shift.ShiftEnd)
                     {
@@ -368,7 +458,7 @@ namespace OZE.Application.Services
 
                     var isTaken = booked.Any(a => a.DoctorId == shift.StaffProfileId
                         && a.TimeSlotStart < end && start < a.TimeSlotEnd);
-                    var isTooSoon = date.ToDateTime(start) < earliestStart;
+                    var isTooSoon = date.ToDateTime(start) < rules.EarliestStart;
 
                     if (!isTaken && !isTooSoon)
                     {
@@ -391,7 +481,7 @@ namespace OZE.Application.Services
         private async Task<AvailableSlotResponse> PickLeastBusyAsync(List<AvailableSlotResponse> candidates, DateOnly date)
         {
             var doctorIds = candidates.Select(x => x.DoctorId).Distinct().ToList();
-            var booked = await _appointmentRepository.GetActiveAppointmentsAsync(date, doctorIds);
+            var booked = await _appointmentRepository.GetActiveAppointmentsInRangeAsync(date, date, doctorIds);
 
             return candidates
                 .OrderBy(c => booked.Count(a => a.DoctorId == c.DoctorId))
@@ -468,32 +558,6 @@ namespace OZE.Application.Services
             return value!;
         }
 
-        // A failed notification must not undo the confirmation, so errors are only logged
-        private async Task SendConfirmationNotificationAsync(Appointment appointment)
-        {
-            var serviceNames = string.Join(", ", appointment.ServiceItems.Select(i => i.Variant == null
-                ? i.Service?.ServiceName
-                : $"{i.Service?.ServiceName} - {i.Variant.VariantName}"));
-            var message = PatientEmailTemplates.AppointmentConfirmed(
-                appointment.Patient?.FullName,
-                serviceNames,
-                appointment.AppointmentDate,
-                appointment.TimeSlotStart);
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(appointment.Patient?.Email))
-                {
-                    await _emailSender.SendEmailAsync(
-                        appointment.Patient.Email,
-                        PatientEmailTemplates.SubjectAppointmentConfirmed,
-                        message);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not send the confirmation notification for appointment {AppointmentId}", appointment.Id);
-            }
-        }
 
         private async Task<int> GetIntConfigAsync(string configKey)
         {
@@ -503,31 +567,6 @@ namespace OZE.Application.Services
             return result;
         }
 
-        // A failed notification must not undo the booking, so errors are only logged
-        private async Task SendBookingNotificationAsync(
-            string? phone, string? email, string? patientName, Appointment appointment, List<BookingLine> lines)
-        {
-            var serviceNames = string.Join(", ", lines.Select(l => l.DisplayName));
-            var message = PatientEmailTemplates.AppointmentRequest(
-                patientName,
-                serviceNames,
-                appointment.AppointmentDate,
-                appointment.TimeSlotStart);
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(email))
-                {
-                    await _emailSender.SendEmailAsync(
-                        email,
-                        PatientEmailTemplates.SubjectAppointmentRequest,
-                        message);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not send the booking notification for appointment {AppointmentId}", appointment.Id);
-            }
-        }
 
         // Same format as AuthService.GeneratePatientCode
         private static string GeneratePatientCode()
@@ -559,6 +598,7 @@ namespace OZE.Application.Services
                     DurationMinutes = item.DurationMinutes,
                     PriceAtBooking = item.PriceAtBooking
                 }).ToList(),
+                RequiredRoomType = RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)),
                 AppointmentType = appointment.AppointmentType,
                 AppointmentDate = appointment.AppointmentDate,
                 TimeSlotStart = slot.SlotStart,
@@ -621,6 +661,15 @@ namespace OZE.Application.Services
                     RoomId = GetCurrentRoom(x.Appointment)?.Id,
                     RoomName = GetCurrentRoom(x.Appointment)?.RoomName,
                     Priority = x.Appointment.Priority,
+                    PriorityReason = x.Appointment.PriorityReason,
+                    RequiredRoomType = RequiredRoomTypeOf(x.Appointment.ServiceItems.Select(i => i.Service?.RequiredRoomType)),
+                    PatientPhoneNumber = x.Appointment.Patient?.PhoneNumber,
+                    PatientAllergies = x.Appointment.Patient?.MedicalProfiles
+                        .Where(m => m.RecordType == PatientConstants.MedicalProfile.AllergyType
+                            && m.Status == PatientConstants.MedicalProfile.ActiveStatus)
+                        .Select(m => m.Title)
+                        .ToList() ?? new List<string>(),
+                    SkipCount = WaitingOrder.SkipCountOf(x.Appointment),
                     IsLate = x.Group == WaitingOrder.LateGroup,
                     IsPriorityReturn = x.Group == WaitingOrder.PriorityReturnGroup,
                     Services = x.Appointment.ServiceItems
@@ -746,7 +795,7 @@ namespace OZE.Application.Services
             var slotStart = request.SlotStart!.Value;
             var before = new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId };
 
-            await _appointmentRepository.ExecuteSerializableAsync(async () =>
+            var chosen = await _appointmentRepository.ExecuteSerializableAsync(async () =>
             {
                 // Re-check inside the transaction; never trust the slot sent by the client
                 var candidates = (await FindSlotsAsync(lines, date, request.DoctorId, excludeAppointmentId: appointment.Id))
@@ -779,12 +828,13 @@ namespace OZE.Application.Services
                 return slot;
             });
 
+            var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
             await _auditLogService.LogAsync(AuditConstants.AppointmentRescheduled, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
-                before, new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId });
+                before, new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId }, reason);
 
             if (!isPatient)
             {
-                await SendConfirmationNotificationAsync(appointment);
+                await SendConfirmationEmailAsync(appointment);
             }
 
             var patientName = appointment.Patient?.FullName;
@@ -795,8 +845,7 @@ namespace OZE.Application.Services
             }
             else
             {
-                await NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
-                    Content(NotificationConstants.Text.AppointmentRescheduledTitle, NotificationConstants.Text.AppointmentRescheduledMessage, appointment), cancellationToken));
+                await NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId, RescheduledContent(appointment, chosen.DoctorName, reason), cancellationToken));
                 await NotifyDoctorOfNewAppointmentAsync(appointment, patientName);
             }
             // The doctor who had a confirmed visit at the old time no longer has it
@@ -809,7 +858,23 @@ namespace OZE.Application.Services
                         NotificationConstants.Reference.Appointment, appointment.Id.ToString()), cancellationToken));
             }
 
-            return MapToResponse(appointment);
+            var rescheduled = MapToResponse(appointment);
+            rescheduled.DoctorId = chosen.DoctorId;
+            rescheduled.DoctorName = chosen.DoctorName;
+            return rescheduled;
+        }
+
+        // The new time and doctor, and the reason when the clinic gave one
+        private static NotificationContent RescheduledContent(Appointment appointment, string? doctorName, string? reason)
+        {
+            var message = string.IsNullOrWhiteSpace(doctorName)
+                ? string.Format(NotificationConstants.Text.AppointmentRescheduledMessage, Hm(appointment.TimeSlotStart), Dmy(appointment.AppointmentDate))
+                : string.Format(NotificationConstants.Text.AppointmentRescheduledWithDoctorMessage, Hm(appointment.TimeSlotStart), Dmy(appointment.AppointmentDate), doctorName);
+            if (reason != null)
+            {
+                message += string.Format(NotificationConstants.Text.AppointmentRescheduledReasonSuffix, reason);
+            }
+            return new NotificationContent(NotificationConstants.Text.AppointmentRescheduledTitle, message, NotificationConstants.Reference.Appointment, appointment.Id.ToString());
         }
 
         public async Task<AppointmentResponse> ConfirmAppointmentAsync(long id, CancellationToken cancellationToken = default)
@@ -826,7 +891,7 @@ namespace OZE.Application.Services
             await _appointmentRepository.UpdateAsync(appointment);
             await _auditLogService.LogAsync(AuditConstants.AppointmentConfirmed, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 new { Status = oldStatus }, new { appointment.Status });
-            await SendConfirmationNotificationAsync(appointment);
+            await SendConfirmationEmailAsync(appointment);
             await NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
                 Content(NotificationConstants.Text.AppointmentConfirmedTitle, NotificationConstants.Text.AppointmentConfirmedMessage, appointment), cancellationToken));
             await NotifyDoctorOfNewAppointmentAsync(appointment, appointment.Patient?.FullName);
@@ -848,12 +913,31 @@ namespace OZE.Application.Services
             var priority = request?.Priority ?? PriorityConstants.Normal;
             EnsureValidPriority(priority, request?.Reason);
 
-            // The patient goes to the room of the doctor's shift
-            var room = await FindDoctorRoomAsync(appointment);
+            // The booked doctor cannot see the patient today and the patient chose another doctor working today
+            var oldDoctorId = appointment.DoctorId;
+            var doctorName = appointment.Doctor?.FullName;
+            Room? room;
+            var newDoctorId = request?.DoctorId;
+            var doctorChanged = newDoctorId.HasValue && newDoctorId != appointment.DoctorId;
+            if (doctorChanged)
+            {
+                var shift = await FindDoctorShiftAsync(newDoctorId!.Value, appointment.AppointmentDate, null,
+                    RequiredRoomTypeOf(appointment.ServiceItems.Select(i => i.Service?.RequiredRoomType)));
+                ConditionGuard.Ensure(shift != null, ErrorConstants.AppointmentMessage.DoctorNoSuitableShiftToday);
+                room = shift!.Room;
+                doctorName = shift.StaffProfile?.FullName;
+                appointment.DoctorId = newDoctorId;
+            }
+            else
+            {
+                // The patient goes to the room of the doctor's shift
+                room = await FindDoctorRoomAsync(appointment);
+            }
 
             var oldStatus = appointment.Status;
             appointment.Status = AppointmentConstants.CheckedInStatus;
             appointment.Priority = priority;
+            appointment.PriorityReason = PriorityReasonOf(priority, request?.Reason);
             appointment.CheckInAt = DateTimeOffset.UtcNow;
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -863,9 +947,19 @@ namespace OZE.Application.Services
 
             await _auditLogService.LogAsync(AuditConstants.AppointmentCheckedIn, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 new { Status = oldStatus }, new { appointment.Status, appointment.Priority }, request?.Reason?.Trim());
-            await NotifyCheckedInAsync(appointment, entry, appointment.Doctor?.FullName, room, cancellationToken);
+            if (doctorChanged)
+            {
+                await _auditLogService.LogAsync(AuditConstants.AppointmentDoctorReassigned, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
+                    new { DoctorId = oldDoctorId }, new { appointment.DoctorId, RoomId = room?.Id });
+                await NotifyAsync(n => n.NotifyStaffAsync(appointment.DoctorId,
+                    new NotificationContent(NotificationConstants.Text.PatientReassignedTitle, string.Format(NotificationConstants.Text.PatientReassignedMessage, appointment.Patient?.FullName),
+                        NotificationConstants.Reference.Appointment, appointment.Id.ToString()), cancellationToken));
+            }
+            await NotifyCheckedInAsync(appointment, entry, doctorName, room, cancellationToken);
 
             var response = MapToResponse(appointment);
+            response.DoctorId = appointment.DoctorId;
+            response.DoctorName = doctorName;
             response.RoomId = room?.Id;
             response.RoomName = room?.RoomName;
             response.QueueNumber = entry?.QueueNumber;
@@ -998,6 +1092,9 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(appointment.AppointmentDate != today, ErrorConstants.AppointmentMessage.ReassignWrongDay);
             var newDoctorId = request.DoctorId!.Value;
             ConditionGuard.ThrowIf(appointment.DoctorId == newDoctorId, ErrorConstants.AppointmentMessage.ReassignSameDoctor);
+            // The patient is told why they are moved
+            var reason = request.Reason?.Trim();
+            ConditionGuard.Ensure(!string.IsNullOrEmpty(reason), ErrorConstants.AppointmentMessage.ReassignReasonRequired);
 
             // The same rule as booking: a shift in the kind of room the services need
             var shift = await FindDoctorShiftAsync(newDoctorId, today, null,
@@ -1020,11 +1117,11 @@ namespace OZE.Application.Services
             entry ??= await EnterExaminationQueueAsync(appointment, room, null, cancellationToken);
 
             await _auditLogService.LogAsync(AuditConstants.AppointmentDoctorReassigned, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
-                new { DoctorId = oldDoctorId }, new { DoctorId = newDoctorId, RoomId = room?.Id });
+                new { DoctorId = oldDoctorId }, new { DoctorId = newDoctorId, RoomId = room?.Id }, reason);
             await NotifyAsync(n => n.NotifyStaffAsync(newDoctorId,
                 new NotificationContent(NotificationConstants.Text.PatientReassignedTitle, string.Format(NotificationConstants.Text.PatientReassignedMessage, appointment.Patient?.FullName),
                     NotificationConstants.Reference.Appointment, appointment.Id.ToString()), cancellationToken));
-            await NotifyMovedToDoctorAsync(appointment, entry, shift.StaffProfile?.FullName, room, cancellationToken);
+            await NotifyMovedToDoctorAsync(appointment, entry, shift.StaffProfile?.FullName, room, cancellationToken, reason);
 
             var response = MapToResponse(appointment);
             response.DoctorId = newDoctorId;
@@ -1060,6 +1157,8 @@ namespace OZE.Application.Services
             return MapToResponse(appointment);
         }
 
+        private const string WalkInCancelReason = "Bệnh nhân đến trực tiếp, đã tiếp nhận vãng lai";
+
         public async Task<AppointmentResponse> CreateWalkInAsync(WalkInRequest request, string? createdByUserId, CancellationToken cancellationToken = default)
         {
             ConditionGuard.Ensure(PhoneNumberHelper.TryNormalize(request.PhoneNumber, out var phone), ErrorConstants.AuthMessage.InvalidPhone);
@@ -1084,8 +1183,31 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(shift != null, ErrorConstants.AppointmentMessage.DoctorNoSuitableShiftToday);
             var room = shift!.Room;
 
+            string? emergencyPhone = null;
+            if (!string.IsNullOrWhiteSpace(request.EmergencyContactPhone))
+            {
+                ConditionGuard.Ensure(PhoneNumberHelper.TryNormalize(request.EmergencyContactPhone, out var normalized), ErrorConstants.AuthMessage.InvalidPhone);
+                emergencyPhone = normalized;
+            }
+            var history = new List<(string RecordType, string Title)>();
+            foreach (var item in request.MedicalHistory ?? new List<WalkInMedicalHistoryItem>())
+            {
+                if (string.IsNullOrWhiteSpace(item.Title))
+                {
+                    continue;
+                }
+                ConditionGuard.Ensure(PatientConstants.MedicalProfile.TryNormalizeRecordType(item.RecordType, out var recordType),
+                    ErrorConstants.PatientMessage.InvalidRecordType);
+                var title = item.Title.Trim();
+                if (!history.Any(h => h.RecordType == recordType && string.Equals(h.Title, title, StringComparison.OrdinalIgnoreCase)))
+                {
+                    history.Add((recordType!, title));
+                }
+            }
+
             var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
             var phoneVariants = PhoneNumberHelper.GetLookupVariants(phone);
+            var replacedPending = new HashSet<long>();
 
             var (appointment, patient) = await _appointmentRepository.ExecuteSerializableAsync(async () =>
             {
@@ -1104,15 +1226,38 @@ namespace OZE.Application.Services
                         Email = email,
                         DateOfBirth = request.DateOfBirth,
                         Gender = gender,
-                        CreatedAt = DateTimeOffset.UtcNow
+                        EmergencyContactName = string.IsNullOrWhiteSpace(request.EmergencyContactName) ? null : request.EmergencyContactName.Trim(),
+                        EmergencyContactPhone = emergencyPhone,
+                        CreatedAt = DateTimeOffset.UtcNow,
+                        MedicalProfiles = history.Select(h => new PatientMedicalProfile
+                        {
+                            RecordType = h.RecordType,
+                            Title = h.Title,
+                            Status = PatientConstants.MedicalProfile.AllowedStatuses[0],
+                            CreatedByUserId = createdByUserId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        }).ToList()
                     };
                     await _appointmentRepository.AddPatientAsync(patient);
                 }
                 else
                 {
-                    // One appointment at a time, also for someone who walks in
-                    ConditionGuard.ThrowIf(await _appointmentRepository.HasUnfinishedAppointmentAsync(patient.Id),
-                        ErrorConstants.AppointmentMessage.PatientHasUnfinishedAppointment);
+                    // Someone who walks in is received even with a booking on another day; that booking stays as it is.
+                    // Today: already in the clinic, or a confirmed booking to check in instead, blocks; a pending one is cancelled.
+                    var sameDay = await _appointmentRepository.GetPatientAppointmentsOnDateAsync(patient.Id, today) ?? new List<Appointment>();
+                    ConditionGuard.ThrowIf(sameDay.Any(x => x.Status == AppointmentConstants.CheckedInStatus || x.Status == AppointmentConstants.InServiceStatus),
+                        ErrorConstants.AppointmentMessage.WalkInPatientInClinic);
+                    ConditionGuard.ThrowIf(sameDay.Any(x => x.Status == AppointmentConstants.ConfirmedStatus),
+                        ErrorConstants.AppointmentMessage.WalkInPatientHasConfirmedToday);
+                    foreach (var pending in sameDay.Where(x => x.Status == AppointmentConstants.PendingStatus))
+                    {
+                        pending.Status = AppointmentConstants.CancelledStatus;
+                        pending.CancellationReason = WalkInCancelReason;
+                        pending.CancelledAt = DateTimeOffset.UtcNow;
+                        pending.CancelledByUserId = createdByUserId;
+                        pending.UpdatedAt = DateTimeOffset.UtcNow;
+                        replacedPending.Add(pending.Id);
+                    }
                 }
 
                 var now = DateTimeOffset.UtcNow;
@@ -1125,6 +1270,7 @@ namespace OZE.Application.Services
                     // The patient is at the desk, so there is nothing to confirm
                     Status = AppointmentConstants.CheckedInStatus,
                     Priority = priority,
+                    PriorityReason = PriorityReasonOf(priority, request.Reason),
                     CheckInAt = now,
                     Notes = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
                     CreatedAt = now,
@@ -1150,6 +1296,11 @@ namespace OZE.Application.Services
             await LogCreatedAsync(appointment, lines);
             await _auditLogService.LogAsync(AuditConstants.AppointmentCheckedIn, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
                 null, new { appointment.Status, appointment.Priority }, request.Reason?.Trim());
+            foreach (var id in replacedPending)
+            {
+                await _auditLogService.LogAsync(AuditConstants.AppointmentCancelled, AuditConstants.AppointmentEntity, id.ToString(),
+                    new { Status = AppointmentConstants.PendingStatus }, new { Status = AppointmentConstants.CancelledStatus, WalkInAppointmentId = appointment.Id }, WalkInCancelReason);
+            }
 
             // A walk-in has no booked time, so the time fields stay empty
             var response = ToResponse(appointment, patient, new AvailableSlotResponse
@@ -1192,7 +1343,7 @@ namespace OZE.Application.Services
         // A booked patient belongs to the shift of the booked time even when arriving during an earlier shift.
         private async Task<StaffSchedule?> FindDoctorShiftAsync(int doctorId, DateOnly date, TimeOnly? slot, string requiredRoomType)
         {
-            var shifts = (await _appointmentRepository.GetDoctorShiftsAsync(date, doctorId) ?? new List<StaffSchedule>())
+            var shifts = (await _appointmentRepository.GetDoctorShiftsInRangeAsync(date, date, doctorId) ?? new List<StaffSchedule>())
                 .Where(x => x.Room?.RoomType == requiredRoomType)
                 .ToList();
             var now = TimeOnly.FromDateTime(ClinicClock.Now);
@@ -1226,7 +1377,7 @@ namespace OZE.Application.Services
         }
 
         // Moved to another doctor: the patient keeps the number, only the doctor and room change
-        private Task NotifyMovedToDoctorAsync(Appointment appointment, QueueEntry? entry, string? doctorName, Room? room, CancellationToken cancellationToken)
+        private Task NotifyMovedToDoctorAsync(Appointment appointment, QueueEntry? entry, string? doctorName, Room? room, CancellationToken cancellationToken, string? reason = null)
         {
             var place = DoctorAndRoom(doctorName, room);
             if (entry == null || place == null)
@@ -1234,7 +1385,9 @@ namespace OZE.Application.Services
                 return Task.CompletedTask;
             }
 
-            var message = string.Format(NotificationConstants.Text.MovedToDoctorMessage, place, QueueNumberText(entry.QueueNumber));
+            var message = string.IsNullOrWhiteSpace(reason)
+                ? string.Format(NotificationConstants.Text.MovedToDoctorMessage, place, QueueNumberText(entry.QueueNumber))
+                : string.Format(NotificationConstants.Text.MovedToDoctorWithReasonMessage, place, QueueNumberText(entry.QueueNumber), reason);
             return NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
                 new NotificationContent(NotificationConstants.Text.MovedToDoctorTitle, message, NotificationConstants.Reference.Appointment, appointment.Id.ToString()),
                 cancellationToken));
@@ -1281,6 +1434,8 @@ namespace OZE.Application.Services
 
             var oldPriority = appointment.Priority;
             appointment.Priority = priority;
+            // Back to normal clears the reason
+            appointment.PriorityReason = PriorityReasonOf(priority, request.Reason);
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _appointmentRepository.UpdateAsync(appointment);
@@ -1535,6 +1690,20 @@ namespace OZE.Application.Services
                 ErrorConstants.AppointmentMessage.PriorityReasonRequired);
         }
 
+        // The reason is kept only while the patient is above normal priority
+        private static string? PriorityReasonOf(int priority, string? reason)
+        {
+            if (priority == PriorityConstants.Normal || string.IsNullOrWhiteSpace(reason))
+            {
+                return null;
+            }
+
+            var trimmed = reason.Trim();
+            return trimmed.Length > PriorityReasonMaxLength ? trimmed[..PriorityReasonMaxLength] : trimmed;
+        }
+
+        private const int PriorityReasonMaxLength = 500;
+
         // autoConfirmed: a returning patient's online booking that skipped the front desk call, kept so the log shows why
         // an online booking started as CONFIRMED
         private Task LogCreatedAsync(Appointment appointment, List<BookingLine> lines, bool autoConfirmed = false) =>
@@ -1626,8 +1795,18 @@ namespace OZE.Application.Services
                 ErrorConstants.AppointmentMessage.PhoneNotVerified);
         }
 
-        public async Task<AppointmentResponse> ScheduleFollowUpAsync(
+        // Booked by the receptionist: confirmed at once
+        public Task<AppointmentResponse> ScheduleFollowUpAsync(
             long appointmentId, ScheduleFollowUpRequest request, string userId, CancellationToken cancellationToken = default)
+            => ScheduleFollowUpCoreAsync(appointmentId, request, userId, false, cancellationToken);
+
+        // Set by the doctor at the end of the visit: in the doctor's own shift, waiting for the receptionist to confirm it with the patient
+        public Task<AppointmentResponse> ScheduleFollowUpByDoctorAsync(
+            long appointmentId, ScheduleFollowUpRequest request, string doctorUserId, CancellationToken cancellationToken = default)
+            => ScheduleFollowUpCoreAsync(appointmentId, request, doctorUserId, true, cancellationToken);
+
+        private async Task<AppointmentResponse> ScheduleFollowUpCoreAsync(
+            long appointmentId, ScheduleFollowUpRequest request, string userId, bool byDoctor, CancellationToken cancellationToken)
         {
             ConditionGuard.Ensure(request.Date.HasValue, ErrorConstants.AppointmentMessage.DateRequired);
             ConditionGuard.Ensure(request.SlotStart.HasValue, ErrorConstants.AppointmentMessage.SlotRequired);
@@ -1647,6 +1826,11 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(request.Date!.Value > originalAppointment.AppointmentDate, ErrorConstants.ExaminationMessage.FollowUpDateMustBeFuture);
 
             var doctorId = request.DoctorId ?? originalAppointment.DoctorId;
+            if (byDoctor)
+            {
+                doctorId = await _appointmentRepository.GetStaffProfileIdByUserIdAsync(userId);
+                ConditionGuard.Ensure<ForbiddenException>(doctorId.HasValue, ErrorConstants.AppointmentMessage.DoctorProfileNotFound);
+            }
             var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
 
             var (appointment, patient, slot) = await CreateBookingAsync(
@@ -1655,8 +1839,8 @@ namespace OZE.Application.Services
                 excludeAppointmentId: originalAppointment.Id,
                 parentAppointmentId: originalAppointment.Id);
 
-            // Q9: Appointments scheduled by staff/receptionist/doctor are confirmed directly
-            appointment.Status = AppointmentConstants.ConfirmedStatus;
+            // Q9: a follow-up booked by the receptionist is confirmed directly; one set by the doctor waits for the receptionist
+            appointment.Status = byDoctor ? AppointmentConstants.PendingStatus : AppointmentConstants.ConfirmedStatus;
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
             originalAppointment.Examination.FollowUpAppointmentId = appointment.Id;
@@ -1667,12 +1851,17 @@ namespace OZE.Application.Services
             }
             originalAppointment.Examination.UpdatedAt = DateTimeOffset.UtcNow;
 
-            // Send instant confirmation notification via SMS/Email to patient
-            await SendConfirmationNotificationAsync(appointment);
+            // The confirmation SMS/email goes out only for a confirmed booking; a pending one is confirmed later by the receptionist
+            if (!byDoctor)
+            {
+                await SendConfirmationEmailAsync(appointment);
+            }
 
             await _appointmentRepository.SaveChangesAsync();
             await NotifyAsync(n => n.NotifyPatientAsync(originalAppointment.PatientId,
-                Content(NotificationConstants.Text.FollowUpScheduledTitle, NotificationConstants.Text.FollowUpScheduledMessage, appointment), cancellationToken));
+                byDoctor
+                    ? Content(NotificationConstants.Text.FollowUpProposedTitle, NotificationConstants.Text.FollowUpProposedMessage, appointment)
+                    : Content(NotificationConstants.Text.FollowUpScheduledTitle, NotificationConstants.Text.FollowUpScheduledMessage, appointment), cancellationToken));
 
             await _auditLogService.LogAsync(
                 AuditConstants.AppointmentFollowUpScheduled,
@@ -1684,7 +1873,8 @@ namespace OZE.Application.Services
                     ExaminationId = originalAppointment.Examination.Id,
                     appointment.AppointmentDate,
                     appointment.TimeSlotStart,
-                    DoctorId = doctorId
+                    DoctorId = doctorId,
+                    appointment.Status
                 });
 
             return ToResponse(appointment, patient, slot, lines);
@@ -1713,6 +1903,7 @@ namespace OZE.Application.Services
                     DurationMinutes = item.DurationMinutes,
                     PriceAtBooking = item.PriceAtBooking
                 }).ToList(),
+                RequiredRoomType = RequiredRoomTypeOf(appointment.ServiceItems.Select(i => i.Service?.RequiredRoomType)),
                 AppointmentType = appointment.AppointmentType,
                 AppointmentDate = appointment.AppointmentDate,
                 TimeSlotStart = appointment.TimeSlotStart,

@@ -25,6 +25,21 @@ export const ROOM_STATUS_OPTIONS = [
     { value: ROOM_STATUSES.INACTIVE, label: "Ngừng sử dụng", badge: "badge-neutral" },
 ];
 
+// A doctor working in these kinds of room can take patients whose services need every required type.
+// Unknown room types (an older backend) never block; the backend checks again.
+export const fitsRoomTypes = (roomTypes = [], ...required) => !roomTypes.length || required.every((type) => !type || roomTypes.includes(type));
+
+// Doctor id -> kinds of room of the given shifts (doctors-on-duty rows)
+export const roomTypesByDoctor = (shifts = []) => {
+    const map = new Map();
+    shifts.forEach((s) => {
+        const types = map.get(s.doctorId) ?? [];
+        if (s.roomType && !types.includes(s.roomType)) types.push(s.roomType);
+        map.set(s.doctorId, types);
+    });
+    return map;
+};
+
 export const roomTypeLabel = (type) => ROOM_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? type;
 
 // The reception desk is not a room on the backend: a receptionist's shift has no room (roomId null).

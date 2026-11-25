@@ -161,10 +161,10 @@ namespace OZE.UnitTest.Services.Appointments
             };
 
             _appointmentRepoMock
-                .Setup(r => r.GetDoctorShiftsAsync(date, DoctorId))
+                .Setup(r => r.GetDoctorShiftsInRangeAsync(date, date, DoctorId))
                 .ReturnsAsync(new List<StaffSchedule> { shift });
             _appointmentRepoMock
-                .Setup(r => r.GetActiveAppointmentsAsync(date, It.IsAny<IReadOnlyCollection<int>>()))
+                .Setup(r => r.GetActiveAppointmentsInRangeAsync(date, date, It.IsAny<IReadOnlyCollection<int>>()))
                 .ReturnsAsync(new List<Appointment>());
             _appointmentRepoMock
                 .Setup(r => r.HasEndedShiftAsync(DoctorId, date))

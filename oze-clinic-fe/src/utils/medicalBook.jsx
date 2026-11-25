@@ -1,6 +1,6 @@
 import { formatDate, formatTimeRange, formatWeekday, getClinicDateTimeParts, getClinicToday } from "./format";
 import { imagingTypeLabel } from "./imagingRequest";
-import { APPOINTMENT_STATUS, MEDICAL_RECORD_ADDENDUM_TYPE, MEDICAL_RECORD_HISTORY_GROUPS, MEDICAL_RECORD_TEXT, PLAN_STATUS } from "./messages";
+import { APPOINTMENT_STATUS, MEDICAL_RECORD_ADDENDUM_TYPE, MEDICAL_RECORD_HISTORY_GROUPS, MEDICAL_RECORD_TEXT, PAYMENT_HISTORY_STATUS, PLAN_STATUS } from "./messages";
 
 const CLINIC = { name: "Nha khoa OZE" };
 const GENDER = { Male: "Nam", Female: "Nữ" };
@@ -42,10 +42,20 @@ const followUpText = (exam) => {
     return `${[date && MEDICAL_RECORD_TEXT.FOLLOW_UP_ON(date), exam.followUpNotes].filter(Boolean).join(" – ")}${booked}`;
 };
 
-const toVisit = (exam, invoiceByAppointment) => {
+// Short summary of an invoice for the visit page ("Thanh toán" card).
+const toVisitInvoice = (invoice) => {
+    const left = toNumber(invoice.remainingAmount);
+    const paid = toNumber(invoice.paidAmount);
+    const status = left <= 0 ? "paid" : paid > 0 ? "partial" : "unpaid";
+    return { id: invoice.id, code: invoice.invoiceNumber ?? "", description: invoice.treatmentPlanName ?? "", amount: toNumber(invoice.finalAmount), status: PAYMENT_HISTORY_STATUS[status] };
+};
+
+const toVisit = (exam, invoicesByAppointment) => {
     const services = list(exam.services).filter(Boolean);
+    const invoices = invoicesByAppointment.get(exam.appointmentId) ?? [];
     return {
         id: exam.id,
+        isoDate: exam.date ?? "",
         code: exam.appointmentCode ?? "",
         stt: exam.queueNumber ?? null,
         date: formatDate(exam.date),
@@ -68,7 +78,8 @@ const toVisit = (exam, invoiceByAppointment) => {
         next: { text: followUpText(exam) },
         plans: list(exam.treatmentPlanIds),
         plan: list(exam.treatmentPlanIds)[0] ?? null,
-        invoiceId: invoiceByAppointment.get(exam.appointmentId) ?? null,
+        invoiceId: invoices[0]?.id ?? null,
+        invoices: invoices.map(toVisitInvoice),
     };
 };
 
@@ -90,6 +101,7 @@ const toStages = (stages) => {
         cost: toNumber(stage.estimatedCost),
         cancelled: stage.status === STAGE_CANCELLED,
         actualDate: stage.actualDate ?? null,
+        scheduledDate: stage.scheduledDate ?? null,
     }));
 };
 
@@ -121,6 +133,7 @@ const toPlan = (plan, visits) => {
         doctor: plan.doctorName ?? "",
         diag: plan.diagnosis ?? "",
         start: clinicDate(status === "proposed" ? plan.createdAt : (plan.approvedAt ?? plan.createdAt)),
+        createdAt: plan.createdAt ?? "",
         sentOn: clinicDate(plan.createdAt),
         stages,
         log: toLog(stages, visits),
@@ -197,8 +210,9 @@ const toUpcoming = (appointments) => {
 };
 
 export const toMedicalRecord = (book, { invoices = [], appointments = [] } = {}) => {
-    const invoiceByAppointment = new Map(invoices.filter((invoice) => invoice.appointmentId != null).map((invoice) => [invoice.appointmentId, invoice.id]));
-    const visits = list(book.examinations).map((exam) => toVisit(exam, invoiceByAppointment));
+    const invoicesByAppointment = new Map();
+    for (const invoice of invoices.filter((item) => item.appointmentId != null)) invoicesByAppointment.set(invoice.appointmentId, [...(invoicesByAppointment.get(invoice.appointmentId) ?? []), invoice]);
+    const visits = list(book.examinations).map((exam) => toVisit(exam, invoicesByAppointment));
     return {
         clinic: CLINIC,
         patient: { code: book.patientCode ?? "" },

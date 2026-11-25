@@ -59,6 +59,9 @@ const MESSAGES = [
     [/Actual cost is invalid/i, "Chi phí thực tế không hợp lệ."],
     [/Follow-up date must be in the future/i, "Ngày tái khám phải sau hôm nay."],
     [/follow-up appointment has already been scheduled/i, "Lượt khám này đã có lịch tái khám."],
+    [/time slot is no longer available/i, "Giờ tái khám này vừa có người đặt. Vui lòng chọn giờ khác."],
+    [/too far in advance/i, "Ngày tái khám vượt quá thời gian mở lịch."],
+    [/No doctor profile is linked/i, "Tài khoản chưa được gắn hồ sơ bác sĩ."],
 ];
 
 const translate = (response) => {
@@ -86,7 +89,15 @@ const state = {
     planSaves: new Map(), // examinationId → the plan save on its way (saves of one plan run one after another)
     types: new Map(), // serviceId → [{ id, name, price }]: the service's variants ("Loại dịch vụ")
     catalog: [], // [{ serviceId, name }]: the services a doctor can add to a plan (all bookable ones but the check-up)
+    followUpsBooked: new Set(),
 };
+
+const CLOSED_FOLLOW_UP = ["CANCELLED", "NO_SHOW"];
+
+const liveFollowUp = (followUp) =>
+    followUp?.appointmentId && !CLOSED_FOLLOW_UP.includes(followUp.status)
+        ? { date: followUp.appointmentDate, slotStart: followUp.timeSlotStart, slotEnd: followUp.timeSlotEnd, doctorName: followUp.doctorName ?? "", status: followUp.status }
+        : null;
 
 const stepKey = (examinationId) => `oze.exam.step.${examinationId}`;
 const readStep = (examinationId) => {
@@ -442,12 +453,13 @@ export const getExamRecord = async (id) => {
     const item = itemOf(id);
     if (!item) return failure("Không tìm thấy hồ sơ của bệnh nhân này.");
 
-    const [work, films, past, savedPlan] = await Promise.all([
+    const [work, films, past, savedPlan, , appointment] = await Promise.all([
         item.examinationId ? call(() => api.get(`/api/examinations/${item.examinationId}`)) : Promise.resolve(null),
         item.examinationId ? loadFilms(item.examinationId) : Promise.resolve([]),
         loadHistoryAndVisits(item),
         item.examinationId ? loadPlan(item.examinationId) : Promise.resolve(null),
         loadPlanTypes(),
+        call(() => api.get(`/api/appointments/${item.appointmentId}`)),
     ]);
     if (work && !work.success) return translate(work);
 
@@ -471,7 +483,6 @@ export const getExamRecord = async (id) => {
     if (!local.treatmentLoaded && (savedPlan || data)) {
         const running = savedPlan?.stages.find((stage) => stage.stageStatus === "InProgress");
         if (running) local.treatment = { ...local.treatment, ...treatmentFromNotes(running.notes), sessionId: `stage-${running.id}` };
-        if (data?.followUpDate) local.treatment = { ...local.treatment, followUpDate: data.followUpDate };
         local.treatmentLoaded = true;
     }
     // Step 5: the prescription of the visit as the backend has it (an empty draft until a medicine is added)
@@ -520,6 +531,8 @@ export const getExamRecord = async (id) => {
             planCatalog: state.catalog,
             treatment: local.treatment,
             prescription: local.prescription,
+            doctor: appointment?.success ? { id: appointment.data?.doctorId ?? null, name: appointment.data?.doctorName ?? "" } : { id: null, name: "" },
+            followUp: liveFollowUp(data?.followUp),
         }),
     );
 };
@@ -926,6 +939,16 @@ export const completeTreatmentSession = async (id, treatment) => {
         if (!saved.success) return saved;
         const { plan, stageId } = sessionStage(item, treatment);
 
+        if (treatment.followUp && !state.followUpsBooked.has(item.examinationId)) {
+            const followUp = translate(
+                await call(() =>
+                    api.post(`/api/examinations/${item.examinationId}/follow-up/schedule`, { date: treatment.followUp.date, slotStart: treatment.followUp.slotStart }),
+                ),
+            );
+            if (!followUp.success) return { ...followUp, followUpFailed: true };
+            state.followUpsBooked.add(item.examinationId);
+        }
+
         const completed = translate(
             await call(() =>
                 api.post(`/api/treatmentplans/${plan.id}/stages/${stageId}/complete`, { notes: treatmentNotes(treatment), actualCost: itemsTotal(treatment) }),
@@ -935,13 +958,6 @@ export const completeTreatmentSession = async (id, treatment) => {
         state.stageStatus.set(stageId, "Completed");
         plan.status = completed.data.status;
 
-        if (treatment.followUpDate) {
-            const followUp = translate(
-                await call(() => api.put(`/api/examinations/${item.examinationId}/follow-up`, { followUpDate: treatment.followUpDate, followUpNotes: null })),
-            );
-            if (!followUp.success) return followUp;
-        }
-
         const local = localOf(item);
         const service = local.plan.services.find((entry) => entry.sessions.some((session) => session.id === treatment.sessionId));
         if (service) {
@@ -950,7 +966,7 @@ export const completeTreatmentSession = async (id, treatment) => {
         }
         local.plan = { ...local.plan, status: plan.status };
         // The next visit starts a new session
-        local.treatment = { ...structuredClone(EMPTY_TREATMENT_DRAFT), followUpDate: treatment.followUpDate };
+        local.treatment = structuredClone(EMPTY_TREATMENT_DRAFT);
         return success(structuredClone(local.plan));
     });
 };

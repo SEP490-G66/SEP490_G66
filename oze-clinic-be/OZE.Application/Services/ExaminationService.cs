@@ -512,8 +512,16 @@ namespace OZE.Application.Services
             return await BuildWorkResponseAsync(examination, cancellationToken);
         }
 
-        public async Task<AppointmentResponse> ScheduleFollowUpAppointmentAsync(
+        public Task<AppointmentResponse> ScheduleFollowUpAppointmentAsync(
             string userId, long examinationId, ScheduleFollowUpRequest request, CancellationToken cancellationToken = default)
+            => ScheduleFollowUpAppointmentCoreAsync(userId, examinationId, request, false, cancellationToken);
+
+        public Task<AppointmentResponse> ScheduleFollowUpAppointmentByDoctorAsync(
+            string doctorUserId, long examinationId, ScheduleFollowUpRequest request, CancellationToken cancellationToken = default)
+            => ScheduleFollowUpAppointmentCoreAsync(doctorUserId, examinationId, request, true, cancellationToken);
+
+        private async Task<AppointmentResponse> ScheduleFollowUpAppointmentCoreAsync(
+            string userId, long examinationId, ScheduleFollowUpRequest request, bool byDoctor, CancellationToken cancellationToken)
         {
             var examination = await _examinationRepository.GetByIdWithFollowUpAsync(examinationId, cancellationToken);
             ConditionGuard.Ensure<NotFoundException>(examination != null, ErrorConstants.MedicalRecordMessage.ExaminationNotFound);
@@ -525,7 +533,9 @@ namespace OZE.Application.Services
                 : examination.FollowUpAppointmentId != null;
             ConditionGuard.ThrowIf(hasActiveFollowUp, ErrorConstants.ExaminationMessage.FollowUpAppointmentAlreadyScheduled);
 
-            return await _appointmentService.ScheduleFollowUpAsync(examination.AppointmentId, request, userId, cancellationToken);
+            return byDoctor
+                ? await _appointmentService.ScheduleFollowUpByDoctorAsync(examination.AppointmentId, request, userId, cancellationToken)
+                : await _appointmentService.ScheduleFollowUpAsync(examination.AppointmentId, request, userId, cancellationToken);
         }
 
         public async Task<PagedResult<FollowUpListItemResponse>> GetFollowUpsAsync(

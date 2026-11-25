@@ -41,10 +41,10 @@ namespace OZE.Persistence.Repositories
             }
 
             var total = await requests.CountAsync(cancellationToken);
-            // New requests first, then the latest
+            // New requests first, then the oldest
             var items = await requests
                 .OrderByDescending(x => x.Status == "New")
-                .ThenByDescending(x => x.CreatedAt)
+                .ThenBy(x => x.CreatedAt)
                 .Skip((query.PageNumber - 1) * query.PageSize)
                 .Take(query.PageSize)
                 .ToListAsync(cancellationToken);

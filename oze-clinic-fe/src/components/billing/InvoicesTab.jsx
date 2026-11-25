@@ -1,30 +1,34 @@
 import { useEffect, useState } from "react";
-import LabeledSelect from "@/components/ui/LabeledSelect";
+import { Eye, Search } from "lucide-react";
 import Pagination from "@/components/ui/Pagination";
-import ConfirmActionDialog from "./ConfirmActionDialog";
 import InvoiceDetailDialog from "./InvoiceDetailDialog";
-import { Card } from "@/components/reception/shared";
-import { money, phoneText, report } from "@/components/reception/receptionUtils";
-import { clinicToday, confirmPayment, getInvoice, rejectPayment, searchInvoices } from "@/services/receptionService";
-import { addDays, dmy } from "@/utils/calendar";
+import { LoadError } from "@/components/cashier/cashierUi";
+import { money, phoneText } from "@/components/reception/receptionUtils";
+import { clinicToday, searchInvoices } from "@/services/receptionService";
+import { dmy } from "@/utils/calendar";
 import { dateKey } from "@/utils/cashShift";
 import { BILLING_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
 const PAGE_SIZE = 10;
-const STATUS_OPTIONS = [["", TEXT.ALL], ...Object.entries(TEXT.INVOICE_STATUS).map(([k, [label]]) => [k, label])];
-
-// "to" left empty means up to now, so a tab left open overnight still shows the new day's invoices.
-const defaults = (today) => ({ keyword: "", from: addDays(today, -30), to: "", status: "" });
+const COLLECTION = { ALL: "received", PAID: "paid", PARTIALLY_PAID: "partial" };
+const STATUS_OPTIONS = [
+    ["", TEXT.ALL],
+    ["PAID", TEXT.INVOICE_STATUS.PAID[0]],
+    ["PARTIALLY_PAID", TEXT.INVOICE_STATUS.PARTIALLY_PAID[0]],
+];
+const NUMBER_COLUMNS = [4, 5];
+const EMPTY_FILTERS = { keyword: "", from: "", to: "", status: "" };
+const iconButton =
+    "inline-grid size-8 shrink-0 cursor-pointer place-items-center rounded-md text-muted outline-none transition-colors hover:bg-primary-soft hover:text-primary focus-visible:shadow-focus";
 
 const InvoicesTab = () => {
     const today = clinicToday();
-    const [filters, setFilters] = useState(() => defaults(today));
-    const [opening, setOpening] = useState(null);
+    const [filters, setFilters] = useState(EMPTY_FILTERS);
     const [page, setPage] = useState(1);
     const [reload, setReload] = useState(0);
     const [result, setResult] = useState(null);
-    const [dialog, setDialog] = useState(null);
+    const [detailId, setDetailId] = useState(null);
 
     const key = JSON.stringify([filters, page, reload]);
 
@@ -32,11 +36,17 @@ const InvoicesTab = () => {
         const controller = new AbortController();
         const timer = setTimeout(() => {
             searchInvoices(
-                { keyword: filters.keyword.trim(), status: filters.status, fromDate: filters.from, toDate: filters.to, page, pageSize: PAGE_SIZE },
+                {
+                    keyword: filters.keyword.trim(),
+                    collection: COLLECTION[filters.status || "ALL"],
+                    fromDate: filters.from,
+                    toDate: filters.to,
+                    page,
+                    pageSize: PAGE_SIZE,
+                },
                 { skipErrorPage: true, signal: controller.signal },
             ).then((response) => {
                 if (controller.signal.aborted || response.aborted) return;
-                // An action can empty the last page: step back to the last page that still has rows.
                 const lastPage = Math.max(1, Number(response.data?.totalPages ?? 1));
                 if (response.success && page > lastPage) {
                     setPage(lastPage);
@@ -47,7 +57,7 @@ const InvoicesTab = () => {
                     ok: response.success,
                     items: response.success ? (response.data?.items ?? []) : [],
                     total: Number(response.data?.totalCount ?? 0),
-                    totalPages: Math.max(1, Number(response.data?.totalPages ?? 1)),
+                    totalPages: lastPage,
                 });
             });
         }, 250);
@@ -57,206 +67,171 @@ const InvoicesTab = () => {
         };
     }, [filters, page, key]);
 
-    const base = defaults(today);
-    const dirty = filters.keyword !== "" || filters.status !== "" || filters.to !== "" || filters.from !== addDays(today, -30);
+    const dirty = Object.values(filters).some(Boolean);
     const setFilter = (k) => (v) => {
         setFilters((f) => {
             const next = { ...f, [k]: v };
-            if (k === "from" && next.to && next.to < v) next.to = v;
-            if (k === "to" && v && next.from > v) next.from = v;
+            if (k === "from" && v && next.to && next.to < v) next.to = v;
+            if (k === "to" && v && next.from && next.from > v) next.from = v;
             return next;
         });
         setPage(1);
     };
-    const refresh = () => setReload((n) => n + 1);
-    // After an action, failed or not, the dialog closes and the list reloads: the row may have been handled by someone else.
-    const settle = () => {
-        setDialog(null);
-        refresh();
-    };
-
-    // The amount and reference always come from a fresh read, never from the list row.
-    const openPending = async (invoice, type) => {
-        setOpening(invoice.id);
-        const detail = await getInvoice(invoice.id, { skipErrorPage: true });
-        setOpening(null);
-        const payment = detail.success ? (detail.data.pendingPayment ?? detail.data.payments?.find((p) => p.paymentStatus === "PENDING")) : null;
-        if (!payment) {
-            report({ success: false, message: detail.success ? TEXT.NO_PENDING : detail.message });
-            refresh();
-            return;
-        }
-        setDialog({ type, invoice: detail.data, payment });
+    const clearFilters = () => {
+        setFilters(EMPTY_FILTERS);
+        setPage(1);
     };
 
     const items = result?.items ?? [];
     const fresh = result?.key === key;
+    const failed = result && !result.ok && fresh;
+    const firstNo = (page - 1) * PAGE_SIZE + 1;
 
     return (
-        <div className="space-y-5">
-            <Card>
-                <div className="flex flex-wrap items-end gap-3 px-4 py-3">
-                    <div className="flex min-w-56 flex-1 flex-col gap-1">
-                        <label htmlFor="inv-q" className="text-caption text-muted">
+        <section className="overflow-hidden rounded-lg border border-border bg-canvas">
+            <div className="p-6">
+                <div className="flex flex-wrap items-end gap-4">
+                    <div className="field w-full sm:w-80">
+                        <label htmlFor="inv-q" className="label">
                             {TEXT.SEARCH}
                         </label>
-                        <input id="inv-q" type="search" className="input" placeholder={TEXT.SEARCH_PLACEHOLDER} value={filters.keyword} onChange={(e) => setFilter("keyword")(e.target.value)} />
+                        <div className="search">
+                            <Search aria-hidden="true" />
+                            <input id="inv-q" type="search" className="input" placeholder={TEXT.SEARCH_PLACEHOLDER} value={filters.keyword} onChange={(e) => setFilter("keyword")(e.target.value)} />
+                        </div>
                     </div>
                     {[
                         ["from", TEXT.FROM],
                         ["to", TEXT.TO],
                     ].map(([k, label]) => (
-                        <div key={k} className="flex flex-col gap-1">
-                            <label htmlFor={`inv-${k}`} className="text-caption text-muted">
+                        <div key={k} className="field w-full sm:w-auto">
+                            <label htmlFor={`inv-${k}`} className="label">
                                 {label}
                             </label>
-                            <input id={`inv-${k}`} type="date" className="input w-auto" max={today} value={filters[k]} onChange={(e) => (k === "to" || e.target.value) && setFilter(k)(e.target.value)} />
+                            <input id={`inv-${k}`} type="date" className="input w-full sm:w-auto" max={today} value={filters[k]} onChange={(e) => setFilter(k)(e.target.value)} />
                         </div>
                     ))}
-                    <LabeledSelect id="inv-status" label={TEXT.STATUS} value={filters.status} options={STATUS_OPTIONS} onChange={setFilter("status")} />
+                    <div className="field w-full sm:w-auto sm:min-w-48">
+                        <label htmlFor="inv-status" className="label">
+                            {TEXT.STATUS}
+                        </label>
+                        <select id="inv-status" className="input w-full" value={filters.status} onChange={(e) => setFilter("status")(e.target.value)}>
+                            {STATUS_OPTIONS.map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                     {dirty && (
-                        <button
-                            type="button"
-                            className="btn-link h-control"
-                            onClick={() => {
-                                setFilters(base);
-                                setPage(1);
-                            }}
-                        >
+                        <button type="button" className="btn-link h-control" onClick={clearFilters}>
                             {TEXT.CLEAR_FILTERS}
                         </button>
                     )}
                 </div>
-            </Card>
-            {result && !result.ok && fresh && (
-                <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
-                    <span className="flex-1">{TEXT.LOAD_ERROR}</span>
-                    <button type="button" className="btn btn-secondary h-9" onClick={refresh}>
-                        {TEXT.RETRY}
-                    </button>
+            </div>
+            {failed ? (
+                <div className="border-t border-border p-6">
+                    <LoadError onRetry={() => setReload((n) => n + 1)} />
                 </div>
-            )}
-            <Card>
-                {!result ? (
-                    <div className="space-y-2 p-4">
-                        <div className="skeleton h-10 rounded" />
-                        <div className="skeleton h-10 rounded" />
-                    </div>
-                ) : !result.ok && !items.length ? null : !items.length ? (
-                    <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.INV_EMPTY}</p>
-                ) : (
-                    <div className={cx("table-wrap rounded-none border-x-0", !fresh && "opacity-60")} aria-busy={!fresh ? "true" : undefined}>
-                        <table className="table table-stack [&_td]:px-3 [&_td]:align-top [&_th]:px-3">
+            ) : result && fresh && !items.length ? (
+                <div className="empty-state border-t border-border">
+                    <p className="empty-state-text">{TEXT.INV_EMPTY}</p>
+                    {dirty && (
+                        <button type="button" className="btn btn-secondary mt-4" onClick={clearFilters}>
+                            {TEXT.CLEAR_FILTERS}
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <>
+                    <div className={cx("table-wrap rounded-none border-x-0 border-b-0", result && !fresh && "opacity-60")} aria-busy={!fresh ? "true" : undefined}>
+                        <table className="table table-stack">
                             <thead>
-                                <tr>
-                                    {TEXT.INV_COLUMNS.map((c, i) => (
-                                        <th key={c} className={i === 4 || i === 5 ? "text-right" : undefined}>
-                                            {i === TEXT.INV_COLUMNS.length - 1 ? <span className="sr-only">{c}</span> : c}
-                                        </th>
-                                    ))}
+                                <tr className="whitespace-nowrap">
+                                    {TEXT.INV_COLUMNS.map((c, i) =>
+                                        i === TEXT.INV_COLUMNS.length - 1 ? (
+                                            <th key={c} className="w-px">
+                                                <span className="sr-only">{c}</span>
+                                            </th>
+                                        ) : (
+                                            <th key={c} className={NUMBER_COLUMNS.includes(i) ? "text-right" : undefined}>
+                                                {c}
+                                            </th>
+                                        ),
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
-                                {items.map((i) => {
-                                    const [label, tone] = TEXT.INVOICE_STATUS[i.paymentStatus] ?? [i.paymentStatus, "badge-neutral"];
-                                    const waiting = i.paymentStatus === "PENDING_CONFIRMATION" || Boolean(i.pendingPayment);
-                                    return (
-                                        <tr key={i.id} className={i.paymentStatus === "CANCELLED" ? "opacity-60" : undefined}>
-                                            <td data-label={TEXT.INV_COLUMNS[0]} className="whitespace-nowrap">
-                                                {i.invoiceNumber}
-                                            </td>
-                                            <td data-label={TEXT.INV_COLUMNS[1]} className="num whitespace-nowrap">
-                                                {i.createdAt ? dmy(dateKey(i.createdAt)) : "—"}
-                                            </td>
-                                            <td data-primary>
-                                                <span className="cell-primary">{i.patientName}</span>
-                                            </td>
-                                            <td data-label={TEXT.INV_COLUMNS[3]} className="num whitespace-nowrap">
-                                                {phoneText(i.patientPhoneNumber)}
-                                            </td>
-                                            <td data-label={TEXT.INV_COLUMNS[4]} className="num whitespace-nowrap text-right">
-                                                {money(i.finalAmount ?? i.totalAmount)}
-                                            </td>
-                                            <td data-label={TEXT.INV_COLUMNS[5]} className="num whitespace-nowrap text-right">
-                                                {money(i.paidAmount)}
-                                            </td>
-                                            <td data-label={TEXT.INV_COLUMNS[6]}>
-                                                <span className={cx("badge", tone)}>{label}</span>
-                                            </td>
-                                            <td data-actions>
-                                                <div className="ml-auto grid w-max gap-2">
-                                                    {waiting && (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-primary h-8 px-2.5"
-                                                                disabled={!fresh || opening === i.id}
-                                                                onClick={() => openPending(i, "confirm")}
-                                                            >
-                                                                {TEXT.CONFIRM_CK}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                className="btn btn-secondary h-8 px-2.5"
-                                                                disabled={!fresh || opening === i.id}
-                                                                onClick={() => openPending(i, "reject")}
-                                                            >
-                                                                {TEXT.REJECT_CK}
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                    <button type="button" className="btn btn-secondary h-8 px-2.5" onClick={() => setDialog({ type: "detail", invoice: i })}>
-                                                        {TEXT.DETAIL}
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                {!result
+                                    ? [1, 2, 3, 4].map((n) => (
+                                          <tr key={n}>
+                                              <td colSpan={TEXT.INV_COLUMNS.length}>
+                                                  <span className="skeleton block h-5 w-full" />
+                                              </td>
+                                          </tr>
+                                      ))
+                                    : items.map((i) => {
+                                          const [label, tone] = TEXT.INVOICE_STATUS[i.collectionStatus] ?? [i.collectionStatus, "badge-neutral"];
+                                          return (
+                                              <tr key={i.id}>
+                                                  <td data-label={TEXT.INV_COLUMNS[0]} className="whitespace-nowrap">
+                                                      {i.invoiceNumber}
+                                                  </td>
+                                                  <td data-label={TEXT.INV_COLUMNS[1]} className="num whitespace-nowrap">
+                                                      {i.createdAt ? dmy(dateKey(i.createdAt)) : "—"}
+                                                  </td>
+                                                  <td data-primary>
+                                                      <span className="whitespace-nowrap font-semibold text-ink">{i.patientName}</span>
+                                                  </td>
+                                                  <td data-label={TEXT.INV_COLUMNS[3]} className="num whitespace-nowrap">
+                                                      {phoneText(i.patientPhoneNumber)}
+                                                  </td>
+                                                  <td data-label={TEXT.INV_COLUMNS[4]} className="num whitespace-nowrap text-right">
+                                                      {money(i.finalAmount ?? i.totalAmount)}
+                                                  </td>
+                                                  <td data-label={TEXT.INV_COLUMNS[5]} className="num whitespace-nowrap text-right font-semibold text-ink">
+                                                      {money(i.collectedAmount)}
+                                                  </td>
+                                                  <td data-label={TEXT.INV_COLUMNS[6]} className="whitespace-nowrap">
+                                                      <span className={cx("badge", tone)}>{label}</span>
+                                                  </td>
+                                                  <td data-actions className="whitespace-nowrap text-right">
+                                                      <button
+                                                          type="button"
+                                                          className={iconButton}
+                                                          aria-label={TEXT.VIEW_DETAIL_OF(i.invoiceNumber)}
+                                                          title={TEXT.VIEW_DETAIL}
+                                                          onClick={() => setDetailId(i.id)}
+                                                      >
+                                                          <Eye className="size-4" aria-hidden="true" />
+                                                      </button>
+                                                  </td>
+                                              </tr>
+                                          );
+                                      })}
                             </tbody>
                         </table>
                     </div>
-                )}
-                {items.length > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3">
-                        <p className="num text-body-sm text-muted">
-                            {(page - 1) * PAGE_SIZE + 1}–{(page - 1) * PAGE_SIZE + items.length} / {result.total || items.length}
-                        </p>
-                        {result.totalPages > 1 && <Pagination page={page} totalPages={result.totalPages} onChange={setPage} busy={!fresh} />}
-                    </div>
-                )}
-            </Card>
-            {dialog?.type === "detail" && <InvoiceDetailDialog invoiceId={dialog.invoice.id} onClose={() => setDialog(null)} onChanged={refresh} />}
-            {dialog?.type === "confirm" && (
-                <ConfirmActionDialog
-                    title={TEXT.CK_TITLE}
-                    description={`${dialog.invoice.invoiceNumber} · ${dialog.invoice.patientName}`}
-                    body={TEXT.CK_BODY(money(dialog.payment.amount), dialog.payment.transactionReference)}
-                    closeLabel={TEXT.CANCEL}
-                    submitLabel={TEXT.CONFIRM}
-                    onClose={() => setDialog(null)}
-                    onSubmit={async () => {
-                        report(await confirmPayment(dialog.payment.id), TEXT.CK_DONE(money(dialog.payment.amount), dialog.invoice.patientName));
-                        settle();
-                    }}
-                />
+                    {items.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-border px-6 py-3">
+                            <p className="num text-body-sm text-muted" aria-live="polite">
+                                {TEXT.INV_COUNT(
+                                    <span key="range" className="font-semibold text-ink">
+                                        {firstNo}–{firstNo + items.length - 1}
+                                    </span>,
+                                    <span key="total" className="font-semibold text-ink">
+                                        {result.total || items.length}
+                                    </span>,
+                                )}
+                            </p>
+                            {result.totalPages > 1 && <Pagination page={page} totalPages={result.totalPages} onChange={setPage} busy={!fresh} />}
+                        </div>
+                    )}
+                </>
             )}
-            {dialog?.type === "reject" && (
-                <ConfirmActionDialog
-                    title={TEXT.CK_REJECT_TITLE}
-                    description={`${dialog.invoice.invoiceNumber} · ${dialog.invoice.patientName}`}
-                    body={TEXT.CK_REJECT_BODY(money(dialog.payment.amount))}
-                    closeLabel={TEXT.CANCEL}
-                    submitLabel={TEXT.CK_REJECT}
-                    danger
-                    onClose={() => setDialog(null)}
-                    onSubmit={async () => {
-                        report(await rejectPayment(dialog.payment.id), TEXT.CK_REJECTED);
-                        settle();
-                    }}
-                />
-            )}
-        </div>
+            {detailId && <InvoiceDetailDialog invoiceId={detailId} onClose={() => setDetailId(null)} />}
+        </section>
     );
 };
 

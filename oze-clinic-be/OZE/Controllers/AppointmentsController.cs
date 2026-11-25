@@ -42,6 +42,16 @@ namespace OZE.Controllers
             return Ok(ApiResponse<List<AvailableSlotResponse>>.SuccessResult(slots));
         }
 
+        // GET api/appointments/available-days?From=2026-11-24&To=2026-12-24&ServiceId=1&VariantId=2&DoctorId=3
+        // One request for the booking calendar instead of one available-slots call per day
+        [HttpGet("available-days")]
+        [AllowAnonymous]
+        public async Task<ActionResult<ApiResponse<List<AvailableDayResponse>>>> GetAvailableDaysAsync([FromQuery] AvailableDaysRequest request)
+        {
+            var days = await _appointmentService.GetAvailableDaysAsync(request);
+            return Ok(ApiResponse<List<AvailableDayResponse>>.SuccessResult(days));
+        }
+
         // POST api/appointments/guest-booking
         [HttpPost("guest-booking")]
         [AllowAnonymous]
@@ -315,7 +325,10 @@ namespace OZE.Controllers
             [FromBody] ScheduleFollowUpRequest request,
             CancellationToken cancellationToken)
         {
-            var result = await _appointmentService.ScheduleFollowUpAsync(id, request, CurrentUserId ?? string.Empty, cancellationToken);
+            // A follow-up set by the doctor waits for the receptionist to confirm it with the patient
+            var result = IsInRole(RoleConstants.DoctorRole)
+                ? await _appointmentService.ScheduleFollowUpByDoctorAsync(id, request, CurrentUserId ?? string.Empty, cancellationToken)
+                : await _appointmentService.ScheduleFollowUpAsync(id, request, CurrentUserId ?? string.Empty, cancellationToken);
             return Ok(ApiResponse<AppointmentResponse>.SuccessResult(result, "Follow-up appointment scheduled successfully"));
         }
 

@@ -142,8 +142,12 @@ namespace OZE.Application.Services
 
             var entries = await _queueRepository.GetActiveEntriesAsync(queueType, roomId, assignedStaffId, cancellationToken);
             entries = await OrderForCallingAsync(entries, queueType, cancellationToken);
-            // A doctor off duty (shift not started, or ended) is only handed patients already examined (back from the X-ray)
-            foreach (var next in entries.Where(x => x.Status == QueueConstants.Waiting && (!offDuty || x.Appointment?.Examination != null)))
+            var atImaging = await GetAppointmentsAtImagingAsync(queueType, cancellationToken);
+            // A doctor off duty (shift not started, or ended) is only handed patients already examined (back from the X-ray).
+            // A patient still in the imaging room is waiting for the result, not for the doctor, so the next one is called instead
+            foreach (var next in entries.Where(x => x.Status == QueueConstants.Waiting
+                && !atImaging.Contains(x.AppointmentId)
+                && (!offDuty || x.Appointment?.Examination != null)))
             {
                 var calledAt = DateTimeOffset.UtcNow;
                 // Someone else may have called this patient a moment ago, then the next one in line is ours
@@ -254,6 +258,18 @@ namespace OZE.Application.Services
             }
         }
 
+        // Appointments that still have an open imaging entry today. Only the examination queue needs them
+        private async Task<HashSet<long>> GetAppointmentsAtImagingAsync(string queueType, CancellationToken cancellationToken)
+        {
+            if (queueType != QueueConstants.ExaminationType)
+            {
+                return new HashSet<long>();
+            }
+
+            var imaging = await _queueRepository.GetActiveEntriesAsync(QueueConstants.ImagingType, null, null, cancellationToken);
+            return (imaging ?? new List<QueueEntry>()).Select(x => x.AppointmentId).ToHashSet();
+        }
+
         // The examination queue uses the waiting-list order, so "call next" calls the patient shown on top of the
         // waiting list. Other queues keep the order of the repository (missed calls, priority, queue number).
         private async Task<List<QueueEntry>> OrderForCallingAsync(List<QueueEntry> entries, string? queueType, CancellationToken cancellationToken)
@@ -356,6 +372,8 @@ namespace OZE.Application.Services
             PatientCode = includePatientDetails ? x.Appointment?.Patient?.PatientCode ?? string.Empty : string.Empty,
             QueueNumber = x.QueueNumber,
             Priority = x.Priority,
+            // The patient may learn they are prioritized, not why (Law on Medical Examination and Treatment 2023, art. 3.2)
+            PriorityReason = includePatientDetails ? x.Appointment?.PriorityReason : null,
             SkipCount = x.SkipCount,
             Status = x.Status,
             CalledAt = x.CalledAt,

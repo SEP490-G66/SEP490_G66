@@ -12,8 +12,10 @@ const isUsable = (element) => element && !element.disabled && element.getAttribu
 
 const parseServices = (serviceKey) => (serviceKey ? JSON.parse(serviceKey) : null);
 
-const useBookingForm = ({ api, guest = null }) => {
-    const [state, dispatch] = useReducer(bookingReducer, null, () => createInitialState(getClinicToday()));
+// initial: { day, slot, doctorId } picked before the form opens
+// embedded: { onBooked, onPatientGone } when the form sits in a staff dialog instead of its own page
+const useBookingForm = ({ api, guest = null, initial = null, embedded = null }) => {
+    const [state, dispatch] = useReducer(bookingReducer, null, () => createInitialState(getClinicToday(), { preset: initial, embedded: Boolean(embedded) }));
     const handledFocus = useRef(0);
     const interimFocus = useRef({ seq: 0, element: null });
     const sending = useRef(false);
@@ -110,11 +112,14 @@ const useBookingForm = ({ api, guest = null }) => {
         sending.current = false;
         dispatch({ type: "SUBMIT_DONE", result, today: getClinicToday(), snapshot });
         if (result.success) {
-            window.scrollTo(0, 0);
+            if (embedded) embedded.onBooked?.(result.data);
+            else window.scrollTo(0, 0);
             return;
         }
+        if (embedded && result.code === BOOKING_ERROR_CODE.PROFILE_NOT_FOUND) embedded.onPatientGone?.();
         const servicesGone = result.code === BOOKING_ERROR_CODE.VARIANT_INACTIVE;
-        if (!servicesGone && result.code !== BOOKING_ERROR_CODE.HAS_UNFINISHED) return;
+        // In a dialog an unfinished appointment is only an error line, there is no blocked screen to fill
+        if (!servicesGone && (embedded || result.code !== BOOKING_ERROR_CODE.HAS_UNFINISHED)) return;
         const context = await calls.current.getContext().catch(() => failedResult);
         if (servicesGone) {
             if (context.success) dispatch({ type: "SERVICES_RELOADED", services: context.data.services });

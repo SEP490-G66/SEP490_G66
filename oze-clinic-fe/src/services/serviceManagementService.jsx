@@ -7,7 +7,6 @@ import { call } from "./receptionService";
 // Turning off is immediate (no date or reason on the backend); nothing is deleted, a service or variant is turned off.
 
 export const SERVICE_PAGE_SIZE = 10;
-const CODE_PAGE_SIZE = 100;
 const CODE_PREFIX = "DV";
 const GENERIC_ERROR = "Có lỗi xảy ra, vui lòng thử lại sau.";
 
@@ -91,17 +90,18 @@ export const getServices = async ({ keyword = "", roomType = "", status = "", pa
                 requiredRoomType: roomType || undefined,
                 isActive: status ? status === "active" : undefined,
                 sortBy: "code",
+                // The variants come with the page (manager only) instead of one call per service
+                includeVariants: true,
             },
         }),
     );
     if (!result.success) return translate(result);
 
     const data = result.data;
-    const typeResults = await Promise.all(data.items.map((item) => loadTypes(item.id)));
     return {
         ...result,
         data: {
-            items: data.items.map((item, index) => toService(item, typeResults[index].success ? typeResults[index].data : [])),
+            items: data.items.map((item) => toService(item, (item.variants ?? []).map(toType))),
             page: data.pageNumber,
             pageSize: data.pageSize,
             totalItems: data.totalCount,
@@ -112,17 +112,8 @@ export const getServices = async ({ keyword = "", roomType = "", status = "", pa
 
 // Next free "DVnnn" code, to fill the code field of a new service (the manager can change it).
 export const getNextServiceCode = async () => {
-    let highest = 0;
-    for (let page = 1; ; page++) {
-        const result = await call(() => api.get("/api/Services", { params: { pageNumber: page, pageSize: CODE_PAGE_SIZE } }));
-        if (!result.success) break;
-        result.data.items.forEach((item) => {
-            const match = /^DV(\d+)$/i.exec(item.serviceCode);
-            if (match) highest = Math.max(highest, Number(match[1]));
-        });
-        if (page >= result.data.totalPages) break;
-    }
-    return `${CODE_PREFIX}${String(highest + 1).padStart(3, "0")}`;
+    const result = await call(() => api.get("/api/Services/next-code"));
+    return result.success && result.data ? result.data : `${CODE_PREFIX}001`;
 };
 
 // request: { code, name, price, durationMinutes, roomType, description, recallIntervalMonths }.

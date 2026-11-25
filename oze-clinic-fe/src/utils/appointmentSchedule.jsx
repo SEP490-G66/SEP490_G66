@@ -1,6 +1,6 @@
 import { fromMinutes, hhmm, slotEnd, toMinutes } from "./calendar";
 
-export const CELL_KEYS = ["done", "noshow", "cancelled", "serving", "checkedin", "notyet", "pending", "confirmed", "callback", "noanswer"];
+export const CELL_KEYS = ["done", "noshow", "cancelled", "serving", "checkedin", "notyet", "pending", "confirmed"];
 
 export const CELL_DOT = {
     done: "bg-success",
@@ -11,15 +11,9 @@ export const CELL_DOT = {
     notyet: "bg-muted",
     pending: "bg-warning",
     confirmed: "bg-success",
-    callback: "bg-chart-7",
-    noanswer: "bg-danger",
 };
 
-export const LEGEND = { past: ["done", "noshow", "cancelled"], today: ["serving", "checkedin", "notyet"], future: ["pending", "confirmed", "callback", "noanswer"] };
-
 const TODAY_KEYS = { COMPLETED: "done", NO_SHOW: "noshow", CANCELLED: "cancelled", IN_SERVICE: "serving", CHECKED_IN: "checkedin", PENDING: "notyet", CONFIRMED: "notyet" };
-
-const CALL_KEYS = { CallBack: "callback", Unreachable: "noanswer" };
 
 const DEFAULT_STEP = 30;
 
@@ -34,7 +28,7 @@ export const rowOf = (time, step = DEFAULT_STEP) => fromMinutes(Math.floor(toMin
 export const cellKeyOf = (appointment, today) => {
     if (appointment.appointmentDate <= today) return TODAY_KEYS[appointment.status] ?? "notyet";
     if (appointment.status === "CANCELLED") return "cancelled";
-    if (appointment.status === "PENDING") return CALL_KEYS[appointment.confirmCallOutcome] ?? "pending";
+    if (appointment.status === "PENDING") return "pending";
     return "confirmed";
 };
 
@@ -67,6 +61,19 @@ export const slotPhase = (day, time, today, now, step = DEFAULT_STEP) => {
     if (slotEnd(time, step) <= now) return "past";
     return time <= now ? "now" : "future";
 };
+
+const CLOSED_STATUSES = ["CANCELLED", "NO_SHOW"];
+
+export const isLiveAppointment = (appointment) => !CLOSED_STATUSES.includes(appointment.status);
+
+export const legendGroups = (appointments, today) =>
+    [
+        ["past", appointments.filter((a) => a.appointmentDate < today)],
+        ["today", appointments.filter((a) => a.appointmentDate === today)],
+        ["future", appointments.filter((a) => a.appointmentDate > today)],
+    ]
+        .map(([group, list]) => [group, CELL_KEYS.filter((key) => list.some((a) => cellKeyOf(a, today) === key))])
+        .filter(([, keys]) => keys.length > 0);
 
 export const currentRow = (rows, now) => rows.filter((t) => t <= now).pop() ?? null;
 

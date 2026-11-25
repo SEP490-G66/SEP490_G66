@@ -32,7 +32,7 @@ const APPOINTMENT_ID_PATTERN = /^[1-9]\d{0,17}$/;
 const NOT_FOUND_TOAST_ID = "appointment-not-found";
 const DEFAULT_TITLE = "Chi tiết lịch hẹn";
 const EMPTY_VALUE = "—";
-const BACK_LABEL = "Quay lại Lịch hẹn của tôi";
+const BACK_LABEL = "Quay lại Lịch hẹn sắp tới";
 const FINISHED_EXAMINATION_STATUSES = [EXAMINATION_STATUS.COMPLETED, EXAMINATION_STATUS.LOCKED];
 const CLOSED_STATUSES = [APPOINTMENT_STATUS.CANCELLED, APPOINTMENT_STATUS.NO_SHOW];
 const MOBILE_ACTION_CLASS = "col-span-2 min-h-11 md:min-h-0";
@@ -467,7 +467,7 @@ const AppointmentDetail = () => {
                 <Link to={ROUTES.APPOINTMENTS} aria-label={BACK_LABEL} title={BACK_LABEL} className="btn btn-secondary btn-icon">
                     <ChevronLeft aria-hidden="true" className="size-4" />
                 </Link>
-                <Breadcrumb items={[{ label: "Lịch hẹn của tôi", href: ROUTES.APPOINTMENTS }, { label: crumb }]} />
+                <Breadcrumb items={[{ label: "Lịch hẹn sắp tới", href: ROUTES.APPOINTMENTS }, { label: crumb }]} />
             </div>
             {resource.failed && !notFound && <ErrorState onRetry={retry} />}
             {detail && !notFound && (

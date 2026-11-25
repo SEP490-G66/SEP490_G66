@@ -1,13 +1,11 @@
 import api from "./api";
 import { call } from "./receptionService";
-import { addDays, getClinicToday, parseDateOnly, toDateOnly } from "../utils/format";
-import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, GUEST_BOOKING_TEXT } from "../utils/messages";
+import { getClinicToday } from "../utils/format";
+import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, GUEST_BOOKING_TEXT, RECEPTION_BOOKING_TEXT } from "../utils/messages";
 
 const READ = { skipErrorPage: true };
 
 const LIST_PARAMS = { indexes: null };
-
-const DAY_REQUESTS_AT_ONCE = 6;
 
 const PAGE_SIZE = 100;
 
@@ -106,27 +104,44 @@ export const getBookingSlots = async ({ date, doctorId, services, signal } = {})
     return result.success ? success(uniqueSlots(listOf(result.data))) : failure();
 };
 
+// The chosen services cannot be booked together (every day answers the same 400): say why instead of showing "no free slot"
+const SERVICES_ERRORS = [
+    ["different rooms", BOOKING_TEXT.SERVICES_DIFFERENT_ROOMS],
+    ["choose a variant", BOOKING_TEXT.SERVICES_INVALID],
+    ["only one variant", BOOKING_TEXT.SERVICES_INVALID],
+    ["not available for booking", BOOKING_TEXT.SERVICES_INVALID],
+    ["service not found", BOOKING_TEXT.SERVICES_INVALID],
+    ["variant not found", BOOKING_TEXT.SERVICES_INVALID],
+];
+const servicesErrorOf = (result) => {
+    const message = String(result.message ?? "").toLowerCase();
+    return SERVICES_ERRORS.find(([text]) => message.includes(text))?.[1] ?? null;
+};
+
+// Free-slot count of every day from..to in ONE request (GET api/appointments/available-days); the backend reads the
+// shifts and appointments of the whole range at once. days: [{ date, freeSlotCount, isWorkingDay, firstSlotStart }].
 export const getBookingDays = async ({ from, to, doctorId, services, signal } = {}) => {
-    const dates = [];
-    for (let date = from; date <= to; date = toDateOnly(addDays(parseDateOnly(date), 1))) dates.push(date);
-    const days = new Array(dates.length);
-    let next = 0;
-    let broken = false;
-    const worker = async () => {
-        while (next < dates.length && !broken) {
-            const index = next++;
-            const result = await loadSlots(dates[index], doctorId, services, signal);
-            if (result.aborted || result.noResponse || (result.status ?? 0) >= 500) {
-                broken = true;
-                return;
-            }
-            const slots = result.success ? uniqueSlots(listOf(result.data)) : [];
-            days[index] = { date: dates[index], freeSlotCount: slots.length, isWorkingDay: slots.length > 0, firstSlotStart: slots[0]?.slotStart ?? null };
-        }
-    };
-    await Promise.all(Array.from({ length: Math.min(DAY_REQUESTS_AT_ONCE, dates.length) }, worker));
+    const result = await call(() =>
+        api.get("/api/appointments/available-days", {
+            ...READ,
+            signal,
+            paramsSerializer: LIST_PARAMS,
+            params: { From: from, To: to, DoctorId: doctorId ?? undefined, ServiceId: services?.ServiceId, VariantId: services?.VariantId },
+        })
+    );
     if (signal?.aborted) throw abortError();
-    return broken ? failure() : success(days);
+    if (!result.success) {
+        const servicesError = servicesErrorOf(result);
+        return servicesError ? failure(BOOKING_ERROR_CODE.SERVICES_INVALID, { servicesError }) : failure();
+    }
+    return success(
+        listOf(result.data).map((day) => ({
+            date: day.date,
+            freeSlotCount: Number(day.freeSlotCount) || 0,
+            isWorkingDay: Boolean(day.isWorkingDay),
+            firstSlotStart: day.firstSlotStart ?? null,
+        }))
+    );
 };
 
 const toBooked = (appointment = {}) => ({
@@ -165,7 +180,18 @@ const toUnfinished = (rows, today) => {
     const row = rows
         .filter((item) => item.appointmentDate >= today && UNFINISHED_STATUSES.has(item.status))
         .sort((a, b) => startOf(a).localeCompare(startOf(b)))[0];
-    return row ? { id: row.id, code: row.appointmentCode, date: row.appointmentDate, slotStart: row.timeSlotStart, status: row.status } : null;
+    return row
+        ? {
+              id: row.id,
+              code: row.appointmentCode,
+              date: row.appointmentDate,
+              slotStart: row.timeSlotStart,
+              slotEnd: row.timeSlotEnd ?? null,
+              status: row.status,
+              serviceName: row.serviceName ?? "",
+              doctorName: row.doctorName ?? "",
+          }
+        : null;
 };
 
 const isProfileMissing = (result) => String(result?.message ?? "").toLowerCase().includes(NO_PROFILE);
@@ -201,4 +227,42 @@ export const PATIENT_BOOKING_API = {
     getDays: getBookingDays,
     getSlots: getBookingSlots,
     create: createPatientBooking,
+};
+
+// ----- the receptionist books for a patient (F-APT-09): confirmed at once -----
+
+const RECEPTION_ERRORS = [
+    ["not finished", BOOKING_ERROR_CODE.HAS_UNFINISHED, RECEPTION_BOOKING_TEXT.ERROR_HAS_UNFINISHED],
+    [NO_PROFILE, BOOKING_ERROR_CODE.PROFILE_NOT_FOUND, RECEPTION_BOOKING_TEXT.ERROR_PATIENT_GONE],
+];
+
+const RECEPTION_TEXTS = [
+    ["more than one patient record", RECEPTION_BOOKING_TEXT.ERROR_MULTIPLE_RECORDS],
+    ["phone number is invalid", RECEPTION_BOOKING_TEXT.ERROR_PHONE],
+    ["email is invalid", RECEPTION_BOOKING_TEXT.ERROR_EMAIL],
+    ["gender", RECEPTION_BOOKING_TEXT.ERROR_GENDER],
+    ["date of birth", RECEPTION_BOOKING_TEXT.ERROR_BIRTHDATE],
+];
+
+export const getReceptionBookingContext = async ({ signal } = {}) => {
+    const shared = await loadSharedContext(signal);
+    return shared ? success({ ...shared, patient: null, unfinished: null }) : failure();
+};
+
+// Resolves with the appointment as the API returns it: every place that opens the dialog reads its fields
+export const createReceptionBooking = async (payload) => {
+    const result = await call(() => api.post("/api/appointments/reception-booking", payload, READ));
+    if (result.success) return success(result.data);
+    const message = String(result.message ?? "").toLowerCase();
+    const known = RECEPTION_ERRORS.find(([text]) => message.includes(text));
+    if (known) return failure(known[1], { submitError: known[2] });
+    const mapped = toFailure(result, { texts: RECEPTION_TEXTS });
+    return mapped.code === BOOKING_ERROR_CODE.GENERIC ? { ...mapped, submitError: RECEPTION_BOOKING_TEXT.SUBMIT_ERROR } : mapped;
+};
+
+export const RECEPTION_BOOKING_API = {
+    getContext: getReceptionBookingContext,
+    getDays: getBookingDays,
+    getSlots: getBookingSlots,
+    create: createReceptionBooking,
 };
