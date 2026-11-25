@@ -119,7 +119,7 @@ namespace OZE.Controllers
         /// <summary>
         /// Cancels a proposed, approved or in-progress plan with a reason. Stages not done yet are cancelled.
         /// </summary>
-        [Authorize(Roles = DoctorOrReception)]
+        [Authorize(Roles = RoleConstants.DoctorRole)]
         [HttpPost("{id:long}/cancel")]
         public async Task<ActionResult<ApiResponse<TreatmentPlanProgressResponse>>> CancelAsync(
             [FromRoute] long id,
