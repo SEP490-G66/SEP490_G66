@@ -26,3 +26,9 @@ services:
       - AuthSmsSenderOptions__Sandbox=${ESMS_SANDBOX:-1}
       - AuthSmsSenderOptions__OtpTemplate=${ESMS_OTP_TEMPLATE:-}
       - AuthSmsSenderOptions__ResetPasswordOtpTemplate=${ESMS_RESET_PASSWORD_OTP_TEMPLATE:-}
+      - ImagingStorage__RootPath=/app/data/imaging
+    volumes:
+      - oze-imaging:/app/data/imaging
+
+volumes:
+  oze-imaging:

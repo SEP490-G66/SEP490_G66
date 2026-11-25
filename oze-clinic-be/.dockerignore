@@ -1,6 +1,7 @@
 **/.git
 **/.github
 **/.vs
+**/.vs_old
 **/.vscode
 **/bin
 **/obj
@@ -8,7 +9,24 @@
 **/*.suo
 **/*.db
 **/*.log
-.env
 Dockerfile*
 docker-compose*.yml
 README.md
+docs/
+
+# Tests are not part of the deployed image
+OZE.UnitTest/
+OZE.ProjectBase/
+
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+**/appsettings.Development.json
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.crt
+
+# Files uploaded while running locally
+**/App_Data
