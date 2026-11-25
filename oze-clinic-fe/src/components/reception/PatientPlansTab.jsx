@@ -1,9 +1,9 @@
 import { Badge, EmptyState } from "./shared";
 import { dmy, money } from "./receptionUtils";
 import { PATIENT_RECORD_TEXT as TEXT } from "@/utils/messages";
-import { PLAN_STATUS, planApproveButtonId } from "@/utils/patientRecord";
+import { PLAN_STATUS } from "@/utils/patientRecord";
 
-const PatientPlansTab = ({ items, onApprove }) => {
+const PatientPlansTab = ({ items }) => {
     const plans = items.filter((p) => p.status !== "Draft");
     if (plans.length === 0) return <EmptyState text={TEXT.PLAN_EMPTY} />;
     return (
@@ -30,13 +30,6 @@ const PatientPlansTab = ({ items, onApprove }) => {
                             <p className="mt-1 text-caption text-muted">
                                 {TEXT.PLAN_NEXT(plan.nextStageName, plan.nextStageScheduledDate ? dmy(String(plan.nextStageScheduledDate).slice(0, 10)) : null)}
                             </p>
-                        )}
-                        {plan.status === "Proposed" && (
-                            <div className="mt-3 flex justify-end">
-                                <button id={planApproveButtonId(plan.id)} type="button" className="btn btn-primary h-9" onClick={() => onApprove(plan)}>
-                                    {TEXT.APPROVE}
-                                </button>
-                            </div>
                         )}
                     </li>
                 );

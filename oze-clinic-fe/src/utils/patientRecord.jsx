@@ -321,5 +321,3 @@ export const walkInName = (name) => {
     }
     return out;
 };
-
-export const planApproveButtonId = (planId) => `pr-plan-approve-${planId}`;

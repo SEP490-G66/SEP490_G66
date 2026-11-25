@@ -8,7 +8,6 @@ import PatientInfoTab from "@/components/reception/PatientInfoTab";
 import PatientInvoicesTab from "@/components/reception/PatientInvoicesTab";
 import PatientPlansTab from "@/components/reception/PatientPlansTab";
 import PatientSummaryCard from "@/components/reception/PatientSummaryCard";
-import PlanApproveDialog from "@/components/reception/PlanApproveDialog";
 import WalkInMismatchDialog from "@/components/reception/WalkInMismatchDialog";
 import { Card, EmptyState, WalkInDialog } from "@/components/reception/shared";
 import { clinicClock, ddmm, hhmm, money } from "@/components/reception/receptionUtils";
@@ -32,7 +31,6 @@ import {
     checkInTimeText,
     invoiceLabels,
     onDutyDoctors,
-    planApproveButtonId,
     readPatientId,
     readTab,
     safeListSearch,
@@ -385,14 +383,6 @@ const ReceptionPatientDetail = () => {
         setReload((n) => n + 1);
     };
 
-    const onPlanResolved = useCallback(() => {
-        const current = latest.current.dialog;
-        if (current?.type === "plan") pendingFocus.current = { key: current.key, target: planApproveButtonId(current.plan.id), waitTab: true };
-        setDialog(null);
-        session.close();
-        setSeq((s) => ({ ...s, [TABS.PLANS]: s[TABS.PLANS] + 1 }));
-    }, [session]);
-
     const listHref = `${ROUTES.RECEPTION_PATIENTS}${safeListSearch(location.state?.listSearch)}`;
     const crumbs = [{ label: TEXT.TITLE, href: listHref }, { label: patient?.fullName ?? (notFound ? TEXT.NOT_FOUND : TEXT.LOADING) }];
 
@@ -492,7 +482,7 @@ const ReceptionPatientDetail = () => {
                                 </button>
                             </div>
                         ) : tab === TABS.PLANS ? (
-                            <PatientPlansTab items={currentTab.items} onApprove={(plan) => openDialog("plan", { plan })} />
+                            <PatientPlansTab items={currentTab.items} />
                         ) : tab === TABS.APPOINTMENTS ? (
                             <Card>
                                 <PatientAppointmentsTab items={currentTab.items} hasMore={currentTab.hasMore} more={more[tab] ?? {}} onMore={loadMore} />
@@ -527,14 +517,6 @@ const ReceptionPatientDetail = () => {
                     onPatientGone={onPatientGone}
                     readConfig={BOOKING_READ}
                     writeConfig={BOOKING_WRITE}
-                />
-            )}
-            {patient && shownDialog?.type === "plan" && (
-                <PlanApproveDialog
-                    plan={shownDialog.plan}
-                    owner={shownDialog.owner}
-                    onClose={() => closeDialog({ target: planApproveButtonId(shownDialog.plan.id) })}
-                    onResolved={onPlanResolved}
                 />
             )}
             {shownDialog?.type === "mismatch" && (
