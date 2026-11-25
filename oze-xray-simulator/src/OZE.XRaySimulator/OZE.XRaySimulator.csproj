@@ -13,8 +13,14 @@
   </ItemGroup>
 
   <!-- Sample X-ray pictures ship with the app so a deployed simulator returns the same films as a local one -->
-  <ItemGroup>
-    <None Update="Assets\**\*.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-  </ItemGroup>
+<ItemGroup>
+  <None Update="Assets\**\*.png"
+        CopyToOutputDirectory="PreserveNewest"
+        CopyToPublishDirectory="PreserveNewest" />
+
+  <None Update="Assets\**\manifest.json"
+        CopyToOutputDirectory="PreserveNewest"
+        CopyToPublishDirectory="PreserveNewest" />
+</ItemGroup>
 
 </Project>

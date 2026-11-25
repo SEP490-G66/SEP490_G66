@@ -4,21 +4,19 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy solution and project file
-COPY OZE.XRaySimulator.sln ./
 COPY src/OZE.XRaySimulator/OZE.XRaySimulator.csproj src/OZE.XRaySimulator/
-COPY tools/MockWebhookReceiver/MockWebhookReceiver.csproj tools/MockWebhookReceiver/
-COPY tests/OZE.XRaySimulator.Tests/OZE.XRaySimulator.Tests.csproj tests/OZE.XRaySimulator.Tests/
 
-# Restore dependencies
-RUN dotnet restore OZE.XRaySimulator.sln
+RUN dotnet restore src/OZE.XRaySimulator/OZE.XRaySimulator.csproj
 
-# Copy the remaining project source files
-COPY . .
+COPY src/OZE.XRaySimulator/ src/OZE.XRaySimulator/
 
-# Build and publish Web API
 WORKDIR /src/src/OZE.XRaySimulator
-RUN dotnet publish OZE.XRaySimulator.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+RUN dotnet publish OZE.XRaySimulator.csproj \
+    -c Release \
+    -o /app/publish \
+    --no-restore \
+    /p:UseAppHost=false
 
 # =======================================================
 # Stage 2: Runtime Image (ASP.NET Core 10 Runtime)
@@ -26,14 +24,21 @@ RUN dotnet publish OZE.XRaySimulator.csproj -c Release -o /app/publish /p:UseApp
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-USER app
+# Install curl for health checks
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
+
+ENV ASPNETCORE_HTTP_PORTS=8080
 
 COPY --from=build /app/publish .
 
-HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+# Ensure sample image storage is writable
+RUN mkdir -p /app/Assets/Samples \
+    && chown -R app:app /app/Assets
+
+USER app
 
 ENTRYPOINT ["dotnet", "OZE.XRaySimulator.dll"]

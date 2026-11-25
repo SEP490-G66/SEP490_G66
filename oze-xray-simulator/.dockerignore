@@ -1,0 +1,45 @@
+
+# Git
+**/.git
+**/.github
+
+# IDE
+**/.vs
+**/.vs_old
+**/.vscode
+**/.idea
+**/*.user
+**/*.suo
+
+# Build artifacts
+**/bin
+**/obj
+**/TestResults
+
+# Projects not required for deployment
+tests/
+tools/
+
+# Local databases and logs
+**/*.db
+**/*.log
+
+# Environment files and secrets
+**/.env
+**/.env.*
+**/secrets.json
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.crt
+**/appsettings.Development.json
+**/appsettings.Local.json
+
+# Docker configuration
+Dockerfile*
+docker-compose*.yml
+docker-compose*.yaml
+
+# Documentation
+README.md
+docs/
