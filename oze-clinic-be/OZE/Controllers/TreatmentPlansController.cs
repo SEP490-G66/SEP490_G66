@@ -104,9 +104,9 @@ namespace OZE.Controllers
         }
 
         /// <summary>
-        /// Proposed -> Approved: records that the patient agreed. Done by the doctor or by reception.
+        /// Proposed -> Approved: the doctor records that the patient agreed after discussing the plan.
         /// </summary>
-        [Authorize(Roles = DoctorOrReception)]
+        [Authorize(Roles = RoleConstants.DoctorRole)]
         [HttpPost("{id:long}/approve")]
         public async Task<ActionResult<ApiResponse<TreatmentPlanProgressResponse>>> ApproveAsync(
             [FromRoute] long id,
