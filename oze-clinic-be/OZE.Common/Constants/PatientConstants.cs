@@ -70,6 +70,8 @@ namespace OZE.Common.Constants
             public static readonly string[] AllowedRecordTypes = { "History", "Condition", "Allergy", "Medication" };
             public static readonly string[] AllowedSeverities = { "Mild", "Moderate", "Severe" };
             public static readonly string[] AllowedStatuses = { "Active", "Resolved", "Discontinued" };
+            public const string AllergyType = "Allergy";
+            public const string ActiveStatus = "Active";
 
             public static bool TryNormalizeRecordType(string? recordType, out string? normalized)
             {

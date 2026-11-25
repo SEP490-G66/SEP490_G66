@@ -16,6 +16,10 @@ namespace OZE.Common.Models
         public long ShiftId { get; set; }
         public int? RoomId { get; set; }
         public string? RoomName { get; set; }
+        // Kind of the shift's room (RoomConstants); a booking only goes to a doctor in the kind of room its services need
+        public string? RoomType { get; set; }
+        // Patients checked in with this doctor today and not examined yet
+        public int WaitingCount { get; set; }
         public TimeOnly ShiftStart { get; set; }
         public TimeOnly ShiftEnd { get; set; }
         public TimeOnly? ActualStartTime { get; set; }

@@ -60,6 +60,16 @@ const fromLegacy = (session) => [
         cashAmount: String(p.paymentMethod ?? "").toUpperCase() === "CASH" ? p.amount : 0,
         transferAmount: String(p.paymentMethod ?? "").toUpperCase() === "CASH" ? 0 : p.amount,
     })),
+    // Approved refunds paid out in cash from this drawer
+    ...(session.refunds ?? []).map((r) => ({
+        id: `r${r.refundRequestId}`,
+        occurredAt: r.paidOutAt,
+        code: r.invoiceNumber,
+        kind: "Refund",
+        description: r.patientName,
+        cashAmount: r.amount,
+        transferAmount: 0,
+    })),
 ];
 
 // Amounts are kept positive: the kind gives the direction, so a refund the API already sends as negative is not flipped twice.

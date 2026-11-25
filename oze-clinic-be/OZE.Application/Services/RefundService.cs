@@ -306,6 +306,8 @@ namespace OZE.Application.Services
                 var now = DateTimeOffset.UtcNow;
                 refundRequest.Status = PaymentConstants.RefundRequestStatus.Processed;
                 refundRequest.ProcessedAt = now;
+                // So the cash paid out is counted in this receptionist's cash session
+                refundRequest.ProcessedByUserId = string.IsNullOrWhiteSpace(paidOutByUserId) ? null : paidOutByUserId;
                 refundRequest.UpdatedAt = now;
 
                 var invoice = refundRequest.Invoice;

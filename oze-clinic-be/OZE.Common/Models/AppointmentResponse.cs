@@ -13,6 +13,8 @@ namespace OZE.Common.Models
         public string PatientPhoneNumber { get; set; } = string.Empty;
         public int? DoctorId { get; set; }
         public string? DoctorName { get; set; }
+        // The kind of room the services need (RoomTypeConstants); only a doctor with a shift in such a room can take the patient
+        public string RequiredRoomType { get; set; } = string.Empty;
         // Kept for the current frontend: the first service of the appointment
         public int ServiceId { get; set; }
         public string ServiceName { get; set; } = string.Empty;

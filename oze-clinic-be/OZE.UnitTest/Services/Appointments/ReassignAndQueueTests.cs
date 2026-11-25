@@ -29,7 +29,7 @@ namespace OZE.UnitTest.Services.Appointments
             _appointmentRepoMock.Setup(r => r.HasEndedShiftAsync(11, Today)).ReturnsAsync(false);
         }
 
-        private static ReassignDoctorRequest To(int doctorId) => new() { DoctorId = doctorId };
+        private static ReassignDoctorRequest To(int doctorId) => new() { DoctorId = doctorId, Reason = "Bac si ban dau co viec dot xuat" };
 
         // UTCID01 (N): a waiting patient moves to another doctor who has a shift now, into that doctor's room
         [Fact]

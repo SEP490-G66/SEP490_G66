@@ -23,6 +23,8 @@ namespace OZE.Application.Interfaces
         Task<bool> HasRunningShiftInRoomAsync(int roomId, DateOnly scheduleDate, long excludeShiftId);
         // Shifts of active doctors on that day, with staff profile and room
         Task<List<StaffSchedule>> GetDoctorShiftsOnDateAsync(DateOnly date);
+        // Doctor (StaffProfile id) -> patients checked in on that day and not examined yet
+        Task<Dictionary<int, int>> CountWaitingByDoctorAsync(DateOnly date, CancellationToken cancellationToken = default);
         void Update(StaffSchedule schedule);
         void Remove(StaffSchedule schedule);
     }

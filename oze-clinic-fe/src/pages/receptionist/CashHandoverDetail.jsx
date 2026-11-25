@@ -11,7 +11,7 @@ import ShiftTransactions from "@/components/handover/ShiftTransactions";
 import { Card } from "@/components/reception/shared";
 import { clinicClock, report } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { closeCashSession, getCashSession, getCurrentCashSession } from "@/services/cashSessionService";
+import { CLOSE_CONFLICT, closeCashSession, getCashSession, getCurrentCashSession } from "@/services/cashSessionService";
 import { clinicToday } from "@/services/receptionService";
 import { getMyShifts } from "@/services/myScheduleService";
 import { dmy, weekdayIndex } from "@/utils/calendar";
@@ -180,7 +180,7 @@ const CashHandoverDetail = () => {
                         onPrint={printSlip}
                     />
                 )}
-                <ShiftCashFlow className="min-w-0" net={summary.net} reconLink={reconLink} />
+                <ShiftCashFlow className="min-w-0" net={summary.net} refunded={summary.rows.Refund.cash} reconLink={reconLink} />
             </div>
             <ShiftTransactions transactions={transactions} />
             {closing && (
@@ -211,10 +211,13 @@ const CashHandoverDetail = () => {
                             toast.warning(TEXT.FIGURES_CHANGED);
                             return done();
                         }
-                        const closed = report(
-                            await closeCashSession({ ...closing.values, sessionId: session.id, expectedCash: system.cash, expectedTransfer: system.transfer }, READ),
-                            TEXT.CLOSED_TOAST(label, clinicClock()),
-                        );
+                        const result = await closeCashSession({ ...closing.values, sessionId: session.id, expectedCash: system.cash, expectedTransfer: system.transfer }, READ);
+                        // Refused because the session or its figures changed meanwhile: reload and count again
+                        if (result.code === CLOSE_CONFLICT.SESSION_CHANGED || result.code === CLOSE_CONFLICT.FIGURES_CHANGED) {
+                            toast.warning(result.code === CLOSE_CONFLICT.SESSION_CHANGED ? TEXT.SESSION_CHANGED : TEXT.FIGURES_CHANGED);
+                            return done();
+                        }
+                        const closed = report(result, TEXT.CLOSED_TOAST(label, clinicClock()));
                         if (closed && closing.print) printAfterReload.current = true;
                         done();
                     }}

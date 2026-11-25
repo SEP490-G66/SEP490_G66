@@ -6,10 +6,23 @@ namespace OZE.Common.Exceptions
     {
         public HttpStatusCode StatusCode { get; }
 
-        public AppException(string message, HttpStatusCode statusCode = HttpStatusCode.BadRequest) 
+        // Stable machine-readable code the client can branch on (sent as "code" in the error response)
+        public string? Code { get; }
+
+        public AppException(string message, HttpStatusCode statusCode = HttpStatusCode.BadRequest, string? code = null)
             : base(message)
         {
             StatusCode = statusCode;
+            Code = code;
+        }
+    }
+
+    // The data changed since the client read it; the client reloads and tries again
+    public class ConflictException : AppException
+    {
+        public ConflictException(string message, string? code = null)
+            : base(message, HttpStatusCode.Conflict, code)
+        {
         }
     }
 

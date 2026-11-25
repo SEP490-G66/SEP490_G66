@@ -47,6 +47,11 @@ namespace OZE.Persistence.Configurations
                    .HasForeignKey(x => x.ApprovedByUserId)
                    .HasConstraintName("FK_RefundAdjustments_ApprovedBy")
                    .OnDelete(DeleteBehavior.NoAction);
+            builder.HasOne<ApplicationUser>()
+                   .WithMany()
+                   .HasForeignKey(x => x.ProcessedByUserId)
+                   .HasConstraintName("FK_RefundAdjustments_ProcessedBy")
+                   .OnDelete(DeleteBehavior.NoAction);
 
             builder.HasIndex(x => x.InvoiceId).HasDatabaseName("IX_RefundAdjustments_InvoiceId");
             builder.HasIndex(x => x.Status)

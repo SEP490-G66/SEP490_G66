@@ -13,6 +13,9 @@ namespace OZE.Application.Interfaces
         Task<CashSessionResponse> CloseAsync(string userId, CloseCashSessionRequest request, CancellationToken cancellationToken = default);
         Task<List<StaffOption>> GetHandoverCandidatesAsync(string userId, CancellationToken cancellationToken = default);
 
+        // The shift the receptionist is about to open; NotFoundException when no session was closed earlier today
+        Task<NextCashShiftResponse> GetNextShiftAsync(string userId, CancellationToken cancellationToken = default);
+
         Task<CashSessionResponse> GetByIdAsync(string userId, bool isManager, long id, CancellationToken cancellationToken = default);
         Task<PagedResult<CashSessionSummaryResponse>> GetPagedAsync(string userId, bool isManager, CashSessionQuery query, CancellationToken cancellationToken = default);
     }

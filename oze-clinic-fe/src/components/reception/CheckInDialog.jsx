@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import { DialogActions } from "./shared";
 import { clinicClock, useSubmit } from "./receptionUtils";
+import { fitsRoomTypes } from "@/utils/constants/room";
 import { allergiesOf, serviceNames, slotOf } from "@/utils/checkIn";
 import { CHECK_IN_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
@@ -17,9 +18,12 @@ const CheckInDialog = ({ appointment: a, doctors = [], waiting = [], onClose, on
     const now = clinicClock();
     const own = doctors.find((d) => d.id === a.doctorId);
     const counted = Array.isArray(waiting);
-    const waitingOf = (id) => (counted ? waiting.filter((w) => w.doctorId === id).length : null);
-    const working = doctors.filter((d) => d.id !== a.doctorId && d.status === "Working").sort((x, y) => (waitingOf(x.id) ?? 0) - (waitingOf(y.id) ?? 0));
-    const later = doctors.filter((d) => d.id !== a.doctorId && d.status === "NotStarted" && (!d.end || d.end > now)).sort((x, y) => (x.start ?? "").localeCompare(y.start ?? ""));
+    // Without the waiting list, the count the backend gives with the doctors on duty
+    const waitingOf = (id) => (counted ? waiting.filter((w) => w.doctorId === id).length : (doctors.find((d) => d.id === id)?.waiting ?? null));
+    // Only doctors with a shift in the kind of room the services need (the backend refuses any other)
+    const suitable = doctors.filter((d) => fitsRoomTypes(d.roomTypes, a.requiredRoomType));
+    const working = suitable.filter((d) => d.id !== a.doctorId && d.status === "Working").sort((x, y) => (waitingOf(x.id) ?? 0) - (waitingOf(y.id) ?? 0));
+    const later = suitable.filter((d) => d.id !== a.doctorId && d.status === "NotStarted" && (!d.end || d.end > now)).sort((x, y) => (x.start ?? "").localeCompare(y.start ?? ""));
     const others = [...working, ...later];
     const [choice, setChoice] = useState(others.length ? "other" : "reschedule");
     const [picked, setPicked] = useState(null);
