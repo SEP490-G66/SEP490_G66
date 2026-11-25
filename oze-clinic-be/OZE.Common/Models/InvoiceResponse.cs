@@ -6,6 +6,7 @@ namespace OZE.Common.Models
         public string InvoiceNumber { get; set; } = string.Empty;
         public int PatientId { get; set; }
         public string? PatientName { get; set; }
+        public string? PatientPhoneNumber { get; set; }
         public long? AppointmentId { get; set; }
         public long? TreatmentPlanId { get; set; }
         public decimal TotalAmount { get; set; }
@@ -14,6 +15,8 @@ namespace OZE.Common.Models
         public decimal PaidAmount { get; set; }
         public decimal RemainingAmount { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
+        public decimal CollectedAmount { get; set; }
+        public string CollectionStatus { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? CancelledAt { get; set; }
     }
@@ -32,6 +35,8 @@ namespace OZE.Common.Models
         public decimal PaidAmount { get; set; }
         public decimal RemainingAmount { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
+        public decimal CollectedAmount { get; set; }
+        public string CollectionStatus { get; set; } = string.Empty;
         public string? Notes { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public string? CreatedByUserId { get; set; }
@@ -61,6 +66,8 @@ namespace OZE.Common.Models
         public string PaymentStatus { get; set; } = string.Empty;
         public string Purpose { get; set; } = string.Empty;
         public string? TransactionReference { get; set; }
+        // Set when the payment is a line of a cashier receipt (confirmed on the cashier screen, not here)
+        public string? ReceiptCode { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? PaidAt { get; set; }
     }

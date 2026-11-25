@@ -14,17 +14,20 @@ namespace OZE.Application.Services
         private readonly IInvoiceRepository _invoiceRepository;
         private readonly IAuditLogService _auditLogService;
         private readonly INotificationService? _notifications;
+        private readonly ICashSessionRepository? _cashSessions;
 
         public PaymentService(
             IPaymentRepository paymentRepository,
             IInvoiceRepository invoiceRepository,
             IAuditLogService auditLogService,
-            INotificationService? notifications = null)
+            INotificationService? notifications = null,
+            ICashSessionRepository? cashSessions = null)
         {
             _paymentRepository = paymentRepository;
             _invoiceRepository = invoiceRepository;
             _auditLogService = auditLogService;
             _notifications = notifications;
+            _cashSessions = cashSessions;
         }
 
         public Task<PaymentResponse> RecordAsync(
@@ -126,10 +129,18 @@ namespace OZE.Application.Services
         {
             return _paymentRepository.ExecuteInTransactionAsync(async () =>
             {
+                if (_cashSessions != null)
+                {
+                    var session = await _cashSessions.GetOpenByUserAsync(confirmedByUserId, cancellationToken);
+                    ConditionGuard.Ensure(session != null, ErrorConstants.CashSessionMessage.NoOpenSession);
+                }
+
                 var payment = await _paymentRepository.GetByIdWithInvoiceAsync(paymentId, cancellationToken);
                 ConditionGuard.Ensure<NotFoundException>(payment != null, ErrorConstants.PaymentMessage.PaymentNotFound);
+                // A line of a cashier receipt is confirmed with the whole receipt on the cashier screen
+                ConditionGuard.ThrowIf(payment!.ReceiptCode != null, ErrorConstants.PaymentMessage.ConfirmAtCashier);
 
-                var invoice = payment!.Invoice;
+                var invoice = payment.Invoice;
                 EnsureInvoicePayable(invoice);
 
                 ConditionGuard.Ensure(

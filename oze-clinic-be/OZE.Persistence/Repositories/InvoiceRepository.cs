@@ -87,7 +87,23 @@ namespace OZE.Persistence.Repositories
             var query = _context.Invoices
                 .AsNoTracking()
                 .Include(x => x.Patient)
+                .Include(x => x.Payments)
                 .AsQueryable();
+
+            var collection = parameters.Collection?.Trim().ToLowerInvariant();
+            if (!string.IsNullOrEmpty(collection))
+            {
+                query = query.Where(x => x.PaymentStatus != InvoiceConstants.Cancelled
+                    && x.Payments.Any(p => p.PaymentStatus == PaymentConstants.Confirmed && p.Amount > 0));
+                if (collection == InvoiceConstants.Collection.Paid)
+                {
+                    query = query.Where(x => x.Payments.Where(p => p.PaymentStatus == PaymentConstants.Confirmed).Sum(p => p.Amount) >= x.FinalAmount);
+                }
+                else if (collection == InvoiceConstants.Collection.Partial)
+                {
+                    query = query.Where(x => x.Payments.Where(p => p.PaymentStatus == PaymentConstants.Confirmed).Sum(p => p.Amount) < x.FinalAmount);
+                }
+            }
 
             if (parameters.PatientId.HasValue)
             {
@@ -127,11 +143,14 @@ namespace OZE.Persistence.Repositories
             if (!string.IsNullOrWhiteSpace(parameters.SearchKeyword))
             {
                 var keyword = parameters.SearchKeyword.Trim();
+                var (phoneLocal, phoneInternational) = PhoneKeys(keyword);
                 query = query.Where(x => x.InvoiceNumber.Contains(keyword)
                     || (x.Notes != null && x.Notes.Contains(keyword))
                     || (x.Patient != null && (x.Patient.FullName.Contains(keyword)
                         || x.Patient.PatientCode.Contains(keyword)
-                        || (x.Patient.PhoneNumber != null && x.Patient.PhoneNumber.Contains(keyword)))));
+                        || (x.Patient.PhoneNumber != null && (x.Patient.PhoneNumber.Contains(keyword)
+                            || x.Patient.PhoneNumber.Contains(phoneLocal)
+                            || x.Patient.PhoneNumber.Contains(phoneInternational))))));
             }
 
             var totalCount = await query.CountAsync(cancellationToken);
@@ -169,6 +188,30 @@ namespace OZE.Persistence.Repositories
                 .ToListAsync(cancellationToken);
 
             return new PagedResult<Invoice>(items, totalCount, parameters.PageNumber, parameters.PageSize);
+        }
+
+        // A phone typed as 0..., +84... or 84... (spaces, dots, dashes allowed) matches a number stored as +84... or 0...,
+        // like CashierService.MatchesSearch; anything else is searched as typed
+        private static (string Local, string International) PhoneKeys(string keyword)
+        {
+            var compact = new string(keyword.Where(c => !char.IsWhiteSpace(c) && c != '.' && c != '-').ToArray());
+            var digits = compact.StartsWith('+') ? compact[1..] : compact;
+            if (digits.Length == 0 || !digits.All(char.IsDigit))
+            {
+                return (keyword, keyword);
+            }
+
+            if (digits.StartsWith("84", StringComparison.Ordinal))
+            {
+                return ("0" + digits[2..], digits);
+            }
+
+            if (digits.StartsWith('0'))
+            {
+                return (digits, "84" + digits[1..]);
+            }
+
+            return (digits, digits);
         }
 
         public async Task<IReadOnlyList<Invoice>> GetByPatientAsync(

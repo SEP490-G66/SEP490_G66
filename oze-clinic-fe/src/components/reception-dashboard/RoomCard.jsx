@@ -4,10 +4,11 @@ import { ROUTES } from "@/utils/routes";
 import { cx } from "@/utils/cx";
 
 // room: from queueBoard rooms; rows: ordered rows of that room; later: today's appointments still to come for an ended doctor
-const RoomCard = ({ room, rows, later, onCall, onMoveAll }) => {
+const RoomCard = ({ room, rows, later, canMove, onMoveAll }) => {
     const serving = rows.find((r) => r.state === "serving");
     const waiting = rows.filter((r) => r.state !== "serving");
     const next = waiting[0];
+    const movable = waiting.filter(canMove);
     const alert = room.ended && (waiting.length > 0 || later > 0);
     return (
         <li
@@ -51,18 +52,11 @@ const RoomCard = ({ room, rows, later, onCall, onMoveAll }) => {
                 {room.ended && later > 0 && <span className="text-danger">{TEXT.ROOM_LATER(later)}</span>}
             </div>
             <div className="mt-1 flex items-center gap-2">
-                {room.ended
-                    ? waiting.length > 0 && (
-                          <button type="button" className="btn btn-primary h-8 px-3" onClick={() => onMoveAll(room, waiting)}>
-                              {TEXT.MOVE_DOCTOR}
-                          </button>
-                      )
-                    : !room.off &&
-                      next && (
-                          <button type="button" className="btn btn-secondary h-8 px-3" onClick={() => onCall(room, next)}>
-                              {next.state === "called" ? TEXT.CALL_AGAIN : TEXT.CALL_NEXT}
-                          </button>
-                      )}
+                {room.ended && movable.length > 0 && (
+                    <button type="button" className="btn btn-primary h-8 px-3" onClick={() => onMoveAll(room, movable)}>
+                        {TEXT.MOVE_DOCTOR}
+                    </button>
+                )}
                 <Link to={ROUTES.RECEPTION_QUEUE} state={{ tab: room.tab, room: room.key }} className="ml-auto text-label font-semibold text-primary hover:underline">
                     {TEXT.VIEW}
                 </Link>

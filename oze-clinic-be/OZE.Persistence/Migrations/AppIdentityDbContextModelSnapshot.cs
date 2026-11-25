@@ -2079,6 +2079,10 @@ namespace OZE.Persistence.Migrations
                         .HasColumnType("datetimeoffset")
                         .HasDefaultValueSql("SYSDATETIMEOFFSET()");
 
+                    b.Property<string>("CreatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<long?>("InstallmentPeriodId")
                         .HasColumnType("bigint");
 
@@ -2111,9 +2115,16 @@ namespace OZE.Persistence.Migrations
                         .HasColumnType("nvarchar(20)")
                         .HasDefaultValue("Regular");
 
+                    b.Property<string>("ReceiptCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("TransactionReference")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<long?>("TreatmentPlanStageId")
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
@@ -2125,10 +2136,18 @@ namespace OZE.Persistence.Migrations
                     b.HasIndex("InvoiceId")
                         .HasDatabaseName("IX_Payments_InvoiceId");
 
+                    b.HasIndex("ReceiptCode")
+                        .HasDatabaseName("IX_Payments_ReceiptCode")
+                        .HasFilter("[ReceiptCode] IS NOT NULL");
+
                     b.HasIndex("TransactionReference")
                         .IsUnique()
                         .HasDatabaseName("IX_Payments_TransactionReference")
                         .HasFilter("[TransactionReference] IS NOT NULL");
+
+                    b.HasIndex("TreatmentPlanStageId")
+                        .HasDatabaseName("IX_Payments_TreatmentPlanStageId")
+                        .HasFilter("[TreatmentPlanStageId] IS NOT NULL");
 
                     b.ToTable("Payments", null, t =>
                         {
@@ -2932,6 +2951,10 @@ namespace OZE.Persistence.Migrations
                     b.Property<int>("CreatedByDoctorId")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("DepositRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
@@ -2946,6 +2969,17 @@ namespace OZE.Persistence.Migrations
 
                     b.Property<int>("PatientId")
                         .HasColumnType("int");
+
+                    b.Property<string>("PaymentOption")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("PaymentOptionChosenAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PaymentOptionChosenByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("PlanName")
                         .HasMaxLength(200)
@@ -2988,7 +3022,11 @@ namespace OZE.Persistence.Migrations
 
                     b.ToTable("TreatmentPlans", null, t =>
                         {
+                            t.HasCheckConstraint("CK_TreatmentPlans_DepositRate", "[DepositRate] IS NULL OR ([DepositRate] >= 0 AND [DepositRate] <= 100)");
+
                             t.HasCheckConstraint("CK_TreatmentPlans_EstimatedTotalCost", "[EstimatedTotalCost] >= 0");
+
+                            t.HasCheckConstraint("CK_TreatmentPlans_PaymentOption", "[PaymentOption] IS NULL OR [PaymentOption] IN ('FULL', 'PERIODS', 'DEPOSIT')");
 
                             t.HasCheckConstraint("CK_TreatmentPlans_Status", "[Status] IN ('Draft', 'Proposed', 'Approved', 'InProgress', 'Completed', 'Cancelled', 'Superseded')");
                         });
@@ -3008,6 +3046,9 @@ namespace OZE.Persistence.Migrations
 
                     b.Property<DateOnly?>("ActualDate")
                         .HasColumnType("date");
+
+                    b.Property<long?>("AppointmentId")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("datetimeoffset");
@@ -3059,6 +3100,10 @@ namespace OZE.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId")
+                        .HasDatabaseName("IX_TreatmentPlanStages_AppointmentId")
+                        .HasFilter("[AppointmentId] IS NOT NULL");
 
                     b.HasIndex("ScheduledDate")
                         .HasDatabaseName("IX_TreatmentPlanStages_ScheduledDate")
@@ -3742,6 +3787,12 @@ namespace OZE.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_Payments_ConfirmedBy");
 
+                    b.HasOne("OZE.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_Payments_CreatedBy");
+
                     b.HasOne("OZE.Domain.Entities.InstallmentPeriod", "InstallmentPeriod")
                         .WithMany()
                         .HasForeignKey("InstallmentPeriodId")
@@ -3755,9 +3806,17 @@ namespace OZE.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Payments_Invoices");
 
+                    b.HasOne("OZE.Domain.Entities.TreatmentPlanStage", "TreatmentPlanStage")
+                        .WithMany()
+                        .HasForeignKey("TreatmentPlanStageId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_Payments_TreatmentPlanStages");
+
                     b.Navigation("InstallmentPeriod");
 
                     b.Navigation("Invoice");
+
+                    b.Navigation("TreatmentPlanStage");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.PaymentReminder", b =>
@@ -3968,6 +4027,12 @@ namespace OZE.Persistence.Migrations
 
             modelBuilder.Entity("OZE.Domain.Entities.TreatmentPlanStage", b =>
                 {
+                    b.HasOne("OZE.Domain.Entities.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TreatmentPlanStages_Appointments");
+
                     b.HasOne("OZE.Domain.Entities.StaffProfile", "PerformedByDoctor")
                         .WithMany()
                         .HasForeignKey("PerformedByDoctorId")
@@ -3986,6 +4051,8 @@ namespace OZE.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("FK_TreatmentPlanStages_Plans");
+
+                    b.Navigation("Appointment");
 
                     b.Navigation("PerformedByDoctor");
 

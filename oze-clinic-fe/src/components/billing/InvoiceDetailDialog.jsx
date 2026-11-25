@@ -1,20 +1,17 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import Modal from "@/components/ui/Modal";
-import ConfirmActionDialog from "./ConfirmActionDialog";
 import ItemsTable from "./ItemsTable";
-import { clockOf, money, report } from "@/components/reception/receptionUtils";
-import { cancelInvoice, getInvoice } from "@/services/receptionService";
+import { clockOf, money } from "@/components/reception/receptionUtils";
+import { getInvoice } from "@/services/receptionService";
 import { invoiceItems } from "@/utils/billing";
 import { ddmm, dmy } from "@/utils/calendar";
 import { dateKey } from "@/utils/cashShift";
 import { BILLING_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
-const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
+const InvoiceDetailDialog = ({ invoiceId, onClose }) => {
     const [state, setState] = useState(null);
-    const [cancelling, setCancelling] = useState(false);
-    const [version, setVersion] = useState(0);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -22,45 +19,14 @@ const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
             if (!controller.signal.aborted && !response.aborted) setState(response);
         });
         return () => controller.abort();
-    }, [invoiceId, version]);
+    }, [invoiceId]);
 
     const invoice = state?.success ? state.data : null;
     const payments = invoice?.payments ?? [];
-    const paid = Number(invoice?.paidAmount ?? 0);
+    const paid = Number(invoice?.collectedAmount ?? 0);
     const waiting = payments.filter((p) => p.paymentStatus === "PENDING").reduce((s, p) => s + Number(p.amount), 0);
-    // Only an invoice nothing was paid on, nothing is waiting on and nothing was refunded on can be cancelled.
-    const canCancel =
-        invoice &&
-        !["CANCELLED", "PENDING_CONFIRMATION", "PARTIALLY_REFUNDED", "REFUNDED"].includes(invoice.paymentStatus) &&
-        !invoice.pendingPayment &&
-        !paid &&
-        !waiting;
-    const [label, tone] = TEXT.INVOICE_STATUS[invoice?.paymentStatus] ?? [invoice?.paymentStatus ?? "—", "badge-neutral"];
-    const remaining = Number(invoice?.remainingAmount ?? 0);
-
-    if (cancelling && invoice) {
-        return (
-            <ConfirmActionDialog
-                title={TEXT.CANCEL_INVOICE_TITLE}
-                description={invoice.invoiceNumber}
-                body={TEXT.CANCEL_INVOICE_BODY(invoice.patientName)}
-                closeLabel={TEXT.KEEP_INVOICE}
-                submitLabel={TEXT.CANCEL_INVOICE}
-                danger
-                reasonLabel={TEXT.CANCEL_REASON}
-                reasonPlaceholder={TEXT.CANCEL_REASON_PLACEHOLDER}
-                onClose={() => setCancelling(false)}
-                onSubmit={async (reason) => {
-                    const ok = report(await cancelInvoice(invoice.id, reason), TEXT.CANCELLED_INVOICE(invoice.invoiceNumber));
-                    onChanged();
-                    if (ok) return onClose();
-                    // It may have been paid or changed meanwhile: show it as it is now.
-                    setCancelling(false);
-                    setVersion((v) => v + 1);
-                }}
-            />
-        );
-    }
+    const [label, tone] = TEXT.INVOICE_STATUS[invoice?.collectionStatus] ?? [invoice?.collectionStatus ?? "—", "badge-neutral"];
+    const remaining = Math.max(0, Number(invoice?.finalAmount ?? invoice?.totalAmount ?? 0) - paid);
 
     return (
         <Modal
@@ -134,11 +100,6 @@ const InvoiceDetailDialog = ({ invoiceId, onClose, onChanged }) => {
                 </div>
             )}
             <div className="mt-6 flex flex-wrap justify-end gap-2">
-                {canCancel && (
-                    <button type="button" className="btn btn-danger mr-auto" onClick={() => setCancelling(true)}>
-                        {TEXT.CANCEL_INVOICE}
-                    </button>
-                )}
                 {invoice && (
                     <button
                         type="button"

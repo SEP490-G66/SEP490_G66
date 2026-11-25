@@ -10,7 +10,7 @@ import EarliestSlotBar from "@/components/booking/EarliestSlotBar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { BOOKING_IDS, dayText } from "@/utils/booking";
 import { formatTime } from "@/utils/format";
-import { BOOKING_TEXT, CLINIC_HOTLINE, PATIENT_APPOINTMENT_STATUS } from "@/utils/messages";
+import { BOOKING_TEXT, CLINIC_HOTLINE, PATIENT_APPOINTMENT_STATUS, RECEPTION_BOOKING_TEXT } from "@/utils/messages";
 import { ROUTES, getAppointmentDetailRoute } from "@/utils/routes";
 
 const GROUP_LABEL = "mt-7 mb-2.5 block font-heading text-heading-3 text-ink";
@@ -26,7 +26,7 @@ export const BookingSectionHeading = ({ number, title }) => (
     </div>
 );
 
-export const LoadErrorBox = ({ headingLevel, onRetry }) => (
+export const LoadErrorBox = ({ headingLevel, onRetry, staff = false }) => (
     <BookingStateBox
         tone="warning"
         icon={CircleAlert}
@@ -39,7 +39,11 @@ export const LoadErrorBox = ({ headingLevel, onRetry }) => (
             </button>
         }
     >
-        {BOOKING_TEXT.LOAD_ERROR_TEXT} <Hotline /> {BOOKING_TEXT.LOAD_ERROR_TEXT_END}
+        {staff ? RECEPTION_BOOKING_TEXT.LOAD_ERROR_TEXT : (
+            <>
+                {BOOKING_TEXT.LOAD_ERROR_TEXT} <Hotline /> {BOOKING_TEXT.LOAD_ERROR_TEXT_END}
+            </>
+        )}
     </BookingStateBox>
 );
 
@@ -65,7 +69,7 @@ const BlockedBox = ({ appointment }) => (
     </BookingStateBox>
 );
 
-const NoSlotsBox = ({ showAllDoctors, onAllDoctors }) => (
+const NoSlotsBox = ({ showAllDoctors, onAllDoctors, staff }) => (
     <BookingStateBox
         icon={CalendarDays}
         title={BOOKING_TEXT.NO_SLOTS_TITLE}
@@ -78,7 +82,11 @@ const NoSlotsBox = ({ showAllDoctors, onAllDoctors }) => (
             )
         }
     >
-        {BOOKING_TEXT.NO_SLOTS_TEXT} <Hotline /> {BOOKING_TEXT.NO_SLOTS_TEXT_END}
+        {staff ? RECEPTION_BOOKING_TEXT.NO_SLOTS_TEXT : (
+            <>
+                {BOOKING_TEXT.NO_SLOTS_TEXT} <Hotline /> {BOOKING_TEXT.NO_SLOTS_TEXT_END}
+            </>
+        )}
     </BookingStateBox>
 );
 
@@ -106,12 +114,15 @@ const DoctorSelect = ({ doctors, value, onChange }) => (
     </>
 );
 
-const BookingSchedule = ({ form }) => {
+// staff: the receptionist's dialog – no hotline lines, a Cancel button beside submit
+const BookingSchedule = ({ form, staff = false, onCancel }) => {
     const { state, actions, services, earliest, unfinished, blocked, bounds, rangeBusy, slotsBusy, busy, slotsKey } = form;
     const { context } = state;
-    const rangeError = state.range.error && !rangeBusy;
+    // The services cannot go in one appointment: a message under the picker, no days or slots to choose
+    const servicesError = !rangeBusy && state.range.error ? state.range.servicesError : null;
+    const rangeError = state.range.error && !rangeBusy && !servicesError;
     const firstLoadFailed = rangeError && !state.formShown;
-    const noSlots = state.formShown && !earliest;
+    const noSlots = state.formShown && !earliest && !servicesError;
     const slotsReady = slotsKey && state.slots.key === slotsKey;
     const page = state.page;
 
@@ -132,7 +143,7 @@ const BookingSchedule = ({ form }) => {
     );
 
         if (page.status === "error" || firstLoadFailed) {
-            return <LoadErrorBox headingLevel={3} onRetry={page.status === "error" ? actions.retryContext : actions.retryDays} />;
+            return <LoadErrorBox headingLevel={3} staff={staff} onRetry={page.status === "error" ? actions.retryContext : actions.retryDays} />;
         }
         if (blocked) return <BlockedBox appointment={state.blockedLoading ? null : unfinished} />;
         if (!state.formShown) {
@@ -148,24 +159,28 @@ const BookingSchedule = ({ form }) => {
         const locked = state.submitting || busy;
         return (
             <>
-                {!noSlots && (
-                    <BookingServicePicker
-                        services={services}
-                        items={state.items}
-                        pickService={state.pickService}
-                        pickVariant={state.pickVariant}
-                        error={state.serviceError}
-                        goneMessages={state.goneMessages}
-                        onPickService={actions.pickService}
-                        onPickVariant={actions.pickVariant}
-                        onAdd={actions.addService}
-                        onRemove={actions.removeService}
-                    />
+                {/* Always shown: when no slot fits the chosen services, removing one is the way out */}
+                <BookingServicePicker
+                    services={services}
+                    items={state.items}
+                    pickService={state.pickService}
+                    pickVariant={state.pickVariant}
+                    error={state.serviceError}
+                    goneMessages={state.goneMessages}
+                    onPickService={actions.pickService}
+                    onPickVariant={actions.pickVariant}
+                    onAdd={actions.addService}
+                    onRemove={actions.removeService}
+                />
+                {servicesError && (
+                    <p role="alert" className="alert alert-warning mt-3 block">
+                        {servicesError}
+                    </p>
                 )}
                 {doctorSelect}
                 {weekPicker}
-                {noSlots && !rangeError && <NoSlotsBox showAllDoctors={Boolean(state.doctorId)} onAllDoctors={actions.allDoctors} />}
-                {(!noSlots || rangeError) && (
+                {noSlots && !rangeError && <NoSlotsBox staff={staff} showAllDoctors={Boolean(state.doctorId)} onAllDoctors={actions.allDoctors} />}
+                {(!noSlots || rangeError) && !servicesError && (
                     <BookingDayStrip
                         weekStart={state.weekStart}
                         today={state.today}
@@ -178,7 +193,7 @@ const BookingSchedule = ({ form }) => {
                         onRetry={actions.retryDays}
                     />
                 )}
-                {!noSlots && (
+                {!noSlots && !servicesError && (
                     <>
                         <EarliestSlotBar
                             earliest={earliest}
@@ -203,19 +218,43 @@ const BookingSchedule = ({ form }) => {
                         <div id="booking-submit-error" role="alert">
                             {state.submitError && (
                                 <p className="alert alert-danger mt-3 block">
-                                    {state.submitError} <Hotline />.
+                                    {state.submitError}
+                                    {!staff && (
+                                        <>
+                                            {" "}
+                                            <Hotline />.
+                                        </>
+                                    )}
                                 </p>
                             )}
                         </div>
-                        <BookingSummaryBar
-                            date={state.day}
-                            slotStart={state.slot}
-                            serviceCount={state.items.length}
-                            locked={locked}
-                            submitting={state.submitting}
-                            describedBy="booking-submit-error"
-                            onSubmit={actions.submit}
-                        />
+                        {staff ? (
+                            <div className="mt-7 flex flex-wrap justify-end gap-3 border-t border-border pt-5">
+                                <button type="button" className="btn btn-secondary max-sm:flex-1" onClick={onCancel}>
+                                    {RECEPTION_BOOKING_TEXT.CANCEL}
+                                </button>
+                                <button
+                                    type="button"
+                                    id={BOOKING_IDS.SUBMIT}
+                                    className="btn btn-primary min-w-32 max-sm:flex-1"
+                                    aria-disabled={locked || undefined}
+                                    aria-describedby="booking-submit-error"
+                                    onClick={actions.submit}
+                                >
+                                    {state.submitting ? BOOKING_TEXT.SUBMITTING : RECEPTION_BOOKING_TEXT.SUBMIT}
+                                </button>
+                            </div>
+                        ) : (
+                            <BookingSummaryBar
+                                date={state.day}
+                                slotStart={state.slot}
+                                serviceCount={state.items.length}
+                                locked={locked}
+                                submitting={state.submitting}
+                                describedBy="booking-submit-error"
+                                onSubmit={actions.submit}
+                            />
+                        )}
                     </>
                 )}
             </>

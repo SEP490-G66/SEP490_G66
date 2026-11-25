@@ -2,9 +2,9 @@ import { HISTORY_ALLERGY_OPTIONS, HISTORY_CONDITION_OPTIONS, HISTORY_DENTAL_OPTI
 import { dmy } from "@/components/reception/receptionUtils";
 import { genderOf, historyKey, isCompactPhone, isValidBloodType, isValidPhone, phoneDisplay, subscriberDigits } from "./patientRecord";
 
-export const ADMIN_FIELDS = ["fullName", "dateOfBirth", "gender", "phoneNumber", "emergencyContactPhone", "email", "address", "bloodType"];
+export const ADMIN_FIELDS = ["fullName", "dateOfBirth", "gender", "phoneNumber", "email", "address", "emergencyContactName", "emergencyContactPhone", "bloodType"];
 
-export const FORM_LIMITS = { fullName: 200, emergencyContactPhone: 20, email: 100, address: 500, historyTitle: 200 };
+export const FORM_LIMITS = { fullName: 200, emergencyContactName: 100, emergencyContactPhone: 20, email: 100, address: 500, historyTitle: 200 };
 
 export const HISTORY_TYPES = ["Allergy", "Condition", "History"];
 
@@ -18,6 +18,7 @@ export const emptyForm = () => ({
     dateOfBirth: "",
     gender: "",
     phoneNumber: "",
+    emergencyContactName: "",
     emergencyContactPhone: "",
     email: "",
     address: "",
@@ -29,7 +30,8 @@ export const formFromPatient = (patient) => ({
     dateOfBirth: patient.dateOfBirth ? String(patient.dateOfBirth).slice(0, 10) : "",
     gender: genderOf(patient.gender).code ?? "",
     phoneNumber: patient.phoneNumber ? phoneDisplay(patient.phoneNumber) : "",
-    emergencyContactPhone: patient.emergencyContactPhone ?? "",
+    emergencyContactName: patient.emergencyContactName ?? "",
+    emergencyContactPhone: patient.emergencyContactPhone && isValidPhone(patient.emergencyContactPhone) ? phoneDisplay(patient.emergencyContactPhone) : (patient.emergencyContactPhone ?? ""),
     email: patient.email ?? "",
     address: patient.address ?? "",
     bloodType: "",
@@ -105,6 +107,7 @@ export const createBody = (values) => {
         gender: values.gender || null,
         phoneNumber: phone ? `0${phone}` : null,
         email: values.email.trim() || null,
+        emergencyContactName: values.emergencyContactName.trim() || null,
         emergencyContactPhone: emergencyToSend(values.emergencyContactPhone),
         address: values.address.trim() || null,
     };
@@ -135,7 +138,7 @@ export const updateBody = ({ values, edited, original, latest }) => {
         address: values.address.trim() || null,
         insuranceNumber: latest.insuranceNumber ?? null,
         bloodType,
-        emergencyContactName: latest.emergencyContactName ?? null,
+        emergencyContactName: edited.has("emergencyContactName") ? values.emergencyContactName.trim() || null : (latest.emergencyContactName ?? null),
         notes: latest.notes ?? null,
     };
 };
@@ -149,6 +152,7 @@ export const bodyMatches = (body, fresh) => {
     if (genderOf(body.gender).code !== genderOf(fresh.gender).code) return false;
     if (!same(body.address, fresh.address)) return false;
     if (!same(body.emergencyContactPhone, fresh.emergencyContactPhone)) return false;
+    if (!same(body.emergencyContactName, fresh.emergencyContactName)) return false;
     if (body.phoneNumber != null && subscriberDigits(body.phoneNumber) !== subscriberDigits(fresh.phoneNumber)) return false;
     if (body.email != null && !same(body.email.toLowerCase(), String(fresh.email ?? "").toLowerCase())) return false;
     if (!same(cleanBloodType(body.bloodType), cleanBloodType(fresh.bloodType))) return false;

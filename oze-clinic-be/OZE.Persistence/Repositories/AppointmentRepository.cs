@@ -355,6 +355,37 @@ namespace OZE.Persistence.Repositories
                     && AppointmentConstants.UnfinishedStatuses.Contains(x.Status));
         }
 
+        public async Task<List<Appointment>> GetPatientAppointmentsOnDateAsync(int patientId, DateOnly date)
+        {
+            // Tracked: a walk-in may cancel the pending one of the same day
+            return await _context.Appointments
+                .Where(x => x.PatientId == patientId
+                    && x.AppointmentDate == date
+                    && AppointmentConstants.UnfinishedStatuses.Contains(x.Status))
+                .ToListAsync();
+        }
+
+        public async Task<List<long>> MarkPastPendingAsNoShowAsync(DateOnly today, CancellationToken cancellationToken = default)
+        {
+            // A booking nobody confirmed before its day: the patient did not come
+            var ids = await _context.Appointments
+                .Where(x => x.AppointmentDate < today && x.Status == AppointmentConstants.PendingStatus)
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+            if (ids.Count == 0)
+            {
+                return ids;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            await _context.Appointments
+                .Where(x => ids.Contains(x.Id) && x.Status == AppointmentConstants.PendingStatus)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(x => x.Status, AppointmentConstants.NoShowStatus)
+                    .SetProperty(x => x.UpdatedAt, now), cancellationToken);
+            return ids;
+        }
+
         public async Task<bool> HasCompletedVisitAsync(int patientId)
         {
             return await _context.Appointments

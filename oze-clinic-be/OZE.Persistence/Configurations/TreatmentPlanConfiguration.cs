@@ -12,6 +12,8 @@ namespace OZE.Persistence.Configurations
             {
                 t.HasCheckConstraint("CK_TreatmentPlans_Status", "[Status] IN ('Draft', 'Proposed', 'Approved', 'InProgress', 'Completed', 'Cancelled', 'Superseded')");
                 t.HasCheckConstraint("CK_TreatmentPlans_EstimatedTotalCost", "[EstimatedTotalCost] >= 0");
+                t.HasCheckConstraint("CK_TreatmentPlans_PaymentOption", "[PaymentOption] IS NULL OR [PaymentOption] IN ('FULL', 'PERIODS', 'DEPOSIT')");
+                t.HasCheckConstraint("CK_TreatmentPlans_DepositRate", "[DepositRate] IS NULL OR ([DepositRate] >= 0 AND [DepositRate] <= 100)");
             });
             builder.HasKey(x => x.Id);
 
@@ -22,6 +24,9 @@ namespace OZE.Persistence.Configurations
             builder.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("Draft");
             builder.Property(x => x.CancellationReason).HasMaxLength(500);
             builder.Property(x => x.CancelledByUserId).HasMaxLength(450);
+            builder.Property(x => x.PaymentOption).HasMaxLength(20);
+            builder.Property(x => x.DepositRate).HasPrecision(5, 2);
+            builder.Property(x => x.PaymentOptionChosenByUserId).HasMaxLength(450);
             builder.Property(x => x.RowVersion).IsRowVersion();
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 

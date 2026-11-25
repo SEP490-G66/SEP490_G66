@@ -226,8 +226,8 @@ export const MOCK_EXAM_DRAFTS = {
 export const EMPTY_EXAM_DRAFT = { symptoms: [], note: "", entries: [], films: [], diagnoses: [] };
 
 // Step 4 draft: the plan session done today, what was done (items), a note, and the proposed check-up date
-// (followUpDate, "yyyy-mm-dd" or "", only once the whole plan is done).
-export const EMPTY_TREATMENT_DRAFT = { sessionId: "", items: [], note: "", followUpDate: "" };
+// (followUp, { date, slotStart } or null, only once the whole plan is done).
+export const EMPTY_TREATMENT_DRAFT = { sessionId: "", items: [], note: "", followUp: null };
 
 // Step 5 draft: the prescribed medicines (PrescriptionItems) and the prescription's note (Prescriptions.Notes).
 // status: "Draft" until the visit is completed, then "Finalized".

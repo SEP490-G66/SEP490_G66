@@ -1,7 +1,7 @@
 import api from "./api";
 import { call } from "./receptionService";
 import { getClinicToday } from "../utils/format";
-import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, GUEST_BOOKING_TEXT } from "../utils/messages";
+import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, GUEST_BOOKING_TEXT, RECEPTION_BOOKING_TEXT } from "../utils/messages";
 
 const READ = { skipErrorPage: true };
 
@@ -104,6 +104,20 @@ export const getBookingSlots = async ({ date, doctorId, services, signal } = {})
     return result.success ? success(uniqueSlots(listOf(result.data))) : failure();
 };
 
+// The chosen services cannot be booked together (every day answers the same 400): say why instead of showing "no free slot"
+const SERVICES_ERRORS = [
+    ["different rooms", BOOKING_TEXT.SERVICES_DIFFERENT_ROOMS],
+    ["choose a variant", BOOKING_TEXT.SERVICES_INVALID],
+    ["only one variant", BOOKING_TEXT.SERVICES_INVALID],
+    ["not available for booking", BOOKING_TEXT.SERVICES_INVALID],
+    ["service not found", BOOKING_TEXT.SERVICES_INVALID],
+    ["variant not found", BOOKING_TEXT.SERVICES_INVALID],
+];
+const servicesErrorOf = (result) => {
+    const message = String(result.message ?? "").toLowerCase();
+    return SERVICES_ERRORS.find(([text]) => message.includes(text))?.[1] ?? null;
+};
+
 // Free-slot count of every day from..to in ONE request (GET api/appointments/available-days); the backend reads the
 // shifts and appointments of the whole range at once. days: [{ date, freeSlotCount, isWorkingDay, firstSlotStart }].
 export const getBookingDays = async ({ from, to, doctorId, services, signal } = {}) => {
@@ -116,7 +130,10 @@ export const getBookingDays = async ({ from, to, doctorId, services, signal } = 
         })
     );
     if (signal?.aborted) throw abortError();
-    if (!result.success) return failure();
+    if (!result.success) {
+        const servicesError = servicesErrorOf(result);
+        return servicesError ? failure(BOOKING_ERROR_CODE.SERVICES_INVALID, { servicesError }) : failure();
+    }
     return success(
         listOf(result.data).map((day) => ({
             date: day.date,
@@ -210,4 +227,42 @@ export const PATIENT_BOOKING_API = {
     getDays: getBookingDays,
     getSlots: getBookingSlots,
     create: createPatientBooking,
+};
+
+// ----- the receptionist books for a patient (F-APT-09): confirmed at once -----
+
+const RECEPTION_ERRORS = [
+    ["not finished", BOOKING_ERROR_CODE.HAS_UNFINISHED, RECEPTION_BOOKING_TEXT.ERROR_HAS_UNFINISHED],
+    [NO_PROFILE, BOOKING_ERROR_CODE.PROFILE_NOT_FOUND, RECEPTION_BOOKING_TEXT.ERROR_PATIENT_GONE],
+];
+
+const RECEPTION_TEXTS = [
+    ["more than one patient record", RECEPTION_BOOKING_TEXT.ERROR_MULTIPLE_RECORDS],
+    ["phone number is invalid", RECEPTION_BOOKING_TEXT.ERROR_PHONE],
+    ["email is invalid", RECEPTION_BOOKING_TEXT.ERROR_EMAIL],
+    ["gender", RECEPTION_BOOKING_TEXT.ERROR_GENDER],
+    ["date of birth", RECEPTION_BOOKING_TEXT.ERROR_BIRTHDATE],
+];
+
+export const getReceptionBookingContext = async ({ signal } = {}) => {
+    const shared = await loadSharedContext(signal);
+    return shared ? success({ ...shared, patient: null, unfinished: null }) : failure();
+};
+
+// Resolves with the appointment as the API returns it: every place that opens the dialog reads its fields
+export const createReceptionBooking = async (payload) => {
+    const result = await call(() => api.post("/api/appointments/reception-booking", payload, READ));
+    if (result.success) return success(result.data);
+    const message = String(result.message ?? "").toLowerCase();
+    const known = RECEPTION_ERRORS.find(([text]) => message.includes(text));
+    if (known) return failure(known[1], { submitError: known[2] });
+    const mapped = toFailure(result, { texts: RECEPTION_TEXTS });
+    return mapped.code === BOOKING_ERROR_CODE.GENERIC ? { ...mapped, submitError: RECEPTION_BOOKING_TEXT.SUBMIT_ERROR } : mapped;
+};
+
+export const RECEPTION_BOOKING_API = {
+    getContext: getReceptionBookingContext,
+    getDays: getBookingDays,
+    getSlots: getBookingSlots,
+    create: createReceptionBooking,
 };

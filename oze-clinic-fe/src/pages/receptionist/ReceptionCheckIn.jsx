@@ -4,45 +4,37 @@ import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import LabeledSelect from "@/components/ui/LabeledSelect";
 import BookingDialog from "@/components/reception/BookingDialog";
-import ConfirmActionDialog from "@/components/billing/ConfirmActionDialog";
 import RowActions from "@/components/reception-dashboard/RowActions";
 import CheckInDialog from "@/components/reception/CheckInDialog";
-import ConfirmAppointmentDialog from "@/components/reception/ConfirmAppointmentDialog";
-import ConfirmCallDialog from "@/components/reception/ConfirmCallDialog";
 import ServiceCell from "@/components/reception/ServiceCell";
 import { Card, CancelDialog, RescheduleDialog, WalkInDialog } from "@/components/reception/shared";
-import { clinicClock, minutesSince, phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
+import { clinicClock, clockOf, phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
     cancelAppointment,
     checkInAppointment,
     clinicToday,
-    confirmAppointment,
     createWalkIn,
     getDoctorOptions,
     getTodayAppointments,
     getWaitingList,
-    markNoShow,
-    recordConfirmCall,
-    rescheduleAppointment,
 } from "@/services/receptionService";
-import { ddmm, hhmm } from "@/utils/calendar";
-import { callBackText } from "@/utils/confirmAppointments";
+import { hhmm } from "@/utils/calendar";
 import {
     EMPTY_CHECK_IN_FILTERS,
     STATE_ORDER,
     allergiesOf,
     appointmentMenu,
-    confirmNoteOf,
-    isLate,
+    isDoctorAway,
     isFilteredCheckIn,
+    isLate,
     matchesKeyword,
     serviceNames,
     slotOf,
     sortCheckIn,
     stateOf,
 } from "@/utils/checkIn";
-import { CHECK_IN_TEXT as TEXT, CONFIRM_TEXT, DASHBOARD_TEXT } from "@/utils/messages";
+import { CHECK_IN_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
@@ -51,6 +43,7 @@ const READ = { skipErrorPage: true };
 const DONE_STATES = ["checkedin", "serving", "done", "noshow", "cancelled"];
 const STATUS_OPTIONS = [["", TEXT.ALL_STATUSES], ...STATE_ORDER.map((key) => [key, TEXT.STATES[key][0]])];
 const WIDTHS = ["120px", "", "136px", "180px", "", "150px", "150px"];
+const REFRESH_MS = 20_000;
 
 const ReceptionCheckIn = () => {
     const { state: navState } = useLocation();
@@ -72,7 +65,7 @@ const ReceptionCheckIn = () => {
         let active = true;
         Promise.all([getTodayAppointments(READ), getWaitingList(READ)]).then(([today, queue]) => {
             if (!active) return;
-            setResult({ ok: today.success, items: today.success ? (today.data?.items ?? []) : [] });
+            setResult((prev) => (today.success ? { ok: true, items: today.data?.items ?? [], at: new Date().toISOString() } : { ok: false, items: prev?.items ?? [], at: prev?.at ?? null }));
             setWaiting(queue.success && Array.isArray(queue.data) ? queue.data : null);
         });
         return () => {
@@ -91,12 +84,19 @@ const ReceptionCheckIn = () => {
     }, []);
 
     const reload = useCallback(() => setVersion((v) => v + 1), []);
+
+    useEffect(() => {
+        if (dialog) return undefined;
+        const timer = setInterval(reload, REFRESH_MS);
+        return () => clearInterval(timer);
+    }, [dialog, reload]);
     // request: a function, so a second click while one is running sends nothing
     const act = async (request, successText, next) => {
         if (acting.current) return;
         acting.current = true;
         try {
-            if (report(await request(), successText)) {
+            const result = await request();
+            if (report(result, typeof successText === "function" ? successText(result.data ?? {}) : successText)) {
                 setDialog(null);
                 focusAfter.current = next ?? "heading";
                 reload();
@@ -115,11 +115,14 @@ const ReceptionCheckIn = () => {
         (button || document.getElementById("checkin-title"))?.focus();
     }, [result]);
 
-    const appointments = result?.items ?? [];
-    const now = clinicClock();
+    const appointments = (result?.items ?? []).filter((a) => a.status !== "PENDING");
     const pendingCount = appointments.filter((a) => stateOf(a) === "notyet").length;
-    const lateCount = appointments.filter((a) => isLate(a, now)).length;
-    const lateMinutes = (a) => minutesSince(a.timeSlotEnd ? `${a.appointmentDate}T${hhmm(a.timeSlotEnd)}:00+07:00` : null);
+    const now = clinicClock();
+    const checkedInText = (a) => (data) => TEXT.CHECKED_IN(a.patientName, data.queueNumber, data.roomName);
+    const startCheckIn = (a) => {
+        if (isDoctorAway(a, doctors, doctorsLoaded)) setDialog({ type: "checkIn", item: a });
+        else act(() => checkInAppointment(a.id), checkedInText(a), nextAfter(a.id));
+    };
     // The next patient still to check in after this one, in the order on screen
     const nextAfter = (id) => {
         const pending = shown.filter((x) => stateOf(x) === "notyet");
@@ -185,19 +188,15 @@ const ReceptionCheckIn = () => {
                     <tbody>
                         {pageItems.map((a) => {
                             const state = stateOf(a);
-                            const note = confirmNoteOf(a);
                             const [label, badge] = TEXT.STATES[state];
                             const allergies = allergiesOf(a);
-                            const late = isLate(a, now);
                             const doctor = doctorOf.get(a.doctorId);
                             const done = DONE_STATES.includes(state);
                             return (
                                 <tr key={a.id} className={cx(done && "text-muted")}>
-                                    <td data-label={TEXT.COLUMNS[0]} className={cx("num whitespace-nowrap [overflow-wrap:normal]", late && "border-l-4 border-l-warning")}>
-                                        <div>
-                                            <span className={done ? "text-muted" : "font-semibold text-ink"}>{slotOf(a) || TEXT.WALK_IN_SLOT}</span>
-                                            {late && <span className="badge badge-warning mt-1 flex w-fit">{TEXT.LATE_BY(lateMinutes(a))}</span>}
-                                        </div>
+                                    <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
+                                        <span className={done ? "text-muted" : "font-semibold text-ink"}>{slotOf(a) || TEXT.WALK_IN_SLOT}</span>
+                                        {isLate(a, now) && <small className="block font-normal text-caption text-warning">{TEXT.LATE}</small>}
                                     </td>
                                     <td data-primary>
                                         <span className={cx("cell-primary block", done && "font-normal text-body", state === "cancelled" && "line-through")}>{a.patientName}</span>
@@ -211,7 +210,7 @@ const ReceptionCheckIn = () => {
                                         <div>
                                             {a.doctorName ?? TEXT.NO_DOCTOR}
                                             {state === "notyet" && doctor?.status === "Ended" && (
-                                                <small className="block text-caption font-semibold text-danger">{TEXT.DOCTOR_ENDED(doctor.end)}</small>
+                                                <small className="block text-caption font-semibold text-danger">{TEXT.DOCTOR_ENDED(doctor.endedAt ?? doctor.end)}</small>
                                             )}
                                             {state === "notyet" && doctor?.status === "OnLeave" && (
                                                 <small className="block text-caption font-semibold text-danger">{TEXT.DOCTOR_ON_LEAVE}</small>
@@ -222,15 +221,7 @@ const ReceptionCheckIn = () => {
                                         <ServiceCell names={serviceNames(a)} />
                                     </td>
                                     <td data-label={TEXT.COLUMNS[5]}>
-                                        <div>
-                                            <span className={cx("badge", badge)}>{label}</span>
-                                            {state === "notyet" && note && (
-                                                <span className={cx("badge mt-1 flex w-fit whitespace-normal", TEXT.CONFIRM_NOTE_BADGE[note])}>
-                                                    {TEXT.CONFIRM_NOTE[note]}
-                                                    {note === "callback" && callBackText(a) && ` ${callBackText(a)}`}
-                                                </span>
-                                            )}
-                                        </div>
+                                        <span className={cx("badge", badge)}>{label}</span>
                                     </td>
                                     <td data-actions>
                                         {state === "notyet" && (
@@ -240,9 +231,9 @@ const ReceptionCheckIn = () => {
                                                     label: TEXT.CHECK_IN,
                                                     ariaLabel: TEXT.CHECK_IN_FOR(a.patientName),
                                                     id: `checkin-${a.id}`,
-                                                    onClick: () => setDialog({ type: "checkIn", item: a, late }),
+                                                    onClick: () => startCheckIn(a),
                                                 }}
-                                                items={appointmentMenu(a, { isToday: true, late, open: (type) => () => setDialog({ type, item: a }) })}
+                                                items={appointmentMenu(a, { open: (type) => () => setDialog({ type, item: a }) })}
                                             />
                                         )}
                                     </td>
@@ -265,7 +256,7 @@ const ReceptionCheckIn = () => {
                     <h1 id="checkin-title" tabIndex={-1} className="page-title focus:outline-none">
                         {TEXT.TITLE}
                     </h1>
-                    <p className="page-description first-letter:uppercase">{TEXT.DESCRIPTION(weekdayDate(clinicToday()), pendingCount, lateCount)}</p>
+                    <p className="page-description first-letter:uppercase">{TEXT.DESCRIPTION(weekdayDate(clinicToday()), pendingCount)}</p>
                 </div>
                 <div className="flex gap-3 max-md:w-full max-md:[&>*]:flex-1">
                     <button type="button" className="btn btn-secondary" onClick={() => setDialog({ type: "book" })}>
@@ -329,62 +320,36 @@ const ReceptionCheckIn = () => {
             <Card>
                 {body()}
                 {footer}
+                {result?.at && <p className="px-4 pb-3 text-caption text-muted">{TEXT.UPDATED_AT(clockOf(result.at))}</p>}
             </Card>
 
             {dialog?.type === "checkIn" && (
                 <CheckInDialog
                     appointment={a}
                     doctors={doctors}
-                    doctorsLoaded={doctorsLoaded}
                     waiting={waiting}
                     onClose={() => setDialog(null)}
                     onReschedule={() => setDialog({ type: "reschedule", item: a })}
-                    onSubmit={(v) =>
-                        act(
-                            () => checkInAppointment(a.id, v),
-                            TEXT.CHECKED_IN(a.patientName, v.room, v.doctorId ? doctorOf.get(v.doctorId)?.name : null),
-                            nextAfter(a.id),
-                        )
-                    }
-                />
-            )}
-            {dialog?.type === "confirm" && (
-                <ConfirmAppointmentDialog appointment={a} onClose={() => setDialog(null)} onSubmit={() => act(() => confirmAppointment(a.id), CONFIRM_TEXT.CONFIRMED(a.patientName), a.id)} />
-            )}
-            {dialog?.type === "call" && (
-                <ConfirmCallDialog
-                    appointment={a}
-                    today={clinicToday()}
-                    onClose={() => setDialog(null)}
-                    onSubmit={(v) => {
-                        const when = `${ddmm(v.callBackDate)} ${v.callBackTime}`;
-                        return act(
-                            () => recordConfirmCall(a.id, v),
-                            v.outcome === "CallBack" ? CONFIRM_TEXT.WILL_CALL_BACK(a.patientName, when) : CONFIRM_TEXT.NO_ANSWER(a.patientName, when),
-                            a.id,
-                        );
-                    }}
-                />
-            )}
-            {dialog?.type === "noShow" && (
-                <ConfirmActionDialog
-                    title={DASHBOARD_TEXT.NO_SHOW_TITLE}
-                    description={DASHBOARD_TEXT.NO_SHOW_SUB(a.patientName, hhmm(a.timeSlotStart))}
-                    body={DASHBOARD_TEXT.NO_SHOW_BODY(slotOf(a), a.doctorName)}
-                    closeLabel={TEXT.CLOSE}
-                    submitLabel={DASHBOARD_TEXT.ACT_NO_SHOW}
-                    onClose={() => setDialog(null)}
-                    onSubmit={() => act(() => markNoShow(a.id), DASHBOARD_TEXT.NO_SHOW_DONE(a.patientName), nextAfter(a.id))}
+                    onCancel={() => setDialog({ type: "cancel", item: a })}
+                    onSubmit={(v) => act(() => checkInAppointment(a.id, v), checkedInText(a), nextAfter(a.id))}
                 />
             )}
             {dialog?.type === "reschedule" && (
-                <RescheduleDialog appointment={a} onClose={() => setDialog(null)} onSubmit={(v) => act(() => rescheduleAppointment(a.id, v), TEXT.RESCHEDULED(a.patientName), nextAfter(a.id))} />
+                <RescheduleDialog
+                    appointment={a}
+                    onClose={() => setDialog(null)}
+                    onDone={() => {
+                        setDialog(null);
+                        focusAfter.current = nextAfter(a.id) ?? "heading";
+                        reload();
+                    }}
+                />
             )}
             {dialog?.type === "cancel" && (
                 <CancelDialog appointment={a} onClose={() => setDialog(null)} onSubmit={(reason) => act(() => cancelAppointment(a.id, reason), TEXT.CANCELLED(a.patientName), nextAfter(a.id))} />
             )}
             {dialog?.type === "walkIn" && (
-                <WalkInDialog doctors={available} onClose={() => setDialog(null)} onSubmit={(request) => act(() => createWalkIn(request), TEXT.WALKED_IN(request.fullName))} />
+                <WalkInDialog doctors={available} waiting={waiting} onClose={() => setDialog(null)} onSubmit={(request) => act(() => createWalkIn(request), TEXT.WALKED_IN(request.fullName))} />
             )}
             {dialog?.type === "book" && (
                 <BookingDialog

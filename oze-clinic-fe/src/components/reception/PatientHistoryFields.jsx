@@ -19,7 +19,8 @@ const PatientHistoryFields = ({ groups, ticked, onChange, notice, lockedNote }) 
                 value={[...group.locked, ...ticked[group.recordType].filter((t) => !group.locked.includes(t))]}
                 onChange={(next) => onChange(group.recordType, next.filter((t) => !group.locked.includes(t)))}
                 tone={TONES[group.recordType]}
-                placeholder={TEXT.HISTORY_OTHER_PLACEHOLDER}
+                placeholder={TEXT.HISTORY_OTHER_PLACEHOLDERS[group.recordType]}
+                otherLabel={TEXT.HISTORY_OTHER}
                 defaultOpen={group.recordType === "Allergy"}
                 locked={group.locked}
                 itemNotes={group.notes}

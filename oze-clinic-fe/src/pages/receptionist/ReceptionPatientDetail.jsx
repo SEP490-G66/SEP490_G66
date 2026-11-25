@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import AppointmentTabs from "@/components/appointment/AppointmentTabs";
+import BackLink from "@/components/navigation/BackLink";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import BookingDialog from "@/components/reception/BookingDialog";
 import PatientAppointmentsTab from "@/components/reception/PatientAppointmentsTab";
@@ -385,11 +386,17 @@ const ReceptionPatientDetail = () => {
 
     const listHref = `${ROUTES.RECEPTION_PATIENTS}${safeListSearch(location.state?.listSearch)}`;
     const crumbs = [{ label: TEXT.TITLE, href: listHref }, { label: patient?.fullName ?? (notFound ? TEXT.NOT_FOUND : TEXT.LOADING) }];
+    const backBar = (className) => (
+        <div className={className ? `flex items-center gap-3 ${className}` : "flex items-center gap-3"}>
+            <BackLink to={listHref} label={TEXT.BACK_LIST_LABEL} />
+            <Breadcrumb items={crumbs} className="min-w-0 flex-wrap wrap-anywhere" />
+        </div>
+    );
 
     if (notFound) {
         return (
             <div className="app-content min-h-full">
-                <Breadcrumb items={crumbs} className="mb-2" />
+                {backBar("mb-2")}
                 <section className="rounded-xl border border-border bg-canvas p-8 text-center">
                     <h1 ref={h1Ref} tabIndex={-1} className="page-title outline-none">
                         {TEXT.NOT_FOUND}
@@ -436,7 +443,7 @@ const ReceptionPatientDetail = () => {
 
     return (
         <div className="app-content min-h-full space-y-4">
-            <Breadcrumb items={crumbs} />
+            {backBar()}
             {patientError ? (
                 <>
                     <h1 ref={h1Ref} tabIndex={-1} className="page-title outline-none">

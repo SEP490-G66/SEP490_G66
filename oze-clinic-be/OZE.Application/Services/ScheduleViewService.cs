@@ -48,7 +48,8 @@ namespace OZE.Application.Services
                 ShiftEnd = shift.ShiftEnd,
                 ActualStartTime = shift.ActualStartTime,
                 ActualEndTime = shift.ActualEndTime,
-                Status = DutyStatusOf(shift, leaves)
+                Status = DutyStatusOf(shift, leaves),
+                AbsenceReason = shift.AbsenceReason
             }).ToList();
         }
 

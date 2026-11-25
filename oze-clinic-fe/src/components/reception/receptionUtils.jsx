@@ -142,6 +142,8 @@ export const useDoctorsOnDuty = (refreshKey = 0) => {
                 shift: `${hhmm(s.shiftStart)}–${hhmm(s.shiftEnd)}`,
                 start: hhmm(s.shiftStart),
                 end: hhmm(s.shiftEnd),
+                endedAt: s.actualEndTime ? hhmm(s.actualEndTime) : null,
+                absenceReason: s.absenceReason ?? null,
             });
         });
         const doctors = [...map.values()];

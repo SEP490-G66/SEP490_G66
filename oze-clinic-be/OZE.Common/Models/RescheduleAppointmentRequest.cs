@@ -13,5 +13,9 @@ namespace OZE.Common.Models
 
         // Optional; null means "keep the doctor if free, otherwise any suitable doctor"
         public int? DoctorId { get; set; }
+
+        // Why the clinic moved the appointment; sent to the patient with the new time
+        [MaxLength(500)]
+        public string? Reason { get; set; }
     }
 }

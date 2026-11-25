@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import BackLink from "@/components/navigation/BackLink";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import PatientAdminFields from "@/components/reception/PatientAdminFields";
 import PatientHistoryFields from "@/components/reception/PatientHistoryFields";
@@ -554,7 +555,14 @@ const ReceptionPatientForm = () => {
     const ready = request.mode === "create" || current.patientId != null || loadCurrent?.status === "ready";
     const header = (
         <>
-            <Breadcrumb items={crumbs} className="mb-2" />
+            <div className="mb-2 flex items-center gap-3">
+                {mode === "edit" ? (
+                    <BackLink to={detailHref} state={nav.linkState()} label={TEXT.BACK_DETAIL_LABEL} />
+                ) : (
+                    <BackLink to={listHref} label={TEXT.BACK_LIST_LABEL} />
+                )}
+                <Breadcrumb items={crumbs} className="min-w-0 flex-wrap wrap-anywhere" />
+            </div>
             <h1 ref={h1Ref} tabIndex={-1} className="page-title outline-none">
                 {mode === "edit" ? TEXT.EDIT_TITLE : TEXT.CREATE_TITLE}
             </h1>
@@ -565,7 +573,10 @@ const ReceptionPatientForm = () => {
     if (request.mode === "edit" && (!idInfo || loadCurrent?.status === "gone") && !current.patientId) {
         return (
             <div className="app-content min-h-full">
-                <Breadcrumb items={[{ label: TEXT.TITLE, href: listHref }, { label: TEXT.NOT_FOUND }]} className="mb-2" />
+                <div className="mb-2 flex items-center gap-3">
+                    <BackLink to={listHref} label={TEXT.BACK_LIST_LABEL} />
+                    <Breadcrumb items={[{ label: TEXT.TITLE, href: listHref }, { label: TEXT.NOT_FOUND }]} className="min-w-0 flex-wrap wrap-anywhere" />
+                </div>
                 <section className="rounded-xl border border-border bg-canvas p-8 text-center">
                     <h1 ref={h1Ref} tabIndex={-1} className="page-title outline-none">
                         {TEXT.NOT_FOUND}

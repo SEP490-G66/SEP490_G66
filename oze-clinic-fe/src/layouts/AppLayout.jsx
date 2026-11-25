@@ -44,12 +44,14 @@ const AppLayout = ({ publicPage = false }) => {
     };
 
     const header = (
-        <Header
-            onToggleSidebar={handleToggle}
-            sidebarOpen={sidebarOpen}
-            sidebarId={sidebarInDom ? SIDEBAR_ID : undefined}
-            sidebarToggleRef={toggleRef}
-        />
+        <div className="contents print:hidden">
+            <Header
+                onToggleSidebar={handleToggle}
+                sidebarOpen={sidebarOpen}
+                sidebarId={sidebarInDom ? SIDEBAR_ID : undefined}
+                sidebarToggleRef={toggleRef}
+            />
+        </div>
     );
 
     const content = (
@@ -64,7 +66,9 @@ const AppLayout = ({ publicPage = false }) => {
     );
 
     const drawer = drawerOpen && (
-        <Sidebar id={SIDEBAR_ID} drawer onClose={() => setDrawerOpen(false)} returnFocusRef={toggleRef} />
+        <div className="contents print:hidden">
+            <Sidebar id={SIDEBAR_ID} drawer onClose={() => setDrawerOpen(false)} returnFocusRef={toggleRef} />
+        </div>
     );
 
     if (role === USER_ROLES.PATIENT) {
@@ -72,7 +76,11 @@ const AppLayout = ({ publicPage = false }) => {
             <div className="flex min-h-dvh flex-col">
                 {header}
                 <div className="flex flex-1">
-                    {isDesktop && <Sidebar id={SIDEBAR_ID} collapsed={collapsed} underHeader />}
+                    {isDesktop && (
+                        <div className="contents print:hidden">
+                            <Sidebar id={SIDEBAR_ID} collapsed={collapsed} underHeader />
+                        </div>
+                    )}
                     <div className="flex min-w-0 flex-1 flex-col">{content}</div>
                 </div>
                 {drawer}
@@ -82,7 +90,11 @@ const AppLayout = ({ publicPage = false }) => {
 
     return (
         <div className="flex min-h-dvh">
-            {isDesktop && <Sidebar id={SIDEBAR_ID} collapsed={collapsed} />}
+            {isDesktop && (
+                <div className="contents print:hidden">
+                    <Sidebar id={SIDEBAR_ID} collapsed={collapsed} />
+                </div>
+            )}
             <div className="flex min-w-0 flex-1 flex-col">
                 {header}
                 {content}

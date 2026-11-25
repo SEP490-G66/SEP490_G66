@@ -38,5 +38,26 @@ namespace OZE.Common.Models
 
         [MaxLength(500)]
         public string? Reason { get; set; }
+
+        // Relative to call when needed; saved only when a new record is created
+        [MaxLength(100)]
+        public string? EmergencyContactName { get; set; }
+
+        public string? EmergencyContactPhone { get; set; }
+
+        // Allergies and conditions ticked at the desk; saved only when a new record is created
+        public List<WalkInMedicalHistoryItem> MedicalHistory { get; set; } = new();
+    }
+
+    public class WalkInMedicalHistoryItem
+    {
+        // Allergy or Condition
+        [Required]
+        [MaxLength(20)]
+        public string RecordType { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
     }
 }

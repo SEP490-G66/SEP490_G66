@@ -6,7 +6,6 @@ import LabeledSelect from "@/components/ui/LabeledSelect";
 import BookingDialog from "@/components/reception/BookingDialog";
 import RowActions from "@/components/reception-dashboard/RowActions";
 import ConfirmAppointmentDialog from "@/components/reception/ConfirmAppointmentDialog";
-import ConfirmCallDialog from "@/components/reception/ConfirmCallDialog";
 import ServiceCell from "@/components/reception/ServiceCell";
 import { Card, CancelDialog, RescheduleDialog } from "@/components/reception/shared";
 import { phoneText, report, usePaging } from "@/components/reception/receptionUtils";
@@ -17,18 +16,16 @@ import {
     confirmAppointment,
     getAppointmentsInRange,
     getDoctorOptions,
-    recordConfirmCall,
-    rescheduleAppointment,
 } from "@/services/receptionService";
-import { addDays, ddmm, hhmm } from "@/utils/calendar";
+import { addDays, hhmm } from "@/utils/calendar";
 import { allergiesOf, appointmentMenu, matchesKeyword, serviceNames, slotOf } from "@/utils/checkIn";
-import { CONFIRM_STATES, callBackText, confirmDefaults, confirmStateOf, isConfirmFiltered, matchesConfirmState, shortDate, sortByVisit } from "@/utils/confirmAppointments";
+import { CONFIRM_STATES, confirmDefaults, confirmStateOf, isConfirmFiltered, isConfirmListed, matchesConfirmState, shortDate, sortByVisit } from "@/utils/confirmAppointments";
 import { CONFIRM_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
-const STATUS_OPTIONS = [["need", TEXT.NEEDS_CONFIRM], ["", TEXT.ALL_STATUSES], ...CONFIRM_STATES.map((key) => [key, TEXT.STATES[key][0]])];
+const STATUS_OPTIONS = [...CONFIRM_STATES.map((key) => [key, TEXT.STATES[key][0]]), ["", TEXT.ALL_STATUSES]];
 const WIDTHS = ["128px", "", "136px", "190px", "", "150px", "150px"];
 
 const ReceptionConfirm = () => {
@@ -69,7 +66,7 @@ const ReceptionConfirm = () => {
     }, []);
 
     const current = result?.key === requestKey ? result : null;
-    const appointments = (current?.items ?? result?.items ?? []).filter((a) => a.appointmentDate > today);
+    const appointments = (current?.items ?? result?.items ?? []).filter((a) => a.appointmentDate >= today && isConfirmListed(a));
     const slotOptions = [["", TEXT.ALL_SLOTS], ...[...new Set(appointments.map(slotOf).filter(Boolean))].sort().map((s) => [s, s])];
     const known = new Map(doctorList);
     appointments.forEach((a) => a.doctorId && !known.has(String(a.doctorId)) && known.set(String(a.doctorId), a.doctorName));
@@ -118,7 +115,7 @@ const ReceptionConfirm = () => {
             <RowActions
                 name={row.patientName}
                 primary={state !== "confirmed" ? { label: TEXT.CONFIRM, onClick: open("confirm") } : null}
-                items={appointmentMenu(row, { isToday: false, late: false, open })}
+                items={appointmentMenu(row, { open })}
             />
         );
     };
@@ -156,7 +153,6 @@ const ReceptionConfirm = () => {
                             const state = confirmStateOf(row);
                             const [label, badge] = TEXT.STATES[state];
                             const allergies = allergiesOf(row);
-                            const when = state === "callback" ? callBackText(row) : null;
                             return (
                                 <tr key={row.id} className={state === "cancelled" ? "opacity-60" : undefined}>
                                     <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
@@ -178,10 +174,7 @@ const ReceptionConfirm = () => {
                                         <ServiceCell names={serviceNames(row)} />
                                     </td>
                                     <td data-label={TEXT.COLUMNS[5]}>
-                                        <div>
-                                            <span className={cx("badge", badge, state === "cancelled" && "line-through")}>{label}</span>
-                                            {when && <small className="block pt-0.5 text-caption text-muted">{TEXT.CALL_BACK_AT(when)}</small>}
-                                        </div>
+                                        <span className={cx("badge", badge, state === "cancelled" && "line-through")}>{label}</span>
                                     </td>
                                     <td data-actions>{actions(row, state)}</td>
                                 </tr>
@@ -199,7 +192,6 @@ const ReceptionConfirm = () => {
                 <div className="min-w-64 flex-1">
                     <Breadcrumb items={CRUMBS} className="mb-2" />
                     <h1 className="page-title">{TEXT.TITLE}</h1>
-                    <p className="page-description">{TEXT.DESCRIPTION}</p>
                 </div>
                 <button type="button" className="btn btn-primary max-md:w-full" onClick={() => setDialog({ type: "book" })}>
                     {TEXT.BOOK}
@@ -223,7 +215,7 @@ const ReceptionConfirm = () => {
                                     id={`cf-${key}`}
                                     type="date"
                                     className="input w-auto"
-                                    min={addDays(today, 1)}
+                                    min={today}
                                     value={filters[key]}
                                     onChange={(e) => e.target.value && setFilter(key)(e.target.value)}
                                 />
@@ -267,18 +259,16 @@ const ReceptionConfirm = () => {
             </Card>
 
             {dialog?.type === "confirm" && <ConfirmAppointmentDialog appointment={a} onClose={close} onSubmit={() => act(confirmAppointment(a.id), TEXT.CONFIRMED(a.patientName))} />}
-            {dialog?.type === "call" && (
-                <ConfirmCallDialog
+            {dialog?.type === "reschedule" && (
+                <RescheduleDialog
                     appointment={a}
-                    today={today}
                     onClose={close}
-                    onSubmit={(v) => {
-                        const when = `${ddmm(v.callBackDate)} ${v.callBackTime}`;
-                        return act(recordConfirmCall(a.id, v), v.outcome === "CallBack" ? TEXT.WILL_CALL_BACK(a.patientName, when) : TEXT.NO_ANSWER(a.patientName, when));
+                    onDone={() => {
+                        setDialog(null);
+                        setReload((n) => n + 1);
                     }}
                 />
             )}
-            {dialog?.type === "reschedule" && <RescheduleDialog appointment={a} onClose={close} onSubmit={(v) => act(rescheduleAppointment(a.id, v), TEXT.RESCHEDULED(a.patientName))} />}
             {dialog?.type === "cancel" && <CancelDialog appointment={a} onClose={close} onSubmit={(reason) => act(cancelAppointment(a.id, reason), TEXT.CANCELLED(a.patientName))} />}
             {dialog?.type === "book" && (
                 <BookingDialog

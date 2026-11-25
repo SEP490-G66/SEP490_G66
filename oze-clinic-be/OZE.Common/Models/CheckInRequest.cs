@@ -11,5 +11,8 @@ namespace OZE.Common.Models
         // Required when the priority is above normal
         [MaxLength(500)]
         public string? Reason { get; set; }
+
+        // Another doctor working today, when the booked one cannot see the patient; null keeps the booked doctor
+        public int? DoctorId { get; set; }
     }
 }

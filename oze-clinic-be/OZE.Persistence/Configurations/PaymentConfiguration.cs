@@ -26,6 +26,8 @@ namespace OZE.Persistence.Configurations
             builder.Property(x => x.PaymentStatus).HasMaxLength(20).HasDefaultValue("PENDING");
             builder.Property(x => x.Purpose).HasMaxLength(20).HasDefaultValue("Regular").IsRequired();
             builder.Property(x => x.Notes).HasMaxLength(500);
+            builder.Property(x => x.ReceiptCode).HasMaxLength(30);
+            builder.Property(x => x.CreatedByUserId).HasMaxLength(450);
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 
             builder.HasOne(x => x.Invoice)
@@ -46,7 +48,25 @@ namespace OZE.Persistence.Configurations
                    .OnDelete(DeleteBehavior.NoAction)
                    .IsRequired(false);
 
+            builder.HasOne(x => x.TreatmentPlanStage)
+                   .WithMany()
+                   .HasForeignKey(x => x.TreatmentPlanStageId)
+                   .HasConstraintName("FK_Payments_TreatmentPlanStages")
+                   .OnDelete(DeleteBehavior.NoAction)
+                   .IsRequired(false);
+            builder.HasOne<ApplicationUser>()
+                   .WithMany()
+                   .HasForeignKey(x => x.CreatedByUserId)
+                   .HasConstraintName("FK_Payments_CreatedBy")
+                   .OnDelete(DeleteBehavior.NoAction)
+                   .IsRequired(false);
             builder.HasIndex(x => x.InvoiceId).HasDatabaseName("IX_Payments_InvoiceId");
+            builder.HasIndex(x => x.ReceiptCode)
+                   .HasDatabaseName("IX_Payments_ReceiptCode")
+                   .HasFilter("[ReceiptCode] IS NOT NULL");
+            builder.HasIndex(x => x.TreatmentPlanStageId)
+                   .HasDatabaseName("IX_Payments_TreatmentPlanStageId")
+                   .HasFilter("[TreatmentPlanStageId] IS NOT NULL");
             builder.HasIndex(x => x.InstallmentPeriodId)
                    .HasDatabaseName("IX_Payments_InstallmentPeriodId")
                    .IsUnique()

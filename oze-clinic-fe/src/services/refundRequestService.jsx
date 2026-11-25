@@ -145,6 +145,11 @@ const CREATE_ERRORS = {
     "Please enter a reason.": "REASON_REQUIRED",
 };
 
+export const refundCreateErrorCode = (result) => {
+    const fieldError = Object.keys(result?.fieldErrors ?? {}).some((key) => key.toLowerCase() === "reason");
+    return CREATE_ERRORS[result?.message] ?? (fieldError ? "REASON_REQUIRED" : null);
+};
+
 export const getMyRefundRequests = async ({ signal } = {}) => {
     const result = await call(() => api.get("/api/refund-requests/my", { ...READ, signal }));
     if (signal?.aborted) throw abortError();
@@ -164,8 +169,7 @@ export const createMyRefundRequest = async ({ invoiceId, reason }, { signal } = 
     const result = await call(() => api.post("/api/refund-requests/my", { invoiceId, reason }, { ...READ, signal }));
     if (signal?.aborted) throw abortError();
     if (!result.success) {
-        const fieldError = Object.keys(result.fieldErrors ?? {}).some((key) => key.toLowerCase() === "reason");
-        return patientFailure(result, CREATE_ERRORS[result.message] ?? (fieldError ? "REASON_REQUIRED" : null));
+        return patientFailure(result, refundCreateErrorCode(result));
     }
     const [created] = normalizeRefundList([result.data]) ?? [];
     if (created) notifyChanged();

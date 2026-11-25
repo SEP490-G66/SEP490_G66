@@ -6,8 +6,10 @@ import {
     ClipboardList,
     CreditCard,
     Heart,
+    HeartHandshake,
     History,
     Image,
+    Landmark,
     LayoutDashboard,
     ScanLine,
     Shield,
@@ -116,6 +118,14 @@ const SIDEBAR_MENU = {
             icon: Users,
             children: [
                 { key: "patient-list", label: "Hồ sơ bệnh nhân", to: ROUTES.RECEPTION_PATIENTS },
+            ],
+        },
+        {
+            key: "customer-care",
+            label: "CSKH",
+            icon: HeartHandshake,
+            children: [
+                { key: "consultations", label: "Yêu cầu tư vấn", to: ROUTES.RECEPTION_CONSULTATIONS },
                 { key: "follow-ups", label: "Nhắc tái khám", to: ROUTES.RECEPTION_FOLLOW_UPS },
             ],
         },
@@ -124,12 +134,30 @@ const SIDEBAR_MENU = {
             label: "Thu ngân",
             icon: Wallet,
             children: [
-                { key: "invoices", label: "Thu tiền", to: ROUTES.RECEPTION_INVOICES },
-                { key: "invoice-list", label: "Hóa đơn & công nợ", to: ROUTES.RECEPTION_INVOICE_LIST },
-                { key: "cash-handover", label: "Phiếu giao ca", to: ROUTES.RECEPTION_CASH_HANDOVER },
+                { key: "payments", label: "Danh sách thanh toán", to: ROUTES.RECEPTION_PAYMENTS },
+                { key: "deposits", label: "Đặt cọc dịch vụ", to: ROUTES.RECEPTION_DEPOSITS },
+                { key: "periods", label: "Thanh toán theo đợt", to: ROUTES.RECEPTION_PERIODS },
+                { key: "collect", label: "Ghi nhận thu tiền", to: ROUTES.RECEPTION_COLLECT },
             ],
         },
-        WORK_GROUP,
+        {
+            key: "finance-management",
+            label: "Quản lý tài chính",
+            icon: Landmark,
+            children: [
+                { key: "invoice-list", label: "Hóa đơn", to: ROUTES.RECEPTION_INVOICE_LIST },
+                { key: "debts", label: "Công nợ", to: ROUTES.RECEPTION_DEBTS },
+                { key: "refunds", label: "Hoàn tiền", to: ROUTES.RECEPTION_REFUNDS },
+            ],
+        },
+        {
+            ...WORK_GROUP,
+            children: [
+                ...WORK_GROUP.children,
+                { key: "cash-handover", label: "Phiếu giao ca", to: ROUTES.RECEPTION_CASH_HANDOVER },
+                { key: "reconciliation", label: "Đối soát cuối ngày", to: ROUTES.RECEPTION_RECONCILIATION },
+            ],
+        },
         ACCOUNT_GROUP,
     ],
     [USER_ROLES.PATIENT]: [

@@ -5,12 +5,12 @@ import { useSubmit } from "./receptionUtils";
 import { QUEUE_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
-// The patient goes home without being seen. Nothing is deleted: an exam appointment becomes "Bỏ về", another room's entry leaves the queue.
+// The patient goes home without being seen: the appointment becomes NO_SHOW and leaves the queue; nothing is deleted.
 const QueueLeaveDialog = ({ row, roomName, onClose, onSubmit }) => {
     const [reason, setReason] = useState("");
     const [tried, setTried] = useState(false);
     const [busy, submit] = useSubmit(onSubmit);
-    const [before, name, after] = TEXT.LEAVE_BODY(row.patientName, roomName, row.kind === "exam");
+    const [before, name, after] = TEXT.LEAVE_BODY(row.patientName, roomName);
     const missing = !reason.trim();
 
     return (

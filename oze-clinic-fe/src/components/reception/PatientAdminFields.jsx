@@ -51,6 +51,7 @@ const PatientAdminFields = ({ values, errors, onChange, onBlur, mode, patient, t
     const dobNote = editing && patient?.dateOfBirth && String(patient.dateOfBirth).slice(0, 10) > today ? TEXT.DOB_FUTURE_NOTE : null;
     const emailNote = account ? TEXT.ACCOUNT_HELP : null;
     const bloodNote = showBloodType(patient) ? TEXT.BLOOD_INVALID_NOTE(String(patient.bloodType).trim()) : null;
+    const genders = GENDER_OPTIONS.filter((code) => code !== "Other" || values.gender === "Other");
 
     return (
         <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -76,7 +77,7 @@ const PatientAdminFields = ({ values, errors, onChange, onBlur, mode, patient, t
             <fieldset className="field" aria-describedby={describedBy("gender", errors.gender)}>
                 <legend className={cx("label", (!editing || patient?.gender) && "label-required")}>{F.GENDER}</legend>
                 <div className="flex h-10 w-full items-center gap-1 rounded-lg bg-surface-muted p-1">
-                    {GENDER_OPTIONS.map((code, index) => (
+                    {genders.map((code, index) => (
                         <label
                             key={code}
                             className={cx(
@@ -145,21 +146,7 @@ const PatientAdminFields = ({ values, errors, onChange, onBlur, mode, patient, t
                     </p>
                 )}
             </div>
-            <div className="field">
-                <label className="label" htmlFor={ids("emergencyContactPhone").id}>
-                    {F.EMERGENCY_PHONE}
-                </label>
-                <input
-                    type="tel"
-                    inputMode="tel"
-                    className="input"
-                    maxLength={FORM_LIMITS.emergencyContactPhone}
-                    aria-describedby={describedBy("emergencyContactPhone", errors.emergencyContactPhone)}
-                    {...input("emergencyContactPhone")}
-                />
-                <FieldError field="emergencyContactPhone" error={errors.emergencyContactPhone} />
-            </div>
-            <div className="field">
+            <div className="field lg:col-span-2">
                 <label className="label" htmlFor={ids("email").id}>
                     {F.EMAIL}
                 </label>
@@ -185,6 +172,36 @@ const PatientAdminFields = ({ values, errors, onChange, onBlur, mode, patient, t
                 <input className="input" maxLength={FORM_LIMITS.address} aria-describedby={describedBy("address", errors.address)} {...input("address")} />
                 <FieldError field="address" error={errors.address} />
             </div>
+            <fieldset className="grid gap-x-6 gap-y-4 sm:col-span-2 sm:grid-cols-2 lg:col-span-3">
+                <legend className="mb-3 text-label font-semibold text-ink">{TEXT.GUARDIAN_GROUP}</legend>
+                <div className="field">
+                    <label className="label" htmlFor={ids("emergencyContactName").id}>
+                        {TEXT.GUARDIAN_NAME}
+                    </label>
+                    <input
+                        className="input"
+                        maxLength={FORM_LIMITS.emergencyContactName}
+                        autoComplete="off"
+                        aria-describedby={describedBy("emergencyContactName", errors.emergencyContactName)}
+                        {...input("emergencyContactName")}
+                    />
+                    <FieldError field="emergencyContactName" error={errors.emergencyContactName} />
+                </div>
+                <div className="field">
+                    <label className="label" htmlFor={ids("emergencyContactPhone").id}>
+                        {TEXT.GUARDIAN_PHONE}
+                    </label>
+                    <input
+                        type="tel"
+                        inputMode="tel"
+                        className="input"
+                        maxLength={FORM_LIMITS.emergencyContactPhone}
+                        aria-describedby={describedBy("emergencyContactPhone", errors.emergencyContactPhone)}
+                        {...input("emergencyContactPhone")}
+                    />
+                    <FieldError field="emergencyContactPhone" error={errors.emergencyContactPhone} />
+                </div>
+            </fieldset>
             {editing && (showBloodType(patient) || forceBloodType) && (
                 <div className="field">
                     <label className="label label-required" htmlFor={ids("bloodType").id}>

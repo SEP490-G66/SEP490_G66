@@ -40,6 +40,8 @@ namespace OZE.Common.Constants
             public const string ReturningBookingConfirmedMessage = "Lịch hẹn của bạn lúc {0} ngày {1} đã được xác nhận. Hẹn gặp bạn tại phòng khám.";
             public const string AppointmentRescheduledTitle = "Lịch hẹn đã được đổi";
             public const string AppointmentRescheduledMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1}.";
+            public const string AppointmentRescheduledWithDoctorMessage = "Lịch hẹn của bạn đã được đổi sang {0} ngày {1} với {2}.";
+            public const string AppointmentRescheduledReasonSuffix = " Lý do: {0}";
             public const string AppointmentCancelledTitle = "Lịch hẹn đã bị hủy";
             public const string AppointmentCancelledMessage = "Lịch hẹn lúc {0} ngày {1} đã bị hủy. Lý do: {2}";
             public const string AppointmentShiftEndedTitle = "Lịch hẹn cần đổi giờ";
@@ -50,6 +52,8 @@ namespace OZE.Common.Constants
             public const string PaymentReminderTitle = "Nhắc thanh toán";
             public const string FollowUpScheduledTitle = "Lịch hẹn tái khám";
             public const string FollowUpScheduledMessage = "Bạn có lịch hẹn tái khám lúc {0} ngày {1}.";
+            public const string FollowUpProposedTitle = "Bác sĩ hẹn tái khám";
+            public const string FollowUpProposedMessage = "Bác sĩ đã hẹn bạn tái khám lúc {0} ngày {1}. Phòng khám sẽ liên hệ để xác nhận lịch.";
             public const string FollowUpReminderTitle = "Nhắc lịch tái khám";
             public const string YourTurnTitle = "Đến lượt bạn";
             public const string YourTurnMessage = "Số {0}, mời bạn vào {1}.";

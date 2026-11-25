@@ -37,6 +37,15 @@ namespace OZE.Persistence.Configurations
                    .HasConstraintName("FK_TreatmentPlanStages_Doctors")
                    .OnDelete(DeleteBehavior.NoAction);
 
+            builder.HasOne(x => x.Appointment)
+                   .WithMany()
+                   .HasForeignKey(x => x.AppointmentId)
+                   .HasConstraintName("FK_TreatmentPlanStages_Appointments")
+                   .OnDelete(DeleteBehavior.NoAction)
+                   .IsRequired(false);
+            builder.HasIndex(x => x.AppointmentId)
+                   .HasDatabaseName("IX_TreatmentPlanStages_AppointmentId")
+                   .HasFilter("[AppointmentId] IS NOT NULL");
             builder.HasIndex(x => new { x.TreatmentPlanId, x.StageNumber })
                    .HasDatabaseName("IX_TreatmentPlanStages_PlanId");
             builder.HasIndex(x => x.ScheduledDate)

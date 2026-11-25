@@ -22,6 +22,9 @@ namespace OZE.Common.Models
         public DateOnly? FollowUpAppointmentDate { get; set; }
         public TimeOnly? FollowUpTimeSlotStart { get; set; }
         public string? FollowUpAppointmentStatus { get; set; }
+        // The doctor of the follow-up appointment, who may differ from the doctor of the original visit
+        public int? FollowUpDoctorId { get; set; }
+        public string? FollowUpDoctorName { get; set; }
         public DateTimeOffset? LastRemindedAt { get; set; }
         public int ReminderCount { get; set; }
         // Set by the service's periodic recall rather than by the doctor
