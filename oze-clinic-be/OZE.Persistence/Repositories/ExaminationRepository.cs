@@ -111,7 +111,8 @@ namespace OZE.Persistence.Repositories
                 .FirstOrDefaultAsync(x => x.Id == examinationId, cancellationToken);
         }
 
-        // The states of the receptionist's follow-up list. A follow-up without a live appointment (none, or cancelled) only has the date the doctor wrote
+        // The states of the receptionist's follow-up list. A follow-up without a live appointment (none, or cancelled) only has the date the doctor wrote.
+        // OPEN: every follow-up that is not DONE (the patient has not arrived for it yet)
         private static IQueryable<Examination> WhereFollowUpState(IQueryable<Examination> query, string state, DateOnly today)
         {
             const string pending = AppointmentConstants.PendingStatus;
@@ -134,6 +135,8 @@ namespace OZE.Persistence.Repositories
                     || ((x.FollowUpAppointment == null || x.FollowUpAppointment.Status == cancelled) && x.FollowUpDate < today)),
                 "DONE" => query.Where(x => x.FollowUpAppointment != null
                     && (x.FollowUpAppointment.Status == checkedIn || x.FollowUpAppointment.Status == inService || x.FollowUpAppointment.Status == completed)),
+                "OPEN" => query.Where(x => !(x.FollowUpAppointment != null
+                    && (x.FollowUpAppointment.Status == checkedIn || x.FollowUpAppointment.Status == inService || x.FollowUpAppointment.Status == completed))),
                 "NEED" => query.Where(x => (x.FollowUpAppointment != null && x.FollowUpAppointment.Status == pending && x.FollowUpAppointment.AppointmentDate >= today)
                     || (x.FollowUpAppointment != null && x.FollowUpAppointment.Status == confirmed)
                     || ((x.FollowUpAppointment == null || x.FollowUpAppointment.Status == cancelled) && x.FollowUpDate >= today)),

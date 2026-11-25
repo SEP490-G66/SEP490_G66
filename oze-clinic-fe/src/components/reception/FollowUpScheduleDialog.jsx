@@ -56,7 +56,6 @@ const FollowUpScheduleDialog = ({ item, mode, doctors, onClose, onSaved }) => {
                     <p className="text-body-sm font-semibold text-ink">
                         {item.patientName} · <span className="num">{item.patientCode}</span> · <span className="num">{phoneText(item.patientPhoneNumber)}</span>
                     </p>
-                    {item.followUpNotes && <p className="mt-0.5 text-body-sm text-muted">{TEXT.PATIENT_WHAT(item.followUpNotes)}</p>}
                 </div>
                 <div className="field">
                     <label className="label" htmlFor="fu-schedule-doctor">

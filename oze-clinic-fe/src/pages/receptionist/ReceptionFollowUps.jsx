@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import { Search } from "lucide-react";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
-import LabeledSelect from "@/components/ui/LabeledSelect";
 import Pagination from "@/components/ui/Pagination";
 import RowMenu from "@/components/ui/RowMenu";
 import FollowUpConfirmDialog from "@/components/reception/FollowUpConfirmDialog";
@@ -9,19 +10,32 @@ import FollowUpDeclineDialog from "@/components/reception/FollowUpDeclineDialog"
 import FollowUpScheduleDialog from "@/components/reception/FollowUpScheduleDialog";
 import { Card } from "@/components/reception/shared";
 import { phoneText } from "@/components/reception/receptionUtils";
-import { usePageTitle } from "@/hooks/usePatientRecordNav";
+import { useDebounced, usePageTitle } from "@/hooks/usePatientRecordNav";
 import { appointmentErrorText, clinicToday, getDoctorOptions, getFollowUpList, remindFollowUp } from "@/services/receptionService";
 import { FOLLOW_UP_TEXT as TEXT } from "@/utils/messages";
 import { slotRange } from "@/utils/booking";
 import { dmy } from "@/utils/calendar";
 import { formatClock, getClinicDateTimeParts } from "@/utils/format";
-import { EMPTY_FILTERS, FOLLOW_UP_PAGE_SIZE, STATE_CHIPS, doctorOf, dueDateOf, followUpQuery, isFiltered, remindUnlockAt, remindedText, rowState, slotOf } from "@/utils/followUp";
+import {
+    DEFAULT_STATE,
+    FILTER_STATES,
+    FOLLOW_UP_PAGE_SIZE,
+    STATE_CHIPS,
+    dateFromUrl,
+    dueDateOf,
+    followUpQuery,
+    remindUnlockAt,
+    remindedText,
+    rowState,
+    slotOf,
+} from "@/utils/followUp";
 import { cx } from "@/utils/cx";
 
 const READ = { skipErrorPage: true };
 const SEARCH_DELAY_MS = 300;
 const SKELETON_ROWS = [1, 2, 3, 4, 5];
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 7;
+const CELL = "@4xl:py-3 @4xl:align-top";
 const CLOCK_TICK_MS = 60_000;
 const C = TEXT.COLUMNS;
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
@@ -32,38 +46,62 @@ const clockOf = (value) => {
 };
 
 const ReceptionFollowUps = () => {
-    const [filters, setFilters] = useState(EMPTY_FILTERS);
-    const [search, setSearch] = useState("");
+    const [params, setParams] = useSearchParams();
+    const q = params.get("q") ?? "";
+    const rawState = params.get("state");
+    const state = FILTER_STATES.includes(rawState) ? rawState : DEFAULT_STATE;
+    const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1);
+    const rawFrom = params.get("from");
+    const rawTo = params.get("to");
+    const datesValid = !dateFromUrl(rawFrom) || !dateFromUrl(rawTo) || dateFromUrl(rawFrom) <= dateFromUrl(rawTo);
+    const from = datesValid ? dateFromUrl(rawFrom) : "";
+    const to = datesValid ? dateFromUrl(rawTo) : "";
+    const [box, setBox] = useState(q);
     const [reload, setReload] = useState(0);
     const [result, setResult] = useState(null);
     const [doctors, setDoctors] = useState([]);
     const [dialog, setDialog] = useState(null);
-    const [needCount, setNeedCount] = useState(null);
     const [reminding, setReminding] = useState(null);
     const [now, setNow] = useState(() => Date.now());
-    const timer = useRef(null);
+    const { schedule, cancel } = useDebounced(SEARCH_DELAY_MS);
 
     usePageTitle(TEXT.DOC_TITLE);
 
-    const requestKey = `${JSON.stringify(filters)}|${reload}`;
+    const update = (changes) => {
+        const next = new URLSearchParams(window.location.search);
+        Object.entries(changes).forEach(([key, value]) => (value ? next.set(key, value) : next.delete(key)));
+        if (!("page" in changes)) next.delete("page");
+        setParams(next, { replace: true });
+    };
+
+    useEffect(() => {
+        const stateInvalid = rawState !== null && (!FILTER_STATES.includes(rawState) || rawState === DEFAULT_STATE);
+        const fromInvalid = rawFrom !== null && (!datesValid || dateFromUrl(rawFrom) !== rawFrom);
+        const toInvalid = rawTo !== null && (!datesValid || dateFromUrl(rawTo) !== rawTo);
+        if (!stateInvalid && !fromInvalid && !toInvalid) return;
+        const next = new URLSearchParams(window.location.search);
+        if (stateInvalid) next.delete("state");
+        if (fromInvalid) next.delete("from");
+        if (toInvalid) next.delete("to");
+        setParams(next, { replace: true });
+    }, [rawState, rawFrom, rawTo, datesValid, setParams]);
+
+    const [shownQ, setShownQ] = useState(q);
+    if (shownQ !== q) {
+        setShownQ(q);
+        if (box.trim() !== q) setBox(q);
+    }
+
+    const requestKey = `${q}|${state}|${from}|${to}|${page}|${reload}`;
 
     useEffect(() => {
         const controller = new AbortController();
-        getFollowUpList(followUpQuery(filters, clinicToday()), { ...READ, signal: controller.signal }).then((response) => {
+        getFollowUpList(followUpQuery({ keyword: q, from, to, state, page }), { ...READ, signal: controller.signal }).then((response) => {
             if (response.aborted || controller.signal.aborted) return;
             setResult({ key: requestKey, ok: response.success, data: response.success ? response.data : null });
         });
         return () => controller.abort();
-    }, [filters, requestKey]);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        getFollowUpList({ state: "need", page: 1, pageSize: 1 }, { ...READ, signal: controller.signal }).then((response) => {
-            if (response.aborted || controller.signal.aborted) return;
-            setNeedCount(response.success ? Number(response.data?.totalCount ?? 0) : null);
-        });
-        return () => controller.abort();
-    }, [reload]);
+    }, [q, from, to, state, page, requestKey]);
 
     useEffect(() => {
         const tick = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
@@ -80,8 +118,6 @@ const ReceptionFollowUps = () => {
         return () => controller.abort();
     }, []);
 
-    useEffect(() => () => clearTimeout(timer.current), []);
-
     const current = result?.key === requestKey ? result : null;
     const status = current ? (current.ok ? "ready" : "error") : "loading";
     const items = current?.data?.items ?? [];
@@ -89,18 +125,17 @@ const ReceptionFollowUps = () => {
     const totalPages = Math.max(1, Number(current?.data?.totalPages ?? Math.ceil(total / FOLLOW_UP_PAGE_SIZE)));
     const lastPager = result?.ok ? Math.max(1, Number(result.data?.totalPages ?? 1)) : 1;
 
-    const change = (patch) => setFilters((f) => ({ ...f, ...patch, page: patch.page ?? 1 }));
-
-    const onSearch = (value) => {
-        setSearch(value);
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => change({ keyword: value }), SEARCH_DELAY_MS);
+    const setDate = (key, value) => {
+        const changes = { [key]: value };
+        if (key === "from" && value && to && to < value) changes.to = value;
+        if (key === "to" && value && from && from > value) changes.from = value;
+        update(changes);
     };
 
-    const clearAll = () => {
-        clearTimeout(timer.current);
-        setSearch("");
-        setFilters(EMPTY_FILTERS);
+    const clearFilters = () => {
+        cancel();
+        setBox("");
+        setParams(new URLSearchParams(), { replace: true });
     };
 
     const done = (message) => {
@@ -121,55 +156,96 @@ const ReceptionFollowUps = () => {
 
     const today = clinicToday();
 
-    const doctorOptions = [["", TEXT.ALL_DOCTORS], ...doctors.map((d) => [String(d.id), d.name])];
-    const dirty = isFiltered({ ...filters, keyword: search });
-    const from = (filters.page - 1) * FOLLOW_UP_PAGE_SIZE + 1;
+    const filtered = Boolean(q || from || to || state !== DEFAULT_STATE);
+    const firstNo = (page - 1) * FOLLOW_UP_PAGE_SIZE + 1;
 
     return (
         <div className="app-content min-h-full space-y-5">
             <div>
                 <Breadcrumb items={CRUMBS} className="mb-2" />
                 <h1 className="page-title">{TEXT.TITLE}</h1>
-                <p className="mt-1 text-body-sm text-muted">
-                    {TEXT.DESCRIPTION}
-                    {needCount !== null && TEXT.NEED_COUNT(needCount)}
-                </p>
+                <p className="mt-1 text-body-sm text-muted">{TEXT.DESCRIPTION}</p>
             </div>
-            <Card>
-                <div className="flex flex-wrap items-end gap-3 px-4 py-3">
-                    <div className="flex min-w-56 flex-1 flex-col gap-1">
-                        <label htmlFor="fu-search" className="text-caption text-muted">
+            <Card className="overflow-hidden">
+                <div className="flex flex-wrap items-end gap-4 p-4 sm:p-6">
+                    <div className="field w-full sm:w-80">
+                        <label htmlFor="fu-search" className="label">
                             {TEXT.SEARCH}
                         </label>
-                        <input id="fu-search" type="search" className="input" placeholder={TEXT.SEARCH_PLACEHOLDER} value={search} onChange={(event) => onSearch(event.target.value)} />
+                        <div className="search">
+                            <Search aria-hidden="true" />
+                            <input
+                                id="fu-search"
+                                type="search"
+                                className="input"
+                                placeholder={TEXT.SEARCH_PLACEHOLDER}
+                                value={box}
+                                onChange={(event) => {
+                                    const value = event.target.value;
+                                    setBox(value);
+                                    schedule(() => {
+                                        const keyword = value.trim();
+                                        if (keyword !== (new URLSearchParams(window.location.search).get("q") ?? "")) update({ q: keyword });
+                                    });
+                                }}
+                            />
+                        </div>
                     </div>
-                    <LabeledSelect id="fu-due" label={TEXT.DUE} value={filters.due} options={Object.entries(TEXT.DUE_OPTIONS)} onChange={(due) => change({ due })} />
-                    <LabeledSelect id="fu-state" label={TEXT.STATE} value={filters.state} options={Object.entries(TEXT.STATE_OPTIONS)} onChange={(value) => change({ state: value })} />
-                    <LabeledSelect id="fu-doctor" label={TEXT.DOCTOR} value={filters.doctorId} options={doctorOptions} onChange={(doctorId) => change({ doctorId })} />
-                    {dirty && (
-                        <button type="button" className="btn btn-link mb-2.5 h-auto p-0" onClick={clearAll}>
+                    {[
+                        ["from", TEXT.FROM, from],
+                        ["to", TEXT.TO, to],
+                    ].map(([key, label, value]) => (
+                        <div key={key} className="field w-full sm:w-auto">
+                            <label htmlFor={`fu-${key}`} className="label">
+                                {label}
+                            </label>
+                            <input id={`fu-${key}`} type="date" className="input w-full sm:w-auto" value={value} onChange={(event) => setDate(key, event.target.value)} />
+                        </div>
+                    ))}
+                    <div className="field w-full sm:w-auto sm:min-w-48">
+                        <label htmlFor="fu-state" className="label">
+                            {TEXT.STATE}
+                        </label>
+                        <select id="fu-state" className="input w-full" value={state} onChange={(event) => update({ state: event.target.value === DEFAULT_STATE ? "" : event.target.value })}>
+                            {FILTER_STATES.map((value) => (
+                                <option key={value} value={value}>
+                                    {TEXT.STATE_OPTIONS[value]}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {filtered && (
+                        <button type="button" className="btn-link h-control" onClick={clearFilters}>
                             {TEXT.CLEAR}
                         </button>
                     )}
                 </div>
-            </Card>
-            <Card>
                 {status === "error" ? (
-                    <div role="alert" className="alert alert-danger m-4 flex flex-wrap items-center gap-3">
-                        <span className="flex-1">{TEXT.LOAD_ERROR}</span>
-                        <button type="button" className="btn btn-secondary h-9" onClick={() => setReload((n) => n + 1)}>
-                            {TEXT.RETRY}
-                        </button>
+                    <div className="border-t border-border p-4 sm:p-6">
+                        <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
+                            <span className="flex-1">{TEXT.LOAD_ERROR}</span>
+                            <button type="button" className="btn btn-secondary h-9" onClick={() => setReload((n) => n + 1)}>
+                                {TEXT.RETRY}
+                            </button>
+                        </div>
                     </div>
                 ) : (
-                    <div className="table-wrap rounded-none border-0" aria-busy={status === "loading" ? "true" : undefined}>
-                        <table className="table table-stack">
+                    <div className="table-wrap rounded-none border-x-0 border-b-0" aria-busy={status === "loading" ? "true" : undefined}>
+                        <table className="table table-stack table-fixed-acts">
+                            <colgroup>
+                                <col className="w-12" />
+                                <col />
+                                <col className="w-32" />
+                                <col className="w-30" />
+                                <col className="w-36" />
+                                <col className="w-36" />
+                                <col className="w-50" />
+                            </colgroup>
                             <thead>
                                 <tr>
+                                    <th className="px-2 text-right">{C.NO}</th>
                                     <th>{C.PATIENT}</th>
                                     <th>{C.PHONE}</th>
-                                    <th>{C.WHAT}</th>
-                                    <th>{C.DOCTOR}</th>
                                     <th>{C.DUE}</th>
                                     <th>{C.REMINDED}</th>
                                     <th>{C.STATE}</th>
@@ -194,68 +270,67 @@ const ReceptionFollowUps = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    items.map((item) => {
+                                    items.map((item, index) => {
                                         const state = rowState(item, today);
                                         const [chipLabel, chipClass] = STATE_CHIPS[state];
                                         const due = dueDateOf(item, state);
                                         const slot = slotOf(item, state);
                                         const finished = state === "ARRIVED" || state === "DONE";
                                         const missed = state === "MISSED";
-                                        const unlock = finished || missed ? null : remindUnlockAt(item, now);
+                                        const unlock = state === "PENDING" || state === "NONE" ? remindUnlockAt(item, now) : null;
                                         const last = item.lastRemindedAt ? clockOf(item.lastRemindedAt) : null;
                                         const reminded = remindedText(item, last);
+                                        const canRemind = state === "PENDING" || state === "NONE";
+                                        const when = [slot && slotRange(slot), due === today && !finished && TEXT.TODAY].filter(Boolean).join(" · ");
                                         const menu = [
+                                            canRemind ? { label: TEXT.CONFIRM, onSelect: () => setDialog({ type: state === "PENDING" ? "confirm" : "book", item, state, reminded }) } : null,
                                             state === "PENDING" || state === "CONFIRMED" ? { label: TEXT.MENU_MOVE, onSelect: () => setDialog({ type: "move", item, state }) } : null,
                                             missed ? { label: TEXT.MENU_BOOK, onSelect: () => setDialog({ type: "book", item, state }) } : null,
                                             { label: TEXT.MENU_DECLINE, danger: true, onSelect: () => setDialog({ type: "decline", item, state }) },
                                         ].filter(Boolean);
                                         return (
                                             <tr key={item.examinationId} className={cx(finished && "text-muted")}>
-                                                <td data-primary>
-                                                    <span className="block font-semibold whitespace-nowrap text-ink">{item.patientName}</span>
+                                                <td data-label={C.NO} data-hide-stack className={cx(CELL, "num px-2 text-right text-muted")}>
+                                                    {firstNo + index}
+                                                </td>
+                                                <td data-primary className={CELL}>
+                                                    <span className="block font-semibold text-ink">{item.patientName}</span>
                                                     <span className="num block text-caption text-muted">{item.patientCode}</span>
                                                 </td>
-                                                <td data-label={C.PHONE} className="num whitespace-nowrap">
+                                                <td data-label={C.PHONE} className={cx(CELL, "num whitespace-nowrap")}>
                                                     {item.patientPhoneNumber ? phoneText(item.patientPhoneNumber) : TEXT.DASH}
                                                 </td>
-                                                <td data-label={C.WHAT}>{item.followUpNotes || TEXT.DASH}</td>
-                                                <td data-label={C.DOCTOR} className="whitespace-nowrap">
-                                                    {doctorOf(item, state) || TEXT.DASH}
-                                                </td>
-                                                <td data-label={C.DUE} className="num whitespace-nowrap">
+                                                <td data-label={C.DUE} className={cx(CELL, "num")}>
                                                     {due ? (
-                                                        <>
+                                                        <div>
                                                             <span className="block font-semibold text-ink">{dmy(due)}</span>
-                                                            <span className="block text-caption text-muted">
-                                                                {slot ? slotRange(slot) : TEXT.NO_TIME}
-                                                                {due === today && !finished && TEXT.TODAY_MARK}
-                                                            </span>
-                                                        </>
+                                                            {when && <span className="block text-caption text-muted">{when}</span>}
+                                                        </div>
                                                     ) : (
                                                         TEXT.DASH
                                                     )}
                                                 </td>
-                                                <td data-label={C.REMINDED} className="num whitespace-nowrap">
+                                                <td data-label={C.REMINDED} className={cx(CELL, "num")}>
                                                     {item.reminderCount ? (
-                                                        <>
+                                                        <div>
                                                             <span className="block">{TEXT.REMIND_COUNT(item.reminderCount)}</span>
                                                             {last && <span className="block text-caption text-muted">{TEXT.REMIND_LAST(last.day, last.time)}</span>}
-                                                        </>
+                                                        </div>
                                                     ) : (
                                                         TEXT.NOT_REMINDED
                                                     )}
                                                 </td>
-                                                <td data-label={C.STATE}>
+                                                <td data-label={C.STATE} className={CELL}>
                                                     <span className={cx("badge", chipClass)}>{chipLabel}</span>
                                                 </td>
-                                                <td data-actions className="w-px text-right">
+                                                <td data-actions className={cx(CELL, "text-right")}>
                                                     {!finished && (
-                                                        <div className="flex flex-col items-end gap-1">
-                                                            <div className="flex justify-end gap-1.5">
-                                                                {!missed && (
+                                                        <div className="flex flex-col items-end gap-1 @max-4xl:w-full">
+                                                            <div className="flex w-full justify-end gap-1.5">
+                                                                {canRemind ? (
                                                                     <button
                                                                         type="button"
-                                                                        className="btn btn-secondary h-8 px-3 text-label whitespace-nowrap"
+                                                                        className="btn btn-primary h-8 w-32 px-3 text-label whitespace-nowrap @max-4xl:max-w-80 @max-4xl:flex-1"
                                                                         disabled={Boolean(unlock) || reminding === item.examinationId}
                                                                         aria-describedby={unlock ? `fu-lock-${item.examinationId}` : undefined}
                                                                         onClick={() => remind(item)}
@@ -263,15 +338,8 @@ const ReceptionFollowUps = () => {
                                                                         {reminding === item.examinationId && <span className="btn-spinner" aria-hidden />}
                                                                         {TEXT.REMIND}
                                                                     </button>
-                                                                )}
-                                                                {(state === "PENDING" || state === "NONE") && (
-                                                                    <button
-                                                                        type="button"
-                                                                        className="btn btn-primary h-8 px-3 text-label whitespace-nowrap"
-                                                                        onClick={() => setDialog({ type: state === "PENDING" ? "confirm" : "book", item, state, reminded })}
-                                                                    >
-                                                                        {TEXT.CONFIRM}
-                                                                    </button>
+                                                                ) : (
+                                                                    <span className="w-32 shrink-0 @max-4xl:hidden" aria-hidden="true" />
                                                                 )}
                                                                 <RowMenu label={TEXT.MORE(item.patientName)} items={menu} />
                                                             </div>
@@ -293,13 +361,13 @@ const ReceptionFollowUps = () => {
                 )}
                 {(status === "ready" ? total > 0 : status === "loading" && result?.ok) && (
                     <div className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3">
-                        <span className="num text-caption text-muted">{status === "ready" ? TEXT.COUNT(from, from + items.length - 1, total) : ""}</span>
+                        <span className="num text-caption text-muted">{status === "ready" ? TEXT.COUNT(firstNo, firstNo + items.length - 1, total) : ""}</span>
                         <span className="flex-1" />
                         {(status === "ready" ? totalPages : lastPager) > 1 && (
                             <Pagination
-                                page={filters.page}
+                                page={page}
                                 totalPages={status === "ready" ? totalPages : lastPager}
-                                onChange={(page) => change({ page })}
+                                onChange={(next) => update({ page: next > 1 ? String(next) : "" })}
                                 busy={status === "loading"}
                                 label={TEXT.TITLE}
                             />

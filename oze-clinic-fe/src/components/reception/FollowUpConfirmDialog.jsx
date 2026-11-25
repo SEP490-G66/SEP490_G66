@@ -13,7 +13,6 @@ const FollowUpConfirmDialog = ({ item, state, reminded, onClose, onSaved }) => {
     const rows = [
         [TEXT.FIELD_PATIENT, `${item.patientName} · ${item.patientCode}`],
         [TEXT.FIELD_PHONE, phoneText(item.patientPhoneNumber)],
-        [TEXT.FIELD_WHAT, item.followUpNotes || TEXT.DASH],
         [TEXT.FIELD_DOCTOR, doctorOf(item, state)],
         [TEXT.FIELD_WHEN, [dmy(dueDateOf(item, state)), slotRange(slotOf(item, state))].filter(Boolean).join(" · ")],
         [TEXT.FIELD_REMINDED, reminded],
