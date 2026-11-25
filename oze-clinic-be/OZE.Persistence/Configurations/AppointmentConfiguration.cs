@@ -19,6 +19,7 @@ namespace OZE.Persistence.Configurations
             builder.Property(x => x.AppointmentType).HasMaxLength(10).IsRequired();
             builder.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("PENDING");
             builder.Property(x => x.Priority).HasDefaultValue(0);
+            builder.Property(x => x.PriorityReason).HasMaxLength(500);
             builder.Property(x => x.CancellationReason).HasMaxLength(500);
             builder.Property(x => x.RowVersion).IsRowVersion();
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");

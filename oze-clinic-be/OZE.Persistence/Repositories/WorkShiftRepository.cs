@@ -127,6 +127,19 @@ namespace OZE.Persistence.Repositories
                 .ToListAsync();
         }
 
+        public async Task<Dictionary<int, int>> CountWaitingByDoctorAsync(DateOnly date, CancellationToken cancellationToken = default)
+        {
+            return await context.Appointments
+                .AsNoTracking()
+                .Where(x => x.AppointmentDate == date
+                    && x.Status == AppointmentConstants.CheckedInStatus
+                    && x.DoctorId != null
+                    && x.Examination == null)
+                .GroupBy(x => x.DoctorId!.Value)
+                .Select(g => new { DoctorId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.DoctorId, x => x.Count, cancellationToken);
+        }
+
         public void Remove(StaffSchedule schedule)
         {
             context.StaffSchedules.Remove(schedule);

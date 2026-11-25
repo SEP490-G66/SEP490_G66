@@ -25,6 +25,10 @@ namespace OZE.Persistence.Configurations
             builder.Property(x => x.ExpectedCash).HasPrecision(18, 2);
             builder.Property(x => x.CountedCash).HasPrecision(18, 2);
             builder.Property(x => x.Difference).HasPrecision(18, 2);
+            builder.Property(x => x.RefundPaidOut).HasPrecision(18, 2);
+            builder.Property(x => x.CountedTransfer).HasPrecision(18, 2);
+            builder.Property(x => x.TransferDifference).HasPrecision(18, 2);
+            builder.Property(x => x.Denominations).HasMaxLength(500);
             builder.Property(x => x.Notes).HasMaxLength(500);
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 

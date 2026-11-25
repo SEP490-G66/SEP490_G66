@@ -332,6 +332,7 @@ namespace OZE.Common.Constants
             public const string ReassignAlreadyExamined = "This patient was already seen by the doctor and stays with that doctor";
             public const string ReassignWrongDay = "A patient can only be moved to another doctor on the day of the appointment";
             public const string ReassignSameDoctor = "The patient is already with this doctor";
+            public const string ReassignReasonRequired = "Please enter why the patient is moved to another doctor";
             public const string DoctorNoSuitableShiftToday = "The doctor has no shift today in a room that suits these services";
             public const string DoctorProfileNotFound = "No doctor profile is linked to this account";
             public const string PriorityInvalid = "Priority must be 0 (normal), 1 (high) or 2 (urgent)";
@@ -766,6 +767,15 @@ namespace OZE.Common.Constants
             public const string CountedCashInvalid = "Counted cash cannot be negative.";
             public const string DifferenceNoteRequired = "The counted cash differs from the expected cash. Please explain in the notes.";
             public const string HandoverInvalid = "The person receiving the hand-over must be another active receptionist.";
+            public const string StatusInvalid = "Status must be Open or Closed.";
+            // {0} receptionist, {1} opened at (clinic time)
+            public const string AnotherSessionOpen = "{0} still has a cash session open since {1}. It must be closed before a new one is opened.";
+            public const string SessionChanged = "This is not your open cash session any more. Reload the page.";
+            public const string FiguresChanged = "The system figures changed while you were counting. Reload and count again.";
+            public const string DenominationsInvalid = "Each banknote must be a valid face value with a count from 0 to 9999.";
+            public const string DenominationsMismatch = "The banknote count does not add up to the counted cash.";
+            public const string TransferNoteRequired = "The checked transfers differ from the confirmed transfers. Please explain in the notes.";
+            public const string NoPreviousSession = "No cash session was closed earlier today.";
             public const string Opened = "Cash session has been opened.";
             public const string ExpenseAdded = "Expense has been recorded.";
             public const string ExpenseRemoved = "Expense has been removed.";

@@ -17,6 +17,13 @@ namespace OZE.Domain.Entities
         public decimal? ExpectedCash { get; set; }
         public decimal? CountedCash { get; set; }
         public decimal? Difference { get; set; }
+        // Approved refunds this receptionist paid out in cash from the drawer
+        public decimal? RefundPaidOut { get; set; }
+        // Transfers the receptionist checked on the bank statement, against TransferConfirmed
+        public decimal? CountedTransfer { get; set; }
+        public decimal? TransferDifference { get; set; }
+        // The drawer counted note by note, as JSON {"500000":2,...}; null when only the total was entered
+        public string? Denominations { get; set; }
         public string? HandoverToUserId { get; set; }
         public string? Notes { get; set; }
         public DateTimeOffset CreatedAt { get; set; }

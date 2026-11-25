@@ -372,6 +372,8 @@ namespace OZE.Application.Services
             PatientCode = includePatientDetails ? x.Appointment?.Patient?.PatientCode ?? string.Empty : string.Empty,
             QueueNumber = x.QueueNumber,
             Priority = x.Priority,
+            // The patient may learn they are prioritized, not why (Law on Medical Examination and Treatment 2023, art. 3.2)
+            PriorityReason = includePatientDetails ? x.Appointment?.PriorityReason : null,
             SkipCount = x.SkipCount,
             Status = x.Status,
             CalledAt = x.CalledAt,

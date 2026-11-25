@@ -15,6 +15,8 @@ namespace OZE.Common.Models
         public string PatientCode { get; set; } = string.Empty;
         public int QueueNumber { get; set; }
         public int Priority { get; set; }
+        // Staff only; null on the public board, where the patient only sees that someone is prioritized
+        public string? PriorityReason { get; set; }
         public int SkipCount { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTimeOffset? CalledAt { get; set; }

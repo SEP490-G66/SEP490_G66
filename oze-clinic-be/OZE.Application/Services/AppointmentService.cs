@@ -598,6 +598,7 @@ namespace OZE.Application.Services
                     DurationMinutes = item.DurationMinutes,
                     PriceAtBooking = item.PriceAtBooking
                 }).ToList(),
+                RequiredRoomType = RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)),
                 AppointmentType = appointment.AppointmentType,
                 AppointmentDate = appointment.AppointmentDate,
                 TimeSlotStart = slot.SlotStart,
@@ -660,6 +661,15 @@ namespace OZE.Application.Services
                     RoomId = GetCurrentRoom(x.Appointment)?.Id,
                     RoomName = GetCurrentRoom(x.Appointment)?.RoomName,
                     Priority = x.Appointment.Priority,
+                    PriorityReason = x.Appointment.PriorityReason,
+                    RequiredRoomType = RequiredRoomTypeOf(x.Appointment.ServiceItems.Select(i => i.Service?.RequiredRoomType)),
+                    PatientPhoneNumber = x.Appointment.Patient?.PhoneNumber,
+                    PatientAllergies = x.Appointment.Patient?.MedicalProfiles
+                        .Where(m => m.RecordType == PatientConstants.MedicalProfile.AllergyType
+                            && m.Status == PatientConstants.MedicalProfile.ActiveStatus)
+                        .Select(m => m.Title)
+                        .ToList() ?? new List<string>(),
+                    SkipCount = WaitingOrder.SkipCountOf(x.Appointment),
                     IsLate = x.Group == WaitingOrder.LateGroup,
                     IsPriorityReturn = x.Group == WaitingOrder.PriorityReturnGroup,
                     Services = x.Appointment.ServiceItems
@@ -927,6 +937,7 @@ namespace OZE.Application.Services
             var oldStatus = appointment.Status;
             appointment.Status = AppointmentConstants.CheckedInStatus;
             appointment.Priority = priority;
+            appointment.PriorityReason = PriorityReasonOf(priority, request?.Reason);
             appointment.CheckInAt = DateTimeOffset.UtcNow;
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -1081,6 +1092,9 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(appointment.AppointmentDate != today, ErrorConstants.AppointmentMessage.ReassignWrongDay);
             var newDoctorId = request.DoctorId!.Value;
             ConditionGuard.ThrowIf(appointment.DoctorId == newDoctorId, ErrorConstants.AppointmentMessage.ReassignSameDoctor);
+            // The patient is told why they are moved
+            var reason = request.Reason?.Trim();
+            ConditionGuard.Ensure(!string.IsNullOrEmpty(reason), ErrorConstants.AppointmentMessage.ReassignReasonRequired);
 
             // The same rule as booking: a shift in the kind of room the services need
             var shift = await FindDoctorShiftAsync(newDoctorId, today, null,
@@ -1103,11 +1117,11 @@ namespace OZE.Application.Services
             entry ??= await EnterExaminationQueueAsync(appointment, room, null, cancellationToken);
 
             await _auditLogService.LogAsync(AuditConstants.AppointmentDoctorReassigned, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
-                new { DoctorId = oldDoctorId }, new { DoctorId = newDoctorId, RoomId = room?.Id });
+                new { DoctorId = oldDoctorId }, new { DoctorId = newDoctorId, RoomId = room?.Id }, reason);
             await NotifyAsync(n => n.NotifyStaffAsync(newDoctorId,
                 new NotificationContent(NotificationConstants.Text.PatientReassignedTitle, string.Format(NotificationConstants.Text.PatientReassignedMessage, appointment.Patient?.FullName),
                     NotificationConstants.Reference.Appointment, appointment.Id.ToString()), cancellationToken));
-            await NotifyMovedToDoctorAsync(appointment, entry, shift.StaffProfile?.FullName, room, cancellationToken);
+            await NotifyMovedToDoctorAsync(appointment, entry, shift.StaffProfile?.FullName, room, cancellationToken, reason);
 
             var response = MapToResponse(appointment);
             response.DoctorId = newDoctorId;
@@ -1256,6 +1270,7 @@ namespace OZE.Application.Services
                     // The patient is at the desk, so there is nothing to confirm
                     Status = AppointmentConstants.CheckedInStatus,
                     Priority = priority,
+                    PriorityReason = PriorityReasonOf(priority, request.Reason),
                     CheckInAt = now,
                     Notes = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
                     CreatedAt = now,
@@ -1362,7 +1377,7 @@ namespace OZE.Application.Services
         }
 
         // Moved to another doctor: the patient keeps the number, only the doctor and room change
-        private Task NotifyMovedToDoctorAsync(Appointment appointment, QueueEntry? entry, string? doctorName, Room? room, CancellationToken cancellationToken)
+        private Task NotifyMovedToDoctorAsync(Appointment appointment, QueueEntry? entry, string? doctorName, Room? room, CancellationToken cancellationToken, string? reason = null)
         {
             var place = DoctorAndRoom(doctorName, room);
             if (entry == null || place == null)
@@ -1370,7 +1385,9 @@ namespace OZE.Application.Services
                 return Task.CompletedTask;
             }
 
-            var message = string.Format(NotificationConstants.Text.MovedToDoctorMessage, place, QueueNumberText(entry.QueueNumber));
+            var message = string.IsNullOrWhiteSpace(reason)
+                ? string.Format(NotificationConstants.Text.MovedToDoctorMessage, place, QueueNumberText(entry.QueueNumber))
+                : string.Format(NotificationConstants.Text.MovedToDoctorWithReasonMessage, place, QueueNumberText(entry.QueueNumber), reason);
             return NotifyAsync(n => n.NotifyPatientAsync(appointment.PatientId,
                 new NotificationContent(NotificationConstants.Text.MovedToDoctorTitle, message, NotificationConstants.Reference.Appointment, appointment.Id.ToString()),
                 cancellationToken));
@@ -1417,6 +1434,8 @@ namespace OZE.Application.Services
 
             var oldPriority = appointment.Priority;
             appointment.Priority = priority;
+            // Back to normal clears the reason
+            appointment.PriorityReason = PriorityReasonOf(priority, request.Reason);
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _appointmentRepository.UpdateAsync(appointment);
@@ -1671,6 +1690,20 @@ namespace OZE.Application.Services
                 ErrorConstants.AppointmentMessage.PriorityReasonRequired);
         }
 
+        // The reason is kept only while the patient is above normal priority
+        private static string? PriorityReasonOf(int priority, string? reason)
+        {
+            if (priority == PriorityConstants.Normal || string.IsNullOrWhiteSpace(reason))
+            {
+                return null;
+            }
+
+            var trimmed = reason.Trim();
+            return trimmed.Length > PriorityReasonMaxLength ? trimmed[..PriorityReasonMaxLength] : trimmed;
+        }
+
+        private const int PriorityReasonMaxLength = 500;
+
         // autoConfirmed: a returning patient's online booking that skipped the front desk call, kept so the log shows why
         // an online booking started as CONFIRMED
         private Task LogCreatedAsync(Appointment appointment, List<BookingLine> lines, bool autoConfirmed = false) =>
@@ -1870,6 +1903,7 @@ namespace OZE.Application.Services
                     DurationMinutes = item.DurationMinutes,
                     PriceAtBooking = item.PriceAtBooking
                 }).ToList(),
+                RequiredRoomType = RequiredRoomTypeOf(appointment.ServiceItems.Select(i => i.Service?.RequiredRoomType)),
                 AppointmentType = appointment.AppointmentType,
                 AppointmentDate = appointment.AppointmentDate,
                 TimeSlotStart = appointment.TimeSlotStart,

@@ -378,6 +378,10 @@ namespace OZE.Persistence.Migrations
                         .HasColumnType("int")
                         .HasDefaultValue(0);
 
+                    b.Property<string>("PriorityReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -607,10 +611,18 @@ namespace OZE.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal?>("CountedTransfer")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetimeoffset")
                         .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.Property<string>("Denominations")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<decimal?>("Difference")
                         .HasPrecision(18, 2)
@@ -642,6 +654,10 @@ namespace OZE.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal?>("RefundPaidOut")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -650,6 +666,10 @@ namespace OZE.Persistence.Migrations
                         .HasDefaultValue("Open");
 
                     b.Property<decimal?>("TransferConfirmed")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("TransferDifference")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
@@ -2418,6 +2438,9 @@ namespace OZE.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ProcessedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("ProcessedByUserId")
+                        .HasColumnType("nvarchar(450)");
+
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -3929,6 +3952,12 @@ namespace OZE.Persistence.Migrations
                         .HasForeignKey("PaymentId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_RefundAdjustments_Payments");
+
+                    b.HasOne("OZE.Domain.Entities.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_RefundAdjustments_ProcessedBy");
 
                     b.HasOne("OZE.Domain.Entities.ApplicationUser", null)
                         .WithMany()

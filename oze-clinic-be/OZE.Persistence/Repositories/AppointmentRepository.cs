@@ -245,6 +245,8 @@ namespace OZE.Persistence.Repositories
             var query = _context.Appointments
                 .AsNoTracking()
                 .Include(x => x.Patient)
+                    .ThenInclude(x => x.MedicalProfiles.Where(m => m.RecordType == PatientConstants.MedicalProfile.AllergyType
+                        && m.Status == PatientConstants.MedicalProfile.ActiveStatus))
                 .Include(x => x.Doctor)
                 .Include(x => x.Examination)
                     .ThenInclude(x => x!.FollowUpAppointment)

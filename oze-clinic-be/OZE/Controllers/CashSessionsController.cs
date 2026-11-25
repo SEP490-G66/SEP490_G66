@@ -82,6 +82,18 @@ namespace OZE.Controllers
         }
 
         /// <summary>
+        /// The shift the receptionist is about to open and the cash it starts with (what the previous shift of today counted).
+        /// 404 when no session was closed earlier today.
+        /// </summary>
+        [HttpGet("next-shift")]
+        [Authorize(Roles = RoleConstants.ReceptionistRole)]
+        public async Task<ActionResult<ApiResponse<NextCashShiftResponse>>> GetNextShiftAsync(CancellationToken cancellationToken)
+        {
+            var next = await _cashSessionService.GetNextShiftAsync(CurrentUserId!, cancellationToken);
+            return Ok(ApiResponse<NextCashShiftResponse>.SuccessResult(next));
+        }
+
+        /// <summary>
         /// Past sessions. A receptionist sees only their own; the manager sees all or filters by OpenedByUserId.
         /// </summary>
         [HttpGet]

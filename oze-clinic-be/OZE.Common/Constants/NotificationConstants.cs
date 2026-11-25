@@ -65,6 +65,8 @@ namespace OZE.Common.Constants
             public const string CheckedInWithPlaceMessage = "Số thứ tự của bạn là {0}. Khám với {1}.";
             public const string MovedToDoctorTitle = "Bạn được chuyển bác sĩ";
             public const string MovedToDoctorMessage = "Bạn được chuyển sang khám với {0}. Số thứ tự của bạn vẫn là {1}.";
+            // {0} doctor and room, {1} queue number, {2} reason
+            public const string MovedToDoctorWithReasonMessage = "Bạn được chuyển sang khám với {0}. Lý do: {2}. Số thứ tự của bạn vẫn là {1}.";
             public const string AppointmentReminderTitle = "Nhắc lịch hẹn ngày mai";
             public const string AppointmentReminderMessage = "Bạn có lịch hẹn lúc {0} ngày {1} tại Nha khoa OZE.";
             public const string ExaminationCompletedTitle = "Đã có phiếu khám";

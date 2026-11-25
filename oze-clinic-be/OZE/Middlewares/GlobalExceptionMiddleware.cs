@@ -46,11 +46,13 @@ namespace OZE.ProjectBase.Middlewares
             var statusCode = HttpStatusCode.InternalServerError;
             string message = "An internal server error occurred.";
             List<string>? errors = null;
+            string? code = null;
 
             if (exception is AppException appException)
             {
                 statusCode = appException.StatusCode;
                 message = appException.Message;
+                code = appException.Code;
             }
             else if (exception is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
             {
@@ -76,6 +78,7 @@ namespace OZE.ProjectBase.Middlewares
             context.Response.StatusCode = (int)statusCode;
 
             var response = ApiResponse.FailureResult(message, errors);
+            response.Code = code;
             var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
             await context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
