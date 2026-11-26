@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Image as ImageIcon } from "lucide-react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ImageCard from "@/components/ui/ImageCard";
@@ -24,8 +24,8 @@ const TypesSection = ({ types }) => (
     <section aria-labelledby={TYPES_TITLE_ID} className={SECTION_CLASS}>
         <SectionHeading id={TYPES_TITLE_ID}>{TEXT.TYPES_TITLE}</SectionHeading>
         <ul className={`grid grid-cols-1 gap-6 ${typeColumns(types.length)}`}>
-            {types.map(({ name, description, imageUrl }) => (
-                <li key={name} className="flex">
+            {types.map(({ id, name, description, imageUrl }) => (
+                <li key={name} id={id ? `variant-${id}` : undefined} className="flex scroll-mt-24">
                     <ImageCard imageUrl={imageUrl} imageAlt={name} title={name} description={description} imageClassName="aspect-4/3" className="w-full" />
                 </li>
             ))}
@@ -101,6 +101,12 @@ const useService = (slug) => {
 const ServiceDetail = () => {
     const { serviceSlug } = useParams();
     const service = useService(serviceSlug);
+    const { hash } = useLocation();
+
+    // A variant picked in the service bar opens the page at that variant
+    useEffect(() => {
+        if (service && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" });
+    }, [service, hash]);
 
     if (service === undefined) {
         return (

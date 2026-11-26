@@ -4,8 +4,9 @@ import Breadcrumb from "@/components/navigation/Breadcrumb";
 import ImageCard from "@/components/ui/ImageCard";
 import Pagination from "@/components/ui/Pagination";
 import SearchInput from "@/components/ui/SearchInput";
+import useMenuServices from "@/hooks/useMenuServices";
 import usePublicList from "@/hooks/usePublicList";
-import { searchServices } from "@/services/dentalService";
+import { filterServices } from "@/services/dentalService";
 import { PUBLIC_SERVICE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES, getServiceDetailRoute } from "@/utils/routes";
 
@@ -17,7 +18,8 @@ const BREADCRUMB = [{ label: TEXT.HOME, href: ROUTES.HOME }, { label: TEXT.SERVI
 
 const ServiceList = () => {
     const gridRef = useRef(null);
-    const { keyword, page, totalPages, items: pageItems, setKeyword: changeKeyword, setPage } = usePublicList(searchServices, PAGE_SIZE);
+    const services = useMenuServices();
+    const { keyword, page, totalPages, items: pageItems, setKeyword: changeKeyword, setPage } = usePublicList((text) => filterServices(services ?? [], text), PAGE_SIZE);
 
     const changePage = (target) => {
         setPage(target);
@@ -45,12 +47,16 @@ const ServiceList = () => {
                     />
                 </div>
 
-                {pageItems.length > 0 ? (
+                {services === null ? (
+                    <p className="py-12 text-center text-body" role="status">
+                        {TEXT.LOADING}
+                    </p>
+                ) : pageItems.length > 0 ? (
                     <>
                         <ul
                             ref={gridRef}
                             aria-label={TEXT.LIST_LABEL}
-                            className="grid scroll-mt-24 grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5"
+                            className="grid scroll-mt-24 grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
                         >
                             {pageItems.map((service) => (
                                 <li key={service.slug} className="flex">
@@ -58,10 +64,14 @@ const ServiceList = () => {
                                         imageUrl={service.imageUrl}
                                         imageAlt={service.name}
                                         title={service.name}
-                                        description={service.summary}
+                                        description={service.intro}
                                         to={getServiceDetailRoute(service.slug)}
                                         className="w-full"
-                                    />
+                                    >
+                                        {service.types.length > 0 && (
+                                            <p className="mt-auto pt-2 text-label text-primary">{TEXT.TYPE_COUNT(service.types.length)}</p>
+                                        )}
+                                    </ImageCard>
                                 </li>
                             ))}
                         </ul>
