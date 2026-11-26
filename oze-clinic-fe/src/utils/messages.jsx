@@ -943,6 +943,8 @@ export const BOOKING_TEXT = {
     BLOCKED_TEXT: "Mỗi lần chỉ đặt được một lịch hẹn. Muốn đặt lịch mới, vui lòng đến khám theo lịch này hoặc hủy lịch trước.",
     BLOCKED_ACTION: "Xem hoặc hủy lịch hẹn",
     NO_SLOTS_TITLE: "Hiện không còn ca trống trong 30 ngày tới",
+    NO_SLOTS_DOCTOR_TITLE: (doctor) => `${doctor} không còn ca trống phù hợp trong 30 ngày tới`,
+    NO_SLOTS_DOCTOR_TEXT: "Bác sĩ này không có khoảng thời gian trống đủ dài cho các dịch vụ bạn chọn. Bấm \"Xem với mọi bác sĩ\" để xem giờ trống của các bác sĩ khác, hoặc bớt dịch vụ.",
     NO_SLOTS_TEXT: "Vui lòng gọi",
     NO_SLOTS_TEXT_END: "để được hỗ trợ xếp lịch.",
     ALL_DOCTORS: "Xem với mọi bác sĩ",
