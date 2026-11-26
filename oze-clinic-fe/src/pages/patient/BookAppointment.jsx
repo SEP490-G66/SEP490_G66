@@ -81,7 +81,7 @@ const BookAppointment = () => {
             <section className="card-app">
                 <BookingSectionHeading number={1} title={BOOKING_TEXT.PATIENT_SECTION} />
                 <BookingPatientCard patient={context.patient} note={state.note} onNoteChange={actions.changeNote} showNote={isForm} />
-                <hr className="my-7 border-border" />
+                <hr className="my-6 border-border" />
                 <BookingSectionHeading number={2} title={BOOKING_TEXT.SCHEDULE_SECTION} />
                 <BookingSchedule form={form} />
             </section>
@@ -89,7 +89,7 @@ const BookAppointment = () => {
     };
 
     return (
-        <>
+        <div className="mx-auto w-full max-w-4xl">
             <div className="page-header">
                 <div>
                     <h1 id={BOOKING_IDS.PAGE_TITLE} tabIndex={-1} className="page-title">
@@ -106,7 +106,7 @@ const BookAppointment = () => {
             <p className="sr-only" role="status">
                 {state.submitting ? BOOKING_TEXT.SUBMITTING : ""}
             </p>
-        </>
+        </div>
     );
 };
 
