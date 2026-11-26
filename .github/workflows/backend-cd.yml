@@ -1,0 +1,269 @@
+
+name: OZE Backend CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'oze-clinic-be/**'
+      - '.github/workflows/backend-cd.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oze-backend-deployment
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  IMAGE_NAME: ghcr.io/sep490-g66/oze-backend
+  SOLUTION_PATH: oze-clinic-be/OZE.sln
+  TEST_PROJECT: oze-clinic-be/OZE.UnitTest/OZE.UnitTest.csproj
+
+jobs:
+  build-and-test:
+    name: Build and Test Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore "${{ env.SOLUTION_PATH }}"
+
+      - name: Build solution
+        run: |
+          dotnet build "${{ env.SOLUTION_PATH }}" \
+            --configuration Release \
+            --no-restore
+
+      - name: Run unit tests
+        run: |
+          dotnet test "${{ env.TEST_PROJECT }}" \
+            --configuration Release \
+            --no-build \
+            --logger "trx;LogFileName=backend-tests.trx" \
+            --results-directory "${{ github.workspace }}/test-results"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+  publish-image:
+    name: Build and Push Docker Image
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./oze-clinic-be
+          file: ./oze-clinic-be/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  deploy:
+    name: Deploy Backend to VPS
+    needs: publish-image
+    if: github.ref == 'refs/heads/main' && vars.VPS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/oze_deploy
+          chmod 600 ~/.ssh/oze_deploy
+
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy Docker image
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          ssh \
+            -i ~/.ssh/oze_deploy \
+            -p "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=3 \
+            "$VPS_USERNAME@$VPS_HOST" \
+            "bash -s -- '$IMAGE_TAG'" <<'REMOTE'
+          set -euo pipefail
+
+          exec 9>/opt/oze/.deployment.lock
+          flock -w 300 9
+
+          echo "Deployment lock acquired."
+
+          cd /opt/oze/backend
+
+          IMAGE_TAG="$1"
+
+          if [[ ! "$IMAGE_TAG" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Invalid image tag."
+            exit 1
+          fi
+
+          NEW_IMAGE="ghcr.io/sep490-g66/oze-backend:${IMAGE_TAG}"
+          OLD_IMAGE_ID=$(docker inspect -f '{{.Image}}' oze-backend)
+
+          echo "Pulling new backend image..."
+          docker pull "$NEW_IMAGE"
+
+          docker tag "$OLD_IMAGE_ID" oze-backend:rollback
+
+          persist_image() {
+            python3 - "$1" <<'PY'
+          import os
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          path = Path(".env")
+          image = sys.argv[1]
+
+          lines = path.read_text().splitlines()
+          lines = [
+              line for line in lines
+              if not line.startswith("BACKEND_IMAGE=")
+          ]
+          lines.append(f"BACKEND_IMAGE={image}")
+
+          fd, tmp = tempfile.mkstemp(dir=".")
+          with os.fdopen(fd, "w") as f:
+              f.write("\n".join(lines) + "\n")
+
+          os.chmod(tmp, 0o600)
+          os.replace(tmp, path)
+          PY
+          }
+
+          health_check() {
+            for attempt in $(seq 1 30); do
+              if curl -fsS \
+                --max-time 5 \
+                http://127.0.0.1:5000/api/services \
+                > /dev/null; then
+                return 0
+              fi
+
+              echo "Waiting for backend: attempt $attempt/30"
+              sleep 5
+            done
+
+            return 1
+          }
+
+          rollback() {
+            echo "Deployment failed. Rolling back..."
+
+            export BACKEND_IMAGE=oze-backend:rollback
+
+            docker compose up -d \
+              --no-build \
+              --no-deps \
+              --force-recreate \
+              oze-backend || return 1
+
+            persist_image "$BACKEND_IMAGE" || return 1
+
+            if health_check; then
+              echo "Rollback successful."
+            else
+              echo "Rollback health check failed."
+              return 1
+            fi
+          }
+
+          export BACKEND_IMAGE="$NEW_IMAGE"
+
+          echo "Starting new backend container..."
+
+          if ! docker compose up -d \
+            --no-build \
+            --no-deps \
+            --force-recreate \
+            oze-backend; then
+            rollback || echo "Manual recovery required."
+            exit 1
+          fi
+
+          echo "Checking backend health..."
+
+          if ! health_check; then
+            rollback || echo "Manual recovery required."
+            exit 1
+          fi
+
+          if ! persist_image "$NEW_IMAGE"; then
+            rollback || echo "Manual recovery required."
+            exit 1
+          fi
+
+          docker compose ps
+
+          echo "Backend deployment successful."
+          echo "Deployed image: $NEW_IMAGE"
+          REMOTE
+
+      - name: Cleanup SSH credentials
+        if: always()
+        run: rm -f ~/.ssh/oze_deploy
