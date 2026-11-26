@@ -23,7 +23,7 @@ const HOVER_CLOSE_DELAY_MS = 150;
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), input:not([disabled])";
 const LINK_CLASS = "public-nav-link flex min-h-11 items-center";
 const DRAWER_ID = "guest-drawer";
-const NAV_LINK_CLASS = "public-nav-link flex h-full items-center";
+const NAV_LINK_CLASS = "public-nav-link flex items-center whitespace-nowrap";
 const ROW_CLASS = "flex h-full w-full items-center justify-between gap-4 px-4 md:px-6";
 const ROW_START_CLASS = "flex shrink-0 items-center lg:flex-1";
 const ROW_END_CLASS = "flex shrink-0 items-center justify-end lg:flex-1";
@@ -143,8 +143,7 @@ const SearchForm = ({ compact = false, className }) => {
     );
 };
 
-// tone "bar" is the blue service bar under the header, whose menus list the variants of one service
-const NavMenu = ({ id, label, to, items, open, onOpenChange, tone = "nav", alignEnd = false }) => {
+const NavMenu = ({ id, label, to, items, open, onOpenChange, alignEnd = false }) => {
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const containerRef = useRef(null);
@@ -267,13 +266,13 @@ const NavMenu = ({ id, label, to, items, open, onOpenChange, tone = "nav", align
     };
 
     return (
-        <div ref={containerRef} className="h-full" onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+        <div ref={containerRef} className="flex h-full items-center" onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
             <button
                 ref={buttonRef}
                 type="button"
                 className={cx(
-                    tone === "bar" ? "service-bar-link flex h-full cursor-pointer items-center gap-1" : "public-nav-link flex h-full cursor-pointer items-center gap-1",
-                    active && (tone === "bar" ? "service-bar-link-active" : "public-nav-link-active"),
+                    "public-nav-link flex cursor-pointer items-center gap-1 whitespace-nowrap",
+                    active && "public-nav-link-active",
                 )}
                 aria-haspopup="true"
                 aria-expanded={open}
@@ -283,7 +282,7 @@ const NavMenu = ({ id, label, to, items, open, onOpenChange, tone = "nav", align
             >
                 {label}
                 <ChevronDown
-                    className={cx("size-5 transition-transform duration-200", open && "rotate-180")}
+                    className={cx("size-4 opacity-60 transition-transform duration-200", open && "rotate-180 opacity-100")}
                     aria-hidden="true"
                 />
             </button>
@@ -295,8 +294,8 @@ const NavMenu = ({ id, label, to, items, open, onOpenChange, tone = "nav", align
                 onKeyDown={handleMenuKeyDown}
                 className={cx(
                     alignEnd ? "right-0" : "left-0",
-                    "absolute top-full z-40 min-w-56 rounded-md border border-border bg-canvas py-2 shadow-sm transition-[opacity,translate,visibility] duration-200 ease-out",
-                    tone === "bar" && items.length > 6 && "grid w-max grid-cols-2 gap-x-2 lg:grid-cols-3",
+                    "absolute top-full z-40 -mt-1 min-w-60 rounded-xl border border-border bg-canvas p-2 shadow-lg transition-[opacity,translate,visibility] duration-200 ease-out",
+                    items.length > 6 && "grid w-max grid-cols-2 gap-x-2 lg:grid-cols-3",
                     open ? "visible translate-y-0 opacity-100" : "pointer-events-none invisible -translate-y-1 opacity-0",
                 )}
             >
@@ -308,7 +307,7 @@ const NavMenu = ({ id, label, to, items, open, onOpenChange, tone = "nav", align
                             role="menuitem"
                             tabIndex={-1}
                             onClick={() => onOpenChange(false)}
-                            className={({ isActive }) => cx("flex min-h-control items-center px-4 py-2 text-label transition-colors duration-150 hover:bg-surface-tint hover:text-primary", isActive ? "text-primary" : "text-body")}
+                            className={({ isActive }) => cx("flex min-h-control items-center rounded-lg px-3 py-2 text-label transition-colors duration-150 hover:bg-primary-soft hover:text-primary", isActive ? "font-medium text-primary" : "text-ink")}
                         >
                             {item.label}
                         </NavLink>
@@ -811,13 +810,25 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
     const openMenuId = openMenu?.key === location.key ? openMenu.id : null;
     const drawerOpen = drawerKey === location.key;
 
-    const navEntries = [
-        { key: "home", label: TEXT.HOME, to: ROUTES.HOME, end: true },
-        { key: "services", label: TEXT.SERVICES, to: ROUTES.SERVICES, items: serviceItems },
-        { key: "book-appointment", label: TEXT.BOOK_APPOINTMENT, to: ROUTES.BOOK_APPOINTMENT },
+    // The drawer and screens under xl group the services under "Dịch vụ"; wider screens show each service as its own tab
+    const servicesEntry = { key: "services", label: TEXT.SERVICES, to: ROUTES.SERVICES, items: serviceItems };
+    const serviceTabs = menuServices.map((service) => {
+        const to = getServiceDetailRoute(service.slug);
+        return {
+            key: `service-${service.slug}`,
+            label: service.name,
+            to,
+            items: service.types.length ? service.types.map((type) => ({ key: `variant-${type.id}`, label: type.name, to: `${to}#variant-${type.id}` })) : null,
+            wide: true,
+        };
+    });
+    const homeEntry = { key: "home", label: TEXT.HOME, to: ROUTES.HOME, end: true };
+    const tailEntries = [
         { key: "about-us", label: TEXT.ABOUT_US, items: ABOUT_ITEMS },
         { key: "contact", label: TEXT.CONTACT, to: ROUTES.CONTACT },
     ];
+    const navEntries = [homeEntry, servicesEntry, ...tailEntries];
+    const tabEntries = [homeEntry, { ...servicesEntry, narrow: serviceTabs.length > 0 }, ...serviceTabs, ...tailEntries];
 
     const setMenuOpen = (menuId) => (nextOpen) =>
         setOpenMenu((current) => {
@@ -838,6 +849,10 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
 
     // Guests and signed-in patients share the public header; patients get session actions instead of sign-in links.
     const signedIn = Boolean(token);
+    // A signed-in patient also has the sidebar toggle and the account menu on the tab row, so the services become
+    // separate tabs only on wider screens
+    const narrowClass = signedIn ? "2xl:hidden" : "xl:hidden";
+    const wideClass = signedIn ? "hidden 2xl:flex" : "hidden xl:flex";
 
     return (
         <>
@@ -855,6 +870,16 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
                         <a href={`tel:${CLINIC_HOTLINE.TEL}`} className="whitespace-nowrap text-on-primary">
                             {TEXT.HOTLINE_LABEL} <span className="num font-semibold underline">{CLINIC_HOTLINE.DISPLAY}</span>
                         </a>
+                        {!signedIn && (
+                            <div className="hidden items-center gap-2 md:flex">
+                                <Link to={ROUTES.SIGN_IN} className="btn btn-secondary border-transparent">
+                                    {TEXT.SIGN_IN}
+                                </Link>
+                                <Link to={ROUTES.REGISTER} className="btn border-white/70 text-on-primary hover:bg-white/10">
+                                    {TEXT.SIGN_UP}
+                                </Link>
+                            </div>
+                        )}
                         <button
                             ref={menuButtonRef}
                             type="button"
@@ -873,7 +898,7 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
             <nav className={cx("public-nav", !signedIn && "hidden md:flex")}>
                 <div className={ROW_CLASS}>
                     {signedIn ? (
-                        <div className={ROW_START_CLASS}>
+                        <div className="flex shrink-0 items-center">
                             {onToggleSidebar && (
                                 <SidebarToggle
                                     onToggleSidebar={onToggleSidebar}
@@ -883,13 +908,11 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
                                 />
                             )}
                         </div>
-                    ) : (
-                        <div className="hidden lg:block lg:flex-1" />
-                    )}
-                    <ul className="hidden h-full min-w-0 flex-1 items-center justify-center gap-6 md:flex lg:flex-none lg:gap-8">
-                        {navEntries.map((entry) =>
+                    ) : null}
+                    <ul className={cx("hidden h-full min-w-0 flex-1 items-center justify-center gap-1 md:flex", signedIn ? "2xl:gap-1.5" : "xl:gap-1.5 2xl:gap-3")}>
+                        {tabEntries.map((entry, index) =>
                             entry.items ? (
-                                <li key={entry.key} className="relative h-full">
+                                <li key={entry.key} className={cx("relative flex h-full items-center", entry.narrow && narrowClass, entry.wide && wideClass)}>
                                     <NavMenu
                                         id={`${entry.key}-menu`}
                                         label={entry.label}
@@ -897,10 +920,11 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
                                         items={entry.items}
                                         open={openMenuId === entry.key}
                                         onOpenChange={setMenuOpen(entry.key)}
+                                        alignEnd={index >= tabEntries.length - 4}
                                     />
                                 </li>
                             ) : (
-                                <li key={entry.key} className="h-full">
+                                <li key={entry.key} className={cx("flex h-full items-center", entry.wide && wideClass)}>
                                     <NavLink to={entry.to} end={entry.end} className={NAV_LINK_CLASS}>
                                         {entry.label}
                                     </NavLink>
@@ -908,48 +932,9 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
                             ),
                         )}
                     </ul>
-                    {signedIn ? (
-                        <SessionActions className={ROW_END_CLASS} />
-                    ) : (
-                        <div className={`${ROW_END_CLASS} gap-3`}>
-                            <Link to={ROUTES.SIGN_IN} className="btn btn-primary">
-                                {TEXT.SIGN_IN}
-                            </Link>
-                            <Link to={ROUTES.REGISTER} className="btn btn-secondary">
-                                {TEXT.SIGN_UP}
-                            </Link>
-                        </div>
-                    )}
+                    {signedIn && <SessionActions className="flex shrink-0 items-center justify-end" />}
                 </div>
             </nav>
-            {menuServices.length > 0 && (
-                <nav aria-label={TEXT.SERVICE_BAR} className="service-bar">
-                    <ul className="flex h-full w-full items-center justify-center gap-2 px-4 md:px-6 lg:gap-6">
-                        {menuServices.map((service, index) =>
-                            service.types.length ? (
-                                <li key={service.slug} className="relative h-full">
-                                    <NavMenu
-                                        id={`service-bar-${service.slug}`}
-                                        label={service.name}
-                                        to={getServiceDetailRoute(service.slug)}
-                                        items={service.types.map((type) => ({ key: `variant-${type.id}`, label: type.name, to: `${getServiceDetailRoute(service.slug)}#variant-${type.id}` }))}
-                                        open={openMenuId === `service-${service.slug}`}
-                                        onOpenChange={setMenuOpen(`service-${service.slug}`)}
-                                        tone="bar"
-                                        alignEnd={index >= menuServices.length - 2}
-                                    />
-                                </li>
-                            ) : (
-                                <li key={service.slug} className="h-full">
-                                    <NavLink to={getServiceDetailRoute(service.slug)} className={({ isActive }) => cx("service-bar-link flex h-full items-center", isActive && "service-bar-link-active")}>
-                                        {service.name}
-                                    </NavLink>
-                                </li>
-                            ),
-                        )}
-                    </ul>
-                </nav>
-            )}
             {drawerOpen && (
                 <Drawer
                     id={DRAWER_ID}
