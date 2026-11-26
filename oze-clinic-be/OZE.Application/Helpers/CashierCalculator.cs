@@ -4,11 +4,11 @@ using OZE.Domain.Entities;
 
 namespace OZE.Application.Helpers
 {
-    // Money rules of the cashier pages, the same as the FE's utils/cashier.js (plan bản 4, mục E). Pure, no database.
-    // Two ways of counting money:
-    //   paid = lines of CONFIRMED receipts -> debts, statuses and the numbers shown;
-    //   held = lines of CONFIRMED or PENDING receipts -> the ceiling (most that may still be collected),
-    //          so nothing is collected twice while a transfer waits for confirmation.
+    /// <summary>
+    /// Bộ tính toán quy tắc tài chính thuần túy cho quầy thu ngân (Cashier Calculator).
+    /// Đồng bộ 100% với logic frontend utils/cashier.js nhằm tính toán chính xác công nợ,
+    /// số dư tạm ứng, số tiền trần tối đa được phép thu (Ceiling) và hạn nợ (OwedSince).
+    /// </summary>
     public static class CashierCalculator
     {
         public sealed record Line(string Kind, long? PlanId, long? PeriodId, long? VisitId, decimal Amount, string Status);

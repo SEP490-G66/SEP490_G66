@@ -3,6 +3,7 @@ using OZE.Common.Models.Base;
 
 namespace OZE.Common.Models
 {
+    /// <summary>Yêu cầu mở ca làm việc tiền mặt mới với số tiền đầu ca.</summary>
     public class OpenCashSessionRequest
     {
         [Required]
@@ -13,6 +14,7 @@ namespace OZE.Common.Models
         public string? Notes { get; set; }
     }
 
+    /// <summary>Yêu cầu ghi nhận khoản chi tiền mặt phát sinh trong ca.</summary>
     public class AddCashExpenseRequest
     {
         [Required]
@@ -27,6 +29,7 @@ namespace OZE.Common.Models
         public string Description { get; set; } = string.Empty;
     }
 
+    /// <summary>Yêu cầu đóng ca làm việc, kiểm đếm tiền và bàn giao ca.</summary>
     public class CloseCashSessionRequest
     {
         [Required]

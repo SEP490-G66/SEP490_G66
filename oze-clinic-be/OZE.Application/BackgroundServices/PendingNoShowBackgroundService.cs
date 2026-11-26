@@ -7,8 +7,10 @@ using OZE.Common.Constants;
 
 namespace OZE.Application.BackgroundServices
 {
-    // Once a clinic day (and at startup), a booking still waiting for confirmation after its day has passed becomes NO_SHOW.
-    // This also closes a follow-up the doctor set that the receptionist never confirmed with the patient.
+    /// <summary>
+    /// Background Service chạy định kỳ trong hệ thống: tự động quét và đánh dấu trạng thái NO_SHOW
+    /// cho các lịch hẹn PENDING mà ngày hẹn đã trôi qua mà chưa từng được xác nhận.
+    /// </summary>
     public class PendingNoShowBackgroundService : BackgroundService
     {
         private const int CheckIntervalMinutes = 30;

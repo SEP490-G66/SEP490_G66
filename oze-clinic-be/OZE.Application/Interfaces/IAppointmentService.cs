@@ -6,14 +6,28 @@ using System.Threading.Tasks;
 
 namespace OZE.Application.Interfaces
 {
+    /// <summary>
+    /// Service quản lý toàn diện lịch hẹn khám (Appointment): đặt lịch online, đặt lịch qua lễ tân,
+    /// check-in hàng đợi, đổi bác sĩ, hủy lịch và khởi động buổi khám.
+    /// </summary>
     public interface IAppointmentService
     {
+        /// <summary>Lấy danh sách các dịch vụ khám có thể đặt lịch trước.</summary>
         Task<List<BookableServiceResponse>> GetBookableServicesAsync();
+
+        /// <summary>Truy vấn các khung giờ còn trống (Available Slots) của bác sĩ.</summary>
         Task<List<AvailableSlotResponse>> GetAvailableSlotsAsync(AvailableSlotRequest request);
-        // Free-slot count of every day of a range, in one request (booking calendar)
+
+        /// <summary>Lấy số lượng slot trống của các ngày trong khoảng thời gian phục vụ lịch đặt hẹn.</summary>
         Task<List<AvailableDayResponse>> GetAvailableDaysAsync(AvailableDaysRequest request);
+
+        /// <summary>Đặt lịch khám dành cho khách vãng lai (chưa có tài khoản).</summary>
         Task<AppointmentResponse> BookAsGuestAsync(GuestBookingRequest request);
+
+        /// <summary>Đặt lịch khám dành cho bệnh nhân đã đăng nhập hệ thống.</summary>
         Task<AppointmentResponse> BookAsPatientAsync(BookingRequest request, string userId);
+
+        /// <summary>Lễ tân đặt lịch khám thay cho bệnh nhân tại quầy tiếp đón.</summary>
         Task<AppointmentResponse> BookByReceptionistAsync(ReceptionBookingRequest request, string receptionistUserId);
         Task<PagedResult<AppointmentResponse>> GetAppointmentsAsync(AppointmentQueryParameters query, CancellationToken cancellationToken = default);
         // doctorUserId: null for staff (any doctor, or all); for a doctor, their own account id, which limits the list to their own patients
