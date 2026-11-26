@@ -27,15 +27,22 @@ export const getFooterServices = () => FOOTER_SERVICE_SLUGS.map((slug) => getSer
 
 export const getMenuServices = () => PUBLIC_SERVICES.filter((service) => !service.hiddenInMenu);
 
-// The service catalog of the database, loaded once per page load; a failed load is tried again next time
+// The service catalog of the database, shared by the header menu, the service pages and the booking form so one
+// page load asks for it once. It is kept for a few minutes; a failed load is tried again next time.
+const CATALOG_TTL_MS = 5 * 60 * 1000;
 let catalogRequest = null;
+let catalogLoadedAt = 0;
 
-const loadCatalog = () => {
-    catalogRequest ??= call(() => api.get("/api/appointments/bookable-services", { skipErrorPage: true })).then((result) => {
-        if (result.success && Array.isArray(result.data)) return result.data;
-        catalogRequest = null;
-        return null;
-    });
+export const loadCatalog = () => {
+    if (catalogRequest && Date.now() - catalogLoadedAt > CATALOG_TTL_MS) catalogRequest = null;
+    if (!catalogRequest) {
+        catalogLoadedAt = Date.now();
+        catalogRequest = call(() => api.get("/api/appointments/bookable-services", { skipErrorPage: true })).then((result) => {
+            if (result.success && Array.isArray(result.data)) return result.data;
+            catalogRequest = null;
+            return null;
+        });
+    }
     return catalogRequest;
 };
 

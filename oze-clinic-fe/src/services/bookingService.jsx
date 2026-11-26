@@ -1,5 +1,6 @@
 import api from "./api";
 import { call } from "./receptionService";
+import { loadCatalog } from "./dentalService";
 import { getClinicToday } from "../utils/format";
 import { ROOM_TYPES } from "../utils/constants/room";
 import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, GUEST_BOOKING_TEXT, RECEPTION_BOOKING_TEXT } from "../utils/messages";
@@ -76,11 +77,12 @@ export const getBookingDoctors = async ({ signal } = {}) => {
 };
 
 const loadSharedContext = async (signal) => {
-    const [services, doctors] = await Promise.all([call(() => api.get("/api/appointments/bookable-services", { ...READ, signal })), loadDoctors(signal)]);
+    // The catalog is the one the header menu already loaded, so the booking page does not ask for it a second time
+    const [catalog, doctors] = await Promise.all([loadCatalog(), loadDoctors(signal)]);
     if (signal?.aborted) throw abortError();
-    if (!services.success || !doctors.success) return null;
+    if (!catalog || !doctors.success) return null;
     return {
-        services: listOf(services.data).filter(isBookable).map(toService),
+        services: catalog.filter(isBookable).map(toService),
         doctors: listOf(doctors.data).map(toDoctor),
     };
 };

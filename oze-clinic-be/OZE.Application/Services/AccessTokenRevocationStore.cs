@@ -23,7 +23,8 @@ namespace OZE.Application.Services
             }
         }
 
-        public bool IsRevoked(string tokenId) => _cache.Get(Key(tokenId)) != null;
+        public async Task<bool> IsRevokedAsync(string tokenId, CancellationToken cancellationToken = default) =>
+            await _cache.GetAsync(Key(tokenId), cancellationToken) != null;
 
         private static string Key(string tokenId) => "revoked-jti:" + tokenId;
     }

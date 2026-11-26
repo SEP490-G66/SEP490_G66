@@ -4,6 +4,7 @@ namespace OZE.Application.Interfaces
     public interface IAccessTokenRevocationStore
     {
         void Revoke(string tokenId, DateTimeOffset expiresAt);
-        bool IsRevoked(string tokenId);
+        // Checked on every signed-in request; async so a Redis round trip does not hold a thread
+        Task<bool> IsRevokedAsync(string tokenId, CancellationToken cancellationToken = default);
     }
 }
