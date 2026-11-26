@@ -1,9 +1,10 @@
+import { useEffect, useState } from "react";
 import { Image as ImageIcon } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ImageCard from "@/components/ui/ImageCard";
-import { getServiceBySlug } from "@/services/dentalService";
+import { getServiceBySlug, isMenuSlug, loadMenuService } from "@/services/dentalService";
 import { PUBLIC_SERVICE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES, getErrorRoute } from "@/utils/routes";
 
@@ -79,10 +80,35 @@ const StepsSection = ({ steps }) => (
     </section>
 );
 
+// A service of the header menu is read from the database; the other pages keep the website content
+const useService = (slug) => {
+    const fromMenu = isMenuSlug(slug);
+    const [loaded, setLoaded] = useState({ slug: null, service: null });
+
+    useEffect(() => {
+        if (!fromMenu) return undefined;
+        let active = true;
+        loadMenuService(slug).then((service) => active && setLoaded({ slug, service }));
+        return () => {
+            active = false;
+        };
+    }, [slug, fromMenu]);
+
+    if (!fromMenu) return getServiceBySlug(slug);
+    return loaded.slug === slug ? loaded.service : undefined;
+};
+
 const ServiceDetail = () => {
     const { serviceSlug } = useParams();
-    const service = getServiceBySlug(serviceSlug);
+    const service = useService(serviceSlug);
 
+    if (service === undefined) {
+        return (
+            <div className="container-public py-16 text-center text-body" role="status">
+                {TEXT.LOADING}
+            </div>
+        );
+    }
     if (!service) return <Navigate to={getErrorRoute(404)} replace />;
 
     const breadcrumbItems = [
