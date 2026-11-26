@@ -24,5 +24,9 @@ namespace OZE.Common.Models
 
         [MaxLength(255)]
         public string? Address { get; set; }
+
+        // Optional: the treatment plan session this visit is for. Needs PatientId; when no service is picked the
+        // session's service is booked
+        public long? TreatmentPlanStageId { get; set; }
     }
 }

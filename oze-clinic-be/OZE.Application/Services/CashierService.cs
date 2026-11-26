@@ -312,10 +312,15 @@ namespace OZE.Application.Services
                 }
 
                 // The visit the session was done in, so its services are not collected again as a walk-in
-                if (stage.StageStatus == TreatmentPlanConstants.StageStatus.Completed && stage.AppointmentId == null && doctorId.HasValue)
+                // The visit booked for the session comes first; only a session without one is matched by patient, doctor and day
+                if (stage.StageStatus == TreatmentPlanConstants.StageStatus.Completed && stage.AppointmentId == null)
                 {
-                    var date = stage.ActualDate ?? DateOnly.FromDateTime(ClinicClock.Today);
-                    stage.AppointmentId = await _cashierRepository.FindSessionAppointmentIdAsync(plan.PatientId, doctorId.Value, date, cancellationToken);
+                    stage.AppointmentId = await _cashierRepository.FindBookedSessionAppointmentIdAsync(stage.Id, cancellationToken);
+                    if (stage.AppointmentId == null && doctorId.HasValue)
+                    {
+                        var date = stage.ActualDate ?? DateOnly.FromDateTime(ClinicClock.Today);
+                        stage.AppointmentId = await _cashierRepository.FindSessionAppointmentIdAsync(plan.PatientId, doctorId.Value, date, cancellationToken);
+                    }
                 }
 
                 if (plan.PaymentOption != null)

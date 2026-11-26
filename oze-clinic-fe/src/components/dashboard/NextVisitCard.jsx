@@ -39,7 +39,8 @@ const QueueTicket = ({ queue }) => {
 // source: optional label of where the appointment comes from (Tự đặt / Kế hoạch điều trị / Tái khám).
 // extra: optional second line under the details (e.g. "Buổi 3/3 của kế hoạch …").
 // showDetailLink: false on pages that already are the appointment page (Lịch hẹn sắp tới).
-const NextVisitCard = ({ appointment, isToday = false, source, extra, showDetailLink = true }) => {
+// showDetails: false hides the "time · doctor · code" line when the page shows them in its own info card.
+const NextVisitCard = ({ appointment, isToday = false, source, extra, showDetailLink = true, showDetails = true }) => {
     const date = formatDate(appointment.appointmentDate);
     const details = [
         formatTimeRange(appointment.timeSlotStart, appointment.timeSlotEnd),
@@ -66,7 +67,7 @@ const NextVisitCard = ({ appointment, isToday = false, source, extra, showDetail
                         <StatusBadge status={appointment.status} labels={PATIENT_APPOINTMENT_STATUS} />
                         {source && <span className="badge badge-neutral">{source}</span>}
                     </div>
-                    {details && <p className="num mt-1 text-body-sm text-body">{details}</p>}
+                    {showDetails && details && <p className="num mt-1 text-body-sm text-body">{details}</p>}
                     {extra && <p className="mt-1 text-body-sm text-body">{extra}</p>}
                 </div>
             </div>

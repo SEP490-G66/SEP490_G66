@@ -355,6 +355,19 @@ namespace OZE.Persistence.Repositories
             return await query.Where(p => p.ReceiptCode == receiptId).OrderBy(p => p.Id).ToListAsync(cancellationToken);
         }
 
+        public Task<long?> FindBookedSessionAppointmentIdAsync(long stageId, CancellationToken cancellationToken = default)
+        {
+            return _context.Appointments
+                .AsNoTracking()
+                .Where(a => a.TreatmentPlanStageId == stageId
+                    && (a.Status == AppointmentConstants.InServiceStatus
+                        || a.Status == AppointmentConstants.CheckedInStatus
+                        || a.Status == AppointmentConstants.CompletedStatus))
+                .OrderBy(a => a.Status == AppointmentConstants.InServiceStatus ? 0 : a.Status == AppointmentConstants.CheckedInStatus ? 1 : 2)
+                .Select(a => (long?)a.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         public Task<long?> FindSessionAppointmentIdAsync(int patientId, int doctorId, DateOnly date, CancellationToken cancellationToken = default)
         {
             // In service first, then any visit of the day with that doctor that is still open or just finished

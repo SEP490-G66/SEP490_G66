@@ -256,9 +256,6 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
                             </div>
                         ) : (
                             <BookingSummaryBar
-                                date={state.day}
-                                slotStart={state.slot}
-                                serviceCount={state.items.length}
                                 locked={locked}
                                 submitting={state.submitting}
                                 describedBy="booking-submit-error"

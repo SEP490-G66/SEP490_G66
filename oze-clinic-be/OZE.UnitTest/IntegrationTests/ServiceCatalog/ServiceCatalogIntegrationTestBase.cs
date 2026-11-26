@@ -1,3 +1,4 @@
+using OZE.Application.Helpers;
 using AutoMapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -109,7 +110,7 @@ namespace OZE.UnitTest.IntegrationTests.ServiceCatalog
         {
             var appointment = new Appointment
             {
-                AppointmentDate = appointmentDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+                AppointmentDate = appointmentDate ?? DateOnly.FromDateTime(ClinicClock.Today),
                 Status = status,
                 CreatedAt = DateTimeOffset.UtcNow
             };
