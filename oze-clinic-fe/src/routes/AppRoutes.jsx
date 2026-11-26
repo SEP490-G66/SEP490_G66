@@ -65,6 +65,9 @@ import ServiceManagement from "../pages/admin/ServiceManagement";
 import StaffManagement from "../pages/admin/StaffManagement";
 import WorkShiftManagement from "../pages/admin/WorkShiftManagement";
 import SystemSettings from "../pages/admin/SystemSettings";
+import DoctorPatientRecordPage from "../pages/doctor/DoctorPatientRecordPage";
+import DoctorPatientsPage from "../pages/doctor/DoctorPatientsPage";
+import DoctorQueuePage from "../pages/doctor/DoctorQueuePage";
 import ExaminationPage from "../pages/doctor/examination/ExaminationPage";
 import ImagingReviewPage from "../pages/doctor/ImagingReviewPage";
 import ImagingCapturePage from "../pages/imagingTechnician/ImagingCapturePage";
@@ -270,6 +273,14 @@ const ROLE_PAGES = {
             <Route path="*" element={NOT_FOUND} />
         </Routes>
     ),
+    [ROUTES.DOCTOR_QUEUE]: <DoctorQueuePage />,
+    [ROUTES.DOCTOR_PATIENTS]: (
+        <Routes>
+            <Route index element={<DoctorPatientsPage />} />
+            <Route path=":patientId" element={<DoctorPatientRecordPage />} />
+            <Route path="*" element={NOT_FOUND} />
+        </Routes>
+    ),
     [ROUTES.DOCTOR_EXAMINATION]: <ExaminationPage />,
     [ROUTES.DOCTOR_IMAGING_REVIEWS]: <ImagingReviewPage />,
     [ROUTES.TECHNICIAN_IMAGING_REQUESTS]: <ImagingCapturePage />,
@@ -291,7 +302,6 @@ const ROLE_PAGES = {
 const COMING_SOON_TITLES = {
     [ROUTES.APPOINTMENTS]: "Lịch hẹn sắp tới",
     [ROUTES.DOCTOR_APPOINTMENTS]: "Lịch hẹn khám",
-    [ROUTES.DOCTOR_PATIENTS]: "Hồ sơ bệnh án",
     [ROUTES.DOCTOR_TREATMENT_PLANS]: "Kế hoạch điều trị",
     [ROUTES.DOCTOR_IMAGING_REQUESTS]: "Yêu cầu chụp phim",
     [ROUTES.ADMIN_ROLES]: "Vai trò",

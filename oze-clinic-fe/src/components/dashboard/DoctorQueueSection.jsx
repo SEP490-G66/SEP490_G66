@@ -17,7 +17,7 @@ const DoctorQueueSection = ({ queue, roomName, loading }) => (
         id={TITLE_ID}
         title={`Hàng chờ khám · ${roomName ?? "Phòng khám"}`}
         busy={loading}
-        link={!loading && queue.length > 0 && { to: ROUTES.DOCTOR_EXAMINATION, label: "Xem tất cả" }}
+        link={!loading && queue.length > 0 && { to: ROUTES.DOCTOR_QUEUE, label: "Xem tất cả" }}
         empty={!loading && queue.length === 0 && { icon: Users, text: "Hàng chờ đang trống." }}
     >
         {loading && (

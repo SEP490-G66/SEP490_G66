@@ -90,8 +90,7 @@ const SIDEBAR_MENU = {
     [USER_ROLES.DOCTOR]: [
         DASHBOARD_LINK,
         { key: "work-schedule", label: "Lịch làm việc", icon: CalendarDays, to: ROUTES.WORK_SCHEDULE },
-        // The queue sits on the exam page; end keeps it unlit on the exam steps below
-        { key: "queue", label: "Hàng chờ", icon: Rows3, to: ROUTES.DOCTOR_EXAMINATION, end: true },
+        { key: "queue", label: "Hàng chờ", icon: Rows3, to: ROUTES.DOCTOR_QUEUE },
         { key: "patients", label: "Hồ sơ bệnh án", icon: FileText, to: ROUTES.DOCTOR_PATIENTS },
         {
             key: "examination",

@@ -277,6 +277,12 @@ const toQueueItem = (item) => {
         atImaging: item.atImaging,
         step: status === QUEUE_STATUS.IN_EXAMINATION && item.examinationId ? readStep(item.examinationId) : undefined,
         startedAt: item.startedAt ? Date.parse(item.startedAt) : undefined,
+        // Shown on the doctor's "Hàng chờ" page
+        patientId: item.patientId,
+        patientCode: item.patientCode ?? "",
+        services: (item.services ?? []).map((service) => service.name),
+        priority: item.priority > 0,
+        skipCount: item.skipCount ?? 0,
     };
 };
 
@@ -420,7 +426,7 @@ const HISTORY_GROUPS = [
 
 const sameTitle = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-const historyFromProfiles = (profiles) => {
+export const historyFromProfiles = (profiles) => {
     const titles = (match) => [...new Set(profiles.filter(match).map((profile) => profile.title?.trim()).filter(Boolean))];
     const isDental = (profile) => profile.recordType === "History" && profile.description === DENTAL_HISTORY_MARK;
     return {

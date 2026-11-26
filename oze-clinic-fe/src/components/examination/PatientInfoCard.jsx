@@ -13,6 +13,7 @@ const Field = ({ label, value, className }) => (
 
 // "Thông tin hành chính" (read only: reception owns these fields).
 // patient: { code, name, birthdate (yyyy-mm-dd), age, gender, phone, emergencyPhone, address }.
+// reason: why the patient came this visit; left out (null / undefined) outside a visit, so the field is not shown.
 const PatientInfoCard = ({ patient, reason }) => (
     <ClinicalExamSection
         title="Thông tin hành chính"
@@ -28,7 +29,7 @@ const PatientInfoCard = ({ patient, reason }) => (
             <Field label="Số điện thoại" value={formatPhone(patient.phone)} />
             <Field label="SĐT khẩn cấp" value={formatPhone(patient.emergencyPhone)} />
             <Field label="Địa chỉ" value={patient.address} className="sm:col-span-1 lg:col-span-2" />
-            <Field label="Lý do khám" value={reason} className="sm:col-span-2 lg:col-span-3" />
+            {reason != null && <Field label="Lý do khám" value={reason} className="sm:col-span-2 lg:col-span-3" />}
         </dl>
     </ClinicalExamSection>
 );

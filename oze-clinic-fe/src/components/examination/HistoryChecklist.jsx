@@ -13,8 +13,8 @@ const TONES = {
 const allOptions = (options, value) => [...options, ...value.filter((item) => !options.some((option) => normalizeText(option) === normalizeText(item)))];
 
 // One collapsible group of the medical history (Dị ứng, Bệnh nền…): tick items, or type one that is not listed.
-// Collapsed, the head shows the ticked items.
-const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "neutral", placeholder, note, defaultOpen = true, locked, itemNotes, maxLength, emptyError, otherLabel }) => {
+// Collapsed, the head shows the ticked items. readOnly: the group still opens and closes, nothing can be ticked or added.
+const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "neutral", placeholder, note, defaultOpen = true, locked, itemNotes, maxLength, emptyError, otherLabel, readOnly = false }) => {
     const panelId = useId();
     const inputId = useId();
     const errorId = useId();
@@ -73,7 +73,7 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
 
             {open && (
                 <div id={panelId} className="mt-2.5 flex flex-col gap-2.5">
-                    <fieldset>
+                    <fieldset disabled={readOnly}>
                         <legend className="sr-only">{title}</legend>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                             {items.map((item) => {
@@ -86,7 +86,7 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
                                         className={cx(
                                             "flex min-w-0 items-center gap-2 rounded-lg border px-2.5 py-2 text-caption transition-colors",
                                             checked ? cx(colors.checked, "font-medium text-ink") : "border-border bg-canvas text-body",
-                                            "cursor-pointer hover:border-primary",
+                                            !readOnly && "cursor-pointer hover:border-primary",
                                         )}
                                     >
                                         <input
@@ -106,7 +106,7 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
                         </div>
                     </fieldset>
                     {note && <p className="text-caption text-muted">{note}</p>}
-                    {otherLabel ? (
+                    {readOnly ? null : otherLabel ? (
                         <div className="flex items-center gap-2">
                             <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-body-sm">
                                 <input
@@ -160,7 +160,7 @@ const HistoryChecklist = ({ title, options = [], value = [], onChange, tone = "n
                             </button>
                         </div>
                     )}
-                    {!otherLabel && draftError && (
+                    {!readOnly && !otherLabel && draftError && (
                         <p id={errorId} className="error-text">
                             {emptyError}
                         </p>
