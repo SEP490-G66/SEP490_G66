@@ -22,3 +22,5 @@
 /.claude
 /.cursor
 /graphify-out
+# Local EF Core migration bundle
+/migration-test/

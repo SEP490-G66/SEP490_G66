@@ -20,15 +20,19 @@ concurrency:
 
 env:
   DOTNET_VERSION: '10.0.x'
+  EF_CORE_VERSION: '10.0.15'
   IMAGE_NAME: ghcr.io/sep490-g66/oze-backend
   SOLUTION_PATH: oze-clinic-be/OZE.sln
   TEST_PROJECT: oze-clinic-be/OZE.UnitTest/OZE.UnitTest.csproj
+  MIGRATION_PROJECT: oze-clinic-be/OZE.Persistence
+  STARTUP_PROJECT: oze-clinic-be/OZE
+  DB_CONTEXT: AppIdentityDbContext
 
 jobs:
   build-and-test:
     name: Build and Test Backend
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -64,6 +68,42 @@ jobs:
           path: test-results/
           retention-days: 14
           if-no-files-found: warn
+
+      - name: Install EF Core CLI
+        run: |
+          dotnet tool install \
+            --tool-path "$RUNNER_TEMP/ef-tools" \
+            dotnet-ef \
+            --version "${{ env.EF_CORE_VERSION }}"
+
+          echo "$RUNNER_TEMP/ef-tools" >> "$GITHUB_PATH"
+
+      - name: Build EF Core migration bundle
+        run: |
+          mkdir -p migration-bundle
+
+          dotnet-ef migrations bundle \
+            --project "${{ env.MIGRATION_PROJECT }}" \
+            --startup-project "${{ env.STARTUP_PROJECT }}" \
+            --context "${{ env.DB_CONTEXT }}" \
+            --configuration Release \
+            --self-contained \
+            --target-runtime linux-x64 \
+            --output "${{ github.workspace }}/migration-bundle/efbundle" \
+            --force
+
+      - name: Verify migration bundle
+        run: |
+          test -s migration-bundle/efbundle
+          ls -lh migration-bundle/efbundle
+
+      - name: Upload migration bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-migration-bundle
+          path: migration-bundle/efbundle
+          retention-days: 3
+          if-no-files-found: error
 
   publish-image:
     name: Build and Push Docker Image
@@ -107,13 +147,19 @@ jobs:
           cache-to: type=gha,mode=max,scope=backend
 
   deploy:
-    name: Deploy Backend to VPS
+    name: Migrate Database and Deploy Backend to VPS
     needs: publish-image
     if: github.ref == 'refs/heads/main' && vars.VPS_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
 
     steps:
+      - name: Download migration bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-migration-bundle
+          path: migration-bundle
+
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
@@ -128,7 +174,34 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Deploy Docker image
+      - name: Upload migration bundle to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          ssh \
+            -i ~/.ssh/oze_deploy \
+            -p "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$VPS_USERNAME@$VPS_HOST" \
+            "mkdir -p /opt/oze/migrations/$IMAGE_TAG && chmod 700 /opt/oze/migrations/$IMAGE_TAG"
+
+          scp \
+            -i ~/.ssh/oze_deploy \
+            -P "$VPS_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            migration-bundle/efbundle \
+            "$VPS_USERNAME@$VPS_HOST:/opt/oze/migrations/$IMAGE_TAG/efbundle"
+
+      - name: Backup, migrate and deploy backend
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -165,6 +238,13 @@ jobs:
           NEW_IMAGE="ghcr.io/sep490-g66/oze-backend:${IMAGE_TAG}"
           OLD_IMAGE_ID=$(docker inspect -f '{{.Image}}' oze-backend)
 
+          BUNDLE_DIR="/opt/oze/migrations/${IMAGE_TAG}"
+          BUNDLE="${BUNDLE_DIR}/efbundle"
+
+          test -s "$BUNDLE"
+          test -x /opt/oze/scripts/backup-database.sh
+          test -x /opt/oze/scripts/migrate-database.sh
+
           echo "Pulling new backend image..."
           docker pull "$NEW_IMAGE"
 
@@ -185,6 +265,7 @@ jobs:
               line for line in lines
               if not line.startswith("BACKEND_IMAGE=")
           ]
+
           lines.append(f"BACKEND_IMAGE={image}")
 
           fd, tmp = tempfile.mkstemp(dir=".")
@@ -213,7 +294,8 @@ jobs:
           }
 
           rollback() {
-            echo "Deployment failed. Rolling back..."
+            echo "Deployment failed. Rolling back backend image..."
+            echo "WARNING: Database migrations are not rolled back."
 
             export BACKEND_IMAGE=oze-backend:rollback
 
@@ -226,12 +308,30 @@ jobs:
             persist_image "$BACKEND_IMAGE" || return 1
 
             if health_check; then
-              echo "Rollback successful."
+              echo "Backend image rollback successful."
             else
               echo "Rollback health check failed."
               return 1
             fi
           }
+
+          echo "Creating database backup..."
+
+          if ! /opt/oze/scripts/backup-database.sh; then
+            echo "Database backup failed."
+            echo "Deployment aborted."
+            exit 1
+          fi
+
+          echo "Applying database migrations..."
+
+          if ! /opt/oze/scripts/migrate-database.sh "$IMAGE_TAG"; then
+            echo "Database migration failed."
+            echo "Deployment aborted. Database inspection may be required."
+            exit 1
+          fi
+
+          echo "Database migration completed."
 
           export BACKEND_IMAGE="$NEW_IMAGE"
 
@@ -260,8 +360,14 @@ jobs:
 
           docker compose ps
 
+          echo "Cleaning up migration bundle..."
+
+          rm -f "$BUNDLE"
+          rmdir "$BUNDLE_DIR" || true
+
           echo "Backend deployment successful."
           echo "Deployed image: $NEW_IMAGE"
+
           REMOTE
 
       - name: Cleanup SSH credentials
