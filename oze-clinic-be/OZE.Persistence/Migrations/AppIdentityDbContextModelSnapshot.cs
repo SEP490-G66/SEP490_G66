@@ -401,6 +401,9 @@ namespace OZE.Persistence.Migrations
                     b.Property<TimeOnly?>("TimeSlotStart")
                         .HasColumnType("time");
 
+                    b.Property<long?>("TreatmentPlanStageId")
+                        .HasColumnType("bigint");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -408,6 +411,10 @@ namespace OZE.Persistence.Migrations
 
                     b.HasIndex("ParentAppointmentId")
                         .HasDatabaseName("IX_Appointments_ParentAppointmentId");
+
+                    b.HasIndex("TreatmentPlanStageId")
+                        .HasDatabaseName("IX_Appointments_TreatmentPlanStageId")
+                        .HasFilter("[TreatmentPlanStageId] IS NOT NULL");
 
                     b.HasIndex("DoctorId", "AppointmentDate")
                         .HasDatabaseName("IX_Appointments_DoctorId_Date")
@@ -3273,11 +3280,19 @@ namespace OZE.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_Appointments_Patients");
 
+                    b.HasOne("OZE.Domain.Entities.TreatmentPlanStage", "TreatmentPlanStage")
+                        .WithMany()
+                        .HasForeignKey("TreatmentPlanStageId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_Appointments_TreatmentPlanStages");
+
                     b.Navigation("Doctor");
 
                     b.Navigation("ParentAppointment");
 
                     b.Navigation("Patient");
+
+                    b.Navigation("TreatmentPlanStage");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.AppointmentServiceItem", b =>

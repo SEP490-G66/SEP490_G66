@@ -313,6 +313,10 @@ namespace OZE.Common.Constants
             public const string WalkInPatientHasConfirmedToday = "The patient has a confirmed appointment today. Check in that appointment instead";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
             public const string PatientHasScheduledTreatmentSession = "You already have a treatment session scheduled in your treatment plan. Please contact the clinic to change it instead of booking a new appointment";
+            public const string TreatmentStageNeedsPatient = "Choose the patient record before booking a treatment plan session";
+            public const string TreatmentStageNotFound = "This treatment plan session was not found for the patient";
+            public const string TreatmentStageNotOpen = "This treatment plan session is already done or cancelled, or its plan is not being carried out";
+            public const string TreatmentStageAlreadyBooked = "This treatment plan session already has an appointment";
             public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";

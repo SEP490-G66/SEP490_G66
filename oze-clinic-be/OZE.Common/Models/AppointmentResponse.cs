@@ -35,6 +35,8 @@ namespace OZE.Common.Models
         public string? Notes { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public long? ParentAppointmentId { get; set; }
+        // Set when the visit is booked for a session of a treatment plan
+        public AppointmentPlanSessionResponse? PlanSession { get; set; }
         public long? ExaminationId { get; set; }
         public string? ExaminationStatus { get; set; }
         public FollowUpSummaryResponse? FollowUp { get; set; }
