@@ -506,6 +506,10 @@ namespace OZE.Application.Services
                 (Variant != null ? Variant.EstimatedMinutes : Service.EstimatedMinutes) ?? slotMinutes;
         }
 
+        // "Service" or "Service - Variant" of each line, for the audit log
+        private static List<string> DescribeServices(IEnumerable<AppointmentServiceItem> items) =>
+            items.Select(i => i.Variant == null ? i.Service?.ServiceName ?? i.ServiceId.ToString() : $"{i.Service?.ServiceName} - {i.Variant.VariantName}").ToList();
+
         // The general exam comes first, then the services and variants the patient picked, without duplicates
         private async Task<List<BookingLine>> ResolveBookingLinesAsync(
             IReadOnlyCollection<int> pickedServiceIds, IReadOnlyCollection<int> pickedVariantIds)
@@ -806,9 +810,15 @@ namespace OZE.Application.Services
                 await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
             }
 
-            // The services stay the same, so the new slot must fit the same total time and room type
-            var lines = appointment!.ServiceItems.Select(i => new BookingLine(i.Service, i.Variant)).ToList();
+            // New services sent: checked like a booking. None sent: the services stay, so the new slot must fit the same
+            // total time and room type
+            var changeServices = request.ServiceId != null || request.VariantId != null;
+            var lines = changeServices
+                ? await ResolveBookingLinesAsync(request.ServiceId ?? new List<int>(), request.VariantId ?? new List<int>())
+                : appointment!.ServiceItems.Select(i => new BookingLine(i.Service, i.Variant)).ToList();
             ConditionGuard.Ensure(lines.Count > 0, ErrorConstants.AppointmentMessage.ServiceNotFound);
+            var slotMinutes = changeServices ? await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes) : 0;
+            var servicesBefore = DescribeServices(appointment!.ServiceItems);
 
             var date = request.Date!.Value;
             var slotStart = request.SlotStart!.Value;
@@ -832,6 +842,19 @@ namespace OZE.Application.Services
                 appointment.TimeSlotStart = slot.SlotStart;
                 appointment.TimeSlotEnd = slot.SlotEnd;
                 appointment.DoctorId = slot.DoctorId;
+                if (changeServices)
+                {
+                    // Price and time copied now, like a new booking
+                    _appointmentRepository.ReplaceServiceItems(appointment, lines.Select(l => new AppointmentServiceItem
+                    {
+                        AppointmentId = appointment.Id,
+                        ServiceId = l.Service.Id,
+                        VariantId = l.Variant?.Id,
+                        DurationMinutes = l.GetMinutes(slotMinutes),
+                        PriceAtBooking = l.Price,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    }));
+                }
                 // A patient's change still needs the receptionist's call; staff changed it after talking to the patient
                 appointment.Status = isPatient ? AppointmentConstants.PendingStatus : AppointmentConstants.ConfirmedStatus;
                 appointment.UpdatedAt = DateTimeOffset.UtcNow;
@@ -847,9 +870,17 @@ namespace OZE.Application.Services
                 return slot;
             });
 
+            if (changeServices)
+            {
+                // The new lines only carry ids; read the appointment again for the service names of the answer
+                appointment = await _appointmentRepository.GetByIdWithDetailsAsync(id, cancellationToken) ?? appointment;
+            }
+
             var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
             await _auditLogService.LogAsync(AuditConstants.AppointmentRescheduled, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
-                before, new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId }, reason);
+                new { before.Status, before.AppointmentDate, before.TimeSlotStart, before.TimeSlotEnd, before.DoctorId, Services = servicesBefore },
+                new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId, Services = DescribeServices(appointment.ServiceItems) },
+                reason);
 
             if (!isPatient)
             {

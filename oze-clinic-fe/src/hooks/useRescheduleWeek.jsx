@@ -7,9 +7,10 @@ const ABORT = "AbortError";
 const focusWeekButton = () => document.getElementById(BOOKING_IDS.WEEK_BUTTON)?.focus();
 
 // Week calendar for the reschedule popup: same data as the booking page (free-slot count per day,
-// then the free slots of the chosen day), scoped to the appointment's services and the chosen doctor.
+// then the free slots of the chosen day), scoped to the services chosen in the popup ({ ServiceId, VariantId }) and the chosen doctor.
 // The shown day is derived: the patient's pick, else the preferred date, else the first free day of the week.
-const useRescheduleWeek = (appointment, { today, preferredDate, doctorId }) => {
+const useRescheduleWeek = (services, { today, preferredDate, doctorId }) => {
+    const servicesKey = JSON.stringify(services ?? null);
     const bounds = weekBounds(today);
     const [weekStart, setWeekStart] = useState(() => weekStartOf(preferredDate));
     const [calendar, setCalendar] = useState(() => ({ open: false, month: monthOf(weekStartOf(preferredDate)) }));
@@ -19,17 +20,20 @@ const useRescheduleWeek = (appointment, { today, preferredDate, doctorId }) => {
     const [rangeVersion, setRangeVersion] = useState(0);
     const [slotsVersion, setSlotsVersion] = useState(0);
 
-    const rangeKey = `${doctorId}|${rangeVersion}`;
+    const rangeKey = `${doctorId}|${servicesKey}|${rangeVersion}`;
 
     useEffect(() => {
+        if (!services) return undefined;
         const controller = new AbortController();
         const { from, to } = getRange(today);
-        getRescheduleDays(appointment, { from, to, doctorId, signal: controller.signal }).then(
-            (result) => setRange({ key: rangeKey, days: result.success ? toDayMap(result.data) : null, error: !result.success }),
-            (error) => error?.name !== ABORT && setRange({ key: rangeKey, days: null, error: true })
+        getRescheduleDays(JSON.parse(servicesKey), { from, to, doctorId, signal: controller.signal }).then(
+            (result) => setRange({ key: rangeKey, days: result.success ? toDayMap(result.data) : null, error: !result.success, servicesError: result.servicesError ?? null }),
+            (error) => error?.name !== ABORT && setRange({ key: rangeKey, days: null, error: true, servicesError: null })
         );
         return () => controller.abort();
-    }, [appointment, today, doctorId, rangeKey]);
+        // services is read through servicesKey, so a new object with the same services does not reload
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [servicesKey, today, doctorId, rangeKey]);
 
     const rangeBusy = range.key !== rangeKey;
     const rangeError = !rangeBusy && range.error;
@@ -38,20 +42,20 @@ const useRescheduleWeek = (appointment, { today, preferredDate, doctorId }) => {
     let day = null;
     if (days) day = [picked, preferredDate].find(isFreeInWeek) ?? pickWeekDay(weekStart, today, days);
 
-    const slotsKey = day ? `${day}|${doctorId}|${slotsVersion}` : null;
+    const slotsKey = day ? `${day}|${doctorId}|${slotsVersion}|${servicesKey}` : null;
 
     useEffect(() => {
         if (!slotsKey) return undefined;
         let alive = true;
         const [date] = slotsKey.split("|");
-        getRescheduleSlots(appointment, { date, doctorId }).then(
+        getRescheduleSlots(JSON.parse(servicesKey), { date, doctorId }).then(
             (result) => alive && setSlots({ key: slotsKey, data: result.success ? result.data : null, error: !result.success }),
             () => alive && setSlots({ key: slotsKey, data: null, error: true })
         );
         return () => {
             alive = false;
         };
-    }, [appointment, doctorId, slotsKey]);
+    }, [servicesKey, doctorId, slotsKey]);
 
     const slotsBusy = Boolean(slotsKey) && slots.key !== slotsKey;
     const slotsError = !slotsBusy && Boolean(slotsKey) && slots.error;
@@ -81,7 +85,10 @@ const useRescheduleWeek = (appointment, { today, preferredDate, doctorId }) => {
         reloadSlots: () => setSlotsVersion((version) => version + 1),
     };
 
-    return { bounds, weekStart, calendar, days, rangeBusy, rangeError, day, slots: slotList, slotsBusy, slotsError, actions };
+    // The chosen services cannot go in one appointment (different rooms, a variant missing): why, instead of "no slot"
+    const servicesError = rangeError ? range.servicesError : null;
+
+    return { bounds, weekStart, calendar, days, rangeBusy, rangeError, servicesError, day, slots: slotList, slotsBusy, slotsError, actions };
 };
 
 export default useRescheduleWeek;

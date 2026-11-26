@@ -56,6 +56,9 @@ namespace OZE.Application.Interfaces
         Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default);
         Task UpdateAsync(Appointment appointment);
 
+        // Swaps the service lines of a tracked appointment; saved with the next UpdateAsync
+        void ReplaceServiceItems(Appointment appointment, IEnumerable<AppointmentServiceItem> items);
+
         // The appointment is already tracked. The examination insert and the status change are one save.
         // What an examination holds when the doctor completes it
         Task<(int Diagnoses, int DraftPrescriptionsWithItems)> GetExaminationCompletionCountsAsync(long examinationId, CancellationToken cancellationToken = default);

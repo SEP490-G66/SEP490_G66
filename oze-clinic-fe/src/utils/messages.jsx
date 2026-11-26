@@ -873,6 +873,7 @@ export const BOOKING_TEXT = {
     CHOSEN_SERVICES: "Dịch vụ đã chọn",
     NO_SERVICE: "Chưa chọn dịch vụ nào. Để trống nếu bạn chỉ cần khám tổng quát và tư vấn; lịch hẹn nào cũng đã gồm phần khám này.",
     REMOVE_SERVICE: (label) => `Bỏ ${label}`,
+    GENERAL_EXAM_ONLY: "Khám tổng quát & tư vấn",
     SERVICE_PENDING: (label) => `"${label}" chưa được thêm vào danh sách. Bấm "Thêm dịch vụ" để thêm, hoặc chọn lại "Chọn dịch vụ" nếu không cần.`,
     SERVICE_GONE: (label) => `"${label}" không còn khả dụng và đã được bỏ.`,
     SERVICE_ADDED: (label, count) => `Đã thêm ${label}. Đã chọn ${count} dịch vụ.`,
