@@ -291,7 +291,7 @@ const ROLE_PAGES = {
 const COMING_SOON_TITLES = {
     [ROUTES.APPOINTMENTS]: "Lịch hẹn sắp tới",
     [ROUTES.DOCTOR_APPOINTMENTS]: "Lịch hẹn khám",
-    [ROUTES.DOCTOR_PATIENTS]: "Bệnh nhân",
+    [ROUTES.DOCTOR_PATIENTS]: "Hồ sơ bệnh án",
     [ROUTES.DOCTOR_TREATMENT_PLANS]: "Kế hoạch điều trị",
     [ROUTES.DOCTOR_IMAGING_REQUESTS]: "Yêu cầu chụp phim",
     [ROUTES.ADMIN_ROLES]: "Vai trò",

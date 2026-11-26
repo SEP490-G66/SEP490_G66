@@ -120,6 +120,12 @@ export const ROLE_ROUTES = [
     }
 ];
 
+// The steps of a visit on the doctor's exam page, by step index (history, exam, plan, treatment, prescription):
+// /doctor/examination/<path> opens that step, so the sidebar can link to each one.
+export const DOCTOR_EXAM_STEP_PATHS = ["history", "diagnosis", "plan", "treatment", "prescription"];
+
+export const getDoctorExamStepRoute = (step) => `${ROUTES.DOCTOR_EXAMINATION}/${DOCTOR_EXAM_STEP_PATHS[step]}`;
+
 // slug of a public service, e.g. "nieng-rang" (utils/data/publicServices.jsx)
 export const getServiceDetailRoute = (serviceSlug) => generatePath(ROUTES.SERVICE_DETAIL, { serviceSlug });
 

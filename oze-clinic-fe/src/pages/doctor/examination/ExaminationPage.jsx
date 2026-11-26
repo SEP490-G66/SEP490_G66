@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Stethoscope } from "lucide-react";
 import { toast } from "react-toastify";
 import ConfirmExamDialog from "@/components/examination/ConfirmExamDialog";
@@ -24,7 +24,7 @@ import {
 import useMediaQuery from "@/hooks/useMediaQuery";
 import { cx } from "@/utils/cx";
 import { EXAM_STEP_TITLES, EXAM_STEPS, GENERIC_ERROR_MESSAGE, QUEUE_STATUS } from "@/utils/messages";
-import { ROUTES } from "@/utils/routes";
+import { DOCTOR_EXAM_STEP_PATHS, ROUTES, getDoctorExamStepRoute } from "@/utils/routes";
 import ClinicalExamTab from "./tab/ClinicalExamTab";
 import PatientRecordTab from "./tab/PatientRecordTab";
 import PrescriptionTab from "./tab/PrescriptionTab";
@@ -137,14 +137,18 @@ const CalledView = ({ item, record }) => (
 
 // Exam in progress: the frame (back link, breadcrumb, stepper, patient card with timer, step heading) around the tab
 // being viewed (EXAM_TABS). handlers: { onHistoryChange, onExamChange, onPlanChange, onTreatmentChange, onPrescriptionChange }.
+// The tab shown comes from the URL (/doctor/examination/<step>, see DOCTOR_EXAM_STEP_PATHS) so the sidebar links open it;
+// a step not reached yet, or no step in the URL, shows the current one.
 const InExamView = ({ item, record, busy, handlers, onStep, onEnd, onReload }) => {
     const current = item.step ?? STEP.HISTORY;
-    const [viewing, setViewing] = useState(current);
-    const shown = Math.min(viewing, current);
+    const { "*": stepPath } = useParams();
+    const navigate = useNavigate();
+    const requested = DOCTOR_EXAM_STEP_PATHS.indexOf(stepPath);
+    const shown = requested >= 0 ? Math.min(requested, current) : current;
 
     const goTo = async (step) => {
         if (step > current && !(await onStep(step))) return;
-        setViewing(step);
+        navigate(getDoctorExamStepRoute(step));
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
