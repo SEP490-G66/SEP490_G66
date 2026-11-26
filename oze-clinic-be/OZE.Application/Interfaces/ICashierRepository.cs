@@ -3,48 +3,61 @@ using OZE.Domain.Entities;
 
 namespace OZE.Application.Interfaces
 {
+    /// <summary>
+    /// Repository quản lý truy xuất và lưu trữ dữ liệu chuyên biệt cho nghiệp vụ thu ngân (Cashier).
+    /// </summary>
     public interface ICashierRepository
     {
-        // Patients that have a plan the cashier works on or a finished visit (not deleted)
+        /// <summary>Lấy danh sách ứng viên bệnh nhân có kế hoạch điều trị hoặc buổi khám đã hoàn tất.</summary>
         Task<List<CashierPatientInfo>> GetCandidatePatientsAsync(CancellationToken cancellationToken = default);
 
+        /// <summary>Lấy thông tin thu ngân cơ bản của một bệnh nhân theo Id.</summary>
         Task<CashierPatientInfo?> GetPatientAsync(int patientId, CancellationToken cancellationToken = default);
 
-        // Plans, walk-in visits and receipts of the patients, in the shape of the FE mock (read only)
+        /// <summary>Lấy danh sách tài khoản thu ngân tổng hợp cho tập hợp bệnh nhân.</summary>
         Task<List<CashierAccountResponse>> GetAccountsAsync(IReadOnlyCollection<CashierPatientInfo> patients, CancellationToken cancellationToken = default);
 
+        /// <summary>Lấy thông tin thực thể kế hoạch điều trị kèm theo dõi (tracked).</summary>
         Task<TreatmentPlan?> GetTrackedPlanAsync(long planId, CancellationToken cancellationToken = default);
 
-        // Open (not cancelled) invoice of a plan, with items, payments and refund requests
+        /// <summary>Lấy hóa đơn đang mở của kế hoạch điều trị kèm danh sách chi tiết (items, payments, refunds).</summary>
         Task<Invoice?> GetTrackedPlanInvoiceAsync(long planId, CancellationToken cancellationToken = default);
 
-        // Open invoice of a walk-in visit (no plan), with items, payments and refund requests
+        /// <summary>Lấy hóa đơn đang mở của buổi khám đơn lẻ (khách vãng lai).</summary>
         Task<Invoice?> GetTrackedVisitInvoiceAsync(long appointmentId, CancellationToken cancellationToken = default);
 
-        // Finished appointment of the patient with its booked services
+        /// <summary>Lấy thông tin buổi khám đã hoàn tất của bệnh nhân.</summary>
         Task<Appointment?> GetVisitAsync(int patientId, long appointmentId, CancellationToken cancellationToken = default);
 
-        // Services of plan sessions done in these appointments (appointment id -> service ids)
+        /// <summary>Truy vấn danh sách dịch vụ thuộc các phiên điều trị thực hiện trong các buổi khám.</summary>
         Task<Dictionary<long, HashSet<int>>> GetSessionServicesByAppointmentAsync(IReadOnlyCollection<long> appointmentIds, CancellationToken cancellationToken = default);
 
-        // Lines of one receipt: ReceiptCode, or P{id} for a payment recorded on its own; with their invoices
+        /// <summary>Lấy danh sách các khoản thanh toán thuộc về một biên lai thu tiền.</summary>
         Task<List<Payment>> GetTrackedReceiptPaymentsAsync(int patientId, string receiptId, CancellationToken cancellationToken = default);
 
-        // Appointment the patient is being treated in today by that doctor, for linking a finished session to its visit
+        /// <summary>Tìm Id lịch hẹn hôm nay để liên kết phiên điều trị với buổi khám thực tế.</summary>
         Task<long?> FindSessionAppointmentIdAsync(int patientId, int doctorId, DateOnly date, CancellationToken cancellationToken = default);
 
+        /// <summary>Lấy giá trị cấu hình hệ thống theo khóa.</summary>
         Task<string?> GetConfigValueAsync(string key, CancellationToken cancellationToken = default);
 
+        /// <summary>Kiểm tra mã biên lai thu tiền đã tồn tại hay chưa.</summary>
         Task<bool> ReceiptCodeExistsAsync(string code, CancellationToken cancellationToken = default);
 
+        /// <summary>Kiểm tra số hóa đơn đã tồn tại hay chưa.</summary>
         Task<bool> InvoiceNumberExistsAsync(string number, CancellationToken cancellationToken = default);
 
+        /// <summary>Thêm mới hóa đơn vào cơ sở dữ liệu.</summary>
         Task AddInvoiceAsync(Invoice invoice, CancellationToken cancellationToken = default);
 
+        /// <summary>Thêm mới bản ghi thanh toán vào cơ sở dữ liệu.</summary>
         Task AddPaymentAsync(Payment payment, CancellationToken cancellationToken = default);
 
+        /// <summary>Thực thi một chuỗi tác vụ trong phạm vi Transaction của cơ sở dữ liệu.</summary>
         Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken = default);
 
+        /// <summary>Lưu các thay đổi dữ liệu bất đồng bộ.</summary>
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 }
+
