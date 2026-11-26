@@ -1,22 +1,18 @@
-import { Stethoscope } from "lucide-react";
-import ExamStepper from "@/components/examination/ExamStepper";
-import PatientCard from "@/components/examination/PatientCard";
+import { Link } from "react-router-dom";
+import { ROUTES } from "@/utils/routes";
+import StepBlockedCard from "./StepBlockedCard";
 
-// Exam page before anyone is called in: locked process, empty patient card, "Chưa có lượt khám".
+// Exam step with nobody in the room: patients are called in from "Hàng chờ".
 const NoExamView = ({ waitingCount }) => (
-    <>
-        <ExamStepper locked />
-        <PatientCard patient={null} />
-        <div className="card-app flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <span aria-hidden="true" className="grid size-16 place-items-center rounded-full bg-primary-soft text-primary">
-                <Stethoscope className="size-7" />
-            </span>
-            <h2 className="font-heading text-heading-2 text-ink">Chưa có lượt khám</h2>
-            <p className="text-muted">
-                {waitingCount > 0 ? `Có ${waitingCount} bệnh nhân đang chờ. Bấm “Gọi vào khám” ở một bệnh nhân để bắt đầu.` : "Hàng chờ đang trống."}
-            </p>
-        </div>
-    </>
+    <StepBlockedCard
+        title="Chưa có lượt khám"
+        text={waitingCount > 0 ? `Có ${waitingCount} bệnh nhân đang chờ. Gọi bệnh nhân vào khám ở trang Hàng chờ.` : "Hàng chờ đang trống."}
+        action={
+            <Link to={ROUTES.DOCTOR_QUEUE} className="btn btn-secondary">
+                Mở hàng chờ
+            </Link>
+        }
+    />
 );
 
 export default NoExamView;

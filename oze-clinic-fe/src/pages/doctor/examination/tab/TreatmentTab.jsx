@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import useAutosave from "@/hooks/useAutosave";
+import useExamDraft from "@/hooks/useExamDraft";
 import { completeTreatmentSession, saveTreatmentDraft } from "@/services/examinationService";
 import { currentTreatmentSessionId, initialTreatmentItems, planSessionList, upcomingPlanSessions } from "@/utils/examination";
 import { getClinicToday } from "@/utils/format";
 import { GENERIC_ERROR_MESSAGE } from "@/utils/messages";
 import FollowUpCard from "@/components/examination/FollowUpCard";
 import SessionInvoiceCard from "@/components/examination/SessionInvoiceCard";
-import StepActionBar from "@/components/examination/StepActionBar";
 import StepBlockedCard from "@/components/examination/StepBlockedCard";
 import TreatmentItemDeleteDialog from "@/components/examination/TreatmentItemDeleteDialog";
 import TreatmentItemDialog from "@/components/examination/TreatmentItemDialog";
@@ -33,9 +33,16 @@ const BACK_TO_PLAN = "Quay lại Lập kế hoạch điều trị";
 // record.treatment is the saved draft; changes are saved automatically (the session's stage is started on the first
 // change, then its actual cost and note updated) and passed to onTreatmentChange.
 // "Chuyển sang Đơn thuốc" completes the session's stage (onPlanChange gets the new plan) then onComplete.
-const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlanChange, onEditPlan, onComplete, onEnd }) => {
+// draft: the visit header's "Lưu nháp" and autosave status (useExamDraft).
+const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlanChange, onEditPlan, onComplete, draft: visitDraft }) => {
     const [initialDraft] = useState(() => initialDraftOf(record));
     const { value: draft, setValue: setDraft, statusText, saveNow } = useAutosave((value) => saveTreatmentDraft(queueId, value), initialDraft, onTreatmentChange);
+    // Today's session pre-fills the draft: the page gets it at once, so "Kê đơn thuốc" and "Kết thúc lượt khám" count it
+    useEffect(() => {
+        onTreatmentChange?.(initialDraft);
+        // once, with the draft the step opened with
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const [dialog, setDialog] = useState(null); // { type: "add" | "edit" | "delete", item? }
     const [working, setWorking] = useState(false); // while "Chuyển sang Đơn thuốc" runs
     const [pickerKey, setPickerKey] = useState(0);
@@ -79,18 +86,23 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
         onComplete();
     };
 
-    const saveDraft = async () => {
-        const response = await saveNow();
-        if (response.success) toast.success("Đã lưu nháp.");
-        else toast.error(response.message ?? GENERIC_ERROR_MESSAGE);
-    };
+    useExamDraft(visitDraft, saveNow, statusText);
 
-    const endVisit = async () => {
-        await saveNow();
-        onEnd();
-    };
+    if (!record.plan.planId) {
+        return (
+            <StepBlockedCard
+                title="Chưa lập kế hoạch điều trị"
+                text="Lập kế hoạch điều trị cho lượt khám này trước khi ghi nhận điều trị."
+                action={
+                    <button type="button" className="btn btn-primary" onClick={onEditPlan}>
+                        Lập kế hoạch điều trị
+                    </button>
+                }
+            />
+        );
+    }
 
-    if (record.plan.planId && !AGREED_STATUSES.includes(record.plan.status)) {
+    if (!AGREED_STATUSES.includes(record.plan.status)) {
         return (
             <StepBlockedCard
                 title="Bệnh nhân chưa đồng ý kế hoạch điều trị"
@@ -136,18 +148,13 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
                     onChange={(followUp) => setDraft({ ...draft, followUp })}
                 />
             )}
-            <StepActionBar status={statusText}>
-                <button type="button" className="btn btn-secondary" disabled={disabled} onClick={saveDraft}>
-                    Lưu nháp
-                </button>
-                <button type="button" className="btn btn-secondary" disabled={disabled} onClick={endVisit}>
-                    Kết thúc lượt khám
-                </button>
+            {/* Completes today's session of the plan (its cost goes to the invoice), then the prescription */}
+            <div className="flex justify-end">
                 <button type="button" className="btn btn-primary" disabled={disabled} onClick={goToPrescription}>
                     {working && <span className="btn-spinner" aria-hidden="true" />}
-                    Chuyển sang Đơn thuốc
+                    Hoàn thành buổi điều trị
                 </button>
-            </StepActionBar>
+            </div>
 
             {(dialog?.type === "add" || dialog?.type === "edit") && (
                 <TreatmentItemDialog

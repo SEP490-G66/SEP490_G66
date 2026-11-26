@@ -1,17 +1,18 @@
-import ExamPreStart from "@/components/examination/ExamPreStart";
-import ExamStepper from "@/components/examination/ExamStepper";
-import PatientCard from "@/components/examination/PatientCard";
+import StepBlockedCard from "./StepBlockedCard";
 
-const CALLED_STATUS = { label: "Đã gọi · chờ vào phòng", tone: "warning" };
-
-// Exam page once a patient is called in but the exam has not started: process still locked, the patient card
-// and what reception recorded. item: the queue item; record: the patient's exam record.
-const CalledExamView = ({ item, record }) => (
-    <>
-        <ExamStepper locked />
-        <PatientCard patient={{ ...record.patient, queueNumber: item.queueNumber }} status={CALLED_STATUS} services={record.services} />
-        <ExamPreStart intake={{ ...record.intake, allergies: record.history.allergies, conditions: record.history.conditions }} />
-    </>
+// Exam step once a patient is called in but the exam has not started (Figma "chưa bắt đầu khám").
+// item: the queue item; onStart starts the exam.
+const CalledExamView = ({ item, busy = false, onStart }) => (
+    <StepBlockedCard
+        title="Chưa bắt đầu khám"
+        text={`Đã gọi số ${item.queueNumber} · ${item.patientName}. Bấm “Bắt đầu khám” khi bệnh nhân vào phòng.`}
+        action={
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={onStart}>
+                {busy && <span className="btn-spinner" aria-hidden="true" />}
+                Bắt đầu khám
+            </button>
+        }
+    />
 );
 
 export default CalledExamView;

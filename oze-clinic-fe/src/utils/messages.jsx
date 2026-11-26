@@ -356,12 +356,6 @@ export const EXAM_QUEUE_STATUS = {
     RETURNED: { label: "Chụp xong · khám tiếp", badge: "badge-info" },
 };
 
-// Steps of one exam visit, shown by ExamStepper once the exam has started.
-export const EXAM_STEPS = ["Lập hồ sơ bệnh án", "Khám & Chẩn đoán", "Lập kế hoạch điều trị", "Điều trị", "Kê đơn thuốc"];
-
-// Heading of each step's content, same order as EXAM_STEPS.
-export const EXAM_STEP_TITLES = ["Bổ sung tiền sử bệnh", "Khám lâm sàng & chẩn đoán", "Lập kế hoạch điều trị", "Thực hiện điều trị", "Kê đơn thuốc"];
-
 // Medical history checklists of step 1. The doctor can also type items not in the list.
 export const HISTORY_ALLERGY_OPTIONS = [
     "Penicillin",

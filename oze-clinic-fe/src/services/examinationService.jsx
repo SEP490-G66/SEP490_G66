@@ -310,8 +310,6 @@ const loadWorkspace = async () => {
     return success(state.snapshot);
 };
 
-const snapshotCopy = () => structuredClone(state.snapshot);
-
 // Runs a queue action, then reloads the room so the page shows the new queue.
 const thenReload = async (request, message) => {
     const response = translate(await call(request));
@@ -351,15 +349,6 @@ export const startExamination = async (id) => {
     if (!item.examinationId) writeStep(response.data.examinationId, 0);
     const reloaded = await loadWorkspace();
     return reloaded.success ? success(reloaded.data, `${item.examinationId ? "Khám tiếp" : "Bắt đầu khám"} ${item.patientName}.`) : reloaded;
-};
-
-// Moves the visit to another step (0-based, see EXAM_STEPS). Kept in the browser: the backend has no step.
-export const setExamStep = async (id, step) => {
-    const item = itemOf(id);
-    if (!item?.examinationId || item.status !== "IN_PROGRESS") return failure("Lượt khám này không còn mở.");
-    writeStep(item.examinationId, Math.max(readStep(item.examinationId), step));
-    state.snapshot.queue = state.snapshot.queue.map((entry) => (entry.id === id ? { ...entry, step: readStep(item.examinationId) } : entry));
-    return success(snapshotCopy());
 };
 
 export const endExamination = async (id) => {

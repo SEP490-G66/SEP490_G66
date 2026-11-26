@@ -1,31 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
 import { toast } from "react-toastify";
 import CalledExamView from "@/components/examination/CalledExamView";
-import ConfirmExamDialog from "@/components/examination/ConfirmExamDialog";
-import ExamStepper from "@/components/examination/ExamStepper";
-import ExamTimer from "@/components/examination/ExamTimer";
+import EndVisitDialog from "@/components/examination/EndVisitDialog";
+import ExamVisitHeader from "@/components/examination/ExamVisitHeader";
 import NoExamView from "@/components/examination/NoExamView";
-import PatientCard from "@/components/examination/PatientCard";
-import QueuePanel from "@/components/examination/QueuePanel";
-import StepHeading from "@/components/examination/StepHeading";
-import Breadcrumb from "@/components/navigation/Breadcrumb";
-import MyShiftBar from "@/components/staff/MyShiftBar";
-import {
-    callPatient,
-    endExamination,
-    getExamRecord,
-    getExamWorkspace,
-    markAbsent,
-    saveMedicalHistory,
-    setExamStep,
-    startExamination,
-} from "@/services/examinationService";
-import useMediaQuery from "@/hooks/useMediaQuery";
-import { cx } from "@/utils/cx";
-import { EXAM_STEP_TITLES, EXAM_STEPS, GENERIC_ERROR_MESSAGE, QUEUE_STATUS } from "@/utils/messages";
-import { DOCTOR_EXAM_STEP_PATHS, ROUTES, getDoctorExamStepRoute } from "@/utils/routes";
+import { endExamination, finalizePrescription, getExamRecord, getExamWorkspace, saveMedicalHistory, startExamination } from "@/services/examinationService";
+import { GENERIC_ERROR_MESSAGE, QUEUE_STATUS } from "@/utils/messages";
+import { DOCTOR_EXAM_STEP_PATHS, getDoctorExamStepRoute } from "@/utils/routes";
 import ClinicalExamTab from "./tab/ClinicalExamTab";
 import PatientRecordTab from "./tab/PatientRecordTab";
 import PrescriptionTab from "./tab/PrescriptionTab";
@@ -34,149 +16,152 @@ import TreatmentTab from "./tab/TreatmentTab";
 
 const STEP = { HISTORY: 0, EXAM: 1, PLAN: 2, TREATMENT: 3, PRESCRIPTION: 4 };
 
-// Breadcrumb / "Tiếp theo" wording that differs from the step names (EXAM_STEPS).
-const BREADCRUMB_LABEL = { [STEP.HISTORY]: "Thông tin bệnh nhân", [STEP.PLAN]: "Kế hoạch điều trị" };
-const NEXT_LABEL = { [STEP.PLAN]: "Chuyển sang phòng điều trị", [STEP.PRESCRIPTION]: "Kết thúc lượt khám" };
+// Page title of each step (Figma); the sidebar's "Khám & Điều trị" opens EXAM … PRESCRIPTION, the header's
+// "Hồ sơ bệnh án" opens HISTORY.
+const STEP_TITLES = {
+    [STEP.HISTORY]: "Lập hồ sơ bệnh án",
+    [STEP.EXAM]: "Khám & chẩn đoán",
+    [STEP.PLAN]: "Lập kế hoạch điều trị",
+    [STEP.TREATMENT]: "Điều trị",
+    [STEP.PRESCRIPTION]: "Kê đơn thuốc",
+};
 
-// The tabs of a visit, in order (index = STEP, the stepper shows EXAM_STEPS for them). Each tab is a component in ./tab;
-// render gets what the frame shares: the queue item, the record, busy, the record updaters (on*Change), goTo(step) and onEnd.
-const EXAM_TABS = [
-    {
-        step: STEP.HISTORY,
-        render: ({ item, record, busy, handlers, goTo, onEnd }) => (
-            <PatientRecordTab
-                queueId={item.id}
-                record={record}
-                busy={busy}
-                onHistoryChange={handlers.onHistoryChange}
-                onNext={async (history) => {
-                    await saveMedicalHistory(item.id, history);
-                    handlers.onHistoryChange(history);
-                    goTo(STEP.EXAM);
-                }}
-                onEnd={(history) => {
-                    handlers.onHistoryChange(history);
-                    onEnd();
-                }}
-            />
-        ),
-    },
-    {
-        step: STEP.EXAM,
-        render: ({ item, record, busy, handlers, goTo, onEnd, onReload }) => (
-            <ClinicalExamTab
-                queueId={item.id}
-                record={record}
-                busy={busy}
-                onExamChange={handlers.onExamChange}
-                onEnd={onEnd}
-                onComplete={() => goTo(STEP.PLAN)}
-                onXraySent={onReload}
-            />
-        ),
-    },
-    {
-        step: STEP.PLAN,
-        render: ({ item, record, busy, handlers, goTo, onEnd }) => (
-            <TreatmentPlanTab queueId={item.id} record={record} busy={busy} onPlanChange={handlers.onPlanChange} onEnd={onEnd} onComplete={() => goTo(STEP.TREATMENT)} />
-        ),
-    },
-    {
-        step: STEP.TREATMENT,
-        render: ({ item, record, busy, handlers, goTo, onEnd }) => (
-            <TreatmentTab
-                queueId={item.id}
-                record={record}
-                busy={busy}
-                onTreatmentChange={handlers.onTreatmentChange}
-                onPlanChange={handlers.onPlanChange}
-                onEditPlan={() => goTo(STEP.PLAN)}
-                onEnd={onEnd}
-                onComplete={() => goTo(STEP.PRESCRIPTION)}
-            />
-        ),
-    },
-    {
-        step: STEP.PRESCRIPTION,
-        render: ({ item, record, busy, handlers, onEnd }) => (
-            <PrescriptionTab queueId={item.id} record={record} busy={busy} onPrescriptionChange={handlers.onPrescriptionChange} onEnd={onEnd} />
-        ),
-    },
-];
+// "2026-11-02" -> "02/11/2026"
+const dmy = (date) => (date ? String(date).slice(0, 10).split("-").reverse().join("/") : null);
 
-// Patient shown on the right: the one in the room, else the one called. Nobody until the doctor calls someone in;
-// waiting patients cannot be opened.
-const defaultSelection = (queue) =>
-    (queue.find((item) => item.status === QUEUE_STATUS.IN_EXAMINATION) ?? queue.find((item) => item.status === QUEUE_STATUS.CALLED))?.id ?? null;
+// The tabs of a visit (index = STEP). Each tab is a component in ./tab; render gets what the frame shares: the queue
+// item, the record, busy, the record updaters (on*Change), goTo(step), draft (the header's "Lưu nháp" and autosave status).
+const EXAM_TABS = {
+    [STEP.HISTORY]: ({ item, record, busy, handlers, goTo }) => (
+        <PatientRecordTab
+            queueId={item.id}
+            record={record}
+            busy={busy}
+            onHistoryChange={handlers.onHistoryChange}
+            onNext={async (history) => {
+                await saveMedicalHistory(item.id, history);
+                handlers.onHistoryChange(history);
+                goTo(STEP.EXAM);
+            }}
+        />
+    ),
+    [STEP.EXAM]: ({ item, record, busy, handlers, onReload, draft }) => (
+        <ClinicalExamTab queueId={item.id} record={record} busy={busy} onExamChange={handlers.onExamChange} onXraySent={onReload} draft={draft} />
+    ),
+    [STEP.PLAN]: ({ item, record, busy, handlers, goTo, draft }) => (
+        <TreatmentPlanTab
+            queueId={item.id}
+            record={record}
+            busy={busy}
+            onPlanChange={handlers.onPlanChange}
+            onComplete={() => goTo(STEP.TREATMENT)}
+            onToDiagnosis={() => goTo(STEP.EXAM)}
+            draft={draft}
+        />
+    ),
+    [STEP.TREATMENT]: ({ item, record, busy, handlers, goTo, draft }) => (
+        <TreatmentTab
+            queueId={item.id}
+            record={record}
+            busy={busy}
+            onTreatmentChange={handlers.onTreatmentChange}
+            onPlanChange={handlers.onPlanChange}
+            onEditPlan={() => goTo(STEP.PLAN)}
+            onComplete={() => goTo(STEP.PRESCRIPTION)}
+            draft={draft}
+        />
+    ),
+    [STEP.PRESCRIPTION]: ({ item, record, busy, handlers, draft }) => (
+        <PrescriptionTab queueId={item.id} record={record} busy={busy} onPrescriptionChange={handlers.onPrescriptionChange} draft={draft} />
+    ),
+};
 
-// Exam in progress: the frame (back link, breadcrumb, stepper, patient card with timer, step heading) around the tab
-// being viewed (EXAM_TABS). handlers: { onHistoryChange, onExamChange, onPlanChange, onTreatmentChange, onPrescriptionChange }.
-// The tab shown comes from the URL (/doctor/examination/<step>, see DOCTOR_EXAM_STEP_PATHS) so the sidebar links open it;
-// a step not reached yet, or no step in the URL, shows the current one.
-const InExamView = ({ item, record, busy, handlers, onStep, onEnd, onReload }) => {
-    const current = item.step ?? STEP.HISTORY;
-    const { "*": stepPath } = useParams();
+// Patient in the room: the one being examined, else the one called. Others are called in from "Hàng chờ".
+const patientInRoom = (queue) => queue.find((item) => item.status === QUEUE_STATUS.IN_EXAMINATION) ?? queue.find((item) => item.status === QUEUE_STATUS.CALLED) ?? null;
+
+// Exam in progress (Figma): the step title, the patient header with "Lưu nháp" / "Kết thúc lượt khám", then the step.
+// The step comes from the URL (/doctor/examination/<step>, DOCTOR_EXAM_STEP_PATHS) so the sidebar opens it; none = Khám & chẩn đoán.
+// Steps are open in any order; a step that needs an earlier one shows why (no diagnosis yet, no plan yet).
+const InExamView = ({ shown, item, record, busy, handlers, onEnd, onReload }) => {
     const navigate = useNavigate();
-    const requested = DOCTOR_EXAM_STEP_PATHS.indexOf(stepPath);
-    const shown = requested >= 0 ? Math.min(requested, current) : current;
+    // The shown tab registers its "save now" here and reports its autosave status
+    const saveRef = useRef(null);
+    const [status, setStatus] = useState("");
+    const [saving, setSaving] = useState(false);
+    const draft = { saveRef, onStatus: setStatus };
 
-    const goTo = async (step) => {
-        if (step > current && !(await onStep(step))) return;
+    const goTo = (step) => {
         navigate(getDoctorExamStepRoute(step));
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+    const saveDraft = async () => {
+        if (!saveRef.current) return;
+        setSaving(true);
+        const response = await saveRef.current();
+        setSaving(false);
+        if (response?.success === false) toast.error(response.message || "Chưa lưu được nháp, thử lại sau.");
+        else toast.success("Đã lưu nháp.");
+    };
+
     return (
         <>
-            <div className="flex items-center gap-3">
-                <Link to={ROUTES.DASHBOARD} className="btn btn-secondary btn-icon size-9" aria-label="Quay lại" title="Quay lại">
-                    <ChevronLeft className="size-4" aria-hidden="true" />
-                </Link>
-                <span className="h-5 w-px bg-border-strong" aria-hidden="true" />
-                <Breadcrumb
-                    items={[
-                        { label: "Khám bệnh", href: ROUTES.DOCTOR_EXAMINATION },
-                        { label: `Lượt khám ${record.encounterCode}` },
-                        { label: BREADCRUMB_LABEL[shown] ?? EXAM_STEPS[shown] },
-                    ]}
-                />
-            </div>
-            <ExamStepper current={current} viewing={shown} onStepClick={goTo} />
-            <PatientCard
-                patient={{ ...record.patient, queueNumber: item.queueNumber, startedAt: item.startedAt }}
-                status={{ label: "Đang khám", tone: "info" }}
+            <ExamVisitHeader
+                name={record.patient.name}
                 services={record.services}
-                action={<ExamTimer startedAt={item.startedAt} />}
+                status={status}
+                actions={
+                    <>
+                        {shown !== STEP.HISTORY && (
+                            <Link to={getDoctorExamStepRoute(STEP.HISTORY)} className="btn btn-secondary">
+                                Hồ sơ bệnh án
+                            </Link>
+                        )}
+                        {shown !== STEP.HISTORY && (
+                            <button type="button" className="btn btn-secondary" disabled={busy || saving} onClick={saveDraft}>
+                                Lưu nháp
+                            </button>
+                        )}
+                        <button type="button" className="btn btn-primary" disabled={busy} onClick={onEnd}>
+                            Kết thúc lượt khám
+                        </button>
+                    </>
+                }
             />
-            <StepHeading index={shown} total={EXAM_STEPS.length} title={EXAM_STEP_TITLES[shown]} nextLabel={NEXT_LABEL[shown] ?? EXAM_STEPS[shown + 1]} />
-
-            {EXAM_TABS.find((tab) => tab.step === shown)?.render({ item, record, busy, handlers, goTo, onEnd, onReload })}
+            {/* key: each step starts with its own draft and status */}
+            <div key={shown} className="flex flex-col gap-5">
+                {EXAM_TABS[shown]({ item, record, busy, handlers, goTo, onReload, draft })}
+            </div>
         </>
     );
 };
 
 const ExaminationPage = () => {
+    const { "*": stepPath } = useParams();
+    const requested = DOCTOR_EXAM_STEP_PATHS.indexOf(stepPath);
+    const shown = requested >= 0 ? requested : STEP.EXAM;
     const [workspace, setWorkspace] = useState(null);
     const [loadFailed, setLoadFailed] = useState(false);
-    const [selectedId, setSelectedId] = useState(null);
     const [record, setRecord] = useState(null); // { id, data, failed }
-    const isDesktop = useMediaQuery("(min-width: 64rem)");
-    const [collapsedChoice, setCollapsedChoice] = useState(null); // null = automatic
     const [busy, setBusy] = useState(false);
-    const [confirm, setConfirm] = useState(null); // { type: "absent" | "end", item }
-    // Starting or ending the shift changes who the doctor may call: reload the queue then
-    const [shiftVersion, setShiftVersion] = useState(0);
+    const [ending, setEnding] = useState(false);
+    const [version, setVersion] = useState(0);
 
     useEffect(() => {
+        let alive = true;
         getExamWorkspace().then((response) => {
-            if (!response.success) {
-                setLoadFailed(true);
-                return;
-            }
-            setWorkspace(response.data);
-            setSelectedId(defaultSelection(response.data.queue));
+            if (!alive) return;
+            setLoadFailed(!response.success);
+            if (response.success) setWorkspace(response.data);
         });
-    }, [shiftVersion]);
+        return () => {
+            alive = false;
+        };
+    }, [version]);
+
+    const queue = workspace?.queue ?? [];
+    const selected = patientInRoom(queue);
+    const selectedId = selected?.id ?? null;
 
     useEffect(() => {
         if (selectedId == null) return undefined;
@@ -189,15 +174,10 @@ const ExaminationPage = () => {
         };
     }, [selectedId]);
 
-    const queue = workspace?.queue ?? [];
-    const selected = queue.find((item) => item.id === selectedId) ?? null;
-    // Below lg the queue sits above the exam: fold it to a strip while a patient is called in or examined,
-    // so the exam shows first. The doctor's own choice (the « / » button) wins.
-    const collapsed = collapsedChoice ?? (!isDesktop && selected !== null);
     const recordReady = record?.id === selectedId && record.data;
 
-    // Runs a queue action, then shows the new queue and moves the selection.
-    const runAction = async (action, id, nextSelection) => {
+    // Runs a queue action and shows the new queue; true when it worked
+    const runAction = async (action, id) => {
         setBusy(true);
         const response = await action(id);
         setBusy(false);
@@ -206,23 +186,8 @@ const ExaminationPage = () => {
             return false;
         }
         if (response.message) toast.success(response.message);
-        if (response.data?.queue) {
-            setWorkspace(response.data);
-            setSelectedId(nextSelection(response.data.queue));
-        }
+        if (response.data?.queue) setWorkspace(response.data);
         return true;
-    };
-
-    const keep = () => selectedId;
-
-    const confirmActions = {
-        absent: markAbsent,
-        end: endExamination,
-    };
-
-    const handleConfirm = async () => {
-        const done = await runAction(confirmActions[confirm.type], confirm.item.id, defaultSelection);
-        if (done) setConfirm(null);
     };
 
     // Keeps the page's copy of the record in sync with the drafts edited in the steps.
@@ -235,83 +200,61 @@ const ExaminationPage = () => {
         onPrescriptionChange: updateRecord("prescription"),
     };
 
+    // "Kết thúc lượt khám": the prescription is finalized first (the visit cannot end on a draft with medicines)
+    const endVisit = async () => {
+        setBusy(true);
+        const finalized = await finalizePrescription(selected.id, record.data.prescription);
+        setBusy(false);
+        if (!finalized.success) {
+            toast.error(finalized.message ?? GENERIC_ERROR_MESSAGE);
+            return;
+        }
+        if (await runAction(endExamination, selected.id)) setEnding(false);
+    };
+
     const renderMain = () => {
         if (loadFailed) return <p role="alert" className="alert alert-danger">{GENERIC_ERROR_MESSAGE}</p>;
         if (!workspace) return <div className="skeleton h-64 rounded-lg" aria-hidden="true" />;
         if (!selected) return <NoExamView waitingCount={queue.filter((item) => item.status === QUEUE_STATUS.WAITING).length} />;
+        if (selected.status === QUEUE_STATUS.CALLED) return <CalledExamView item={selected} busy={busy} onStart={() => runAction(startExamination, selected.id)} />;
         if (record?.id === selectedId && record.failed) return <p role="alert" className="alert alert-danger">Không tải được hồ sơ của bệnh nhân này.</p>;
         if (!recordReady) return <div className="skeleton h-64 rounded-lg" aria-hidden="true" />;
-        if (selected.status === QUEUE_STATUS.IN_EXAMINATION) {
-            return (
-                <InExamView
-                    key={selected.id}
-                    item={selected}
-                    record={record.data}
-                    busy={busy}
-                    handlers={recordHandlers}
-                    onStep={(step) => runAction((id) => setExamStep(id, step), selected.id, keep)}
-                    onEnd={() => setConfirm({ type: "end", item: selected })}
-                    onReload={() => setShiftVersion((v) => v + 1)}
-                />
-            );
-        }
-        return <CalledExamView item={selected} record={record.data} />;
+        return (
+            <InExamView
+                key={selected.id}
+                shown={shown}
+                item={selected}
+                record={record.data}
+                busy={busy}
+                handlers={recordHandlers}
+                onEnd={() => setEnding(true)}
+                onReload={() => setVersion((current) => current + 1)}
+            />
+        );
     };
 
+    const data = recordReady ? record.data : null;
+
     return (
-        <>
-        <MyShiftBar onChange={() => setShiftVersion((v) => v + 1)} />
-        <div className={cx("grid grid-cols-1 items-start gap-5", collapsed ? "lg:grid-cols-[4rem_minmax(0,1fr)]" : "lg:grid-cols-[18.75rem_minmax(0,1fr)]")}>
-            <div className="lg:sticky lg:top-4">
-                {workspace ? (
-                    <QueuePanel
-                        shift={workspace.shift}
-                        items={queue}
-                        done={workspace.done}
-                        selectedId={selectedId}
-                        collapsed={collapsed}
-                        onToggleCollapse={() => setCollapsedChoice(!collapsed)}
-                        onSelect={setSelectedId}
-                        onCall={(id) => runAction(callPatient, id, () => id)}
-                        onMarkAbsent={(id) => setConfirm({ type: "absent", item: queue.find((item) => item.id === id) })}
-                        onStart={(id) => runAction(startExamination, id, () => id)}                    />
-                ) : (
-                    !loadFailed && <div className="skeleton h-96 rounded-lg" aria-hidden="true" />
-                )}
-            </div>
-
-            <section className="flex min-w-0 flex-col gap-5" aria-label="Khám bệnh">
-                {renderMain()}
-            </section>
-
-            {confirm?.type === "absent" && (
-                <ConfirmExamDialog
-                    title="Báo vắng mặt"
-                    description={`Số ${confirm.item.queueNumber} · ${confirm.item.patientName} chưa vào phòng sẽ được chuyển xuống cuối hàng chờ.`}
-                    confirmLabel="Báo vắng mặt"
-                    danger
+        <section className="flex min-w-0 flex-col gap-5" aria-label="Khám bệnh">
+            <h1 className="page-title">{STEP_TITLES[shown]}</h1>
+            {renderMain()}
+            {ending && data && (
+                <EndVisitDialog
+                    patientName={data.patient.name}
+                    queueNumber={selected.queueNumber}
+                    summary={{
+                        diagnoses: data.exam.diagnoses.length,
+                        treatments: data.treatment.items.length,
+                        medicines: data.prescription.items.length,
+                        followUpDate: dmy((data.followUp ?? data.treatment.followUp)?.date),
+                    }}
                     busy={busy}
-                    onConfirm={handleConfirm}
-                    onClose={() => setConfirm(null)}
+                    onConfirm={endVisit}
+                    onClose={() => setEnding(false)}
                 />
             )}
-            {confirm?.type === "end" && (
-                // Reached the prescription (last step): ending completes the visit and finalizes the prescription.
-                <ConfirmExamDialog
-                    title={confirm.item.step >= STEP.PRESCRIPTION ? "Hoàn tất lượt khám" : "Kết thúc lượt khám"}
-                    description={
-                        confirm.item.step >= STEP.PRESCRIPTION
-                            ? `Hoàn tất lượt khám của ${confirm.item.patientName}? Đơn thuốc sẽ được chốt và không sửa được nữa.`
-                            : `Kết thúc lượt khám của ${confirm.item.patientName}? Các bước chưa làm sẽ không còn mở được trong lượt này.`
-                    }
-                    confirmLabel={confirm.item.step >= STEP.PRESCRIPTION ? "Hoàn tất" : "Kết thúc lượt khám"}
-                    busy={busy}
-                    onConfirm={handleConfirm}
-                    onClose={() => setConfirm(null)}
-                />
-            )}
-        </div>
-        </>
+        </section>
     );
 };
 
