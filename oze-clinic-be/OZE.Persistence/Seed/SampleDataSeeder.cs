@@ -143,77 +143,105 @@ namespace OZE.Persistence.Seed
             new(Hang, -4, 2, A, "Việc cá nhân", LeaveRequestConstants.Approved, Ngoc, null, 5, "11:00"),
         };
 
-        // Catalog demo (services + variants). DV001 keeps RequiredRoomType null so auto-added exam
-        // does not occupy a room or block the main service. RecallMonths null = no auto recall (form "0").
+        // Catalog laid out like the clinic website menu: each menu heading is a service and the items under it are its
+        // variants. DV001 keeps RequiredRoomType null so the auto-added exam does not occupy a room or block the main
+        // service. RecallMonths null = no auto recall (form "0").
+        // Services of the old flat list are kept but inactive: past visits and invoices still point at them.
         private record ServiceRow(string Code, string Name, string Description, decimal Price, int Minutes, string? RoomType, int? RecallMonths = null, bool Active = true);
 
         private static readonly ServiceRow[] ServiceRows =
         {
             new("DV001", "Khám tổng quát & tư vấn", "Khám, tư vấn, lập kế hoạch điều trị", 0, 30, null, 6),
-            new("DV002", "Lấy cao răng", "Làm sạch cao răng, đánh bóng", 150000, 30, RoomTypeConstants.GeneralTreatment, 6),
-            new("DV003", "Điều trị tủy răng", "Lấy tủy, làm sạch và trám bít ống tủy", 800000, 60, RoomTypeConstants.GeneralTreatment, 6),
+            new("DV006", "Niềng răng thẩm mỹ", "Chỉnh nha răng hô, móm, thưa, khấp khểnh bằng mắc cài hoặc khay trong", 18000000, 60, RoomTypeConstants.GeneralTreatment, 1),
+            new("DV005", "Trồng răng Implant", "Cấy ghép trụ Implant và phục hình răng mất", 18000000, 90, RoomTypeConstants.MinorSurgery, 6),
+            new("DV012", "Bọc răng sứ", "Phục hình bằng mão răng sứ hoặc mặt dán sứ Veneer", 2500000, 90, RoomTypeConstants.GeneralTreatment, 6),
             new("DV004", "Nhổ răng khôn", "Nhổ răng khôn bằng phương pháp truyền thống hoặc kỹ thuật hỗ trợ Piezotome", 1500000, 60, RoomTypeConstants.MinorSurgery, 1),
-            new("DV005", "Trồng răng Implant (cấy ghép Implant)", "Cấy ghép trụ Implant và phục hình răng mất", 18000000, 90, RoomTypeConstants.MinorSurgery, 6),
-            new("DV006", "Niềng răng thẩm mỹ", "Chỉnh nha răng hô, móm, thưa, khấp khểnh", 18000000, 60, RoomTypeConstants.GeneralTreatment, 1),
+            new("DV024", "Nha khoa tổng quát", "Điều trị nha khoa cơ bản: nhổ răng, trám răng, lấy cao răng, điều trị tủy, tẩy trắng, phục hình và bệnh nướu", 400000, 30, RoomTypeConstants.GeneralTreatment, 6),
             new("DV007", "Chụp Panorama", "Phim toàn cảnh hai hàm", 250000, 15, RoomTypeConstants.XRay),
-            new("DV008", "Scan răng iTero", "Quét dấu răng kỹ thuật số", 800000, 30, RoomTypeConstants.GeneralTreatment),
-            new("DV009", "Trám răng (hàn răng)", "Phục hồi răng sâu, răng mẻ bằng vật liệu trám hoặc phục hình gián tiếp", 400000, 30, RoomTypeConstants.GeneralTreatment, 6),
-            new("DV010", "Tẩy trắng răng", "Tẩy trắng tại phòng khám hoặc tại nhà", 2500000, 60, RoomTypeConstants.GeneralTreatment, 12),
             new("DV011", "Chụp X-quang quanh chóp", "Phim quanh chóp một răng", 100000, 15, RoomTypeConstants.XRay),
-            new("DV012", "Bọc răng sứ", "Phục hình bằng mão răng sứ Katana, Cercon HT, Emax, Nacera, Emax Press hoặc Lava Esthetic", 2500000, 90, RoomTypeConstants.GeneralTreatment, 6),
-            new("DV013", "Dán sứ Veneer", "Phục hình thẩm mỹ bằng mặt dán sứ Veneer", 5500000, 90, RoomTypeConstants.GeneralTreatment, 6),
-            new("DV014", "Niềng răng trẻ em", "Chỉnh nha cho trẻ em bằng phương pháp chỉnh nha sớm, mắc cài hoặc khay trong", 12000000, 60, RoomTypeConstants.GeneralTreatment, 1),
-            new("DV015", "Nhổ răng thường", "Nhổ răng không thuộc nhóm răng khôn theo chỉ định chuyên môn", 500000, 30, RoomTypeConstants.MinorSurgery, 1),
-            new("DV016", "Đính đá vào răng", "Đính đá trang trí lên bề mặt răng", 350000, 20, RoomTypeConstants.GeneralTreatment),
-            new("DV017", "Cầu răng sứ", "Phục hình răng mất bằng cầu răng sứ", 7500000, 90, RoomTypeConstants.GeneralTreatment, 6),
-            new("DV018", "Hàm răng tháo lắp", "Phục hình răng mất bằng hàm giả tháo lắp", 3000000, 60, RoomTypeConstants.GeneralTreatment, 6),
-            new("DV019", "Cắt lợi", "Cắt lợi hoặc cắt nướu theo chỉ định điều trị", 1800000, 45, RoomTypeConstants.MinorSurgery, 1),
-            new("DV020", "Điều trị viêm lợi (viêm nướu)", "Thăm khám và điều trị tình trạng viêm lợi, viêm nướu", 500000, 45, RoomTypeConstants.GeneralTreatment, 3),
-            new("DV021", "Điều trị viêm nha chu", "Thăm khám và điều trị bệnh lý nha chu, chăm sóc mô quanh răng", 1500000, 60, RoomTypeConstants.GeneralTreatment, 3),
-            new("DV022", "Phục hình sứ Inlay / Onlay / Overlay", "Phục hình khuyết hổng mô răng bằng miếng sứ Inlay, Onlay hoặc Overlay", 2500000, 60, RoomTypeConstants.GeneralTreatment, 6),
-            new("DV023", "Phục hồi tủy nhân tạo", "Phục hồi tủy nhân tạo theo chỉ định điều trị", 1800000, 60, RoomTypeConstants.GeneralTreatment, 3),
+            new("DV008", "Scan răng iTero", "Quét dấu răng kỹ thuật số", 800000, 30, RoomTypeConstants.GeneralTreatment),
+
+            // Old flat list, now variants of the services above
+            new("DV002", "Lấy cao răng", "Làm sạch cao răng, đánh bóng", 150000, 30, RoomTypeConstants.GeneralTreatment, 6, Active: false),
+            new("DV003", "Điều trị tủy răng", "Lấy tủy, làm sạch và trám bít ống tủy", 800000, 60, RoomTypeConstants.GeneralTreatment, 6, Active: false),
+            new("DV009", "Trám răng (hàn răng)", "Phục hồi răng sâu, răng mẻ bằng vật liệu trám hoặc phục hình gián tiếp", 400000, 30, RoomTypeConstants.GeneralTreatment, 6, Active: false),
+            new("DV010", "Tẩy trắng răng", "Tẩy trắng tại phòng khám hoặc tại nhà", 2500000, 60, RoomTypeConstants.GeneralTreatment, 12, Active: false),
+            new("DV013", "Dán sứ Veneer", "Phục hình thẩm mỹ bằng mặt dán sứ Veneer", 5500000, 90, RoomTypeConstants.GeneralTreatment, 6, Active: false),
+            new("DV014", "Niềng răng trẻ em", "Chỉnh nha cho trẻ em bằng phương pháp chỉnh nha sớm, mắc cài hoặc khay trong", 12000000, 60, RoomTypeConstants.GeneralTreatment, 1, Active: false),
+            new("DV015", "Nhổ răng thường", "Nhổ răng không thuộc nhóm răng khôn theo chỉ định chuyên môn", 500000, 30, RoomTypeConstants.MinorSurgery, 1, Active: false),
+            new("DV016", "Đính đá vào răng", "Đính đá trang trí lên bề mặt răng", 350000, 20, RoomTypeConstants.GeneralTreatment, Active: false),
+            new("DV017", "Cầu răng sứ", "Phục hình răng mất bằng cầu răng sứ", 7500000, 90, RoomTypeConstants.GeneralTreatment, 6, Active: false),
+            new("DV018", "Hàm răng tháo lắp", "Phục hình răng mất bằng hàm giả tháo lắp", 3000000, 60, RoomTypeConstants.GeneralTreatment, 6, Active: false),
+            new("DV019", "Cắt lợi", "Cắt lợi hoặc cắt nướu theo chỉ định điều trị", 1800000, 45, RoomTypeConstants.MinorSurgery, 1, Active: false),
+            new("DV020", "Điều trị viêm lợi (viêm nướu)", "Thăm khám và điều trị tình trạng viêm lợi, viêm nướu", 500000, 45, RoomTypeConstants.GeneralTreatment, 3, Active: false),
+            new("DV021", "Điều trị viêm nha chu", "Thăm khám và điều trị bệnh lý nha chu, chăm sóc mô quanh răng", 1500000, 60, RoomTypeConstants.GeneralTreatment, 3, Active: false),
+            new("DV022", "Phục hình sứ Inlay / Onlay / Overlay", "Phục hình khuyết hổng mô răng bằng miếng sứ Inlay, Onlay hoặc Overlay", 2500000, 60, RoomTypeConstants.GeneralTreatment, 6, Active: false),
+            new("DV023", "Phục hồi tủy nhân tạo", "Phục hồi tủy nhân tạo theo chỉ định điều trị", 1800000, 60, RoomTypeConstants.GeneralTreatment, 3, Active: false),
         };
 
         private record VariantRow(string Service, string Code, string Name, decimal Price, int Minutes, int Order, string Description, bool Active = true);
 
         private static readonly VariantRow[] VariantRows =
         {
-            new("DV002", "DV002-01", "Một hàm", 150000, 20, 1, "Lấy cao răng và đánh bóng một hàm."),
-            new("DV002", "DV002-02", "Toàn hàm", 300000, 30, 2, "Lấy cao răng cả hai hàm, đánh bóng."),
-            new("DV002", "DV002-03", "Nửa hàm", 100000, 15, 3, "Lấy cao răng nửa hàm; không tiếp nhận lịch hẹn mới.", Active: false),
-            new("DV003", "DV003-01", "Răng một chân", 800000, 45, 1, "Điều trị tủy răng cửa, răng nanh."),
-            new("DV003", "DV003-02", "Răng nhiều chân", 1500000, 60, 2, "Điều trị tủy răng hàm."),
-            new("DV004", "DV004-01", "Nhổ răng khôn truyền thống", 1500000, 60, 1, "Nhổ răng khôn bằng kỹ thuật truyền thống."),
-            new("DV004", "DV004-02", "Nhổ răng khôn bằng Piezotome", 2500000, 75, 2, "Nhổ răng khôn với hỗ trợ của máy Piezotome."),
-            new("DV004", "DV004-03", "Răng khôn mọc thẳng", 900000, 30, 3, "Nhổ răng khôn mọc thẳng."),
-            new("DV004", "DV004-04", "Răng khôn mọc lệch nhẹ", 1500000, 45, 4, "Nhổ răng khôn mọc lệch nhẹ."),
-            new("DV004", "DV004-05", "Răng khôn mọc ngầm / mọc ngang", 2800000, 90, 5, "Nhổ răng khôn mọc ngầm hoặc mọc ngang."),
-            new("DV004", "DV004-06", "Răng khôn phức tạp / sát dây thần kinh", 4500000, 120, 6, "Nhổ răng khôn có độ khó cao hoặc nằm sát dây thần kinh."),
-            new("DV005", "DV005-01", "Phục hình răng", 18000000, 90, 1, "Cấy ghép Implant để phục hình răng mất."),
-            new("DV005", "DV005-02", "Phục hình một vài răng liền kề", 45000000, 150, 2, "Cấy ghép Implant để phục hình một vài răng liền kề."),
-            new("DV005", "DV005-03", "Phục hình toàn hàm", 120000000, 210, 3, "Cấy ghép Implant để phục hình toàn hàm."),
-            new("DV006", "DV006-01", "Mắc cài kim loại thường (truyền thống)", 18000000, 60, 1, "Chỉnh nha bằng mắc cài kim loại, sử dụng thun buộc cố định dây cung."),
-            new("DV006", "DV006-02", "Mắc cài sứ truyền thống", 30000000, 60, 2, "Chỉnh nha mắc cài sứ truyền thống, cố định dây cung bằng thun; tính thẩm mỹ cao."),
-            new("DV006", "DV006-03", "Niềng răng khay trong suốt", 45000000, 30, 3, "Chỉnh nha bằng khay trong suốt tháo lắp, bao gồm lựa chọn Invisalign."),
-            new("DV006", "DV006-04", "Mắc cài kim loại tự buộc", 23000000, 60, 4, "Mắc cài kim loại có chốt/nắp trượt giữ dây cung, không cần thun buộc."),
-            new("DV006", "DV006-05", "Mắc cài sứ tự buộc", 35000000, 60, 5, "Mắc cài sứ với cơ chế tự khóa để giữ dây cung."),
-            new("DV009", "DV009-01", "Trám composite", 400000, 30, 1, "Trám thẩm mỹ cùng màu răng."),
-            new("DV009", "DV009-02", "Trám GIC", 250000, 30, 2, "Trám GIC cho răng sữa, cổ răng."),
-            new("DV009", "DV009-03", "Inlay / onlay sứ", 2500000, 60, 3, "Phục hình gián tiếp bằng miếng sứ Inlay hoặc Onlay."),
-            new("DV010", "DV010-01", "Tại phòng khám", 2500000, 60, 1, "Tẩy trắng bằng đèn tại phòng khám."),
-            new("DV010", "DV010-02", "Tại nhà (máng)", 1500000, 30, 2, "Máng tẩy trắng đeo tại nhà."),
+            // Niềng răng thẩm mỹ
+            new("DV006", "DV006-01", "Niềng răng mắc cài kim loại", 18000000, 60, 1, "Chỉnh nha bằng mắc cài kim loại, chi phí hợp lý, hiệu quả ổn định."),
+            new("DV006", "DV006-02", "Niềng răng mắc cài sứ", 30000000, 60, 2, "Mắc cài sứ cùng màu răng, khó nhận thấy khi giao tiếp."),
+            new("DV006", "DV006-03", "Niềng răng khay trong", 45000000, 30, 3, "Khay trong suốt tháo lắp, thay khay định kỳ, bao gồm lựa chọn Invisalign."),
+            new("DV006", "DV006-06", "Niềng răng trẻ em", 12000000, 45, 4, "Chỉnh nha sớm và chỉnh nha cho trẻ em bằng mắc cài hoặc khay trong."),
+            new("DV006", "DV006-04", "Mắc cài kim loại tự buộc", 23000000, 60, 5, "Gói cũ, gộp vào niềng răng mắc cài kim loại.", Active: false),
+            new("DV006", "DV006-05", "Mắc cài sứ tự buộc", 35000000, 60, 6, "Gói cũ, gộp vào niềng răng mắc cài sứ.", Active: false),
+
+            // Trồng răng Implant and Nhổ răng khôn have no variants on the website; the old ones stay inactive for past visits
+            new("DV005", "DV005-01", "Implant một răng", 18000000, 90, 1, "Cấy một trụ Implant và mão sứ cho một răng mất.", Active: false),
+            new("DV005", "DV005-02", "Implant nhiều răng liền kề", 45000000, 150, 2, "Cấy ghép Implant phục hình một vài răng mất liền kề.", Active: false),
+            new("DV005", "DV005-03", "Implant toàn hàm", 120000000, 210, 3, "Cấy ghép Implant phục hình toàn hàm (All-on-4 / All-on-6).", Active: false),
+            new("DV004", "DV004-01", "Nhổ răng khôn truyền thống", 1500000, 60, 1, "Nhổ răng khôn bằng kỹ thuật truyền thống.", Active: false),
+            new("DV004", "DV004-02", "Nhổ răng khôn bằng Piezotome", 2500000, 75, 2, "Nhổ răng khôn với hỗ trợ của máy Piezotome, ít sang chấn.", Active: false),
+            new("DV004", "DV004-03", "Răng khôn mọc thẳng", 900000, 30, 3, "Nhổ răng khôn mọc thẳng.", Active: false),
+            new("DV004", "DV004-04", "Răng khôn mọc lệch nhẹ", 1500000, 45, 4, "Nhổ răng khôn mọc lệch nhẹ.", Active: false),
+            new("DV004", "DV004-05", "Răng khôn mọc ngầm / mọc ngang", 2800000, 90, 5, "Nhổ răng khôn mọc ngầm hoặc mọc ngang.", Active: false),
+            new("DV004", "DV004-06", "Răng khôn phức tạp / sát dây thần kinh", 4500000, 120, 6, "Nhổ răng khôn có độ khó cao hoặc nằm sát dây thần kinh.", Active: false),
+
+            // Bọc răng sứ
             new("DV012", "DV012-01", "Răng sứ Katana", 2500000, 75, 1, "Phục hình bằng răng sứ Katana."),
             new("DV012", "DV012-02", "Răng sứ Cercon HT", 4000000, 75, 2, "Phục hình bằng răng sứ Cercon HT."),
             new("DV012", "DV012-03", "Răng sứ Emax", 5500000, 90, 3, "Phục hình bằng răng sứ Emax."),
             new("DV012", "DV012-04", "Răng sứ Nacera", 4500000, 75, 4, "Phục hình bằng răng sứ Nacera."),
             new("DV012", "DV012-05", "Răng sứ Emax Press", 6500000, 90, 5, "Phục hình bằng răng sứ Emax Press."),
             new("DV012", "DV012-06", "Răng sứ Lava Esthetic", 8000000, 90, 6, "Phục hình bằng răng sứ Lava Esthetic."),
-            new("DV014", "DV014-01", "Tiền chỉnh nha / chỉnh nha sớm", 12000000, 45, 1, "Chỉnh nha sớm dành cho trẻ em."),
-            new("DV014", "DV014-02", "Mắc cài kim loại cho trẻ em", 18000000, 60, 2, "Phương pháp chỉnh nha mắc cài kim loại, theo nhóm trẻ em."),
-            new("DV014", "DV014-03", "Khay trong cho trẻ em", 30000000, 45, 3, "Phương pháp chỉnh nha khay trong, theo nhóm trẻ em."),
-            new("DV022", "DV022-01", "Inlay", 2500000, 60, 1, "Phục hình gián tiếp bằng miếng sứ Inlay."),
-            new("DV022", "DV022-02", "Onlay", 3000000, 75, 2, "Phục hình gián tiếp bằng miếng sứ Onlay."),
-            new("DV022", "DV022-03", "Overlay", 3500000, 90, 3, "Phục hình gián tiếp bằng miếng sứ Overlay."),
+            new("DV012", "DV012-07", "Dán sứ Veneer", 5500000, 90, 7, "Mặt dán sứ Veneer mỏng, cải thiện màu và hình dáng răng."),
+
+            // Nha khoa tổng quát
+            new("DV024", "DV024-01", "Nhổ răng thường", 500000, 30, 1, "Nhổ răng không thuộc nhóm răng khôn theo chỉ định chuyên môn."),
+            new("DV024", "DV024-02", "Trám răng", 400000, 30, 2, "Trám thẩm mỹ composite cùng màu răng cho răng sâu, mẻ."),
+            new("DV024", "DV024-03", "Hàn răng", 300000, 30, 3, "Hàn răng bằng GIC cho răng sữa, cổ răng, lỗ sâu nhỏ."),
+            new("DV024", "DV024-04", "Lấy cao răng", 300000, 30, 4, "Làm sạch cao răng và đánh bóng cả hai hàm."),
+            new("DV024", "DV024-05", "Điều trị tủy răng", 1500000, 60, 5, "Lấy tủy, làm sạch và trám bít ống tủy."),
+            new("DV024", "DV024-06", "Tẩy trắng răng", 2500000, 60, 6, "Tẩy trắng bằng đèn tại phòng khám hoặc máng tại nhà."),
+            new("DV024", "DV024-07", "Đính đá vào răng", 350000, 20, 7, "Đính đá trang trí lên bề mặt răng."),
+            new("DV024", "DV024-08", "Cầu răng sứ", 7500000, 90, 8, "Phục hình răng mất bằng cầu răng sứ dựa trên răng bên cạnh."),
+            new("DV024", "DV024-09", "Hàm răng tháo lắp", 3000000, 60, 9, "Phục hình răng mất bằng hàm giả tháo lắp."),
+            new("DV024", "DV024-10", "Cắt lợi", 1800000, 45, 10, "Cắt lợi hoặc cắt nướu theo chỉ định điều trị."),
+            new("DV024", "DV024-11", "Điều trị viêm lợi (viêm nướu)", 500000, 45, 11, "Thăm khám và điều trị tình trạng viêm lợi, viêm nướu."),
+            new("DV024", "DV024-12", "Điều trị viêm nha chu", 1500000, 60, 12, "Điều trị bệnh lý nha chu, chăm sóc mô quanh răng."),
+
+            // Variants of the old flat list, inactive with their services
+            new("DV002", "DV002-01", "Một hàm", 150000, 20, 1, "Lấy cao răng và đánh bóng một hàm.", Active: false),
+            new("DV002", "DV002-02", "Toàn hàm", 300000, 30, 2, "Lấy cao răng cả hai hàm, đánh bóng.", Active: false),
+            new("DV002", "DV002-03", "Nửa hàm", 100000, 15, 3, "Lấy cao răng nửa hàm.", Active: false),
+            new("DV003", "DV003-01", "Răng một chân", 800000, 45, 1, "Điều trị tủy răng cửa, răng nanh.", Active: false),
+            new("DV003", "DV003-02", "Răng nhiều chân", 1500000, 60, 2, "Điều trị tủy răng hàm.", Active: false),
+            new("DV009", "DV009-01", "Trám composite", 400000, 30, 1, "Trám thẩm mỹ cùng màu răng.", Active: false),
+            new("DV009", "DV009-02", "Trám GIC", 250000, 30, 2, "Trám GIC cho răng sữa, cổ răng.", Active: false),
+            new("DV009", "DV009-03", "Inlay / onlay sứ", 2500000, 60, 3, "Phục hình gián tiếp bằng miếng sứ Inlay hoặc Onlay.", Active: false),
+            new("DV010", "DV010-01", "Tại phòng khám", 2500000, 60, 1, "Tẩy trắng bằng đèn tại phòng khám.", Active: false),
+            new("DV010", "DV010-02", "Tại nhà (máng)", 1500000, 30, 2, "Máng tẩy trắng đeo tại nhà.", Active: false),
+            new("DV014", "DV014-01", "Tiền chỉnh nha / chỉnh nha sớm", 12000000, 45, 1, "Chỉnh nha sớm dành cho trẻ em.", Active: false),
+            new("DV014", "DV014-02", "Mắc cài kim loại cho trẻ em", 18000000, 60, 2, "Chỉnh nha mắc cài kim loại cho trẻ em.", Active: false),
+            new("DV014", "DV014-03", "Khay trong cho trẻ em", 30000000, 45, 3, "Chỉnh nha khay trong cho trẻ em.", Active: false),
+            new("DV022", "DV022-01", "Inlay", 2500000, 60, 1, "Phục hình gián tiếp bằng miếng sứ Inlay.", Active: false),
+            new("DV022", "DV022-02", "Onlay", 3000000, 75, 2, "Phục hình gián tiếp bằng miếng sứ Onlay.", Active: false),
+            new("DV022", "DV022-03", "Overlay", 3500000, 90, 3, "Phục hình gián tiếp bằng miếng sứ Overlay.", Active: false),
         };
 
         // MOCK_SYSTEM_CONFIGS plus the general check-up code the booking flow needs.
@@ -683,20 +711,20 @@ namespace OZE.Persistence.Seed
                 const string Ok = PaymentConstants.Confirmed, Waiting = PaymentConstants.Pending, Failed = PaymentConstants.Failed;
 
                 // Previous visits of the exam screen
-                Complete(new Visit { Patient = "BN000123", Day = -66, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV009-01" }, Complaint = "Ê buốt răng hàm dưới bên trái khi ăn lạnh",
+                Complete(new Visit { Patient = "BN000123", Day = -66, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV024-02" }, Complaint = "Ê buốt răng hàm dưới bên trái khi ăn lạnh",
                     Diagnoses = new[] { new Diagnosis("K02.1", "Sâu ngà răng", "36"), new Diagnosis("K02.0", "Sâu men răng", "37") },
-                    Invoice = "HD000158", Lines = new[] { new Line("Chụp X-quang quanh chóp răng 36", "DV011", 100000), new Line("Trám composite răng 36", "DV009", 400000) },
+                    Invoice = "HD000158", Lines = new[] { new Line("Chụp X-quang quanh chóp răng 36", "DV011", 100000), new Line("Trám composite răng 36", "DV024", 400000) },
                     Payments = new[] { new Pay(-66, 500000, Bank, Ok, Mai) } });
-                Complete(new Visit { Patient = "BN000187", Day = -63, Time = "09:30", Doctor = Khoa, Book = new[] { "DV001", "DV003-02" }, Complaint = "Đau nhức răng hàm trên bên phải về đêm",
+                Complete(new Visit { Patient = "BN000187", Day = -63, Time = "09:30", Doctor = Khoa, Book = new[] { "DV001", "DV024-05" }, Complaint = "Đau nhức răng hàm trên bên phải về đêm",
                     Diagnoses = new[] { new Diagnosis("K04.0", "Viêm tủy răng không hồi phục", "16") },
-                    Invoice = "HD000160", Lines = new[] { new Line("Điều trị tủy răng 16", "DV003", 1500000) }, Payments = new[] { new Pay(-63, 1500000, Cash, Ok, Mai) } });
-                Complete(new Visit { Patient = "BN000211", Day = -55, Time = "14:00", Doctor = Ha, Book = new[] { "DV001", "DV002-02" }, Complaint = "Chảy máu chân răng khi chải răng",
+                    Invoice = "HD000160", Lines = new[] { new Line("Điều trị tủy răng 16", "DV024", 1500000) }, Payments = new[] { new Pay(-63, 1500000, Cash, Ok, Mai) } });
+                Complete(new Visit { Patient = "BN000211", Day = -55, Time = "14:00", Doctor = Ha, Book = new[] { "DV001", "DV024-04" }, Complaint = "Chảy máu chân răng khi chải răng",
                     Diagnoses = new[] { new Diagnosis("K05.1", "Viêm lợi mạn tính") },
-                    Invoice = "HD000163", Lines = new[] { new Line("Lấy cao răng toàn hàm", "DV002", 300000) }, Payments = new[] { new Pay(-55, 300000, Cash, Ok, Hang) } });
+                    Invoice = "HD000163", Lines = new[] { new Line("Lấy cao răng toàn hàm", "DV024", 300000) }, Payments = new[] { new Pay(-55, 300000, Cash, Ok, Hang) } });
 
                 // Debts (amounts still owed)
-                Complete(new Visit { Patient = "BN000133", Day = -68, Time = "08:30", Doctor = Khoa, Book = new[] { "DV001", "DV009-01" }, Complaint = "Răng cửa ố, mẻ",
-                    Invoice = "HD000176", Lines = new[] { new Line("Trám răng thẩm mỹ", "DV009", 500000, 3) }, Payments = new[] { new Pay(-68, 500000, Cash, Ok, Mai) }, FollowUpDays = 5 });
+                Complete(new Visit { Patient = "BN000133", Day = -68, Time = "08:30", Doctor = Khoa, Book = new[] { "DV001", "DV024-02" }, Complaint = "Răng cửa ố, mẻ",
+                    Invoice = "HD000176", Lines = new[] { new Line("Trám răng thẩm mỹ", "DV024", 500000, 3) }, Payments = new[] { new Pay(-68, 500000, Cash, Ok, Mai) }, FollowUpDays = 5 });
                 Complete(new Visit { Patient = "BN000118", Day = -47, Time = "09:00", Doctor = Khoa, Complaint = "Răng hô, muốn niềng", Plan = "Niềng răng mắc cài kim loại",
                     Invoice = "HD000188",
                     Lines = new[] { new Line("Giai đoạn 1 · Gắn mắc cài kim loại", "DV006", 20000000), new Line("Giai đoạn 2 · Siết dây định kỳ (6 tháng)", "DV006", 18000000), new Line("Giai đoạn 3 · Tháo mắc cài & duy trì", "DV006", 7000000) },
@@ -705,41 +733,41 @@ namespace OZE.Persistence.Seed
                     Invoice = "HD000192", Lines = new[] { new Line("Trụ Implant", "DV005", 16000000), new Line("Mão sứ trên Implant", "DV005", 8000000) },
                     Payments = new[] { new Pay(-34, 12000000, Bank, Ok, Hang) }, FollowUpDays = 12 });
                 Complete(new Visit { Patient = "BN000151", Day = -21, Time = "14:30", Doctor = Anh, Complaint = "Răng 26 vỡ lớn", Plan = "Bọc răng sứ 26",
-                    Invoice = "HD000201", Lines = new[] { new Line("Mão sứ toàn sứ", null, 6000000), new Line("Điều trị tủy trước bọc", "DV003", 500000) },
+                    Invoice = "HD000201", Lines = new[] { new Line("Mão sứ toàn sứ", null, 6000000), new Line("Điều trị tủy trước bọc", "DV024", 500000) },
                     Payments = new[] { new Pay(-21, 4500000, Qr, Ok, Ngoc) } });
-                var tuan = Complete(new Visit { Patient = "BN000098", Day = -3, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV004-04" }, Complaint = "Răng khôn hàm dưới mọc lệch, sưng đau",
+                var tuan = Complete(new Visit { Patient = "BN000098", Day = -3, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV004" }, Complaint = "Răng khôn hàm dưới mọc lệch, sưng đau",
                     Diagnoses = new[] { new Diagnosis("K01.1", "Răng khôn mọc ngầm", "38") },
                     Invoice = "HD000187", Lines = new[] { new Line("Nhổ răng khôn", "DV004", 1500000) }, Payments = new[] { new Pay(-3, 1500000, Qr, Waiting) } });
                 Complete(new Visit { Patient = "BN000152", Day = -3, Time = "14:00", Doctor = Huy, Invoice = "HD000190", Lines = new[] { new Line("Khám tổng quát", "DV001", 150000) } });
-                Complete(new Visit { Patient = "BN000153", Day = -1, Time = "08:30", Doctor = Khoa, Book = new[] { "DV001", "DV002-02", "DV009-01" },
-                    Invoice = "HD000198", Lines = new[] { new Line("Lấy cao răng", "DV002", 300000), new Line("Trám răng", "DV009", 300000) } });
-                Complete(new Visit { Patient = "BN000154", Day = -1, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV002-02" },
-                    Invoice = "HD000203", Lines = new[] { new Line("Lấy cao răng", "DV002", 350000) } });
+                Complete(new Visit { Patient = "BN000153", Day = -1, Time = "08:30", Doctor = Khoa, Book = new[] { "DV001", "DV024-04", "DV024-02" },
+                    Invoice = "HD000198", Lines = new[] { new Line("Lấy cao răng", "DV024", 300000), new Line("Trám răng", "DV024", 300000) } });
+                Complete(new Visit { Patient = "BN000154", Day = -1, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV024-04" },
+                    Invoice = "HD000203", Lines = new[] { new Line("Lấy cao răng", "DV024", 350000) } });
                 Complete(new Visit { Patient = "BN000097", Day = -1, Time = "09:30", Doctor = Huy, Complaint = "Kiểm tra tổng quát, chụp phim toàn cảnh",
                     Invoice = "HD000204", Lines = new[] { new Line("Chụp X-quang toàn cảnh", "DV007", 250000) } });
                 Complete(new Visit { Patient = "BN000101", Day = -1, Time = "14:00", Doctor = Anh, Complaint = "Đau răng 36", Plan = "Điều trị tủy răng 36",
-                    Invoice = "HD000205", Lines = new[] { new Line("Điều trị tủy", "DV003", 1800000) }, Payments = new[] { new Pay(-1, 800000, Cash, Ok, Hang) }, FollowUpDays = 6 });
-                Complete(new Visit { Patient = "BN000125", Day = -1, Time = "10:00", Doctor = Ha, Book = new[] { "DV001", "DV009-01" },
-                    Invoice = "HD000206", Lines = new[] { new Line("Trám răng", "DV009", 400000) } });
-                Complete(new Visit { Patient = "BN000090", Day = -1, Time = "10:30", Doctor = Khoa, Book = new[] { "DV001", "DV010-01" },
-                    Invoice = "HD000207", Lines = new[] { new Line("Tẩy trắng răng", "DV010", 2500000) }, Payments = new[] { new Pay(-1, 2500000, Bank, Waiting) } });
+                    Invoice = "HD000205", Lines = new[] { new Line("Điều trị tủy", "DV024", 1800000) }, Payments = new[] { new Pay(-1, 800000, Cash, Ok, Hang) }, FollowUpDays = 6 });
+                Complete(new Visit { Patient = "BN000125", Day = -1, Time = "10:00", Doctor = Ha, Book = new[] { "DV001", "DV024-02" },
+                    Invoice = "HD000206", Lines = new[] { new Line("Trám răng", "DV024", 400000) } });
+                Complete(new Visit { Patient = "BN000090", Day = -1, Time = "10:30", Doctor = Khoa, Book = new[] { "DV001", "DV024-06" },
+                    Invoice = "HD000207", Lines = new[] { new Line("Tẩy trắng răng", "DV024", 2500000) }, Payments = new[] { new Pay(-1, 2500000, Bank, Waiting) } });
 
                 // Paid invoices that the refund requests are about (AddRefundRequests)
-                Complete(new Visit { Patient = "BN000123", Day = -52, Time = "08:30", Doctor = Khoa, Book = new[] { "DV001", "DV002-02" }, Complaint = "Lấy cao răng định kỳ 6 tháng",
+                Complete(new Visit { Patient = "BN000123", Day = -52, Time = "08:30", Doctor = Khoa, Book = new[] { "DV001", "DV024-04" }, Complaint = "Lấy cao răng định kỳ 6 tháng",
                     Diagnoses = new[] { new Diagnosis("K03.6", "Cao răng (lắng đọng trên răng)") },
-                    Invoice = "HD000165", Lines = new[] { new Line("Khám tổng quát", "DV001", 150000), new Line("Lấy cao răng", "DV002", 300000) }, Payments = new[] { new Pay(-52, 450000, Cash, Ok, Mai) } });
-                Complete(new Visit { Patient = "BN000125", Day = -26, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV009-01" },
-                    Invoice = "HD000202", Lines = new[] { new Line("Trám răng", "DV009", 400000, 2) }, Payments = new[] { new Pay(-26, 800000, Cash, Ok, Hang) } });
+                    Invoice = "HD000165", Lines = new[] { new Line("Khám tổng quát", "DV001", 150000), new Line("Lấy cao răng", "DV024", 300000) }, Payments = new[] { new Pay(-52, 450000, Cash, Ok, Mai) } });
+                Complete(new Visit { Patient = "BN000125", Day = -26, Time = "09:00", Doctor = Ha, Book = new[] { "DV001", "DV024-02" },
+                    Invoice = "HD000202", Lines = new[] { new Line("Trám răng", "DV024", 400000, 2) }, Payments = new[] { new Pay(-26, 800000, Cash, Ok, Hang) } });
                 Complete(new Visit { Patient = "BN000133", Day = -28, Time = "10:00", Doctor = Khoa, Complaint = "Khám và tư vấn, không điều trị",
                     Invoice = "HD000171", Lines = new[] { new Line("Khám tổng quát", "DV001", 200000) }, Payments = new[] { new Pay(-28, 200000, Cash, Ok, Mai), new Pay(-28, 200000, Bank, Ok, Mai) } });
-                Complete(new Visit { Patient = "BN000118", Day = -34, Time = "14:00", Doctor = Anh, Book = new[] { "DV001", "DV003-02" },
-                    Invoice = "HD000150", Lines = new[] { new Line("Điều trị tủy răng 46", "DV003", 1500000) }, Payments = new[] { new Pay(-34, 1500000, Cash, Ok, Hang) } });
-                Complete(new Visit { Patient = "BN000101", Day = -41, Time = "15:00", Doctor = Duc, Book = new[] { "DV001", "DV004-04" },
+                Complete(new Visit { Patient = "BN000118", Day = -34, Time = "14:00", Doctor = Anh, Book = new[] { "DV001", "DV024-05" },
+                    Invoice = "HD000150", Lines = new[] { new Line("Điều trị tủy răng 46", "DV024", 1500000) }, Payments = new[] { new Pay(-34, 1500000, Cash, Ok, Hang) } });
+                Complete(new Visit { Patient = "BN000101", Day = -41, Time = "15:00", Doctor = Duc, Book = new[] { "DV001", "DV004" },
                     Invoice = "HD000141", Lines = new[] { new Line("Nhổ răng khôn", "DV004", 1250000) }, Payments = new[] { new Pay(-41, 1250000, Cash, Ok, Hang) } });
                 Complete(new Visit { Patient = "BN000097", Day = -48, Time = "09:00", Doctor = Huy,
                     Invoice = "HD000136", Lines = new[] { new Line("Chụp X-quang toàn cảnh", "DV007", 250000) }, Payments = new[] { new Pay(-48, 250000, Cash, Ok, Ngoc) } });
-                Complete(new Visit { Patient = "BN000090", Day = -58, Time = "10:00", Doctor = Khoa, Book = new[] { "DV001", "DV002-02" },
-                    Invoice = "HD000122", Lines = new[] { new Line("Lấy cao răng", "DV002", 300000) }, Payments = new[] { new Pay(-58, 300000, Cash, Ok, Mai) } });
+                Complete(new Visit { Patient = "BN000090", Day = -58, Time = "10:00", Doctor = Khoa, Book = new[] { "DV001", "DV024-04" },
+                    Invoice = "HD000122", Lines = new[] { new Line("Lấy cao răng", "DV024", 300000) }, Payments = new[] { new Pay(-58, 300000, Cash, Ok, Mai) } });
 
                 // The X-ray films of Phạm Minh Tuấn's visit 3 days ago (YC000301 approved, YC000296 cancelled)
                 var exam = tuan.Appointment.Examination!;
@@ -767,25 +795,25 @@ namespace OZE.Persistence.Seed
                     Invoice = "HD000209", Lines = new[] { new Line("Khám tổng quát", "DV001", 150000), new Line("Chụp X-quang quanh chóp", "DV011", 100000, 2) } });
                 Complete(new Visit { Patient = "BN000157", WalkIn = true, CheckIn = "08:30", Doctor = Huy, Complaint = "Răng sữa lung lay",
                     Invoice = "HD000210", Lines = new[] { new Line("Nhổ răng sữa", null, 200000) } });
-                Complete(new Visit { Patient = "BN000241", WalkIn = true, CheckIn = "08:40", Doctor = Khoa, Book = new[] { "DV001", "DV002-02" },
-                    Invoice = "HD000215", Lines = new[] { new Line("Lấy cao răng toàn hàm", "DV002", 300000) } });
+                Complete(new Visit { Patient = "BN000241", WalkIn = true, CheckIn = "08:40", Doctor = Khoa, Book = new[] { "DV001", "DV024-04" },
+                    Invoice = "HD000215", Lines = new[] { new Line("Lấy cao răng toàn hàm", "DV024", 300000) } });
                 Complete(new Visit { Patient = "BN000158", WalkIn = true, CheckIn = "08:45", Doctor = Ha, Complaint = "Răng cửa đổi màu", Plan = "Bọc răng sứ 11, 21",
                     Invoice = "HD000211", Lines = new[] { new Line("Mão sứ toàn sứ", null, 6000000, 2) }, Payments = new[] { new Pay(0, 5000000, Qr, Ok, Ngoc) }, FollowUpDays = 10 });
-                Complete(new Visit { Patient = "BN000159", WalkIn = true, CheckIn = "09:00", Doctor = Khoa, Book = new[] { "DV001", "DV002-02" },
-                    Invoice = "HD000212", Lines = new[] { new Line("Lấy cao răng", "DV002", 300000) }, Payments = new[] { new Pay(0, 300000, Bank, PaymentConstants.Failed) } });
-                Complete(new Visit { Patient = "BN000160", WalkIn = true, CheckIn = "09:15", Doctor = Anh, Book = new[] { "DV001", "DV009-01" },
-                    Invoice = "HD000213", Lines = new[] { new Line("Trám răng", "DV009", 450000) } });
+                Complete(new Visit { Patient = "BN000159", WalkIn = true, CheckIn = "09:00", Doctor = Khoa, Book = new[] { "DV001", "DV024-04" },
+                    Invoice = "HD000212", Lines = new[] { new Line("Lấy cao răng", "DV024", 300000) }, Payments = new[] { new Pay(0, 300000, Bank, PaymentConstants.Failed) } });
+                Complete(new Visit { Patient = "BN000160", WalkIn = true, CheckIn = "09:15", Doctor = Anh, Book = new[] { "DV001", "DV024-02" },
+                    Invoice = "HD000213", Lines = new[] { new Line("Trám răng", "DV024", 450000) } });
 
                 // The queue of the exam screen, all for the doctor examining this morning (BS. Khoa, or whoever has the room)
-                Open(new Visit { Patient = "BN000123", Time = "08:30", CheckIn = "08:21", Doctor = Khoa, Book = new[] { "DV001", "DV002-02", "DV009-01" }, Complaint = "Đau răng hàm dưới, muốn lấy cao răng" },
+                Open(new Visit { Patient = "BN000123", Time = "08:30", CheckIn = "08:21", Doctor = Khoa, Book = new[] { "DV001", "DV024-04", "DV024-02" }, Complaint = "Đau răng hàm dưới, muốn lấy cao răng" },
                     AppointmentConstants.CheckedInStatus);
-                Open(new Visit { Patient = "BN000187", Time = "09:00", CheckIn = "08:35", Doctor = Khoa, Book = new[] { "DV001", "DV003-02" }, Complaint = "Đau nhức răng hàm trên bên phải về đêm" },
+                Open(new Visit { Patient = "BN000187", Time = "09:00", CheckIn = "08:35", Doctor = Khoa, Book = new[] { "DV001", "DV024-05" }, Complaint = "Đau nhức răng hàm trên bên phải về đêm" },
                     AppointmentConstants.CheckedInStatus);
-                Open(new Visit { Patient = "BN000204", CheckIn = "08:42", WalkIn = true, Doctor = Khoa, Book = new[] { "DV001", "DV010-01" }, Complaint = "Muốn tẩy trắng răng" },
+                Open(new Visit { Patient = "BN000204", CheckIn = "08:42", WalkIn = true, Doctor = Khoa, Book = new[] { "DV001", "DV024-06" }, Complaint = "Muốn tẩy trắng răng" },
                     AppointmentConstants.CheckedInStatus);
-                Open(new Visit { Patient = "BN000211", Time = "09:30", CheckIn = "08:50", Doctor = Khoa, Book = new[] { "DV001", "DV002-02" }, Complaint = "Lấy cao răng định kỳ" },
+                Open(new Visit { Patient = "BN000211", Time = "09:30", CheckIn = "08:50", Doctor = Khoa, Book = new[] { "DV001", "DV024-04" }, Complaint = "Lấy cao răng định kỳ" },
                     AppointmentConstants.CheckedInStatus);
-                Open(new Visit { Patient = "BN000230", CheckIn = "09:02", WalkIn = true, Doctor = Khoa, Book = new[] { "DV001", "DV009-01" }, Complaint = "Răng cửa bị mẻ khi chơi thể thao" },
+                Open(new Visit { Patient = "BN000230", CheckIn = "09:02", WalkIn = true, Doctor = Khoa, Book = new[] { "DV001", "DV024-02" }, Complaint = "Răng cửa bị mẻ khi chơi thể thao" },
                     AppointmentConstants.CheckedInStatus);
 
                 // YC000318: examined, filmed, waiting for the doctor's review and back in the doctor's queue
@@ -814,8 +842,8 @@ namespace OZE.Persistence.Seed
 
                 // Booked for later today, not arrived yet (Check-in page)
                 Open(new Visit { Patient = "BN000152", Day = 0, Time = "10:30", Doctor = Huy, Complaint = "Tái khám" }, AppointmentConstants.ConfirmedStatus);
-                Open(new Visit { Patient = "BN000154", Day = 0, Time = "14:00", Doctor = Anh, Book = new[] { "DV001", "DV009-01" } }, AppointmentConstants.ConfirmedStatus);
-                Open(new Visit { Patient = "BN000153", Day = 0, Time = "15:00", Doctor = Anh, Book = new[] { "DV001", "DV009-01" }, Complaint = "Trám nốt răng còn lại" }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000154", Day = 0, Time = "14:00", Doctor = Anh, Book = new[] { "DV001", "DV024-02" } }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000153", Day = 0, Time = "15:00", Doctor = Anh, Book = new[] { "DV001", "DV024-02" }, Complaint = "Trám nốt răng còn lại" }, AppointmentConstants.ConfirmedStatus);
 
                 // The queue of the afternoon shift (BS. Ánh, Phòng khám): checked in, waiting for the doctor to start the shift and call them
                 Open(new Visit { Patient = "BN000151", Time = "13:00", CheckIn = "12:50", Doctor = Anh, Complaint = "Ê buốt răng khi uống nước lạnh" },
@@ -834,18 +862,18 @@ namespace OZE.Persistence.Seed
             private void AddUpcomingAppointments()
             {
                 Open(new Visit { Patient = "BN000157", Day = 2, Time = "09:00", Doctor = Huy, Complaint = "Kiểm tra sau nhổ răng sữa" }, AppointmentConstants.PendingStatus);
-                Open(new Visit { Patient = "BN000160", Day = 3, Time = "14:00", Doctor = Anh, Book = new[] { "DV001", "DV002-02" } }, AppointmentConstants.PendingStatus);
-                Open(new Visit { Patient = "BN000156", Day = 4, Time = "10:00", Doctor = Ha, Book = new[] { "DV001", "DV003-02" }, Complaint = "Điều trị tủy theo kết quả phim" }, AppointmentConstants.PendingStatus);
+                Open(new Visit { Patient = "BN000160", Day = 3, Time = "14:00", Doctor = Anh, Book = new[] { "DV001", "DV024-04" } }, AppointmentConstants.PendingStatus);
+                Open(new Visit { Patient = "BN000156", Day = 4, Time = "10:00", Doctor = Ha, Book = new[] { "DV001", "DV024-05" }, Complaint = "Điều trị tủy theo kết quả phim" }, AppointmentConstants.PendingStatus);
 
                 // KHOA_APPOINTMENTS: on the day of leave #2, now with the substitute BS. Huy
                 var friday = WeekDate(1, 4).DayNumber - Today.DayNumber;
                 Open(new Visit { Patient = "BN000098", Day = friday, Time = "08:30", Doctor = Huy, Complaint = "Khám tổng quát" }, AppointmentConstants.ConfirmedStatus);
-                Open(new Visit { Patient = "BN000118", Day = friday, Time = "09:30", Doctor = Huy, Book = new[] { "DV001", "DV003-02" } }, AppointmentConstants.ConfirmedStatus);
-                Open(new Visit { Patient = "BN000150", Day = friday, Time = "10:30", Doctor = Huy, Book = new[] { "DV001", "DV009-01" } }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000118", Day = friday, Time = "09:30", Doctor = Huy, Book = new[] { "DV001", "DV024-05" } }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000150", Day = friday, Time = "10:30", Doctor = Huy, Book = new[] { "DV001", "DV024-02" } }, AppointmentConstants.ConfirmedStatus);
 
                 // ANH_APPOINTMENTS: in the shift of the pending leave #6
                 var tuesday = WeekDate(1, 1).DayNumber - Today.DayNumber;
-                Open(new Visit { Patient = "BN000161", Day = tuesday, Time = "13:30", Doctor = Anh, Book = new[] { "DV001", "DV002-02" } }, AppointmentConstants.ConfirmedStatus);
+                Open(new Visit { Patient = "BN000161", Day = tuesday, Time = "13:30", Doctor = Anh, Book = new[] { "DV001", "DV024-04" } }, AppointmentConstants.ConfirmedStatus);
                 Open(new Visit { Patient = "BN000162", Day = tuesday, Time = "15:00", Doctor = Anh, Complaint = "Tư vấn nhổ răng khôn" }, AppointmentConstants.ConfirmedStatus);
 
                 // KHOA_QUEUE_NEXT_DAYS: confirmed for the next two days, checked in at the counter on the day
