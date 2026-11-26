@@ -5,7 +5,7 @@ namespace OZE.Common.Models
 {
     // ---------- Requests ----------
 
-    // Danh sách Thanh toán. Date = one day (the FE sends today by default); null with no search = every day.
+    /// <summary>Truy vấn danh sách bệnh nhân trên màn hình thu ngân kèm bộ lọc trạng thái và ngày.</summary>
     public class CashierPatientQuery : PagedRequestBase
     {
         public DateOnly? Date { get; set; }
@@ -13,7 +13,7 @@ namespace OZE.Common.Models
         public string? Status { get; set; }
     }
 
-    // Công nợ: patients still owing confirmed money. Age = lt7 | 7to30 | gt30 | empty (days since OwedSince)
+    /// <summary>Truy vấn danh sách công nợ bệnh nhân theo độ tuổi nợ và khoảng thời gian.</summary>
     public class CashierDebtQuery : PagedRequestBase
     {
         public string? Age { get; set; }
@@ -21,6 +21,7 @@ namespace OZE.Common.Models
         public DateOnly? ToDate { get; set; }
     }
 
+    /// <summary>Yêu cầu chọn hình thức thanh toán cho kế hoạch điều trị.</summary>
     public class ChoosePaymentOptionRequest
     {
         [Required]
@@ -31,7 +32,7 @@ namespace OZE.Common.Models
         public string Option { get; set; } = string.Empty;
     }
 
-    // One cashier receipt: Đặt cọc dịch vụ (one DEPOSIT line) or Ghi nhận thu tiền (FULL / PERIOD / VISIT_SERVICE lines)
+    /// <summary>Yêu cầu tạo biên lai thu tiền / đặt cọc dịch vụ.</summary>
     public class CreateReceiptRequest
     {
         [Required]
