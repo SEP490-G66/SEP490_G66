@@ -1,3 +1,4 @@
+using OZE.Application.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -191,7 +192,7 @@ namespace OZE.UnitTest.IntegrationTests.ServiceCatalog
             await AttachServiceToAppointmentAsync(
                 serviceId: service.Id,
                 variantId: variantBusy.Id,
-                appointmentDate: DateOnly.FromDateTime(DateTime.UtcNow),
+                appointmentDate: DateOnly.FromDateTime(ClinicClock.Today),
                 status: AppointmentConstants.ConfirmedStatus);
 
             // Act: Toggle variantFree to false -> should succeed

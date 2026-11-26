@@ -1,3 +1,4 @@
+using OZE.Application.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -143,7 +144,7 @@ namespace OZE.UnitTest.IntegrationTests.ServiceCatalog
             // Attach open appointment today
             await AttachServiceToAppointmentAsync(
                 serviceId: service.Id,
-                appointmentDate: DateOnly.FromDateTime(DateTime.UtcNow),
+                appointmentDate: DateOnly.FromDateTime(ClinicClock.Today),
                 status: AppointmentConstants.ConfirmedStatus);
 
             var updateRequest = new UpdateServiceRequest
