@@ -203,7 +203,22 @@ namespace OZE.Application.Services
                 ErrorConstants.PatientMessage.InvalidDateOfBirth);
             var address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
 
-            var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
+            // A visit for a treatment plan session: the session must belong to this patient and still be ahead
+            TreatmentPlanStage? stage = null;
+            if (request.TreatmentPlanStageId.HasValue)
+            {
+                ConditionGuard.Ensure(known != null, ErrorConstants.AppointmentMessage.TreatmentStageNeedsPatient);
+                stage = await _appointmentRepository.GetTreatmentStageAsync(request.TreatmentPlanStageId.Value);
+                ConditionGuard.Ensure<NotFoundException>(stage != null && stage.TreatmentPlan.PatientId == known!.Id,
+                    ErrorConstants.AppointmentMessage.TreatmentStageNotFound);
+                ConditionGuard.Ensure(IsOpenSession(stage!), ErrorConstants.AppointmentMessage.TreatmentStageNotOpen);
+            }
+
+            // No service picked: book the service of the session
+            var serviceIds = stage?.ServiceId != null && request.ServiceId.Count == 0 && request.VariantId.Count == 0
+                ? new List<int> { stage.ServiceId.Value }
+                : request.ServiceId;
+            var lines = await ResolveBookingLinesAsync(serviceIds, request.VariantId);
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
                 request.DoctorId, request.Note, receptionistUserId, async () =>
                 {
@@ -242,13 +257,46 @@ namespace OZE.Application.Services
                     }
 
                     return patient;
-                }, initialStatus: AppointmentConstants.ConfirmedStatus);
+                }, initialStatus: AppointmentConstants.ConfirmedStatus, treatmentPlanStageId: stage?.Id);
 
             await SendBookingEmailAsync(appointment, patient.Email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: true);
             await NotifyAsync(n => n.NotifyPatientAsync(patient.Id, Content(NotificationConstants.Text.AppointmentBookedByClinicTitle, NotificationConstants.Text.AppointmentBookedByClinicMessage, appointment)));
             await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
             await LogCreatedAsync(appointment, lines);
-            return ToResponse(appointment, patient, slot, lines);
+            var response = ToResponse(appointment, patient, slot, lines);
+            response.PlanSession = ToPlanSession(stage);
+            return response;
+        }
+
+        // A session can be booked while its plan is being carried out and the session is not done or cancelled
+        private static bool IsOpenSession(TreatmentPlanStage stage) =>
+            (stage.TreatmentPlan.Status == TreatmentPlanConstants.Approved || stage.TreatmentPlan.Status == TreatmentPlanConstants.InProgress)
+            && (stage.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled || stage.StageStatus == TreatmentPlanConstants.StageStatus.InProgress);
+
+        // "Buổi 4/6": the position among the plan's sessions that are not cancelled
+        private static AppointmentPlanSessionResponse? ToPlanSession(TreatmentPlanStage? stage)
+        {
+            if (stage == null)
+            {
+                return null;
+            }
+
+            // The appointment list loads the plan without its sessions: then the stored number and total are used
+            var counted = (stage.TreatmentPlan?.Stages ?? new List<TreatmentPlanStage>())
+                .Where(s => s.StageStatus != TreatmentPlanConstants.StageStatus.Cancelled)
+                .OrderBy(s => s.StageNumber)
+                .ToList();
+            var position = counted.FindIndex(s => s.Id == stage.Id);
+            return new AppointmentPlanSessionResponse
+            {
+                TreatmentPlanId = stage.TreatmentPlanId,
+                PlanName = stage.TreatmentPlan?.PlanName,
+                StageId = stage.Id,
+                StageNumber = position >= 0 ? position + 1 : stage.StageNumber,
+                StageName = stage.StageName,
+                TotalStages = counted.Count > 0 ? counted.Count : stage.TreatmentPlan?.TotalStages ?? 0,
+                StageStatus = stage.StageStatus
+            };
         }
 
         // Booking email to the patient: "confirmed" when the visit is CONFIRMED, otherwise "request received, we will call".
@@ -291,7 +339,7 @@ namespace OZE.Application.Services
         private async Task<(Appointment Appointment, Patient Patient, AvailableSlotResponse Slot)> CreateBookingAsync(
             List<BookingLine> lines, DateOnly date, TimeOnly slotStart, int? doctorId, string? note,
             string? createdByUserId, Func<Task<Patient>> getPatientAsync, long? excludeAppointmentId = null, long? parentAppointmentId = null,
-            string initialStatus = AppointmentConstants.PendingStatus, bool selfBooking = false)
+            string initialStatus = AppointmentConstants.PendingStatus, bool selfBooking = false, long? treatmentPlanStageId = null)
         {
             var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
 
@@ -322,6 +370,13 @@ namespace OZE.Application.Services
                     }
                 }
 
+                // One appointment per session; checked inside the transaction so two bookings cannot both take it
+                if (treatmentPlanStageId.HasValue)
+                {
+                    ConditionGuard.ThrowIf(await _appointmentRepository.IsTreatmentStageBookedAsync(treatmentPlanStageId.Value, excludeAppointmentId),
+                        ErrorConstants.AppointmentMessage.TreatmentStageAlreadyBooked);
+                }
+
                 var appointment = new Appointment
                 {
                     Patient = patient,
@@ -335,6 +390,7 @@ namespace OZE.Application.Services
                     Status = initialStatus,
                     Notes = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
                     ParentAppointmentId = parentAppointmentId,
+                    TreatmentPlanStageId = treatmentPlanStageId,
                     CreatedAt = DateTimeOffset.UtcNow,
                     CreatedByUserId = createdByUserId,
                     // Saved together with the appointment in the same transaction
@@ -1964,6 +2020,7 @@ namespace OZE.Application.Services
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt,
                 ParentAppointmentId = appointment.ParentAppointmentId,
+                PlanSession = ToPlanSession(appointment.TreatmentPlanStage),
                 ExaminationId = appointment.Examination?.Id,
                 ExaminationStatus = appointment.Examination?.ExaminationStatus,
                 FollowUp = appointment.Examination.ToFollowUpSummary()

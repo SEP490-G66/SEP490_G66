@@ -254,6 +254,9 @@ const RECEPTION_TEXTS = [
     ["email is invalid", RECEPTION_BOOKING_TEXT.ERROR_EMAIL],
     ["gender", RECEPTION_BOOKING_TEXT.ERROR_GENDER],
     ["date of birth", RECEPTION_BOOKING_TEXT.ERROR_BIRTHDATE],
+    ["session was not found", RECEPTION_BOOKING_TEXT.ERROR_STAGE_NOT_FOUND],
+    ["session is already done", RECEPTION_BOOKING_TEXT.ERROR_STAGE_NOT_OPEN],
+    ["session already has an appointment", RECEPTION_BOOKING_TEXT.ERROR_STAGE_BOOKED],
 ];
 
 export const getReceptionBookingContext = async ({ signal } = {}) => {

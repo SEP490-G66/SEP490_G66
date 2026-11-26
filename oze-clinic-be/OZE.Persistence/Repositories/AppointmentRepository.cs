@@ -301,6 +301,9 @@ namespace OZE.Persistence.Repositories
                     .ThenInclude(x => x.Service)
                 .Include(x => x.ServiceItems)
                     .ThenInclude(x => x.Variant)
+                .Include(x => x.TreatmentPlanStage)
+                    .ThenInclude(x => x!.TreatmentPlan)
+                        .ThenInclude(x => x.Stages)
                 .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         }
 
@@ -388,6 +391,24 @@ namespace OZE.Persistence.Repositories
             return ids;
         }
 
+        public async Task<TreatmentPlanStage?> GetTreatmentStageAsync(long stageId)
+        {
+            return await _context.TreatmentPlanStages
+                .AsNoTrackingWithIdentityResolution()
+                .Include(x => x.TreatmentPlan)
+                    .ThenInclude(x => x.Stages)
+                .FirstOrDefaultAsync(x => x.Id == stageId);
+        }
+
+        public async Task<bool> IsTreatmentStageBookedAsync(long stageId, long? excludeAppointmentId = null)
+        {
+            return await _context.Appointments
+                .AnyAsync(x => x.TreatmentPlanStageId == stageId
+                    && x.Id != excludeAppointmentId
+                    && x.Status != AppointmentConstants.CancelledStatus
+                    && x.Status != AppointmentConstants.NoShowStatus);
+        }
+
         public async Task<bool> HasCompletedVisitAsync(int patientId)
         {
             return await _context.Appointments
@@ -422,6 +443,9 @@ namespace OZE.Persistence.Repositories
                     .ThenInclude(x => x.Service)
                 .Include(x => x.ServiceItems)
                     .ThenInclude(x => x.Variant)
+                // The session and its plan only; the plan's sessions are loaded after the page (LoadPlanSessionsAsync)
+                .Include(x => x.TreatmentPlanStage)
+                    .ThenInclude(x => x!.TreatmentPlan)
                 .AsQueryable();
 
             if (parameters.Date.HasValue)
@@ -485,7 +509,36 @@ namespace OZE.Persistence.Repositories
                 .Take(parameters.PageSize)
                 .ToListAsync(cancellationToken);
 
+            await LoadPlanSessionsAsync(items, cancellationToken);
             return new PagedResult<Appointment>(items, totalCount, parameters.PageNumber, parameters.PageSize);
+        }
+
+        // "Buổi 4/6" needs every session of the plan; one small query for the page instead of joining them into the list query
+        private async Task LoadPlanSessionsAsync(List<Appointment> items, CancellationToken cancellationToken)
+        {
+            var plans = items
+                .Select(a => a.TreatmentPlanStage?.TreatmentPlan)
+                .OfType<TreatmentPlan>()
+                .GroupBy(p => p.Id)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            if (plans.Count == 0)
+            {
+                return;
+            }
+
+            var planIds = plans.Keys.ToList();
+            var stages = await _context.TreatmentPlanStages
+                .AsNoTracking()
+                .Where(s => planIds.Contains(s.TreatmentPlanId))
+                .Select(s => new TreatmentPlanStage { Id = s.Id, TreatmentPlanId = s.TreatmentPlanId, StageNumber = s.StageNumber, StageStatus = s.StageStatus })
+                .ToListAsync(cancellationToken);
+            foreach (var group in stages.GroupBy(s => s.TreatmentPlanId))
+            {
+                foreach (var plan in plans[group.Key])
+                {
+                    plan.Stages = group.ToList();
+                }
+            }
         }
 
         public async Task UpdateAsync(Appointment appointment)

@@ -321,6 +321,7 @@ namespace OZE.Application.Services
                 .OrderBy(s => s.StageNumber)
                 .Select(s => new PatientBookStageResponse
                 {
+                    Id = s.Id,
                     Number = s.StageNumber,
                     StageName = s.StageName ?? string.Empty,
                     Description = s.Description,

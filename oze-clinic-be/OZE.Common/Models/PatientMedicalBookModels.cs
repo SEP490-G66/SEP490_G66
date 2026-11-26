@@ -84,6 +84,8 @@ namespace OZE.Common.Models
 
     public class PatientBookStageResponse
     {
+        // Matches AppointmentResponse.PlanSession.StageId, so the patient app knows which session an appointment is for
+        public long Id { get; set; }
         public int Number { get; set; }
         public string StageName { get; set; } = string.Empty;
         public string? Description { get; set; }
