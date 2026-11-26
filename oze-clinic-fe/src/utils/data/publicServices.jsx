@@ -325,6 +325,16 @@ export const PUBLIC_SERVICES = [
     },
 ];
 
+// The header "Dịch vụ" menu in the order of the clinic website. Names, descriptions and variants come from the database
+// (GET api/appointments/bookable-services, matched by service code); the slug opens the detail page and its pictures.
+export const MENU_SERVICES = [
+    { code: "DV006", slug: "nieng-rang" },
+    { code: "DV005", slug: "trong-rang-implant" },
+    { code: "DV012", slug: "boc-rang-su-veneer" },
+    { code: "DV004", slug: "nho-rang-khon" },
+    { code: "DV024", slug: "nha-khoa-tong-quat" },
+];
+
 export const FOOTER_SERVICE_SLUGS = [
     "nieng-rang",
     "trong-rang-implant",

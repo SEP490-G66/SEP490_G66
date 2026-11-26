@@ -65,10 +65,12 @@ namespace OZE.Application.Services
                 .Select(s => new BookableServiceResponse
                 {
                     ServiceId = s.Id,
+                    ServiceCode = s.ServiceCode,
                     ServiceName = s.ServiceName,
                     Description = s.Description,
                     ReferencePrice = s.ReferencePrice,
                     EstimatedMinutes = s.EstimatedMinutes,
+                    RequiredRoomType = s.RequiredRoomType,
                     IsMandatory = s.ServiceCode == examServiceCode,
                     Variants = s.Variants.Select(v => new BookableVariantResponse
                     {

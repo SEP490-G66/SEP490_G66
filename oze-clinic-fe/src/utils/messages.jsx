@@ -247,6 +247,7 @@ export const PUBLIC_SERVICE_TEXT = {
     NO_RESULT: (keyword) => `Không tìm thấy dịch vụ phù hợp với “${keyword}”`,
     NO_RESULT_HINT: "Thử từ khóa khác, ví dụ: niềng răng, implant, răng sứ.",
     CLEAR_SEARCH: "Xóa tìm kiếm",
+    LOADING: "Đang tải thông tin dịch vụ...",
     TYPES_TITLE: "Các loại dịch vụ",
     BENEFITS_TITLE: "Lợi ích sau điều trị",
     STEPS_TITLE: "Quy trình điều trị",

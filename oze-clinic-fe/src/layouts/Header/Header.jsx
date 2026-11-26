@@ -8,7 +8,7 @@ import useAsync from "@/hooks/useAsync";
 import useLiveNotifications from "@/hooks/useLiveNotifications";
 import useSession from "@/hooks/useSession";
 import { signOut } from "@/services/authService";
-import { getMenuServices } from "@/services/dentalService";
+import useMenuServices from "@/hooks/useMenuServices";
 import {
     getNotifications,
     getUnreadNotificationCount,
@@ -803,7 +803,7 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
     const [drawerKey, setDrawerKey] = useState(null);
     const menuButtonRef = useRef(null);
 
-    const serviceItems = toServiceItems(getMenuServices());
+    const serviceItems = toServiceItems(useMenuServices());
     const openMenuId = openMenu?.key === location.key ? openMenu.id : null;
     const drawerOpen = drawerKey === location.key;
 

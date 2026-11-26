@@ -1,6 +1,7 @@
 import api from "./api";
 import { call } from "./receptionService";
 import { getClinicToday } from "../utils/format";
+import { ROOM_TYPES } from "../utils/constants/room";
 import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, GUEST_BOOKING_TEXT, RECEPTION_BOOKING_TEXT } from "../utils/messages";
 
 const READ = { skipErrorPage: true };
@@ -55,6 +56,9 @@ const toFailure = (result, { codes = [], texts = [] } = {}) => {
     return text ? failure(null, { submitError: text[1] }) : failure();
 };
 
+// X-ray is ordered by the doctor during the visit, so the patient does not book it
+const isBookable = (service) => service.requiredRoomType !== ROOM_TYPES.XRAY;
+
 const toService = (service) => ({
     id: service.serviceId,
     name: service.serviceName,
@@ -76,7 +80,7 @@ const loadSharedContext = async (signal) => {
     if (signal?.aborted) throw abortError();
     if (!services.success || !doctors.success) return null;
     return {
-        services: listOf(services.data).map(toService),
+        services: listOf(services.data).filter(isBookable).map(toService),
         doctors: listOf(doctors.data).map(toDoctor),
     };
 };
