@@ -332,7 +332,7 @@ export const MENU_SERVICES = [
     { code: "DV005", slug: "trong-rang-implant" },
     { code: "DV012", slug: "boc-rang-su-veneer" },
     { code: "DV004", slug: "nho-rang-khon" },
-    { code: "DV024", slug: "nha-khoa-tong-quat" },
+    { code: "DV024", slug: "nha-khoa-tong-quat", imageUrl: khamTongQuatImage },
 ];
 
 export const FOOTER_SERVICE_SLUGS = [

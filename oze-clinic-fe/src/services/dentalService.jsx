@@ -39,17 +39,24 @@ const loadCatalog = () => {
     return catalogRequest;
 };
 
+// Search over the services read from the database: name, description and variant names
+export const filterServices = (services, keyword) => {
+    const text = toSearchText(keyword);
+    if (!text) return services;
+    return services.filter((service) => toSearchText(`${service.name} ${service.intro} ${service.types.map((type) => type.name).join(" ")}`).includes(text));
+};
+
 export const isMenuSlug = (slug) => MENU_SERVICES.some((entry) => entry.slug === slug);
 
 // Name, description and variants from the database; the picture, benefits and steps of the website page when it has them
-const toMenuService = (row, slug) => {
+const toMenuService = (row, { slug, imageUrl }) => {
     const page = getServiceBySlug(slug);
     return {
         slug,
         name: row.serviceName,
-        imageUrl: page?.imageUrl ?? null,
+        imageUrl: imageUrl ?? page?.imageUrl ?? null,
         intro: row.description || page?.intro || "",
-        types: (row.variants ?? []).map((variant) => ({ name: variant.variantName, description: variant.description ?? "", imageUrl: null })),
+        types: (row.variants ?? []).map((variant) => ({ id: variant.variantId, name: variant.variantName, description: variant.description ?? "", imageUrl: null })),
         benefits: page?.benefits ?? [],
         steps: page?.steps ?? [],
     };
@@ -59,9 +66,9 @@ const toMenuService = (row, slug) => {
 export const loadMenuServices = async () => {
     const rows = await loadCatalog();
     if (!rows) return [];
-    return MENU_SERVICES.flatMap(({ code, slug }) => {
-        const row = rows.find((item) => item.serviceCode === code);
-        return row ? [toMenuService(row, slug)] : [];
+    return MENU_SERVICES.flatMap((entry) => {
+        const row = rows.find((item) => item.serviceCode === entry.code);
+        return row ? [toMenuService(row, entry)] : [];
     });
 };
 
@@ -71,5 +78,5 @@ export const loadMenuService = async (slug) => {
     if (!rows) return getServiceBySlug(slug);
     const entry = MENU_SERVICES.find((item) => item.slug === slug);
     const row = rows.find((item) => item.serviceCode === entry?.code);
-    return row ? toMenuService(row, slug) : null;
+    return row ? toMenuService(row, entry) : null;
 };

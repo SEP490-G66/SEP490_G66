@@ -143,7 +143,8 @@ const SearchForm = ({ compact = false, className }) => {
     );
 };
 
-const NavMenu = ({ id, label, to, items, open, onOpenChange }) => {
+// tone "bar" is the blue service bar under the header, whose menus list the variants of one service
+const NavMenu = ({ id, label, to, items, open, onOpenChange, tone = "nav", alignEnd = false }) => {
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const containerRef = useRef(null);
@@ -271,8 +272,8 @@ const NavMenu = ({ id, label, to, items, open, onOpenChange }) => {
                 ref={buttonRef}
                 type="button"
                 className={cx(
-                    "public-nav-link flex h-full cursor-pointer items-center gap-1",
-                    active && "public-nav-link-active",
+                    tone === "bar" ? "service-bar-link flex h-full cursor-pointer items-center gap-1" : "public-nav-link flex h-full cursor-pointer items-center gap-1",
+                    active && (tone === "bar" ? "service-bar-link-active" : "public-nav-link-active"),
                 )}
                 aria-haspopup="true"
                 aria-expanded={open}
@@ -293,7 +294,9 @@ const NavMenu = ({ id, label, to, items, open, onOpenChange }) => {
                 aria-label={label}
                 onKeyDown={handleMenuKeyDown}
                 className={cx(
-                    "absolute left-0 top-full z-40 min-w-56 rounded-md border border-border bg-canvas py-2 shadow-sm transition-[opacity,translate,visibility] duration-200 ease-out",
+                    alignEnd ? "right-0" : "left-0",
+                    "absolute top-full z-40 min-w-56 rounded-md border border-border bg-canvas py-2 shadow-sm transition-[opacity,translate,visibility] duration-200 ease-out",
+                    tone === "bar" && items.length > 6 && "grid w-max grid-cols-2 gap-x-2 lg:grid-cols-3",
                     open ? "visible translate-y-0 opacity-100" : "pointer-events-none invisible -translate-y-1 opacity-0",
                 )}
             >
@@ -803,7 +806,8 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
     const [drawerKey, setDrawerKey] = useState(null);
     const menuButtonRef = useRef(null);
 
-    const serviceItems = toServiceItems(useMenuServices());
+    const menuServices = useMenuServices() ?? [];
+    const serviceItems = toServiceItems(menuServices);
     const openMenuId = openMenu?.key === location.key ? openMenu.id : null;
     const drawerOpen = drawerKey === location.key;
 
@@ -918,6 +922,34 @@ const Header = ({ onToggleSidebar, sidebarOpen, sidebarId, sidebarToggleRef }) =
                     )}
                 </div>
             </nav>
+            {menuServices.length > 0 && (
+                <nav aria-label={TEXT.SERVICE_BAR} className="service-bar">
+                    <ul className="flex h-full w-full items-center justify-center gap-2 px-4 md:px-6 lg:gap-6">
+                        {menuServices.map((service, index) =>
+                            service.types.length ? (
+                                <li key={service.slug} className="relative h-full">
+                                    <NavMenu
+                                        id={`service-bar-${service.slug}`}
+                                        label={service.name}
+                                        to={getServiceDetailRoute(service.slug)}
+                                        items={service.types.map((type) => ({ key: `variant-${type.id}`, label: type.name, to: `${getServiceDetailRoute(service.slug)}#variant-${type.id}` }))}
+                                        open={openMenuId === `service-${service.slug}`}
+                                        onOpenChange={setMenuOpen(`service-${service.slug}`)}
+                                        tone="bar"
+                                        alignEnd={index >= menuServices.length - 2}
+                                    />
+                                </li>
+                            ) : (
+                                <li key={service.slug} className="h-full">
+                                    <NavLink to={getServiceDetailRoute(service.slug)} className={({ isActive }) => cx("service-bar-link flex h-full items-center", isActive && "service-bar-link-active")}>
+                                        {service.name}
+                                    </NavLink>
+                                </li>
+                            ),
+                        )}
+                    </ul>
+                </nav>
+            )}
             {drawerOpen && (
                 <Drawer
                     id={DRAWER_ID}

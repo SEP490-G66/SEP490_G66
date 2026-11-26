@@ -56,8 +56,8 @@ const toFailure = (result, { codes = [], texts = [] } = {}) => {
     return text ? failure(null, { submitError: text[1] }) : failure();
 };
 
-// X-ray is ordered by the doctor during the visit, so the patient does not book it
-const isBookable = (service) => service.requiredRoomType !== ROOM_TYPES.XRAY;
+// The general exam is in every appointment and X-ray is ordered by the doctor during the visit, so neither is picked here
+const isBookable = (service) => !service.isMandatory && service.requiredRoomType !== ROOM_TYPES.XRAY;
 
 const toService = (service) => ({
     id: service.serviceId,

@@ -159,7 +159,7 @@ namespace OZE.Persistence.Seed
             new("DV024", "Nha khoa tổng quát", "Điều trị nha khoa cơ bản: nhổ răng, trám răng, lấy cao răng, điều trị tủy, tẩy trắng, phục hình và bệnh nướu", 400000, 30, RoomTypeConstants.GeneralTreatment, 6),
             new("DV007", "Chụp Panorama", "Phim toàn cảnh hai hàm", 250000, 15, RoomTypeConstants.XRay),
             new("DV011", "Chụp X-quang quanh chóp", "Phim quanh chóp một răng", 100000, 15, RoomTypeConstants.XRay),
-            new("DV008", "Scan răng iTero", "Quét dấu răng kỹ thuật số", 800000, 30, RoomTypeConstants.GeneralTreatment),
+            new("DV008", "Scan răng iTero", "Quét dấu răng kỹ thuật số", 800000, 30, RoomTypeConstants.GeneralTreatment, Active: false),
 
             // Old flat list, now variants of the services above
             new("DV002", "Lấy cao răng", "Làm sạch cao răng, đánh bóng", 150000, 30, RoomTypeConstants.GeneralTreatment, 6, Active: false),
