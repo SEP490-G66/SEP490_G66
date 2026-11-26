@@ -99,7 +99,10 @@ builder.Services.AddCors(options =>
         // Frontend SignalR uses accessTokenFactory with withCredentials: false — no cookies required
         policy.WithOrigins(configuredOrigins)
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              // The site and the API are on different hosts, so every call with a token is preceded by a preflight;
+              // the browser may reuse the answer for 10 minutes instead of asking again before each call
+              .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
     });
 });
 
@@ -158,7 +161,8 @@ builder.Services.AddAuthentication(options =>
             var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
             var user = string.IsNullOrEmpty(userId) ? null : await userManager.FindByIdAsync(userId);
             var tokenId = context.Principal?.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti);
-            var revoked = tokenId != null && context.HttpContext.RequestServices.GetRequiredService<OZE.Application.Interfaces.IAccessTokenRevocationStore>().IsRevoked(tokenId);
+            var revoked = tokenId != null && await context.HttpContext.RequestServices.GetRequiredService<OZE.Application.Interfaces.IAccessTokenRevocationStore>()
+                .IsRevokedAsync(tokenId, context.HttpContext.RequestAborted);
             if (user == null || stamp == null || stamp != user.SecurityStamp || user.LockoutEnd == DateTimeOffset.MaxValue || revoked)
             {
                 context.Fail("The session has ended");
@@ -227,6 +231,7 @@ var app = builder.Build();
 
 // 6. Global Exception Middleware
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<OZE.ProjectBase.Middlewares.SlowRequestLoggingMiddleware>();
 
 // 7. Seed Database (Roles, Default Admin)
 using (var scope = app.Services.CreateScope())
