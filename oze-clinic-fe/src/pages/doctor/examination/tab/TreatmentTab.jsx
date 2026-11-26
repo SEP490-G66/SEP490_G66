@@ -8,6 +8,7 @@ import { GENERIC_ERROR_MESSAGE } from "@/utils/messages";
 import FollowUpCard from "@/components/examination/FollowUpCard";
 import SessionInvoiceCard from "@/components/examination/SessionInvoiceCard";
 import StepActionBar from "@/components/examination/StepActionBar";
+import StepBlockedCard from "@/components/examination/StepBlockedCard";
 import TreatmentItemDeleteDialog from "@/components/examination/TreatmentItemDeleteDialog";
 import TreatmentItemDialog from "@/components/examination/TreatmentItemDialog";
 import TreatmentItemTable from "@/components/examination/TreatmentItemTable";
@@ -24,6 +25,8 @@ const initialDraftOf = ({ plan, treatment }) => {
 
 // The plan the patient agreed to; only then can its sessions be carried out
 const AGREED_STATUSES = ["Approved", "InProgress", "Completed"];
+
+const BACK_TO_PLAN = "Quay lại Lập kế hoạch điều trị";
 
 // Step 4 "Thực hiện điều trị": today's session of the plan, what was done and its price, a note and the session invoice.
 // When today's session is the last one of the plan, the doctor can also propose a check-up date ("Hẹn tái khám").
@@ -89,25 +92,23 @@ const TreatmentTab = ({ queueId, record, busy = false, onTreatmentChange, onPlan
 
     if (record.plan.planId && !AGREED_STATUSES.includes(record.plan.status)) {
         return (
-            <div className="card-app flex flex-col items-center gap-3 py-14 text-center">
-                <p className="font-semibold text-ink">Bệnh nhân chưa đồng ý kế hoạch điều trị</p>
-                <p className="text-muted">Xác nhận kế hoạch ở bước Lập kế hoạch điều trị trước khi thực hiện buổi điều trị.</p>
-                <button type="button" className="btn btn-secondary" onClick={onEditPlan}>
-                    Quay lại Lập kế hoạch điều trị
-                </button>
-            </div>
+            <StepBlockedCard
+                title="Bệnh nhân chưa đồng ý kế hoạch điều trị"
+                text="Xác nhận kế hoạch ở bước Lập kế hoạch điều trị trước khi thực hiện buổi điều trị."
+                actionLabel={BACK_TO_PLAN}
+                onAction={onEditPlan}
+            />
         );
     }
 
     if (!draft.sessionId) {
         return (
-            <div className="card-app flex flex-col items-center gap-3 py-14 text-center">
-                <p className="font-semibold text-ink">Không còn buổi điều trị nào trong kế hoạch</p>
-                <p className="text-muted">Thêm buổi điều trị ở bước Lập kế hoạch điều trị để thực hiện.</p>
-                <button type="button" className="btn btn-secondary" onClick={onEditPlan}>
-                    Quay lại Lập kế hoạch điều trị
-                </button>
-            </div>
+            <StepBlockedCard
+                title="Không còn buổi điều trị nào trong kế hoạch"
+                text="Thêm buổi điều trị ở bước Lập kế hoạch điều trị để thực hiện."
+                actionLabel={BACK_TO_PLAN}
+                onAction={onEditPlan}
+            />
         );
     }
 

@@ -90,8 +90,6 @@ export const getWaitingList = (config = {}) => call(() => api.get("/api/appointm
 export const setPriority = (id, { priority, reason }) =>
     call(() => api.post(`/api/appointments/${id}/priority`, { priority, reason: reason || null }));
 
-export const getNeedsAttention = () => call(() => api.get("/api/appointments/needs-attention"));
-
 // reason is required: it goes into the notification the patient receives
 export const reassignDoctor = (id, doctorId, reason) => call(() => api.post(`/api/appointments/${id}/reassign-doctor`, { doctorId, reason }));
 

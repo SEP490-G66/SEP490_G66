@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Stethoscope } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { toast } from "react-toastify";
+import CalledExamView from "@/components/examination/CalledExamView";
 import ConfirmExamDialog from "@/components/examination/ConfirmExamDialog";
-import ExamPreStart from "@/components/examination/ExamPreStart";
 import ExamStepper from "@/components/examination/ExamStepper";
 import ExamTimer from "@/components/examination/ExamTimer";
+import NoExamView from "@/components/examination/NoExamView";
 import PatientCard from "@/components/examination/PatientCard";
 import QueuePanel from "@/components/examination/QueuePanel";
 import StepHeading from "@/components/examination/StepHeading";
@@ -36,7 +37,6 @@ const STEP = { HISTORY: 0, EXAM: 1, PLAN: 2, TREATMENT: 3, PRESCRIPTION: 4 };
 // Breadcrumb / "Tiếp theo" wording that differs from the step names (EXAM_STEPS).
 const BREADCRUMB_LABEL = { [STEP.HISTORY]: "Thông tin bệnh nhân", [STEP.PLAN]: "Kế hoạch điều trị" };
 const NEXT_LABEL = { [STEP.PLAN]: "Chuyển sang phòng điều trị", [STEP.PRESCRIPTION]: "Kết thúc lượt khám" };
-const CALLED_STATUS = { label: "Đã gọi · chờ vào phòng", tone: "warning" };
 
 // The tabs of a visit, in order (index = STEP, the stepper shows EXAM_STEPS for them). Each tab is a component in ./tab;
 // render gets what the frame shares: the queue item, the record, busy, the record updaters (on*Change), goTo(step) and onEnd.
@@ -108,32 +108,6 @@ const EXAM_TABS = [
 // waiting patients cannot be opened.
 const defaultSelection = (queue) =>
     (queue.find((item) => item.status === QUEUE_STATUS.IN_EXAMINATION) ?? queue.find((item) => item.status === QUEUE_STATUS.CALLED))?.id ?? null;
-
-// Right side before anyone is called in: locked process, empty patient card, "Chưa có lượt khám".
-const NoExamView = ({ waitingCount }) => (
-    <>
-        <ExamStepper locked />
-        <PatientCard patient={null} />
-        <div className="card-app flex flex-col items-center gap-3 px-6 py-16 text-center">
-            <span aria-hidden="true" className="grid size-16 place-items-center rounded-full bg-primary-soft text-primary">
-                <Stethoscope className="size-7" />
-            </span>
-            <h2 className="font-heading text-heading-2 text-ink">Chưa có lượt khám</h2>
-            <p className="text-muted">
-                {waitingCount > 0 ? `Có ${waitingCount} bệnh nhân đang chờ. Bấm “Gọi vào khám” ở một bệnh nhân để bắt đầu.` : "Hàng chờ đang trống."}
-            </p>
-        </div>
-    </>
-);
-
-// Patient called in, exam not started: process still locked, patient card and what reception recorded.
-const CalledView = ({ item, record }) => (
-    <>
-        <ExamStepper locked />
-        <PatientCard patient={{ ...record.patient, queueNumber: item.queueNumber }} status={CALLED_STATUS} services={record.services} />
-        <ExamPreStart intake={{ ...record.intake, allergies: record.history.allergies, conditions: record.history.conditions }} />
-    </>
-);
 
 // Exam in progress: the frame (back link, breadcrumb, stepper, patient card with timer, step heading) around the tab
 // being viewed (EXAM_TABS). handlers: { onHistoryChange, onExamChange, onPlanChange, onTreatmentChange, onPrescriptionChange }.
@@ -281,7 +255,7 @@ const ExaminationPage = () => {
                 />
             );
         }
-        return <CalledView item={selected} record={record.data} />;
+        return <CalledExamView item={selected} record={record.data} />;
     };
 
     return (
