@@ -80,15 +80,15 @@ const GuestBookAppointment = () => {
 
     return (
         <div className="bg-surface-tint">
-            <div className="container-public pb-6 pt-3">
+            <div className="container-public max-w-4xl pb-6 pt-3">
                 <Breadcrumb items={BREADCRUMB} />
             </div>
-            <div className="container-public flex flex-col gap-6 pb-12 md:pb-16">
+            <div className="container-public flex max-w-4xl flex-col gap-6 pb-12 md:pb-16">
                 <div>
-                    <h1 id={BOOKING_IDS.PAGE_TITLE} tabIndex={-1} className="text-display-md md:text-display-lg">
+                    <h1 id={BOOKING_IDS.PAGE_TITLE} tabIndex={-1} className="font-heading text-heading-1 text-ink md:text-display-md">
                         {TEXT.TITLE}
                     </h1>
-                    <p className="mt-2 text-body-lg text-body">{TEXT.DESCRIPTION}</p>
+                    <p className="mt-2 text-body-md text-body">{TEXT.DESCRIPTION}</p>
                 </div>
                 {renderCard()}
             </div>

@@ -39,7 +39,7 @@ const BookingServicePicker = ({ services, items, pickService, pickVariant, error
 
     return (
         <div role="group" aria-labelledby={LABEL_ID} aria-describedby={HELP_ID}>
-            <span id={LABEL_ID} className="mt-7 mb-2.5 block font-heading text-heading-3 text-ink">
+            <span id={LABEL_ID} className="mt-5 mb-2 block font-heading text-heading-3 text-ink">
                 {BOOKING_TEXT.SERVICE}
             </span>
             <span id={HELP_ID} className="sr-only">
