@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Image as ImageIcon } from "lucide-react";
-import { Navigate, useLocation, useParams } from "react-router-dom";
+import { CalendarCheck, Clock, Image as ImageIcon, Layers, Wallet } from "lucide-react";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ImageCard from "@/components/ui/ImageCard";
 import { getServiceBySlug, isMenuSlug, loadMenuService } from "@/services/dentalService";
+import { formatCurrency } from "@/utils/format";
 import { PUBLIC_SERVICE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES, getErrorRoute } from "@/utils/routes";
 
@@ -24,9 +25,26 @@ const TypesSection = ({ types }) => (
     <section aria-labelledby={TYPES_TITLE_ID} className={SECTION_CLASS}>
         <SectionHeading id={TYPES_TITLE_ID}>{TEXT.TYPES_TITLE}</SectionHeading>
         <ul className={`grid grid-cols-1 gap-6 ${typeColumns(types.length)}`}>
-            {types.map(({ id, name, description, imageUrl }) => (
+            {types.map(({ id, name, description, imageUrl, price, minutes }) => (
                 <li key={name} id={id ? `variant-${id}` : undefined} className="flex scroll-mt-24">
-                    <ImageCard imageUrl={imageUrl} imageAlt={name} title={name} description={description} imageClassName="aspect-4/3" className="w-full" />
+                    <ImageCard imageUrl={imageUrl} imageAlt={name} title={name} description={description} imageClassName="aspect-4/3" className="w-full" hideEmptyImage>
+                        {(price > 0 || minutes) && (
+                            <dl className="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-2 text-label">
+                                {price > 0 && (
+                                    <div className="flex gap-1">
+                                        <dt className="sr-only">{TEXT.PRICE}</dt>
+                                        <dd className="num text-primary">{formatCurrency(price)}</dd>
+                                    </div>
+                                )}
+                                {minutes && (
+                                    <div className="flex gap-1">
+                                        <dt className="sr-only">{TEXT.DURATION}</dt>
+                                        <dd className="text-muted">{TEXT.MINUTES(minutes)}</dd>
+                                    </div>
+                                )}
+                            </dl>
+                        )}
+                    </ImageCard>
                 </li>
             ))}
         </ul>
@@ -98,6 +116,36 @@ const useService = (slug) => {
     return loaded.slug === slug ? loaded.service : undefined;
 };
 
+// Price, time and number of variants of a service read from the database
+const FactList = ({ service }) => {
+    const prices = service.types.map((type) => type.price).filter((price) => price > 0);
+    const price = prices.length ? Math.min(...prices) : service.price;
+    const minutes = service.types.length ? Math.min(...service.types.map((type) => type.minutes ?? Infinity)) : service.minutes;
+    const facts = [
+        price > 0 && { icon: Wallet, label: prices.length > 1 ? TEXT.PRICE_FROM : TEXT.PRICE, value: formatCurrency(price) },
+        Number.isFinite(minutes) && minutes > 0 && { icon: Clock, label: TEXT.DURATION, value: TEXT.MINUTES(minutes) },
+        service.types.length > 0 && { icon: Layers, label: TEXT.TYPE_TOTAL, value: service.types.length },
+    ].filter(Boolean);
+    if (!facts.length) return null;
+
+    return (
+        <div className="flex flex-col gap-2">
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {facts.map(({ icon: Icon, label, value }) => (
+                    <div key={label} className="flex items-center gap-3 rounded-xl bg-surface-tint p-3">
+                        <Icon className="size-5 shrink-0 text-primary" aria-hidden="true" />
+                        <div className="flex min-w-0 flex-col">
+                            <dt className="text-label text-muted">{label}</dt>
+                            <dd className="num text-title text-ink">{value}</dd>
+                        </div>
+                    </div>
+                ))}
+            </dl>
+            {price > 0 && <p className="text-body-sm text-muted">{TEXT.PRICE_NOTE}</p>}
+        </div>
+    );
+};
+
 const ServiceDetail = () => {
     const { serviceSlug } = useParams();
     const service = useService(serviceSlug);
@@ -143,7 +191,22 @@ const ServiceDetail = () => {
                             <ImageIcon className="size-12 text-placeholder" aria-hidden="true" />
                         </div>
                     )}
-                    <p className="text-body-lg text-body">{service.intro}</p>
+                    <div className="flex flex-col gap-5">
+                        <p className="text-body-lg text-ink">{service.intro}</p>
+                        {service.details && <p className="text-body-md text-body">{service.details}</p>}
+                        <FactList service={service} />
+                        <div className="flex flex-wrap gap-3">
+                            <Link to={ROUTES.BOOK_APPOINTMENT} className="btn btn-primary">
+                                <CalendarCheck className="size-4" aria-hidden="true" />
+                                {TEXT.BOOK}
+                            </Link>
+                            {service.types.length > 0 && (
+                                <a href="#service-types-title" className="btn btn-secondary">
+                                    {TEXT.VIEW_TYPES}
+                                </a>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </section>
 

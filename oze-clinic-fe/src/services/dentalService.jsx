@@ -56,7 +56,18 @@ const toMenuService = (row, { slug, imageUrl }) => {
         name: row.serviceName,
         imageUrl: imageUrl ?? page?.imageUrl ?? null,
         intro: row.description || page?.intro || "",
-        types: (row.variants ?? []).map((variant) => ({ id: variant.variantId, name: variant.variantName, description: variant.description ?? "", imageUrl: null })),
+        // The longer text of the website page, shown under the description of the database
+        details: row.description && page?.intro && page.intro !== row.description ? page.intro : "",
+        price: Number(row.referencePrice) || 0,
+        minutes: row.estimatedMinutes ?? null,
+        types: (row.variants ?? []).map((variant) => ({
+            id: variant.variantId,
+            name: variant.variantName,
+            description: variant.description ?? "",
+            imageUrl: null,
+            price: Number(variant.referencePrice) || 0,
+            minutes: variant.estimatedMinutes ?? null,
+        })),
         benefits: page?.benefits ?? [],
         steps: page?.steps ?? [],
     };

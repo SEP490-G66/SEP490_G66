@@ -217,7 +217,6 @@ export const ROLE_LABELS = {
 
 export const GUEST_HEADER_TEXT = {
     LOGO_ALT: "OZE Dental",
-    SERVICE_BAR: "Dịch vụ của phòng khám",
     SEARCH_LABEL: "Tìm kiếm",
     SEARCH_PLACEHOLDER: "Tìm kiếm...",
     SEARCH_BUTTON: "Tìm kiếm",
@@ -251,6 +250,14 @@ export const PUBLIC_SERVICE_TEXT = {
     LOADING: "Đang tải thông tin dịch vụ...",
     TYPE_COUNT: (count) => `${count} loại dịch vụ`,
     TYPES_TITLE: "Các loại dịch vụ",
+    PRICE_FROM: "Giá tham khảo từ",
+    PRICE: "Giá tham khảo",
+    DURATION: "Thời gian dự kiến",
+    MINUTES: (n) => `khoảng ${n} phút`,
+    TYPE_TOTAL: "Số loại dịch vụ",
+    PRICE_NOTE: "Giá tham khảo; chi phí chính xác do bác sĩ báo sau khi thăm khám.",
+    BOOK: "Đặt lịch khám",
+    VIEW_TYPES: "Xem các loại dịch vụ",
     BENEFITS_TITLE: "Lợi ích sau điều trị",
     STEPS_TITLE: "Quy trình điều trị",
     STEP: (n) => `Bước ${n}`,
