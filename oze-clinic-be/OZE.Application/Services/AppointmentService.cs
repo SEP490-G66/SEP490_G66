@@ -512,15 +512,32 @@ namespace OZE.Application.Services
             var exam = await _serviceRepository.GetByCodeAsync(examServiceCode);
             ConditionGuard.Ensure(exam != null && exam.IsActive, ErrorConstants.AppointmentMessage.GeneralExamServiceMissing);
 
-            var pickedIds = pickedServiceIds.Where(id => id != exam!.Id).Distinct().ToList();
-            var picked = await _appointmentRepository.GetServicesByIdsAsync(pickedIds);
-            ConditionGuard.Ensure<NotFoundException>(picked.Count == pickedIds.Count, ErrorConstants.AppointmentMessage.ServiceNotFound);
-            ConditionGuard.Ensure(picked.All(s => s.IsActive), ErrorConstants.AppointmentMessage.ServiceInactive);
-
             var variantIds = pickedVariantIds.Distinct().ToList();
             var variants = await _appointmentRepository.GetVariantsByIdsAsync(variantIds);
             ConditionGuard.Ensure<NotFoundException>(variants.Count == variantIds.Count, ErrorConstants.AppointmentMessage.VariantNotFound);
-            ConditionGuard.Ensure(variants.All(v => v.IsActive && v.Service.IsActive), ErrorConstants.AppointmentMessage.VariantInactive);
+
+            // An old appointment can hold a variant that was switched off because its service no longer has variants;
+            // moving that appointment books the service itself. Any other inactive variant is refused.
+            var retired = variants.Where(v => !v.IsActive).ToList();
+            if (retired.Count > 0)
+            {
+                var owners = await _appointmentRepository.GetServicesByIdsAsync(retired.Select(v => v.ServiceId).Distinct().ToList());
+                ConditionGuard.Ensure(retired.All(v => owners.Any(s => s.Id == v.ServiceId && s.IsActive && !s.Variants.Any())),
+                    ErrorConstants.AppointmentMessage.VariantInactive);
+                variants = variants.Except(retired).ToList();
+                variantIds = variantIds.Where(id => variants.Any(v => v.Id == id)).ToList();
+            }
+            ConditionGuard.Ensure(variants.All(v => v.Service.IsActive), ErrorConstants.AppointmentMessage.VariantInactive);
+
+            // A variant line already carries its service, so the same service sent on its own is not a second line
+            var variantServiceIds = variants.Select(v => v.ServiceId).ToHashSet();
+            var pickedIds = pickedServiceIds.Concat(retired.Select(v => v.ServiceId))
+                .Where(id => id != exam!.Id && !variantServiceIds.Contains(id))
+                .Distinct()
+                .ToList();
+            var picked = await _appointmentRepository.GetServicesByIdsAsync(pickedIds);
+            ConditionGuard.Ensure<NotFoundException>(picked.Count == pickedIds.Count, ErrorConstants.AppointmentMessage.ServiceNotFound);
+            ConditionGuard.Ensure(picked.All(s => s.IsActive), ErrorConstants.AppointmentMessage.ServiceInactive);
 
             // A service that has active variants is booked through exactly one of them, never on its own
             var serviceNeedingVariant = picked.FirstOrDefault(s => s.Variants.Any(v => v.IsActive));

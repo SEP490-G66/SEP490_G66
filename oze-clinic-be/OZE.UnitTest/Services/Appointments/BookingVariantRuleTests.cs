@@ -74,6 +74,63 @@ namespace OZE.UnitTest.Services.Appointments
             var thrown = await Record.ExceptionAsync(act);
             thrown?.Message.Should().NotBe(string.Format(ErrorConstants.AppointmentMessage.VariantRequired, "Nieng rang"));
         }
+
+        // An old appointment of a service whose variants were all switched off is moved as the service itself
+        [Fact]
+        public async Task GetAvailableSlotsAsync_ShouldBookService_WhenVariantRetiredWithAllItsSiblings()
+        {
+            var braces = Braces();
+            foreach (var variant in braces.Variants) variant.IsActive = false;
+            _appointmentRepoMock
+                .Setup(r => r.GetVariantsByIdsAsync(It.IsAny<IReadOnlyCollection<int>>()))
+                .ReturnsAsync(new List<ServiceVariant> { braces.Variants.First() });
+            var plain = new Service { Id = 7, ServiceCode = "NIENG", ServiceName = "Nieng rang", IsActive = true };
+            _appointmentRepoMock
+                .Setup(r => r.GetServicesByIdsAsync(It.IsAny<IReadOnlyCollection<int>>()))
+                .ReturnsAsync(new List<Service> { plain });
+
+            var act = () => _service.GetAvailableSlotsAsync(Request(new List<int> { 7 }, new List<int> { 71 }));
+
+            var thrown = await Record.ExceptionAsync(act);
+            thrown?.Message.Should().NotBe(ErrorConstants.AppointmentMessage.VariantInactive);
+            thrown?.Message.Should().NotBe(string.Format(ErrorConstants.AppointmentMessage.VariantRequired, "Nieng rang"));
+        }
+
+        [Fact]
+        public async Task GetAvailableSlotsAsync_ShouldThrow_WhenVariantInactiveButServiceStillHasVariants()
+        {
+            var braces = Braces();
+            var retired = braces.Variants.First();
+            retired.IsActive = false;
+            _appointmentRepoMock
+                .Setup(r => r.GetVariantsByIdsAsync(It.IsAny<IReadOnlyCollection<int>>()))
+                .ReturnsAsync(new List<ServiceVariant> { retired });
+            _appointmentRepoMock
+                .Setup(r => r.GetServicesByIdsAsync(It.IsAny<IReadOnlyCollection<int>>()))
+                .ReturnsAsync(new List<Service> { new() { Id = 7, ServiceName = "Nieng rang", IsActive = true, Variants = braces.Variants.Where(v => v.IsActive).ToList() } });
+
+            var act = () => _service.GetAvailableSlotsAsync(Request(new List<int>(), new List<int> { 71 }));
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.VariantInactive);
+        }
+
+        // Reception sends the service of every line, so a variant line also comes with its own service id
+        [Fact]
+        public async Task GetAvailableSlotsAsync_ShouldNotAskForVariant_WhenServiceIsSentWithItsVariant()
+        {
+            var braces = Braces();
+            _appointmentRepoMock
+                .Setup(r => r.GetVariantsByIdsAsync(It.IsAny<IReadOnlyCollection<int>>()))
+                .ReturnsAsync(new List<ServiceVariant> { braces.Variants.First() });
+            _appointmentRepoMock
+                .Setup(r => r.GetServicesByIdsAsync(It.IsAny<IReadOnlyCollection<int>>()))
+                .ReturnsAsync((IReadOnlyCollection<int> ids) => ids.Contains(7) ? new List<Service> { braces } : new List<Service>());
+
+            var act = () => _service.GetAvailableSlotsAsync(Request(new List<int> { 7 }, new List<int> { 71 }));
+
+            var thrown = await Record.ExceptionAsync(act);
+            thrown?.Message.Should().NotBe(string.Format(ErrorConstants.AppointmentMessage.VariantRequired, "Nieng rang"));
+        }
     }
 
     // OZ-SVC-11 Variant rule when the doctor adds a service on the examination
