@@ -239,6 +239,8 @@ export const toDashboardPlans = (book) =>
             estimatedTotalCost: toNumber(plan.estimatedTotalCost),
             stages: list(plan.stages).map((stage) => ({
                 id: `${plan.id}-${stage.number}`,
+                // Real session id, to match AppointmentResponse.planSession.stageId
+                stageId: stage.id ?? null,
                 stageNumber: stage.number,
                 stageName: stage.stageName,
                 stageStatus: stage.status,

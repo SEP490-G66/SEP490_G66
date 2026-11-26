@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import Modal from "@/components/ui/Modal";
 import BookingSchedule from "@/components/booking/BookingSchedule";
 import { GuestPatientFields } from "@/components/booking/GuestPatientForm";
+import PlanSessionPicker from "@/components/reception/PlanSessionPicker";
 import useBookingForm from "@/hooks/useBookingForm";
 import { RECEPTION_BOOKING_API } from "@/services/bookingService";
-import { findPatientsByPhone } from "@/services/receptionService";
+import { findPatientsByPhone, getBookablePlanSessions } from "@/services/receptionService";
 import { BOOKING_IDS, avatarLetter } from "@/utils/booking";
 import { formatDate, getClinicToday } from "@/utils/format";
 import { EMPTY_GUEST, firstGuestError, guestPayload, validateGuest } from "@/utils/guestBooking";
@@ -65,6 +66,8 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
     const [errors, setErrors] = useState({});
     const [checked, setChecked] = useState(false);
     const latest = useRef(null);
+    // Next session of each plan the found patient is being treated with; stageId: the one this visit is for
+    const [plan, setPlan] = useState({ patientId: null, status: "idle", sessions: [], stageId: null });
 
     const preset = initial.date && initial.slotStart ? { day: initial.date, slot: initial.slotStart, doctorId: initial.doctorId ?? null } : null;
 
@@ -133,10 +136,44 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
                 }
                 return firstGuestError(found);
             },
-            payload: () => (lookup.status === "found" ? { PatientId: lookup.patient.id } : guestPayload(guestValues)),
+            payload: () =>
+                lookup.status === "found"
+                    ? { PatientId: lookup.patient.id, TreatmentPlanStageId: plan.patientId === lookup.patient.id ? plan.stageId : null }
+                    : guestPayload(guestValues),
         },
     });
     const { state, actions } = form;
+
+    // Picking a session books its service: pick it in the service box, and add it when it has no variant to choose
+    const pickSession = (stageId, sessions = plan.sessions) => {
+        setPlan((current) => ({ ...current, stageId }));
+        const session = sessions.find((item) => item.stageId === stageId);
+        const service = session?.serviceId != null ? form.services.find((item) => item.id === session.serviceId) : null;
+        if (!service || state.items.some((item) => item.serviceId === service.id)) return;
+        actions.pickService(service.id);
+        if (!service.variants.length) actions.addService();
+    };
+
+    const foundId = lookup.status === "found" ? lookup.patient.id : null;
+    const servicesReady = form.services.length > 0;
+    useEffect(() => {
+        if (foundId == null || !servicesReady || plan.patientId === foundId) return;
+        let active = true;
+        getBookablePlanSessions(foundId, { skipErrorPage: true }).then((result) => {
+            if (!active) return;
+            if (!result.success) {
+                setPlan({ patientId: foundId, status: "error", sessions: [], stageId: null });
+                return;
+            }
+            setPlan({ patientId: foundId, status: "ready", sessions: result.data, stageId: null });
+            // A patient under treatment usually comes for the next session: choose it already
+            if (result.data.length) pickSession(result.data[0].stageId, result.data);
+        });
+        return () => {
+            active = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [foundId, servicesReady]);
 
     const changeValue = (key, value) => {
         const next = { ...values, [key]: value };
@@ -212,6 +249,9 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
                             </div>
                         )}
                         {lookup.status === "found" && <ReceptionPatientCard patient={lookup.patient} />}
+                        {lookup.status === "found" && (
+                            <PlanSessionPicker status={plan.patientId === lookup.patient.id ? plan.status : "loading"} sessions={plan.sessions} value={plan.stageId} onChange={(stageId) => pickSession(stageId)} />
+                        )}
                         {lookup.status === "new" && (
                             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                                 <GuestPatientFields values={values} errors={errors} onChange={changeValue} today={getClinicToday()} showPhone={false} />

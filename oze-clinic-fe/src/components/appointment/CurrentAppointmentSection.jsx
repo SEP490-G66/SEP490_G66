@@ -9,7 +9,8 @@ const TITLE_ID = "current-appointment-title";
 // "Lịch hẹn hiện tại" (Figma: Lịch hẹn sắp tới). A pending self-booked appointment can still be changed here
 // (canChange): Đổi lịch / Huỷ lịch. Once confirmed the patient calls the front desk instead.
 // notice: { tone: "warning" | "success" | "neutral", content } shown under the card.
-const CurrentAppointmentSection = ({ appointment, source, canChange, notice, onReschedule, onCancel }) => {
+// children: shown between the card and the notice (the plan progress when the visit is a plan session).
+const CurrentAppointmentSection = ({ appointment, source, canChange, notice, onReschedule, onCancel, children }) => {
     const actions = canChange ? (
         <div className="flex flex-wrap gap-2">
             <button type="button" className="btn btn-secondary min-h-11 md:min-h-0" onClick={onReschedule}>
@@ -31,7 +32,8 @@ const CurrentAppointmentSection = ({ appointment, source, canChange, notice, onR
 
     return (
         <DashboardSection id={TITLE_ID} title="Lịch hẹn hiện tại" badge={actions}>
-            <NextVisitCard appointment={appointment} source={source} showDetailLink={false} />
+            <NextVisitCard appointment={appointment} source={source} showDetailLink={false} showDetails={false} />
+            {children}
             {notice && <Notice tone={notice.tone}>{notice.content}</Notice>}
         </DashboardSection>
     );

@@ -842,6 +842,14 @@ export const RECEPTION_BOOKING_TEXT = {
     ERROR_EMAIL: "Email không hợp lệ.",
     ERROR_GENDER: "Giới tính không hợp lệ.",
     ERROR_BIRTHDATE: "Ngày sinh không được sau ngày hôm nay.",
+    PLAN_SECTION: "Buổi điều trị theo kế hoạch",
+    PLAN_HELP: "Chọn buổi nếu lịch này để làm buổi tiếp theo của kế hoạch. Bệnh nhân sẽ thấy lịch là buổi đó.",
+    PLAN_NONE: "Không thuộc kế hoạch (khám lẻ)",
+    PLAN_LOADING: "Đang tải kế hoạch điều trị…",
+    PLAN_LOAD_ERROR: "Không tải được kế hoạch điều trị. Vẫn có thể đặt lịch khám lẻ.",
+    ERROR_STAGE_NOT_FOUND: "Buổi điều trị không thuộc bệnh nhân này. Tải lại hộp đặt lịch rồi chọn lại.",
+    ERROR_STAGE_NOT_OPEN: "Buổi này đã làm xong hoặc đã huỷ, hoặc kế hoạch không còn đang điều trị.",
+    ERROR_STAGE_BOOKED: "Buổi này đã có lịch hẹn khác. Đổi giờ lịch đó thay vì đặt mới.",
 };
 
 export const BOOKING_TEXT = {
