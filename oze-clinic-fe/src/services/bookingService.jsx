@@ -69,6 +69,12 @@ const toService = (service) => ({
 
 const toDoctor = (doctor) => ({ doctorId: doctor.id, doctorName: doctor.fullName });
 
+// The services a patient can pick (the same list as the booking form); null when they could not be loaded
+export const getBookingServices = async () => {
+    const catalog = await loadCatalog();
+    return catalog ? catalog.filter(isBookable).map(toService) : null;
+};
+
 const loadDoctors = (signal) => call(() => api.get("/api/home/doctors", { ...READ, signal, params: { PageSize: PAGE_SIZE } }));
 
 export const getBookingDoctors = async ({ signal } = {}) => {

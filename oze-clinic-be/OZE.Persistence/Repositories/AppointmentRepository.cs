@@ -494,6 +494,16 @@ namespace OZE.Persistence.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public void ReplaceServiceItems(Appointment appointment, IEnumerable<AppointmentServiceItem> items)
+        {
+            _context.AppointmentServiceItems.RemoveRange(appointment.ServiceItems);
+            appointment.ServiceItems.Clear();
+            foreach (var item in items)
+            {
+                appointment.ServiceItems.Add(item);
+            }
+        }
+
         public async Task SaveStartedExaminationAsync(Appointment appointment, Examination examination, CancellationToken cancellationToken = default)
         {
             // The appointment was loaded without AsNoTracking, so the status change is already tracked
