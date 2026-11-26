@@ -46,6 +46,8 @@ const matches = (row, keyword) => !keyword || [row.patientName, row.patientCode,
 const detailOf = (row) =>
     [
         row.patientCode,
+        // "Chuyển từ Phòng khám · BS. Lê Thu Hà · Nhổ răng 38" for a patient referred to this room
+        row.note,
         row.status === DONE && row.finishedAt && `Xong lúc ${row.finishedAt}`,
         row.skipCount > 0 && `Đã báo vắng ${row.skipCount} lần`,
     ]

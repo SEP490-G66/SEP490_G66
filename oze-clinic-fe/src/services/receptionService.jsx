@@ -161,8 +161,10 @@ export const getAvailableSlots = ({ date, doctorId, serviceIds = [], variantIds 
     return call(() => api.get(`/api/appointments/available-slots?${params}`, config));
 };
 
-export const rescheduleAppointment = (id, { date, slotStart, doctorId, reason }) =>
-    call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null, reason: reason || null }));
+export const rescheduleAppointment = async (id, { date, slotStart, doctorId, reason }) => {
+    const result = await call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null, reason: reason || null }));
+    return result.success ? result : { ...result, message: appointmentErrorText(result) };
+};
 
 export const getPaidInvoices = async () => {
     const results = await Promise.all(

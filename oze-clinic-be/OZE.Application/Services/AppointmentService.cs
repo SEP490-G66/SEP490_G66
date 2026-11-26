@@ -134,7 +134,7 @@ namespace OZE.Application.Services
                     }
 
                     return patient;
-                }, selfBooking: true);
+                });
 
             await SendBookingEmailAsync(appointment, email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: false);
             await NotifyNewOnlineBookingAsync(appointment, patient);
@@ -159,7 +159,7 @@ namespace OZE.Application.Services
 
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
                 request.DoctorId, request.Note, userId, () => Task.FromResult(existing!),
-                initialStatus: initialStatus, selfBooking: true);
+                initialStatus: initialStatus);
 
             // A confirmed booking must not say "the receptionist will call to confirm"
             await SendBookingEmailAsync(appointment, patient.Email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: returning);
@@ -339,7 +339,7 @@ namespace OZE.Application.Services
         private async Task<(Appointment Appointment, Patient Patient, AvailableSlotResponse Slot)> CreateBookingAsync(
             List<BookingLine> lines, DateOnly date, TimeOnly slotStart, int? doctorId, string? note,
             string? createdByUserId, Func<Task<Patient>> getPatientAsync, long? excludeAppointmentId = null, long? parentAppointmentId = null,
-            string initialStatus = AppointmentConstants.PendingStatus, bool selfBooking = false, long? treatmentPlanStageId = null)
+            string initialStatus = AppointmentConstants.PendingStatus, long? treatmentPlanStageId = null)
         {
             var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
 
@@ -361,12 +361,11 @@ namespace OZE.Application.Services
                     ConditionGuard.ThrowIf(await _appointmentRepository.HasUnfinishedAppointmentAsync(patient.Id, excludeAppointmentId),
                         ErrorConstants.AppointmentMessage.PatientHasUnfinishedAppointment);
 
-                    // The clinic keeps one booking at a time: a patient whose treatment plan already has a session
-                    // scheduled cannot book online on top of it; the front desk arranges such visits
-                    if (selfBooking)
+                    // A patient whose treatment plan is being carried out books only its sessions (and the doctor's follow-up)
+                    // until the plan is cancelled; this holds for every way of booking
+                    if (!treatmentPlanStageId.HasValue && !parentAppointmentId.HasValue)
                     {
-                        ConditionGuard.ThrowIf(await _appointmentRepository.HasUpcomingTreatmentSessionAsync(patient.Id),
-                            ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
+                        await EnsureNoActiveTreatmentPlanAsync(patient.Id);
                     }
                 }
 
@@ -858,6 +857,11 @@ namespace OZE.Application.Services
             EnsureOwnedBy(appointment!, ownerUserId);
 
             ConditionGuard.ThrowIf(!IsOpen(appointment!), ErrorConstants.AppointmentMessage.OnlyOpenCanBeRescheduled);
+            // Moving a visit that is not a session of the plan (nor its follow-up) counts as booking a new one
+            if (!appointment!.TreatmentPlanStageId.HasValue && !appointment.ParentAppointmentId.HasValue)
+            {
+                await EnsureNoActiveTreatmentPlanAsync(appointment.PatientId);
+            }
 
             var isPatient = ownerUserId != null;
             if (isPatient)
@@ -1238,6 +1242,83 @@ namespace OZE.Application.Services
             return response;
         }
 
+        // "Chỉ định chuyển phòng · tiểu phẫu": the doctor hands the visit being examined (with its diagnoses and plan) to a doctor
+        // who has started a shift in the minor surgery room. The patient leaves this doctor's queue for that doctor's,
+        // as a waiting patient with a note of where they come from; that doctor continues the same examination.
+        public async Task<AppointmentResponse> ReferToMinorSurgeryAsync(long id, ReferMinorSurgeryRequest request, string doctorUserId, CancellationToken cancellationToken = default)
+        {
+            var doctorId = await _appointmentRepository.GetStaffProfileIdByUserIdAsync(doctorUserId);
+            ConditionGuard.Ensure<NotFoundException>(doctorId != null, ErrorConstants.AppointmentMessage.DoctorProfileNotFound);
+
+            var appointment = await _appointmentRepository.GetByIdWithExaminationAsync(id, cancellationToken);
+            ConditionGuard.Ensure<NotFoundException>(appointment != null, ErrorConstants.AppointmentMessage.AppointmentNotFound);
+            ConditionGuard.Ensure<ForbiddenException>(appointment!.DoctorId == doctorId, ErrorConstants.AppointmentMessage.NotAssignedDoctor);
+
+            var examination = appointment.Examination;
+            var today = DateOnly.FromDateTime(ClinicClock.Today);
+            ConditionGuard.Ensure(appointment.Status == AppointmentConstants.InServiceStatus
+                    && appointment.AppointmentDate == today
+                    && examination != null
+                    && examination.ExaminationStatus == ExaminationConstants.InProgress
+                    && examination.DoctorId == doctorId,
+                ErrorConstants.AppointmentMessage.ReferOnlyInExamination);
+            if (_queueService != null)
+            {
+                ConditionGuard.ThrowIf(await _queueService.GetActiveEntryAsync(appointment.Id, QueueConstants.ImagingType, cancellationToken) != null,
+                    ErrorConstants.AppointmentMessage.ReferWhileImaging);
+            }
+
+            var surgeonId = request.SurgeryDoctorId!.Value;
+            ConditionGuard.ThrowIf(surgeonId == doctorId, ErrorConstants.AppointmentMessage.ReferSameDoctor);
+            var shift = await FindDoctorShiftAsync(surgeonId, today, null, RoomTypeConstants.MinorSurgery);
+            ConditionGuard.Ensure(shift != null, ErrorConstants.AppointmentMessage.ReferNoSurgeryShift);
+            if (_queueService != null)
+            {
+                ConditionGuard.ThrowIf(await _queueService.IsDoctorOffDutyAsync(surgeonId, cancellationToken),
+                    ErrorConstants.AppointmentMessage.ReferSurgeonNotOnDuty);
+            }
+            var room = shift!.Room;
+
+            // "Chuyển từ Phòng khám · BS. Lê Thu Hà · <ghi chú>" in the surgery doctor's queue
+            var fromRoom = (await _appointmentRepository.GetDoctorShiftsInRangeAsync(today, today, doctorId) ?? new List<StaffSchedule>())
+                .FirstOrDefault(x => x.ActualStartTime != null && x.ActualEndTime == null)?.Room?.RoomName;
+            var note = request.Note?.Trim();
+            var queueNote = string.Join(" · ", new[] { $"Chuyển từ {fromRoom ?? "phòng khám"}", appointment.Doctor?.FullName, note }
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+
+            var now = DateTimeOffset.UtcNow;
+            var oldDoctorId = appointment.DoctorId;
+            appointment.DoctorId = surgeonId;
+            // Waiting again, now to be called by the surgery doctor (who resumes the same examination)
+            appointment.Status = AppointmentConstants.CheckedInStatus;
+            appointment.UpdatedAt = now;
+            examination!.DoctorId = surgeonId;
+            examination.UpdatedAt = now;
+            await _appointmentRepository.UpdateAsync(appointment);
+
+            QueueEntry? entry = null;
+            if (_queueService != null)
+            {
+                entry = await _queueService.TransferAsync(appointment.Id, QueueConstants.ExaminationType, room?.Id, surgeonId, queueNote, cancellationToken);
+            }
+            entry ??= await EnterExaminationQueueAsync(appointment, room, queueNote, cancellationToken);
+
+            await _auditLogService.LogAsync(AuditConstants.AppointmentReferredMinorSurgery, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
+                new { DoctorId = oldDoctorId }, new { DoctorId = surgeonId, RoomId = room?.Id }, note);
+            await NotifyAsync(n => n.NotifyStaffAsync(surgeonId,
+                new NotificationContent(NotificationConstants.Text.PatientReferredTitle,
+                    string.Format(NotificationConstants.Text.PatientReferredMessage, appointment.Patient?.FullName, appointment.Doctor?.FullName),
+                    NotificationConstants.Reference.Appointment, appointment.Id.ToString()), cancellationToken));
+
+            var response = MapToResponse(appointment);
+            response.DoctorId = surgeonId;
+            response.DoctorName = shift.StaffProfile?.FullName;
+            response.QueueNumber = entry?.QueueNumber;
+            response.RoomId = room?.Id;
+            response.RoomName = room?.RoomName;
+            return response;
+        }
+
         public async Task<AppointmentResponse> MarkNoShowAsync(long id, MarkNoShowRequest? request, CancellationToken cancellationToken = default)
         {
             var appointment = await _appointmentRepository.GetByIdWithExaminationAsync(id, cancellationToken);
@@ -1348,6 +1429,9 @@ namespace OZE.Application.Services
                 }
                 else
                 {
+                    // A patient in the middle of a treatment plan comes for its sessions, not as a new walk-in visit
+                    await EnsureNoActiveTreatmentPlanAsync(patient.Id);
+
                     // Someone who walks in is received even with a booking on another day; that booking stays as it is.
                     // Today: already in the clinic, or a confirmed booking to check in instead, blocks; a pending one is cancelled.
                     var sameDay = await _appointmentRepository.GetPatientAppointmentsOnDateAsync(patient.Id, today) ?? new List<Appointment>();
@@ -1862,6 +1946,13 @@ namespace OZE.Application.Services
         private Task NotifyDoctorOfNewAppointmentAsync(Appointment appointment, string? patientName) =>
             NotifyAsync(n => n.NotifyStaffAsync(appointment.DoctorId,
                 Content(NotificationConstants.Text.NewAppointmentForDoctorTitle, NotificationConstants.Text.NewAppointmentForDoctorMessage, appointment, patientName ?? string.Empty)));
+
+        // A patient whose treatment plan is approved or running gets no new visit until the plan is cancelled
+        private async Task EnsureNoActiveTreatmentPlanAsync(int patientId)
+        {
+            ConditionGuard.ThrowIf(await _appointmentRepository.HasActiveTreatmentPlanAsync(patientId),
+                ErrorConstants.AppointmentMessage.PatientHasActiveTreatmentPlan);
+        }
 
         // A patient can only cancel or reschedule while the appointment is further away than the cutoff.
         // A cutoff of 0 means no limit: until check-in, even after the booked time

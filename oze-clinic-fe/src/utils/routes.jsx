@@ -131,6 +131,10 @@ export const getDoctorExamStepRoute = (step) => `${ROUTES.DOCTOR_EXAMINATION}/${
 // Doctor's "Hồ sơ bệnh án" of one patient (patient id)
 export const getDoctorPatientRoute = (patientId) => `${ROUTES.DOCTOR_PATIENTS}/${patientId}`;
 
+// During a visit "Hồ sơ bệnh án" opens the patient being examined; this query shows the list anyway (?all=1)
+export const DOCTOR_PATIENTS_ALL_PARAM = "all";
+export const DOCTOR_PATIENTS_LIST_ROUTE = `${ROUTES.DOCTOR_PATIENTS}?${DOCTOR_PATIENTS_ALL_PARAM}=1`;
+
 // slug of a public service, e.g. "nieng-rang" (utils/data/publicServices.jsx)
 export const getServiceDetailRoute = (serviceSlug) => generatePath(ROUTES.SERVICE_DETAIL, { serviceSlug });
 

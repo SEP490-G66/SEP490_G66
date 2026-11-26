@@ -5,9 +5,21 @@ import CalledExamView from "@/components/examination/CalledExamView";
 import EndVisitDialog from "@/components/examination/EndVisitDialog";
 import ExamVisitHeader from "@/components/examination/ExamVisitHeader";
 import NoExamView from "@/components/examination/NoExamView";
-import { endExamination, finalizePrescription, getExamRecord, getExamWorkspace, saveMedicalHistory, startExamination } from "@/services/examinationService";
+import ReferRoomDialog from "@/components/examination/ReferRoomDialog";
+import XrayRequestDialog from "@/components/examination/XrayRequestDialog";
+import useSession from "@/hooks/useSession";
+import {
+    endExamination,
+    finalizePrescription,
+    getExamRecord,
+    getExamWorkspace,
+    referToMinorSurgery,
+    requestXray,
+    saveMedicalHistory,
+    startExamination,
+} from "@/services/examinationService";
 import { GENERIC_ERROR_MESSAGE, QUEUE_STATUS } from "@/utils/messages";
-import { DOCTOR_EXAM_STEP_PATHS, getDoctorExamStepRoute } from "@/utils/routes";
+import { DOCTOR_EXAM_STEP_PATHS, ROUTES, getDoctorExamStepRoute } from "@/utils/routes";
 import ClinicalExamTab from "./tab/ClinicalExamTab";
 import PatientRecordTab from "./tab/PatientRecordTab";
 import PrescriptionTab from "./tab/PrescriptionTab";
@@ -104,6 +116,40 @@ const InExamView = ({ shown, item, record, busy, handlers, onEnd, onReload }) =>
         else toast.success("Đã lưu nháp.");
     };
 
+    // "Chỉ định chuyển phòng": null | "room" (pick the room) | "imaging" (the X-ray order)
+    const [refer, setRefer] = useState(null);
+    const [referring, setReferring] = useState(false);
+    const { userName } = useSession();
+    const birthYear = record.patient.birthdate?.slice(0, 4);
+
+    // What is being typed in the step is saved first: the patient leaves the room
+    const sendToImaging = async (request) => {
+        setReferring(true);
+        await saveRef.current?.();
+        const response = await requestXray(item.id, request);
+        setReferring(false);
+        if (!response.success) {
+            toast.error(response.message ?? GENERIC_ERROR_MESSAGE);
+            return;
+        }
+        toast.success(response.message);
+        setRefer(null);
+        onReload();
+    };
+
+    const sendToSurgery = async (request) => {
+        setReferring(true);
+        await saveRef.current?.();
+        const response = await referToMinorSurgery(item.id, request);
+        setReferring(false);
+        if (!response.success) {
+            toast.error(response.message ?? GENERIC_ERROR_MESSAGE);
+            return;
+        }
+        toast.success(response.message);
+        navigate(ROUTES.DOCTOR_QUEUE);
+    };
+
     return (
         <>
             <ExamVisitHeader
@@ -112,6 +158,9 @@ const InExamView = ({ shown, item, record, busy, handlers, onEnd, onReload }) =>
                 status={status}
                 actions={
                     <>
+                        <button type="button" className="btn btn-secondary" disabled={busy || referring} onClick={() => setRefer("room")}>
+                            Chỉ định chuyển phòng
+                        </button>
                         {shown !== STEP.HISTORY && (
                             <Link to={getDoctorExamStepRoute(STEP.HISTORY)} className="btn btn-secondary">
                                 Hồ sơ bệnh án
@@ -132,6 +181,23 @@ const InExamView = ({ shown, item, record, busy, handlers, onEnd, onReload }) =>
             <div key={shown} className="flex flex-col gap-5">
                 {EXAM_TABS[shown]({ item, record, busy, handlers, goTo, onReload, draft })}
             </div>
+            {refer === "room" && (
+                <ReferRoomDialog
+                    patientName={record.patient.name}
+                    busy={referring}
+                    onImaging={() => setRefer("imaging")}
+                    onSurgery={sendToSurgery}
+                    onClose={() => setRefer(null)}
+                />
+            )}
+            {refer === "imaging" && (
+                <XrayRequestDialog
+                    subtitle={[record.patient.name, birthYear && `sinh ${birthYear}`, userName && `BS. ${userName}`].filter(Boolean).join(" · ")}
+                    busy={referring}
+                    onSubmit={sendToImaging}
+                    onClose={() => setRefer(null)}
+                />
+            )}
         </>
     );
 };

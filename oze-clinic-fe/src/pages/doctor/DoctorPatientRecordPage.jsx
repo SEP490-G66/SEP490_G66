@@ -11,9 +11,10 @@ import useAsync from "@/hooks/useAsync";
 import useSession from "@/hooks/useSession";
 import { addVisitAddendum, getDoctorPatientRecord } from "@/services/doctorPatientService";
 import { GENDER_LABELS, GENERIC_ERROR_MESSAGE } from "@/utils/messages";
-import { ROUTES } from "@/utils/routes";
+import { DOCTOR_PATIENTS_LIST_ROUTE, ROUTES } from "@/utils/routes";
 
-const BACK = { to: ROUTES.DOCTOR_PATIENTS, label: "Hồ sơ bệnh án" };
+// The list itself, even while a patient is being examined (the plain route would open this record again)
+const BACK = { to: DOCTOR_PATIENTS_LIST_ROUTE, label: "Hồ sơ bệnh án" };
 
 // The patient is in the doctor's room today: being examined, or called / waiting
 const ROOM_BADGE = {

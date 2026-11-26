@@ -70,6 +70,7 @@ namespace OZE.Application.Services
                 CheckInAt = appointment?.CheckInAt,
                 TimeSlotStart = appointment?.TimeSlotStart,
                 Reason = examination?.ChiefComplaint ?? appointment?.Notes,
+                Note = entry.Notes,
                 PatientId = appointment?.PatientId ?? 0,
                 PatientCode = patient?.PatientCode ?? string.Empty,
                 PatientName = patient?.FullName?.Trim() ?? string.Empty,

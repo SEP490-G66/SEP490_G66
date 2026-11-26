@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import DataTable from "@/components/ui/DataTable";
 import ListFooter from "@/components/ui/ListFooter";
 import PageHeader from "@/components/ui/PageHeader";
 import SearchInput from "@/components/ui/SearchInput";
 import { useDebounced } from "@/hooks/usePatientRecordNav";
-import { getDoctorPatients } from "@/services/doctorPatientService";
+import { getDoctorPatients, getPatientInExam } from "@/services/doctorPatientService";
 import { formatPhone } from "@/utils/format";
 import { GENDER_LABELS, GENERIC_ERROR_MESSAGE } from "@/utils/messages";
-import { getDoctorPatientRoute } from "@/utils/routes";
+import { DOCTOR_PATIENTS_ALL_PARAM as ALL_PARAM, getDoctorPatientRoute } from "@/utils/routes";
 
 const PAGE_SIZE = 8;
 const TITLE_ID = "doctor-patients-title";
@@ -17,7 +17,7 @@ const detailOf = (patient) => [patient.code, GENDER_LABELS[patient.gender], pati
 
 // "Hồ sơ bệnh án": the patients the doctor examined or has a confirmed booking with (the ones whose record opens),
 // latest visit first. Search by name, patient code or phone; paged by the server.
-const DoctorPatientsPage = () => {
+const PatientList = () => {
     const [search, setSearch] = useState("");
     const [query, setQuery] = useState({ keyword: "", page: 1 });
     const [result, setResult] = useState({ key: null, items: [], total: 0, failed: false });
@@ -118,6 +118,29 @@ const DoctorPatientsPage = () => {
             </section>
         </>
     );
+};
+
+// While a patient is being examined, "Hồ sơ bệnh án" opens that patient's record; "?all=1" (the record's back link)
+// shows the list anyway.
+const DoctorPatientsPage = () => {
+    const [params] = useSearchParams();
+    const showAll = params.get(ALL_PARAM) === "1";
+    const [inExam, setInExam] = useState({ checked: false, patientId: null });
+
+    useEffect(() => {
+        if (showAll) return undefined;
+        const controller = new AbortController();
+        getPatientInExam({ signal: controller.signal }).then(
+            (patientId) => !controller.signal.aborted && setInExam({ checked: true, patientId }),
+            () => !controller.signal.aborted && setInExam({ checked: true, patientId: null }),
+        );
+        return () => controller.abort();
+    }, [showAll]);
+
+    if (showAll) return <PatientList />;
+    if (!inExam.checked) return <div aria-busy="true" className="skeleton h-96" />;
+    if (inExam.patientId) return <Navigate to={getDoctorPatientRoute(inExam.patientId)} replace />;
+    return <PatientList />;
 };
 
 export default DoctorPatientsPage;

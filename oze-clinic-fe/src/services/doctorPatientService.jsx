@@ -82,6 +82,13 @@ const loadRoomEntry = async (patientId) => {
     return entry ? { appointmentId: entry.appointmentId, status: entry.status, reason: entry.reason ?? "" } : null;
 };
 
+// The patient the doctor is examining right now (patient id), or null: "Hồ sơ bệnh án" then opens that record
+export const getPatientInExam = async ({ signal } = {}) => {
+    const room = await call(() => api.get("/api/doctor-room", { signal }));
+    const entry = room.success ? (room.data?.queue ?? []).find((item) => item.status === "IN_PROGRESS") : null;
+    return entry?.patientId ?? null;
+};
+
 // Everything the record page shows about one patient. Fails only when the record itself cannot be read
 // (403: the doctor never examined the patient).
 export const getDoctorPatientRecord = async (patientId) => {

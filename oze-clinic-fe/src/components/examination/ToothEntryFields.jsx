@@ -1,11 +1,13 @@
 import { useId } from "react";
 import { cx } from "@/utils/cx";
+import SuggestInput from "@/components/ui/SuggestInput";
 import { EXAM_TOOTH_SURFACES, TOOTH_CONDITION_SUGGESTIONS } from "@/utils/messages";
 
-// Free-text condition with suggestions ("Nhập tự do hoặc chọn gợi ý").
+const CONDITION_OPTIONS = TOOTH_CONDITION_SUGGESTIONS.map((item) => ({ value: item }));
+
+// Free-text condition with suggestions while typing ("Nhập tự do hoặc chọn gợi ý").
 export const ConditionField = ({ value, onChange, error, hint, autoFocus = false }) => {
     const inputId = useId();
-    const listId = useId();
     const errorId = useId();
     const hintId = useId();
 
@@ -14,22 +16,16 @@ export const ConditionField = ({ value, onChange, error, hint, autoFocus = false
             <label htmlFor={inputId} className="label">
                 Tình trạng <span className="text-danger-solid">*</span>
             </label>
-            <input
+            <SuggestInput
                 id={inputId}
-                className="input"
-                list={listId}
-                placeholder="Ví dụ: Nứt răng, lung lay độ 2"
+                options={CONDITION_OPTIONS}
+                placeholder="Gõ để xem gợi ý, ví dụ: sâu ngà, lung lay độ 2"
                 value={value}
                 autoFocus={autoFocus}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={cx(error && errorId, hint && hintId) || undefined}
-                onChange={(event) => onChange(event.target.value)}
+                onChange={onChange}
             />
-            <datalist id={listId}>
-                {TOOTH_CONDITION_SUGGESTIONS.map((item) => (
-                    <option key={item} value={item} />
-                ))}
-            </datalist>
             {hint && (
                 <p id={hintId} className="text-caption text-muted">
                     {hint}

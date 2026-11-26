@@ -39,9 +39,15 @@ const PATIENT_ERRORS = [
     ["verify your phone number", BOOKING_ERROR_CODE.PHONE_NOT_VERIFIED],
 ];
 
+// The patient is in the middle of a treatment plan: only its sessions can be booked (by the clinic)
+const ACTIVE_PLAN = "undergoing a treatment plan";
+
+const PATIENT_TEXTS = [[ACTIVE_PLAN, BOOKING_TEXT.ERROR_ACTIVE_PLAN]];
+
 const GUEST_ERRORS = [
     ["already has an account", GUEST_BOOKING_TEXT.ERROR_PHONE_HAS_ACCOUNT],
     ["not finished", GUEST_BOOKING_TEXT.ERROR_HAS_UNFINISHED],
+    [ACTIVE_PLAN, GUEST_BOOKING_TEXT.ERROR_ACTIVE_PLAN],
     ["more than one patient record", GUEST_BOOKING_TEXT.ERROR_MULTIPLE_RECORDS],
     ["phone number is invalid", GUEST_BOOKING_TEXT.ERROR_PHONE],
     ["email is invalid", GUEST_BOOKING_TEXT.ERROR_EMAIL],
@@ -224,7 +230,7 @@ export const getPatientBookingContext = async ({ signal } = {}) => {
 
 export const createPatientBooking = async (payload) => {
     const result = await call(() => api.post("/api/appointments", payload, READ));
-    return result.success ? success(toBooked(result.data)) : toFailure(result, { codes: PATIENT_ERRORS });
+    return result.success ? success(toBooked(result.data)) : toFailure(result, { codes: PATIENT_ERRORS, texts: PATIENT_TEXTS });
 };
 
 export const GUEST_BOOKING_API = {
@@ -257,6 +263,7 @@ const RECEPTION_TEXTS = [
     ["session was not found", RECEPTION_BOOKING_TEXT.ERROR_STAGE_NOT_FOUND],
     ["session is already done", RECEPTION_BOOKING_TEXT.ERROR_STAGE_NOT_OPEN],
     ["session already has an appointment", RECEPTION_BOOKING_TEXT.ERROR_STAGE_BOOKED],
+    [ACTIVE_PLAN, RECEPTION_BOOKING_TEXT.ERROR_ACTIVE_PLAN],
 ];
 
 export const getReceptionBookingContext = async ({ signal } = {}) => {

@@ -128,6 +128,31 @@ namespace OZE.UnitTest.Services.Appointments
             saved[1].PriceAtBooking.Should().Be(300000);
         }
 
+        // UTCID05 (A): the patient's treatment plan is being carried out, so a visit outside the plan cannot be moved
+        [Fact]
+        public async Task RescheduleAppointmentAsync_ShouldThrow_WhenTreatmentPlanActive()
+        {
+            var (_, newDate) = MovableAppointment();
+            _appointmentRepoMock.Setup(r => r.HasActiveTreatmentPlanAsync(It.IsAny<int>())).ReturnsAsync(true);
+
+            var act = () => _service.RescheduleAppointmentAsync(889, new RescheduleAppointmentRequest { Date = newDate, SlotStart = new TimeOnly(9, 0), DoctorId = DoctorId }, null);
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasActiveTreatmentPlan);
+        }
+
+        // UTCID06 (N): a session of that plan can still be moved
+        [Fact]
+        public async Task RescheduleAppointmentAsync_ShouldMovePlanSession_WhenTreatmentPlanActive()
+        {
+            var (appointment, newDate) = MovableAppointment();
+            appointment.TreatmentPlanStageId = 7;
+            _appointmentRepoMock.Setup(r => r.HasActiveTreatmentPlanAsync(It.IsAny<int>())).ReturnsAsync(true);
+
+            await _service.RescheduleAppointmentAsync(889, new RescheduleAppointmentRequest { Date = newDate, SlotStart = new TimeOnly(9, 0), DoctorId = DoctorId }, null);
+
+            appointment.AppointmentDate.Should().Be(newDate);
+        }
+
         // UTCID04 (A): an inactive service cannot be moved into the appointment
         [Fact]
         public async Task RescheduleAppointmentAsync_ShouldThrow_WhenNewServiceIsInactive()

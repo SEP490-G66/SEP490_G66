@@ -312,7 +312,8 @@ namespace OZE.Common.Constants
             public const string WalkInPatientInClinic = "The patient is already being seen today";
             public const string WalkInPatientHasConfirmedToday = "The patient has a confirmed appointment today. Check in that appointment instead";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
-            public const string PatientHasScheduledTreatmentSession = "You already have a treatment session scheduled in your treatment plan. Please contact the clinic to change it instead of booking a new appointment";
+            // The patient has an approved or running treatment plan: only its sessions (and follow-ups) can be booked until it is cancelled
+            public const string PatientHasActiveTreatmentPlan = "This patient is undergoing a treatment plan. Book the next session of the plan, or cancel the plan before booking a new appointment";
             public const string TreatmentStageNeedsPatient = "Choose the patient record before booking a treatment plan session";
             public const string TreatmentStageNotFound = "This treatment plan session was not found for the patient";
             public const string TreatmentStageNotOpen = "This treatment plan session is already done or cancelled, or its plan is not being carried out";
@@ -337,6 +338,12 @@ namespace OZE.Common.Constants
             public const string ReassignWrongDay = "A patient can only be moved to another doctor on the day of the appointment";
             public const string ReassignSameDoctor = "The patient is already with this doctor";
             public const string ReassignReasonRequired = "Please enter why the patient is moved to another doctor";
+            // A doctor refers the patient being examined to the minor surgery room
+            public const string ReferOnlyInExamination = "Only the patient you are examining can be referred to another room";
+            public const string ReferWhileImaging = "The patient is waiting for an X-ray. Refer the patient after the film is done";
+            public const string ReferSameDoctor = "Choose another doctor to refer the patient to";
+            public const string ReferNoSurgeryShift = "This doctor has no shift in the minor surgery room today";
+            public const string ReferSurgeonNotOnDuty = "This doctor has not started the minor surgery shift yet";
             public const string DoctorNoSuitableShiftToday = "The doctor has no shift today in a room that suits these services";
             public const string DoctorProfileNotFound = "No doctor profile is linked to this account";
             public const string PriorityInvalid = "Priority must be 0 (normal), 1 (high) or 2 (urgent)";

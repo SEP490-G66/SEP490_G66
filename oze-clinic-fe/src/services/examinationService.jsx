@@ -4,6 +4,7 @@ import { getMyShifts } from "./myScheduleService";
 import { EMPTY_PRESCRIPTION_DRAFT, EMPTY_TREATMENT_DRAFT } from "../utils/data/mockExamination";
 import { icdName, newPlanSession, validatePlan } from "../utils/examination";
 import { formatClock, getClinicDateTimeParts, getClinicToday } from "../utils/format";
+import { ROOM_TYPES } from "../utils/constants/room";
 import { AFTERNOON_STARTS_AT } from "../utils/constants/shift";
 import { imagingTypeLabel } from "../utils/imagingRequest";
 import { QUEUE_STATUS } from "../utils/messages";
@@ -62,6 +63,12 @@ const MESSAGES = [
     [/time slot is no longer available/i, "Giờ tái khám này vừa có người đặt. Vui lòng chọn giờ khác."],
     [/too far in advance/i, "Ngày tái khám vượt quá thời gian mở lịch."],
     [/No doctor profile is linked/i, "Tài khoản chưa được gắn hồ sơ bác sĩ."],
+    // "Chỉ định chuyển phòng · tiểu phẫu"
+    [/Only the patient you are examining can be referred/i, "Chỉ chuyển phòng được bệnh nhân bạn đang khám."],
+    [/waiting for an X-ray\. Refer/i, "Bệnh nhân đang chờ chụp chiếu. Chuyển phòng sau khi có kết quả chụp."],
+    [/Choose another doctor to refer/i, "Chọn bác sĩ khác để chuyển bệnh nhân."],
+    [/no shift in the minor surgery room/i, "Bác sĩ này không có ca ở phòng tiểu phẫu hôm nay."],
+    [/not started the minor surgery shift/i, "Bác sĩ phòng tiểu phẫu chưa bắt đầu ca. Chọn bác sĩ khác hoặc đợi bác sĩ bắt đầu ca."],
 ];
 
 const translate = (response) => {
@@ -267,7 +274,8 @@ const shiftOf = (shifts) => {
 
 const toQueueItem = (item) => {
     const status = queueStatusByApi[item.status] ?? QUEUE_STATUS.WAITING;
-    const badge = status === QUEUE_STATUS.WAITING ? (item.atImaging ? "AT_IMAGING" : item.isReturning ? "RETURNED" : undefined) : undefined;
+    // A visit handed over from another room (item.note "Chuyển từ…") is resumed too, but it is not back from an X-ray
+    const badge = status === QUEUE_STATUS.WAITING ? (item.atImaging ? "AT_IMAGING" : item.isReturning && !item.note ? "RETURNED" : undefined) : undefined;
     return {
         id: item.appointmentId,
         queueNumber: item.queueNumber,
@@ -283,6 +291,8 @@ const toQueueItem = (item) => {
         services: (item.services ?? []).map((service) => service.name),
         priority: item.priority > 0,
         skipCount: item.skipCount ?? 0,
+        // "Chuyển từ Phòng khám · BS. Lê Thu Hà · Nhổ răng 38" when referred from another room
+        note: item.note ?? "",
     };
 };
 
@@ -349,6 +359,39 @@ export const startExamination = async (id) => {
     if (!item.examinationId) writeStep(response.data.examinationId, 0);
     const reloaded = await loadWorkspace();
     return reloaded.success ? success(reloaded.data, `${item.examinationId ? "Khám tiếp" : "Bắt đầu khám"} ${item.patientName}.`) : reloaded;
+};
+
+// Doctors with a shift in the minor surgery room today: { doctorId, name, roomName, started, waitingCount }.
+// Only one who has started the shift can take a referred patient.
+export const getSurgeryDoctorsOnDuty = async () => {
+    const response = await call(() => api.get("/api/schedules/doctors-on-duty"));
+    if (!response.success) return translate(response);
+    const doctors = (response.data ?? [])
+        .filter((item) => item.roomType === ROOM_TYPES.MINOR_SURGERY)
+        .map((item) => ({
+            doctorId: item.doctorId,
+            name: item.doctorName,
+            roomName: item.roomName ?? "Phòng tiểu phẫu",
+            started: Boolean(item.actualStartTime) && !item.actualEndTime,
+            waitingCount: item.waitingCount ?? 0,
+        }));
+    // The same doctor may have a morning and an afternoon shift there: one row, started if either is
+    const byDoctor = new Map();
+    doctors.forEach((doctor) => {
+        const seen = byDoctor.get(doctor.doctorId);
+        byDoctor.set(doctor.doctorId, seen ? { ...seen, started: seen.started || doctor.started } : doctor);
+    });
+    return success([...byDoctor.values()]);
+};
+
+// "Chỉ định chuyển phòng · tiểu phẫu": the visit (with its diagnoses and plan) goes to that doctor's queue
+export const referToMinorSurgery = async (id, { surgeryDoctorId, note }) => {
+    const item = itemOf(id);
+    if (!item || item.status !== "IN_PROGRESS") return failure("Chỉ chuyển phòng được bệnh nhân đang khám.");
+    return thenReload(
+        () => api.post(`/api/appointments/${id}/refer-minor-surgery`, { surgeryDoctorId, note: note?.trim() || null }),
+        `Đã chuyển ${item.patientName} sang phòng tiểu phẫu.`,
+    );
 };
 
 export const endExamination = async (id) => {
@@ -443,6 +486,14 @@ const loadHistoryAndVisits = async (item) => {
     };
 };
 
+// "Ê buốt khi ăn nóng / lạnh, Đau khi nhai. Ê buốt răng hàm dưới trái…": the ticked symptoms of an older visit, then its notes
+const symptomsText = (symptoms, notes) => {
+    const ticked = (symptoms ?? []).filter(Boolean).join(", ");
+    const text = (notes ?? "").trim();
+    if (!ticked) return text;
+    return text ? `${ticked}. ${text}` : ticked;
+};
+
 // Everything the exam screen shows about one patient in the queue, including the step 2 draft (record.exam).
 export const getExamRecord = async (id) => {
     const item = itemOf(id);
@@ -489,8 +540,9 @@ export const getExamRecord = async (id) => {
     const exam = data
         ? {
               chiefComplaint: data.chiefComplaint ?? item.reason ?? "",
-              symptoms: data.symptoms ?? [],
-              note: data.clinicalNotes ?? "",
+              // Symptoms are one free text now (clinicalNotes); a visit saved with ticked symptoms shows them first
+              symptoms: [],
+              note: symptomsText(data.symptoms, data.clinicalNotes),
               entries: (data.toothFindings ?? []).map(toEntry),
               films,
               diagnoses: (data.diagnoses ?? []).map(toDiagnosis),

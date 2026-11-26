@@ -49,8 +49,8 @@ namespace OZE.Application.Interfaces
         Task<bool> HasUnfinishedAppointmentAsync(int patientId, long? excludeAppointmentId = null);
         Task<List<Appointment>> GetPatientAppointmentsOnDateAsync(int patientId, DateOnly date);
         Task<List<long>> MarkPastPendingAsNoShowAsync(DateOnly today, CancellationToken cancellationToken = default);
-        // True when an approved or running treatment plan of the patient has a session scheduled for today or later
-        Task<bool> HasUpcomingTreatmentSessionAsync(int patientId);
+        // True when the patient has a treatment plan being carried out (Approved or InProgress)
+        Task<bool> HasActiveTreatmentPlanAsync(int patientId);
         // A session of a treatment plan with its plan and the plan's other sessions (read only)
         Task<TreatmentPlanStage?> GetTreatmentStageAsync(long stageId);
         // True when an appointment that is not cancelled or no-show is booked for this session

@@ -15,6 +15,8 @@ export const APPOINTMENT_ACTION_CODE = {
     SLOT_TAKEN: "SLOT_TAKEN",
     DATE_INVALID: "DATE_INVALID",
     NOT_FOUND: "NOT_FOUND",
+    // The patient is in the middle of a treatment plan: a visit outside the plan cannot be moved
+    ACTIVE_PLAN: "ACTIVE_PLAN",
     GENERIC: "GENERIC",
 };
 
@@ -25,6 +27,7 @@ const ACTION_ERRORS = [
     ["no longer available", APPOINTMENT_ACTION_CODE.SLOT_TAKEN],
     ["cannot be in the past", APPOINTMENT_ACTION_CODE.DATE_INVALID],
     ["too far in advance", APPOINTMENT_ACTION_CODE.DATE_INVALID],
+    ["undergoing a treatment plan", APPOINTMENT_ACTION_CODE.ACTIVE_PLAN],
 ];
 
 const success = (data) => ({ success: true, message: null, data, code: null });

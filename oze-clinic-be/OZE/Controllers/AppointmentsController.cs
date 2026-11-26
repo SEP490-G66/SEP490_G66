@@ -286,6 +286,21 @@ namespace OZE.Controllers
         }
 
         /// <summary>
+        /// "Chỉ định chuyển phòng · tiểu phẫu": the doctor hands the patient being examined (and the examination) to a doctor
+        /// who has started a shift in the minor surgery room; the patient moves to that doctor's queue.
+        /// </summary>
+        [HttpPost("{id:long}/refer-minor-surgery")]
+        [Authorize(Roles = RoleConstants.DoctorRole)]
+        public async Task<ActionResult<ApiResponse<AppointmentResponse>>> ReferToMinorSurgeryAsync(
+            [FromRoute] long id,
+            [FromBody] ReferMinorSurgeryRequest request,
+            CancellationToken cancellationToken)
+        {
+            var result = await _appointmentService.ReferToMinorSurgeryAsync(id, request, CurrentUserId ?? string.Empty, cancellationToken);
+            return Ok(ApiResponse<AppointmentResponse>.SuccessResult(result, "Patient referred to the minor surgery room"));
+        }
+
+        /// <summary>
         /// Starts the visit: creates the examination and moves a checked-in appointment to in service.
         /// </summary>
         [HttpPost("{id:long}/start-examination")]
