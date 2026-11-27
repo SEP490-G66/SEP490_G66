@@ -64,6 +64,7 @@ const MESSAGES = {
     "Room not found": "Phòng không còn tồn tại.",
     "Room is not active": "Phòng đang không hoạt động.",
     "Shift start time must be earlier than end time": "Giờ bắt đầu ca phải trước giờ kết thúc.",
+    "Shift start time must fall on a booking slot boundary": "Giờ bắt đầu ca phải đúng mốc ô lịch hẹn (ví dụ 08:00, 08:30).",
     "Shift date cannot be in the past": "Không thể phân ca cho ngày đã qua.",
     "This staff member already has a shift that overlaps this time": "Nhân viên này đã có ca khác trùng giờ.",
     "This room is already used by another shift at that time": "Phòng này đã có người trực trong ca.",
