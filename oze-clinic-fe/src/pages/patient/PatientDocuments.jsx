@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Upload } from "lucide-react";
+import { Check, Eye, Upload } from "lucide-react";
 import { toast } from "react-toastify";
 import DocumentDetailDrawer from "@/components/documentRequest/DocumentDetailDrawer";
 import PatientDocumentTable from "@/components/documentRequest/PatientDocumentTable";
@@ -294,7 +294,15 @@ const PatientDocuments = () => {
                                 <p className="rounded-md border border-border bg-canvas px-4 py-8 text-center text-muted">Chưa có bác sĩ nào yêu cầu bổ sung tài liệu.</p>
                             ) : (
                                 <div className="overflow-hidden rounded-md border border-border bg-canvas">
-                                    <table className="w-full border-collapse text-left">
+                                    {/* Fixed columns so every row lines up, whatever its status */}
+                                    <table className="w-full table-fixed border-collapse text-left max-md:table-auto">
+                                        <colgroup>
+                                            <col />
+                                            <col className="w-32" />
+                                            <col className="w-28" />
+                                            <col className="w-36" />
+                                            <col className="w-40" />
+                                        </colgroup>
                                         <thead className="bg-surface-tint text-caption text-muted max-md:hidden">
                                             <tr>
                                                 <th className="px-4 py-2.5 font-medium">Tài liệu yêu cầu</th>
@@ -316,25 +324,29 @@ const PatientDocuments = () => {
                                                     </th>
                                                 </tr>
                                                 {visit.items.map((doc) => (
-                                                    <tr key={doc.id} className="border-t border-border max-md:flex max-md:flex-col max-md:gap-1 max-md:py-2">
+                                                    <tr key={doc.id} className="border-t border-border align-middle max-md:flex max-md:flex-col max-md:gap-1 max-md:py-3">
                                                         <td className="px-4 py-3 max-md:py-0">
-                                                            <span className="block font-semibold text-ink">{doc.name}</span>
-                                                            <span className="block text-caption text-muted">{[doc.note, doc.files.length ? `${doc.files.length} tệp` : null].filter(Boolean).join(" · ")}</span>
+                                                            <button type="button" className="block max-w-full truncate text-left font-semibold text-ink hover:text-primary" onClick={() => setViewing(doc)}>
+                                                                {doc.name}
+                                                            </button>
+                                                            <span className="block truncate text-caption text-muted">{[doc.note, doc.files.length ? `${doc.files.length} tệp` : null].filter(Boolean).join(" · ")}</span>
                                                         </td>
                                                         <td className="px-4 py-3 max-md:py-0">{doc.typeLabel}</td>
                                                         <td className="num px-4 py-3 max-md:py-0">{doc.uploadedAt ? formatDate(doc.uploadedAt) : <span className="text-muted">—</span>}</td>
                                                         <td className="px-4 py-3 max-md:py-0">{doc.status && <span className={cx("badge", doc.status.badge)}>{doc.status.label}</span>}</td>
-                                                        <td className="px-4 py-3 text-right max-md:py-0 max-md:text-left">
-                                                            <div className="flex justify-end gap-2 max-md:justify-start">
-                                                                <button type="button" className="btn btn-link" onClick={() => setViewing(doc)}>
+                                                        <td className="px-4 py-3 text-right max-md:pt-2 max-md:pb-0 max-md:text-left">
+                                                            {/* One button per row, same width: send while the doctor waits, otherwise open it */}
+                                                            {doc.canUpload ? (
+                                                                <button type="button" className="btn btn-primary w-32 justify-center" onClick={() => startAnswer(doc)}>
+                                                                    <Upload className="size-4" aria-hidden="true" />
+                                                                    Gửi tài liệu
+                                                                </button>
+                                                            ) : (
+                                                                <button type="button" className="btn btn-secondary w-32 justify-center" onClick={() => setViewing(doc)}>
+                                                                    <Eye className="size-4" aria-hidden="true" />
                                                                     Xem
                                                                 </button>
-                                                                {doc.canUpload && (
-                                                                    <button type="button" className="btn btn-secondary" onClick={() => startAnswer(doc)}>
-                                                                        Gửi tài liệu
-                                                                    </button>
-                                                                )}
-                                                            </div>
+                                                            )}
                                                         </td>
                                                     </tr>
                                                 ))}

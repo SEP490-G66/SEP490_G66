@@ -71,3 +71,19 @@ export const buildUpcomingVisits = (appointment, plans) => {
     // Sessions with no day yet go last.
     return rows.sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
 };
+
+// "Lịch hẹn": a day and a time are set. "Buổi dự kiến": a session with only a planned day, the desk calls to set the time.
+export const isBookedVisit = (row) => row.state === VISIT_STATE.APPOINTMENT || row.state === VISIT_STATE.BOOKED;
+
+// The patient booked it themselves: they change it from "Lịch hẹn hiện tại". Everything else the clinic arranged.
+export const isOwnVisit = (row) => row.state === VISIT_STATE.APPOINTMENT && row.appointment?.bookedByPatient === true;
+
+export const visitSource = (row) => {
+    if (row.stage) return `Buổi điều trị ${row.number}/${row.total}`;
+    if (row.appointment?.bookedByPatient) return "Bạn đặt";
+    return row.appointment?.parentAppointmentId != null ? "Tái khám bác sĩ hẹn" : "Lễ tân đặt hộ";
+};
+
+export const visitTitle = (row) => (row.stage ? row.stage.stageName || "Buổi điều trị" : row.appointment.serviceName);
+
+export const visitDoctor = (row) => (row.stage && !row.appointment ? row.plan.doctorName : row.appointment?.doctorName);

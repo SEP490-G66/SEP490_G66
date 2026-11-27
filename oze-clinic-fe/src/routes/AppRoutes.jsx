@@ -34,6 +34,7 @@ import ReceptionConsultations from "../pages/receptionist/ReceptionConsultations
 import DailyReconciliation from "../pages/admin/DailyReconciliation";
 import ReceptionConfirm from "../pages/receptionist/ReceptionConfirm";
 import ReceptionFollowUps from "../pages/receptionist/ReceptionFollowUps";
+import ReceptionChangeRequests from "../pages/receptionist/ReceptionChangeRequests";
 import ReceptionQueue from "../pages/receptionist/ReceptionQueue";
 import CashHandover from "../pages/receptionist/CashHandover";
 import CashHandoverDetail from "../pages/receptionist/CashHandoverDetail";
@@ -188,6 +189,7 @@ const ROLE_PAGES = {
     [ROUTES.RECEPTION_INVOICES]: <Navigate to={ROUTES.RECEPTION_PAYMENTS} replace />,
     [ROUTES.RECEPTION_QUEUE]: <ReceptionQueue />,
     [ROUTES.RECEPTION_FOLLOW_UPS]: <ReceptionFollowUps />,
+    [ROUTES.RECEPTION_CHANGE_REQUESTS]: <ReceptionChangeRequests />,
     [ROUTES.RECEPTION_DEBTS]: <ReceptionDebts />,
     [ROUTES.RECEPTION_INVOICE_LIST]: <ReceptionInvoices />,
     [ROUTES.RECEPTION_REFUNDS]: <ReceptionRefunds />,

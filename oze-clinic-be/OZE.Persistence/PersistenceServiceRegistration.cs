@@ -51,6 +51,7 @@ namespace OZE.Persistence
             services.AddScoped<IMedicalRecordRepository, MedicalRecordRepository>();
             services.AddScoped<IImagingRequestRepository, ImagingRequestRepository>();
             services.AddScoped<IDocumentRequestRepository, DocumentRequestRepository>();
+            services.AddScoped<IAppointmentChangeRequestRepository, AppointmentChangeRequestRepository>();
             services.AddScoped<IImagingCaptureRepository, ImagingCaptureRepository>();
             services.AddScoped<IExaminationRepository, ExaminationRepository>();
             services.AddScoped<IAuditLogRepository, AuditLogRepository>();

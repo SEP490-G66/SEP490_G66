@@ -16,6 +16,7 @@ namespace OZE.Common.Constants
             public const string Appointment = "Appointment";
             public const string ImagingRequest = "ImagingRequest";
             public const string DocumentRequest = "DocumentRequest";
+            public const string AppointmentChangeRequest = "AppointmentChangeRequest";
             public const string Examination = "Examination";
             public const string TreatmentPlan = "TreatmentPlan";
             public const string Invoice = "Invoice";
@@ -90,6 +91,10 @@ namespace OZE.Common.Constants
             public const string ReturningOnlineBookingMessage = "{0} (khách quen) đặt lịch lúc {1} ngày {2}. Lịch đã tự xác nhận, không cần gọi lại.";
             public const string PatientRescheduledTitle = "Bệnh nhân đổi lịch, chờ xác nhận lại";
             public const string PatientRescheduledMessage = "{0} đổi lịch sang {1} ngày {2}. Gọi bệnh nhân để xác nhận lại.";
+            public const string ChangeRequestedTitle = "Bệnh nhân xin đổi / huỷ lịch";
+            public const string ChangeRequestedMessage = "{0} {1} {2}. Lý do: {3}";
+            public const string ChangeRequestHandledTitle = "Yêu cầu đổi / huỷ lịch đã được xử lý";
+            public const string ChangeRequestHandledMessage = "Lễ tân đã xử lý yêu cầu của bạn cho {0}: {1}.";
             public const string PatientCancelledTitle = "Bệnh nhân tự hủy lịch";
             public const string PatientCancelledMessage = "{0} đã hủy lịch lúc {1} ngày {2}. Lý do: {3}";
             public const string NewConsultationTitle = "Có yêu cầu tư vấn mới";

@@ -188,14 +188,16 @@ namespace OZE.Application.Services
                     string.Format(ErrorConstants.DocumentRequestMessage.UploadFileTooLarge, file.FileName));
             }
 
-            // Same optional details as a document the patient provides on their own
+            // Same details as a document the patient provides on their own: when and where required, note optional
             var patientNote = details?.Note?.Trim() ?? string.Empty;
             var address = details?.ProviderAddress?.Trim() ?? string.Empty;
-            ConditionGuard.Ensure(patientNote.Length <= ProvidedDocumentConstants.NoteMaxLength, ErrorConstants.ProvidedDocumentMessage.NoteInvalid);
-            ConditionGuard.Ensure(address.Length <= ProvidedDocumentConstants.ProviderAddressMaxLength, ErrorConstants.ProvidedDocumentMessage.ProviderAddressInvalid);
+            ConditionGuard.Ensure(details?.PerformedOn != null, ErrorConstants.ProvidedDocumentMessage.PerformedOnRequired);
             ConditionGuard.Ensure(
-                details?.PerformedOn == null || details.PerformedOn.Value <= DateOnly.FromDateTime(ClinicClock.Today),
+                details!.PerformedOn!.Value <= DateOnly.FromDateTime(ClinicClock.Today),
                 ErrorConstants.ProvidedDocumentMessage.PerformedOnInFuture);
+            ConditionGuard.Ensure(address.Length > 0, ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired);
+            ConditionGuard.Ensure(address.Length <= ProvidedDocumentConstants.ProviderAddressMaxLength, ErrorConstants.ProvidedDocumentMessage.ProviderAddressInvalid);
+            ConditionGuard.Ensure(patientNote.Length <= ProvidedDocumentConstants.NoteMaxLength, ErrorConstants.ProvidedDocumentMessage.NoteInvalid);
 
             var now = DateTimeOffset.UtcNow;
             var documents = new List<PatientDocument>();
