@@ -9,8 +9,14 @@ namespace OZE.Common.Models
         /// <summary>Ngày thực hiện khám hoặc xét nghiệm tại cơ sở y tế bên ngoài.</summary>
         public DateOnly? PerformedOn { get; set; }
 
-        /// <summary>Tên hoặc địa chỉ cơ sở y tế thực hiện dịch vụ.</summary>
+        /// <summary>Tên hoặc địa chỉ cơ sở y tế thực hiện dịch vụ (không bắt buộc).</summary>
         public string? ProviderAddress { get; set; }
+
+        /// <summary>Loại tài liệu: Imaging, LabResult, Prescription, MedicalPaper, Other.</summary>
+        public string? Category { get; set; }
+
+        /// <summary>Ghi chú của bệnh nhân cho bác sĩ (không bắt buộc).</summary>
+        public string? Note { get; set; }
     }
 
     /// <summary>Một tài liệu bệnh nhân tự cung cấp: các tệp của cùng một lần tải lên.</summary>
@@ -27,6 +33,21 @@ namespace OZE.Common.Models
 
         /// <summary>Cơ sở y tế cấp tài liệu.</summary>
         public string ProviderAddress { get; set; } = string.Empty;
+
+        /// <summary>Loại tài liệu (null với tài liệu tải lên trước khi có trường này).</summary>
+        public string? Category { get; set; }
+
+        /// <summary>Ghi chú của bệnh nhân cho bác sĩ.</summary>
+        public string? Note { get; set; }
+
+        /// <summary>Lần đầu bác sĩ xem tài liệu (null = chưa xem).</summary>
+        public DateTimeOffset? SeenAt { get; set; }
+
+        /// <summary>Bác sĩ đã xem tài liệu.</summary>
+        public string? SeenByDoctorName { get; set; }
+
+        /// <summary>Bệnh nhân còn xoá được tài liệu (bác sĩ chưa xem).</summary>
+        public bool CanDelete { get; set; }
 
         /// <summary>Thời điểm bệnh nhân tải tài liệu lên hệ thống.</summary>
         public DateTimeOffset CreatedAt { get; set; }

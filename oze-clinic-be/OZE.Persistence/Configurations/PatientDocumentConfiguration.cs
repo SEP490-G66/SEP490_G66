@@ -17,6 +17,8 @@ namespace OZE.Persistence.Configurations
             builder.Property(x => x.MimeType).HasMaxLength(100);
             builder.Property(x => x.Description).HasMaxLength(500);
             builder.Property(x => x.ProviderAddress).HasMaxLength(300);
+            builder.Property(x => x.Category).HasMaxLength(30);
+            builder.Property(x => x.Note).HasMaxLength(500);
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 
             builder.HasOne(x => x.Patient)
@@ -28,6 +30,11 @@ namespace OZE.Persistence.Configurations
                    .WithMany(x => x.Documents)
                    .HasForeignKey(x => x.DocumentRequestId)
                    .HasConstraintName("FK_PatientDocuments_DocumentRequests")
+                   .OnDelete(DeleteBehavior.NoAction);
+            builder.HasOne(x => x.SeenByDoctor)
+                   .WithMany()
+                   .HasForeignKey(x => x.SeenByDoctorId)
+                   .HasConstraintName("FK_PatientDocuments_SeenByDoctor")
                    .OnDelete(DeleteBehavior.NoAction);
             builder.HasOne<ApplicationUser>()
                    .WithMany()

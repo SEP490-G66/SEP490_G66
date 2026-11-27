@@ -75,8 +75,9 @@ namespace OZE.Persistence.Repositories
 
         public Task<List<PatientDocument>> GetProvidedByPatientIdAsync(int patientId, CancellationToken cancellationToken = default)
         {
+            // Tracked: opening them for a doctor marks them seen (ProvidedDocumentService.GetByExaminationAsync)
             return _context.PatientDocuments
-                .AsNoTracking()
+                .Include(x => x.SeenByDoctor)
                 .Where(x => x.PatientId == patientId && x.UploadGroupId != null && x.DocumentType == ProvidedDocumentConstants.DocumentType)
                 .OrderByDescending(x => x.CreatedAt)
                 .ThenBy(x => x.Id)

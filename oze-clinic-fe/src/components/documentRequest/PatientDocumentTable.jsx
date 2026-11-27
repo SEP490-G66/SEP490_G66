@@ -2,17 +2,28 @@ import { Eye, Trash2, Upload } from "lucide-react";
 import DataTable from "@/components/ui/DataTable";
 import IconLinkButton from "@/components/ui/IconLinkButton";
 import { cx } from "@/utils/cx";
-import { formatDateTime } from "@/utils/format";
+import { formatDate } from "@/utils/format";
 
-// "Cung cấp tài liệu" list (Figma 1242:4131).
-// documents: [{ id, name, provider, uploadedAt, status: { label, badge }, canUpload, canDelete }]
-// canUpload adds an upload button (the popup reuses imagingTechnician/ManualUploadDialog); canDelete a delete button.
-const PatientDocumentTable = ({ documents = [], offset = 0, loading = false, busyIds = [], labelledBy, empty = "Bạn chưa có tài liệu nào.", footer, onView, onUpload, onDelete }) => {
+// "Cung cấp tài liệu" list. documents: [{ id, name, typeLabel, provider, doctorName, files, performedOn, uploadedAt,
+// status: { label, badge }, canUpload, canDelete }]. canUpload adds an upload button, canDelete a delete button.
+const PatientDocumentTable = ({ documents = [], loading = false, busyIds = [], labelledBy, empty = "Bạn chưa có tài liệu nào.", footer, onView, onUpload, onDelete }) => {
     const columns = [
-        { key: "stt", label: "STT", hideStack: true, render: (_, index) => offset + index + 1 },
-        { key: "name", label: "Tên tài liệu", primary: true, render: (doc) => <span className="font-semibold text-ink">{doc.name}</span> },
-        { key: "provider", label: "Địa chỉ cung cấp", block: true, optional: true },
-        { key: "uploadedAt", label: "Ngày upload", render: (doc) => (doc.uploadedAt ? formatDateTime(doc.uploadedAt) : <span className="text-muted">Chưa tải lên</span>) },
+        {
+            key: "name",
+            label: "Tài liệu",
+            primary: true,
+            render: (doc) => (
+                <div className="flex flex-col">
+                    <span className="font-semibold text-ink">{doc.name}</span>
+                    <span className="text-caption text-muted">
+                        {[doc.provider, `${doc.files.length} tệp`, doc.doctorName && `Theo yêu cầu của ${doc.doctorName}`].filter(Boolean).join(" · ")}
+                    </span>
+                </div>
+            ),
+        },
+        { key: "type", label: "Loại", render: (doc) => doc.typeLabel },
+        { key: "performedOn", label: "Ngày thực hiện", optional: true, render: (doc) => (doc.performedOn ? <span className="num">{formatDate(doc.performedOn)}</span> : <span className="text-muted">—</span>) },
+        { key: "uploadedAt", label: "Ngày gửi", render: (doc) => (doc.uploadedAt ? <span className="num">{formatDate(doc.uploadedAt)}</span> : <span className="text-muted">Chưa gửi</span>) },
         { key: "status", label: "Trạng thái", render: (doc) => doc.status && <span className={cx("badge", doc.status.badge)}>{doc.status.label}</span> },
         {
             key: "actions",
@@ -24,7 +35,7 @@ const PatientDocumentTable = ({ documents = [], offset = 0, loading = false, bus
                 return (
                     <div className="flex justify-end gap-2">
                         <IconLinkButton icon={Eye} label={`Xem tài liệu ${doc.name}`} onClick={() => onView(doc)} />
-                        {doc.canUpload && onUpload && <IconLinkButton icon={Upload} label={`Tải lên tài liệu ${doc.name}`} disabled={busy} onClick={() => onUpload(doc)} />}
+                        {doc.canUpload && onUpload && <IconLinkButton icon={Upload} label={`Gửi tài liệu ${doc.name}`} disabled={busy} onClick={() => onUpload(doc)} />}
                         {doc.canDelete && onDelete && <IconLinkButton icon={Trash2} label={`Xoá tài liệu ${doc.name}`} disabled={busy} onClick={() => onDelete(doc)} />}
                     </div>
                 );

@@ -531,7 +531,9 @@ namespace OZE.Common.Constants
         {
             public const string DocumentNameRequired = "Please enter document name.";
             public const string DocumentNameInvalid = "Document name must be at most 200 characters.";
-            public const string ProviderAddressRequired = "Please enter provider address.";
+            public const string CategoryInvalid = "Please choose the document type.";
+            public const string NoteInvalid = "Note must be at most 500 characters.";
+            public const string CannotDeleteSeen = "A doctor has already seen this document, it can no longer be deleted.";
             public const string ProviderAddressInvalid = "Provider address must be at most 300 characters.";
             public const string PerformedOnInFuture = "Performed date cannot be in the future.";
             public const string UploadFilesRequired = "Please choose at least one file.";
