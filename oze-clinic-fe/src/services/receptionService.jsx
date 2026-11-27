@@ -137,6 +137,9 @@ export const getAppointments = ({ fromDate, toDate, date, doctorId, patientId, s
 
 const RANGE_PAGE_LIMIT = 20;
 
+// One appointment (a link from another screen names it by id)
+export const getAppointment = (id, config = {}) => call(() => api.get(`/api/appointments/${id}`, config));
+
 export const getAppointmentsInRange = async ({ fromDate, toDate, doctorId } = {}, config = {}) => {
     const items = [];
     for (let page = 1; page <= RANGE_PAGE_LIMIT; page += 1) {

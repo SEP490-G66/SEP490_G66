@@ -9,6 +9,7 @@ import CheckInDialog from "@/components/reception/CheckInDialog";
 import ServiceCell from "@/components/reception/ServiceCell";
 import { Card, CancelDialog, RescheduleDialog, WalkInDialog } from "@/components/reception/shared";
 import { clinicClock, clockOf, phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
+import useAppointmentLink from "@/hooks/useAppointmentLink";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
     cancelAppointment,
@@ -154,6 +155,13 @@ const ReceptionCheckIn = () => {
         setFilters(EMPTY_CHECK_IN_FILTERS);
         setPage(1);
     };
+    // "?appointment=" from the appointment grid: clear the filters and open the page that holds the row
+    const { highlightId } = useAppointmentLink(sortCheckIn(appointments), {
+        reveal: (_, index) => {
+            setFilters(EMPTY_CHECK_IN_FILTERS);
+            setPage(Math.floor(index / 10) + 1);
+        },
+    });
 
     const body = () => {
         if (!result) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.LOADING}</p>;
@@ -193,7 +201,7 @@ const ReceptionCheckIn = () => {
                             const doctor = doctorOf.get(a.doctorId);
                             const done = DONE_STATES.includes(state);
                             return (
-                                <tr key={a.id} className={cx(done && "text-muted")}>
+                                <tr key={a.id} data-appointment-row={a.id} className={cx(done && "text-muted", highlightId === a.id && "bg-warning-soft")}>
                                     <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
                                         <span className={done ? "text-muted" : "font-semibold text-ink"}>{slotOf(a) || TEXT.WALK_IN_SLOT}</span>
                                         {isLate(a, now) && <small className="block font-normal text-caption text-warning">{TEXT.LATE}</small>}
