@@ -436,8 +436,9 @@ namespace OZE.Application.Services
                 today.AddDays(maxDaysAhead),
                 slotMinutes,
                 ClinicClock.Now.AddHours(minHoursAhead),
-                // Services are done one after another, so the slot must fit their total time
-                TimeSpan.FromMinutes(lines.Sum(l => l.GetMinutes(slotMinutes))),
+                // Services are done one after another, so the slot must fit their total time, held in whole slots (R3);
+                // each service line still keeps its own minutes (DurationMinutes) for the doctor
+                TimeSpan.FromMinutes(SlotTimeHelper.HeldMinutes(lines.Sum(l => l.GetMinutes(slotMinutes)), slotMinutes)),
                 RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)));
         }
 
