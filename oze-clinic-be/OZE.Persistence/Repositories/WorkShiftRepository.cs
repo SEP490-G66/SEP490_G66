@@ -19,6 +19,9 @@ namespace OZE.Persistence.Repositories
         {
             context = _context;
         }
+        public Task<string?> GetConfigValueAsync(string configKey) =>
+            context.SystemConfigurations.ValueOfAsync(configKey);
+
         public async Task AddAsync(StaffSchedule schedule)
         {
             await context.StaffSchedules.AddAsync(schedule);
