@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import DocumentRequestDialog from "@/components/documentRequest/DocumentRequestDialog";
 import CalledExamView from "@/components/examination/CalledExamView";
 import EndVisitDialog from "@/components/examination/EndVisitDialog";
 import ExamVisitHeader from "@/components/examination/ExamVisitHeader";
@@ -8,6 +9,7 @@ import NoExamView from "@/components/examination/NoExamView";
 import ReferRoomDialog from "@/components/examination/ReferRoomDialog";
 import XrayRequestDialog from "@/components/examination/XrayRequestDialog";
 import useSession from "@/hooks/useSession";
+import { createDocumentRequest } from "@/services/documentRequestService";
 import {
     endExamination,
     finalizePrescription,
@@ -137,6 +139,21 @@ const InExamView = ({ shown, item, record, busy, handlers, onEnd, onReload }) =>
         onReload();
     };
 
+    // "Yêu cầu tài liệu": the patient uploads it from the medical book; the requests and files are listed in "Hồ sơ bệnh án"
+    const [askingDocument, setAskingDocument] = useState(false);
+    const [sendingDocument, setSendingDocument] = useState(false);
+    const sendDocumentRequest = async (request) => {
+        setSendingDocument(true);
+        const response = await createDocumentRequest(item.id, request);
+        setSendingDocument(false);
+        if (!response.success) {
+            toast.error(response.message ?? GENERIC_ERROR_MESSAGE);
+            return;
+        }
+        toast.success(`${response.message} Theo dõi ở mục Hồ sơ bệnh án.`);
+        setAskingDocument(false);
+    };
+
     const sendToSurgery = async (request) => {
         setReferring(true);
         await saveRef.current?.();
@@ -161,6 +178,12 @@ const InExamView = ({ shown, item, record, busy, handlers, onEnd, onReload }) =>
                         <button type="button" className="btn btn-secondary" disabled={busy || referring} onClick={() => setRefer("room")}>
                             Chỉ định chuyển phòng
                         </button>
+                        {/* "Lập hồ sơ bệnh án" has its own button next to the list of requests */}
+                        {shown !== STEP.HISTORY && (
+                            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setAskingDocument(true)}>
+                                Yêu cầu tài liệu
+                            </button>
+                        )}
                         {shown !== STEP.HISTORY && (
                             <Link to={getDoctorExamStepRoute(STEP.HISTORY)} className="btn btn-secondary">
                                 Hồ sơ bệnh án
@@ -188,6 +211,14 @@ const InExamView = ({ shown, item, record, busy, handlers, onEnd, onReload }) =>
                     onImaging={() => setRefer("imaging")}
                     onSurgery={sendToSurgery}
                     onClose={() => setRefer(null)}
+                />
+            )}
+            {askingDocument && (
+                <DocumentRequestDialog
+                    subtitle={record.patient.name}
+                    busy={sendingDocument}
+                    onSubmit={sendDocumentRequest}
+                    onClose={() => setAskingDocument(false)}
                 />
             )}
             {refer === "imaging" && (
