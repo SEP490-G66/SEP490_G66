@@ -65,7 +65,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure<NotFoundException>(staff != null, ErrorConstants.ScheduleMessage.StaffProfileNotFound);
 
             var today = DateOnly.FromDateTime(ClinicClock.Today);
-            var from = query.FromDate ?? StartOfWeek(today);
+            var from = query.FromDate ?? ShiftTimeHelper.StartOfWeek(today);
             var to = query.ToDate ?? from.AddDays(WorkShiftConstants.DaysInWeek * 2 - 1);
             ConditionGuard.Ensure(from <= to, ErrorConstants.ScheduleMessage.DateRangeInvalid);
             ConditionGuard.Ensure(to.DayNumber - from.DayNumber < MaxRangeDays, ErrorConstants.ScheduleMessage.DateRangeTooLarge);
@@ -112,13 +112,6 @@ namespace OZE.Application.Services
             }
 
             return shift.ActualStartTime.HasValue ? DutyStatus.Working : DutyStatus.NotStarted;
-        }
-
-        private static DateOnly StartOfWeek(DateOnly date)
-        {
-            var daysSinceWeekStart = ((int)date.DayOfWeek - (int)WorkShiftConstants.WeekStartDay + WorkShiftConstants.DaysInWeek)
-                                     % WorkShiftConstants.DaysInWeek;
-            return date.AddDays(-daysSinceWeekStart);
         }
     }
 }
