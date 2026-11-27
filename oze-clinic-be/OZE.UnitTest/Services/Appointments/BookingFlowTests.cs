@@ -567,7 +567,8 @@ namespace OZE.UnitTest.Services.Appointments
         [Fact]
         public async Task BookByReceptionistAsync_ShouldBookPlanSession_WhenTreatmentPlanActive()
         {
-            var plan = new TreatmentPlan { Id = 3, PatientId = _patient.Id, Status = TreatmentPlanConstants.InProgress };
+            // The session is booked with the plan's doctor (SessionDoctorOrRequested), the same one the request asks for
+            var plan = new TreatmentPlan { Id = 3, PatientId = _patient.Id, Status = TreatmentPlanConstants.InProgress, CreatedByDoctorId = DoctorId };
             var stage = new TreatmentPlanStage { Id = StageId, StageNumber = 2, StageName = "Buoi 2", StageStatus = TreatmentPlanConstants.StageStatus.Scheduled, TreatmentPlan = plan };
             plan.Stages = new List<TreatmentPlanStage> { stage };
             _appointmentRepoMock.Setup(r => r.GetTreatmentStageAsync(StageId)).ReturnsAsync(stage);
