@@ -14,6 +14,9 @@ namespace OZE.Domain.Entities
         public DateOnly? ScheduledDate { get; set; }
         public DateOnly? ActualDate { get; set; }
         public int? PerformedByDoctorId { get; set; }
+        // The doctor who is to do this session (chosen when the plan is made: the planning doctor by default, or a doctor
+        // who can do the service). The front desk books the session with this doctor. PerformedByDoctorId is who really did it.
+        public int? AssignedDoctorId { get; set; }
         // The visit in which the doctor did this session, so the cashier does not collect it twice with that visit
         public long? AppointmentId { get; set; }
         public string? Notes { get; set; }
@@ -24,6 +27,7 @@ namespace OZE.Domain.Entities
         public virtual TreatmentPlan TreatmentPlan { get; set; } = null!;
         public virtual Service? Service { get; set; }
         public virtual StaffProfile? PerformedByDoctor { get; set; }
+        public virtual StaffProfile? AssignedDoctor { get; set; }
         public virtual Appointment? Appointment { get; set; }
     }
 }

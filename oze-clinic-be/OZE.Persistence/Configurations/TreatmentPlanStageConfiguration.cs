@@ -36,6 +36,12 @@ namespace OZE.Persistence.Configurations
                    .HasForeignKey(x => x.PerformedByDoctorId)
                    .HasConstraintName("FK_TreatmentPlanStages_Doctors")
                    .OnDelete(DeleteBehavior.NoAction);
+            builder.HasOne(x => x.AssignedDoctor)
+                   .WithMany()
+                   .HasForeignKey(x => x.AssignedDoctorId)
+                   .HasConstraintName("FK_TreatmentPlanStages_AssignedDoctors")
+                   .OnDelete(DeleteBehavior.NoAction)
+                   .IsRequired(false);
 
             builder.HasOne(x => x.Appointment)
                    .WithMany()
