@@ -219,6 +219,7 @@ namespace OZE.Application.Services
                 ? new List<int> { stage.ServiceId.Value }
                 : request.ServiceId;
             var lines = await ResolveBookingLinesAsync(serviceIds, request.VariantId);
+            EnsureSurgeryFromPlan(lines, stage != null);
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
                 doctorId, request.Note, receptionistUserId, async () =>
                 {
@@ -266,6 +267,15 @@ namespace OZE.Application.Services
             var response = ToResponse(appointment, patient, slot, lines);
             response.PlanSession = ToPlanSession(stage);
             return response;
+        }
+
+        // R8: the front desk does not book minor surgery on its own. The minor surgery room takes only the treatment plan
+        // sessions a doctor has set (with the doctor chosen for them); a doctor sends a patient there during a visit
+        // (ReferToMinorSurgeryAsync).
+        private static void EnsureSurgeryFromPlan(List<BookingLine> lines, bool forPlanSession)
+        {
+            var surgery = RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)) == RoomTypeConstants.MinorSurgery;
+            ConditionGuard.ThrowIf(surgery && !forPlanSession, ErrorConstants.AppointmentMessage.MinorSurgeryNeedsPlanSession);
         }
 
         // A plan session is booked with the doctor chosen for it in the plan (the planning doctor when none was chosen);
@@ -904,6 +914,11 @@ namespace OZE.Application.Services
                 ? await ResolveBookingLinesAsync(request.ServiceId ?? new List<int>(), request.VariantId ?? new List<int>())
                 : appointment!.ServiceItems.Select(i => new BookingLine(i.Service, i.Variant)).ToList();
             ConditionGuard.Ensure(lines.Count > 0, ErrorConstants.AppointmentMessage.ServiceNotFound);
+            // Staff changing the services cannot turn a visit outside the plans into minor surgery (R8)
+            if (changeServices && !isPatient)
+            {
+                EnsureSurgeryFromPlan(lines, appointment!.TreatmentPlanStageId.HasValue);
+            }
             var slotMinutes = changeServices ? await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes) : 0;
             var servicesBefore = DescribeServices(appointment!.ServiceItems);
 

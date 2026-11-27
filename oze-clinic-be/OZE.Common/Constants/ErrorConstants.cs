@@ -342,6 +342,7 @@ namespace OZE.Common.Constants
             public const string TreatmentStageNotFound = "This treatment plan session was not found for the patient";
             public const string TreatmentStageNotOpen = "This treatment plan session is already done or cancelled, or its plan is not being carried out";
             public const string TreatmentStageAlreadyBooked = "This treatment plan session already has an appointment";
+            public const string MinorSurgeryNeedsPlanSession = "Minor surgery is booked only for a treatment plan session set by a doctor";
             public const string TreatmentStageDoctorMismatch = "A treatment plan session is booked with the doctor chosen for it in the plan";
             public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
