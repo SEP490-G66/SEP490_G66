@@ -458,6 +458,71 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.WalkInPatientInClinic);
         }
 
+        // UTCID07 (N): a pending booking on another day is left as it is when the patient walks in
+        [Fact]
+        public async Task CreateWalkInAsync_ShouldSucceed_WhenPatientHasPendingOnAnotherDay()
+        {
+            _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            _appointmentRepoMock.Setup(r => r.GetPatientAppointmentsOnDateAsync(_patient.Id, Today))
+                .ReturnsAsync(new List<Appointment>());
+            var otherDayPending = new Appointment
+            {
+                Id = 77,
+                PatientId = _patient.Id,
+                AppointmentDate = Tomorrow,
+                Status = AppointmentConstants.PendingStatus
+            };
+
+            var result = await _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
+
+            result.PatientId.Should().Be(_patient.Id);
+            result.Status.Should().Be(AppointmentConstants.CheckedInStatus);
+            otherDayPending.Status.Should().Be(AppointmentConstants.PendingStatus);
+            _auditLogMock.Verify(a => a.LogAsync(AuditConstants.AppointmentCancelled, AuditConstants.AppointmentEntity,
+                It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<object?>(), It.IsAny<string?>()), Times.Never);
+        }
+
+        // UTCID08 (N): a pending booking today is cancelled with reason and audit when walk-in is received
+        [Fact]
+        public async Task CreateWalkInAsync_ShouldCancelPendingToday_WhenPatientWalksIn()
+        {
+            _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            var pendingToday = new Appointment
+            {
+                Id = 88,
+                PatientId = _patient.Id,
+                AppointmentDate = Today,
+                Status = AppointmentConstants.PendingStatus
+            };
+            _appointmentRepoMock.Setup(r => r.GetPatientAppointmentsOnDateAsync(_patient.Id, Today))
+                .ReturnsAsync(new List<Appointment> { pendingToday });
+
+            var result = await _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
+
+            result.Status.Should().Be(AppointmentConstants.CheckedInStatus);
+            pendingToday.Status.Should().Be(AppointmentConstants.CancelledStatus);
+            pendingToday.CancellationReason.Should().Be("Bệnh nhân đến trực tiếp, đã tiếp nhận vãng lai");
+            pendingToday.CancelledByUserId.Should().Be("receptionist-1");
+            _auditLogMock.Verify(a => a.LogAsync(AuditConstants.AppointmentCancelled, AuditConstants.AppointmentEntity, "88",
+                It.IsAny<object?>(), It.IsAny<object?>(), "Bệnh nhân đến trực tiếp, đã tiếp nhận vãng lai"), Times.Once);
+        }
+
+        // UTCID09 (A): a confirmed booking today must be checked in instead of a new walk-in
+        [Fact]
+        public async Task CreateWalkInAsync_ShouldThrow_WhenPatientHasConfirmedToday()
+        {
+            _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            _appointmentRepoMock.Setup(r => r.GetPatientAppointmentsOnDateAsync(_patient.Id, Today))
+                .ReturnsAsync(new List<Appointment>
+                {
+                    new() { Id = 99, PatientId = _patient.Id, AppointmentDate = Today, Status = AppointmentConstants.ConfirmedStatus }
+                });
+
+            var act = () => _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.WalkInPatientHasConfirmedToday);
+        }
+
         // UTCID06 (A): the existing patient is in the middle of a treatment plan, so no new walk-in visit
         [Fact]
         public async Task CreateWalkInAsync_ShouldThrow_WhenTreatmentPlanActive()

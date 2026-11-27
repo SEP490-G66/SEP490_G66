@@ -60,6 +60,7 @@ namespace OZE.UnitTest.Services.Invoices
             result.Amount.Should().Be(250000);
             _request.Status.Should().Be(PaymentConstants.RefundRequestStatus.Approved);
             _request.ApprovedByUserId.Should().Be("manager-user");
+            _request.ProcessedAt.Should().BeNull();
             _invoice.PaidAmount.Should().Be(150000);
             _invoice.PaymentStatus.Should().Be(InvoiceConstants.PartiallyRefunded);
         }
