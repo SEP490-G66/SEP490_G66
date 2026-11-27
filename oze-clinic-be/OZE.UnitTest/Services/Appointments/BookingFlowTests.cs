@@ -284,6 +284,7 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.ServiceInactive);
         }
 
+        // UTCID06 (A): signed-in account has no confirmed phone number
         [Fact]
         public async Task BookAsPatientAsync_ShouldThrow_WhenPhoneNotVerified()
         {

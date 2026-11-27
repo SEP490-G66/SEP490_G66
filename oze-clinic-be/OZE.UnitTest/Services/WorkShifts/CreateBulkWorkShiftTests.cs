@@ -12,7 +12,8 @@ using Xunit;
 
 namespace OZE.UnitTest.Services.WorkShifts
 {
-    // SCRUM-1008 Bulk create / preview work shifts
+    // OZ-WS-07 CreateBulkWorkShift — SCRUM-1008 bulk create / preview work shifts
+    [Trait("Tab", "OZ-WS-07")]
     public class CreateBulkWorkShiftTests : WorkShiftTestBase
     {
         [Fact]

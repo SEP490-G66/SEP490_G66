@@ -8,8 +8,8 @@ using Xunit;
 
 namespace OZE.UnitTest.Services.TreatmentPlans
 {
-    // OZ-TP-07 AssignedDoctor: each session has the doctor who is to do it (the planning doctor by default)
-    [Trait("Tab", "OZ-TP-07")]
+    // OZ-TP-08 AssignedDoctor: each session has the doctor who is to do it (the planning doctor by default)
+    [Trait("Tab", "OZ-TP-08")]
     public class AssignedDoctorTests : TreatmentPlanTestBase
     {
         private const int ServiceId = 12;
