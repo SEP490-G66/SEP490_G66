@@ -68,6 +68,9 @@ namespace OZE.Persistence.Seed
                 // TEMPORARY: patients BNTN01..09 with plans, visits and receipts for the cashier pages
                 await CashierDemoSeeder.SeedAsync(serviceProvider);
             }
+
+            // 4. Demo data for the patient account set in DemoPatient:Email (any environment; nothing when it is empty)
+            await PatientAccountDemoSeeder.SeedAsync(serviceProvider);
         }
     }
 }
