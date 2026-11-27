@@ -52,6 +52,40 @@ namespace OZE.UnitTest.Services.DocumentRequests
         }
 
         [Fact]
+        public async Task SubmitAsync_ShouldKeepTheTypeAndWhatThePatientFilledIn()
+        {
+            var request = SetupRequest();
+            request.Category = ProvidedDocumentConstants.Category.Imaging;
+            List<PatientDocument>? added = null;
+            _repository
+                .Setup(r => r.AddDocuments(It.IsAny<IEnumerable<PatientDocument>>()))
+                .Callback<IEnumerable<PatientDocument>>(documents => added = documents.ToList());
+            var performedOn = new DateOnly(2026, 10, 20);
+
+            var result = await _service.SubmitAsync(PatientUserId, RequestId, new List<UploadedImagingFile> { File("phim.png") },
+                new SubmitDocumentRequestDetails { Note = " Chụp ở BV Răng Hàm Mặt ", PerformedOn = performedOn, ProviderAddress = " BV Răng Hàm Mặt " });
+
+            added.Should().ContainSingle().Which.Should().Match<PatientDocument>(d =>
+                d.Category == ProvidedDocumentConstants.Category.Imaging && d.Note == "Chụp ở BV Răng Hàm Mặt" &&
+                d.PerformedOn == performedOn && d.ProviderAddress == "BV Răng Hàm Mặt");
+            result.Category.Should().Be(ProvidedDocumentConstants.Category.Imaging);
+            result.PatientNote.Should().Be("Chụp ở BV Răng Hàm Mặt");
+            result.PerformedOn.Should().Be(performedOn);
+        }
+
+        [Fact]
+        public async Task SubmitAsync_ShouldRejectAPerformedDateInTheFuture()
+        {
+            SetupRequest();
+
+            var act = () => _service.SubmitAsync(PatientUserId, RequestId, new List<UploadedImagingFile> { File("a.png") },
+                new SubmitDocumentRequestDetails { PerformedOn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)) });
+
+            (await act.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.PerformedOnInFuture);
+            _fileStore.Verify(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
         public async Task SubmitAsync_ShouldWorkAfterTheExaminationEnded()
         {
             // The examination state is never checked when the patient submits
