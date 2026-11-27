@@ -1,53 +1,84 @@
-import { Fragment, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
-import LabeledSelect from "@/components/ui/LabeledSelect";
 import BookingDialog from "@/components/reception/BookingDialog";
-import { Card } from "@/components/reception/shared";
+import { RescheduleDialog } from "@/components/reception/shared";
 import { clinicClock } from "@/components/reception/receptionUtils";
+import AppointmentPopover from "@/components/schedule/AppointmentPopover";
+import { PendingSessionsButton, PendingSessionsList, PickBar } from "@/components/schedule/PendingSessionsBar";
+import RoomDayGrid from "@/components/schedule/RoomDayGrid";
+import ScheduleToolbar from "@/components/schedule/ScheduleToolbar";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { clinicToday, getAppointmentsInRange, getAvailableSlots, getBookableServices, getDoctorOptions, getDoctorsOnDuty } from "@/services/receptionService";
-import { addDays, ddmm, dmy, hhmm, mondayOf, weekdayIndex } from "@/utils/calendar";
-import { CELL_DOT, CELL_KEYS, breakBefore, cellKeyOf, currentRow, hasService, isLiveAppointment, legendGroups, rowOf, scheduleRows, slotLabel, slotPhase, slotStep } from "@/utils/appointmentSchedule";
+import { clinicToday, getAppointmentsInRange, getAvailableSlots, getDoctorsOnDuty, getPendingPlanSessions } from "@/services/receptionService";
+import { addDays, ddmm, hhmm, mondayOf, weekdayIndex } from "@/utils/calendar";
 import { SCHEDULE_TEXT as TEXT } from "@/utils/messages";
-import { ROUTES } from "@/utils/routes";
+import {
+    dayRows,
+    displayStateOf,
+    freeCountOfDay,
+    freeKeysOf,
+    hasWorkingShift,
+    isOnGrid,
+    roomIdOf,
+    roomsOf,
+    shiftsOfRoom,
+    slotStepOf,
+    withAppointment,
+} from "@/utils/roomSchedule";
+import { RECEPTION_PATIENT_TABS, ROUTES, getReceptionPatientRoute } from "@/utils/routes";
 import { cx } from "@/utils/cx";
+
+// "Quản lý lịch hẹn" (spec spec-man-quan-ly-lich-hen): the clinic's working day by room, to find a free time and book or move
+// an appointment. Status work (check-in, confirm, queue) stays on its own pages; each appointment only links there.
 
 const READ = { skipErrorPage: true };
 const CLOCK_TICK_MS = 60_000;
-const LEGEND_TITLES = { past: TEXT.LEGEND_PAST, today: TEXT.LEGEND_TODAY, future: TEXT.LEGEND_FUTURE };
-const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
+const FLASH_MS = 2_500;
 const TOO_FAR = "too far in advance";
+const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
+const MOVABLE = ["late", "notyet", "pending", "confirmed"];
 
-// Free slots of one day (all doctors, or the filtered one). A day without free slots asks the duty list whether it has a shift at all:
-// today after the shift, or inside the "book at least 2 hours ahead" window, has no free slot but still has a shift.
-// Returns { state: "ok", slots, shift } | { state: "notOpen" } (past the booking limit) | { state: "error" } | null (aborted)
-const loadDay = async (date, doctorId, config) => {
-    const free = await getAvailableSlots({ date, doctorId: doctorId || undefined }, config);
-    if (free.aborted) return null;
-    if (!free.success) return { state: String(free.message ?? "").toLowerCase().includes(TOO_FAR) ? "notOpen" : "error" };
-    const slots = (Array.isArray(free.data) ? free.data : []).map((x) => x.slotStart);
-    if (slots.length) return { state: "ok", slots, shift: true };
-    const duty = await getDoctorsOnDuty(date, config);
-    if (duty.aborted) return null;
-    if (!duty.success) return { state: "ok", slots, shift: "error" };
-    const shift = (duty.data ?? []).some((d) => (!doctorId || String(d.doctorId) === String(doctorId)) && d.status !== "OnLeave");
-    return { state: "ok", slots, shift };
+const freeOf = (response) => {
+    if (!response) return { state: "past" };
+    if (response.aborted) return null;
+    if (!response.success) return { state: String(response.message ?? "").toLowerCase().includes(TOO_FAR) ? "notOpen" : "error" };
+    const slots = Array.isArray(response.data) ? response.data : [];
+    return { state: "ok", keys: freeKeysOf(slots), starts: slots.map((s) => s.slotStart) };
+};
+
+// The whole week of the picked day: appointments, the shift plan of each day, and free general slots of each open day
+const loadWeek = async (week, today, config) => {
+    const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
+    const [appointments, duty, free] = await Promise.all([
+        getAppointmentsInRange({ fromDate: week, toDate: days[6] }, config),
+        Promise.all(days.map((d) => getDoctorsOnDuty(d, config))),
+        Promise.all(days.map((d) => (d >= today ? getAvailableSlots({ date: d }, config) : null))),
+    ]);
+    if (appointments.aborted || duty.some((r) => r.aborted) || free.some((r) => r?.aborted)) return null;
+    return {
+        ok: appointments.success && duty.every((r) => r.success),
+        appointments: appointments.success ? appointments.items.filter(isOnGrid) : [],
+        duty: Object.fromEntries(days.map((d, i) => [d, duty[i].success && Array.isArray(duty[i].data) ? duty[i].data : []])),
+        free: Object.fromEntries(days.map((d, i) => [d, freeOf(free[i])])),
+    };
 };
 
 const ReceptionSchedule = () => {
-    const navigate = useNavigate();
     const [clock, setClock] = useState(() => ({ today: clinicToday(), now: clinicClock() }));
-    const [week, setWeek] = useState(() => mondayOf(clinicToday()));
-    const [doctorId, setDoctorId] = useState("");
-    const [serviceId, setServiceId] = useState("");
+    const [day, setDay] = useState(clinicToday);
     const [reload, setReload] = useState(0);
     const [result, setResult] = useState(null);
-    const [doctors, setDoctors] = useState([]);
-    const [services, setServices] = useState([]);
     const [booking, setBooking] = useState(null);
+    const [moving, setMoving] = useState(null);
+    const [detail, setDetail] = useState(null);
+    const [flashId, setFlashId] = useState(null);
+    const flashTimer = useRef(null);
+    // "Buổi chờ xếp giờ": the sessions, whether the list is open, the one being given a time and its fitting slots
+    const [pending, setPending] = useState({ status: "loading", sessions: [] });
+    const [pendingReload, setPendingReload] = useState(0);
+    const [pendingOpen, setPendingOpen] = useState(false);
+    const [picked, setPicked] = useState(null);
+    const [pickFree, setPickFree] = useState(null);
 
     usePageTitle(TEXT.DOC_TITLE);
 
@@ -56,184 +87,201 @@ const ReceptionSchedule = () => {
         return () => clearInterval(timer);
     }, []);
 
-    const requestKey = `${week}|${doctorId}|${reload}`;
+    const { today, now } = clock;
+    const week = mondayOf(day);
+    const requestKey = `${week}|${reload}`;
 
     useEffect(() => {
         const controller = new AbortController();
-        const config = { ...READ, signal: controller.signal };
-        const open = Array.from({ length: 7 }, (_, i) => addDays(week, i)).filter((d) => d >= clinicToday());
-        Promise.all([
-            getAppointmentsInRange({ fromDate: week, toDate: addDays(week, 6), doctorId }, config),
-            ...open.map((date) => loadDay(date, doctorId, config)),
-        ]).then(([response, ...loaded]) => {
-            if (controller.signal.aborted || response.aborted || loaded.includes(null)) return;
+        loadWeek(week, clinicToday(), { ...READ, signal: controller.signal }).then((loaded) => {
+            if (!loaded || controller.signal.aborted) return;
             setClock({ today: clinicToday(), now: clinicClock() });
-            setResult({
-                key: requestKey,
-                ok: response.success,
-                items: response.success ? response.items : [],
-                days: Object.fromEntries(open.map((date, i) => [date, loaded[i]])),
-            });
+            setResult({ key: requestKey, ...loaded });
         });
         return () => controller.abort();
-    }, [week, doctorId, requestKey]);
+    }, [week, requestKey]);
 
     useEffect(() => {
         const controller = new AbortController();
-        const config = { ...READ, signal: controller.signal };
-        getDoctorOptions(config).then((response) => {
-            if (!response.success || controller.signal.aborted) return;
-            const items = Array.isArray(response.data) ? response.data : (response.data?.items ?? []);
-            setDoctors(items.map((d) => [String(d.id), d.fullName]));
-        });
-        getBookableServices(config).then((response) => {
-            if (!response.success || controller.signal.aborted) return;
-            setServices((response.data ?? []).filter((s) => !s.isMandatory).map((s) => [String(s.serviceId), s.serviceName]));
+        getPendingPlanSessions({ ...READ, signal: controller.signal }).then((response) => {
+            if (response.aborted || controller.signal.aborted) return;
+            setPending(response.success ? { status: "ready", sessions: Array.isArray(response.data) ? response.data : [] } : { status: "error", sessions: [] });
         });
         return () => controller.abort();
+    }, [pendingReload]);
+
+    // The picked session's free slots that day, with its own service and doctor. A service with kinds (variants) needs one
+    // chosen before the API can answer: then keys is null and the grid works the fit out from the shifts.
+    useEffect(() => {
+        if (!picked || day < clinicToday()) return undefined;
+        const controller = new AbortController();
+        const serviceIds = picked.serviceId ? [picked.serviceId] : [];
+        getAvailableSlots({ date: day, doctorId: picked.doctorId, serviceIds }, { ...READ, signal: controller.signal }).then((response) => {
+            if (response.aborted || controller.signal.aborted) return;
+            setPickFree({ key: `${picked.stageId}|${day}|${reload}`, keys: response.success ? freeKeysOf(Array.isArray(response.data) ? response.data : []) : null });
+        });
+        return () => controller.abort();
+    }, [picked, day, reload]);
+
+    // The appointment just booked or moved flashes once it is on the grid
+    useEffect(() => {
+        if (!flashId || flashTimer.current || !result?.appointments.some((a) => a.id === flashId)) return;
+        flashTimer.current = setTimeout(() => {
+            flashTimer.current = null;
+            setFlashId(null);
+        }, FLASH_MS);
+    }, [flashId, result]);
+    useEffect(() => () => clearTimeout(flashTimer.current), []);
+
+    const current = result?.key === requestKey ? result : null;
+    // A reload of the same week keeps the old grid on screen until the new one is in
+    const shown = current ?? (result?.key.startsWith(`${week}|`) ? result : null);
+    const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(week, i)), [week]);
+    const rooms = useMemo(() => roomsOf(shown?.duty ?? {}), [shown]);
+    const step = useMemo(() => {
+        if (!shown) return 30;
+        const starts = Object.values(shown.free).flatMap((f) => f?.starts ?? []);
+        const shifts = Object.values(shown.duty).flatMap((list) => list.map((d) => d.shiftStart));
+        return slotStepOf([...starts, ...shifts]);
+    }, [shown]);
+    const duty = useMemo(() => shown?.duty[day] ?? [], [shown, day]);
+    const dayAppointments = useMemo(() => (shown?.appointments ?? []).filter((a) => a.appointmentDate === day), [shown, day]);
+    const rows = useMemo(() => dayRows(duty, rooms, step), [duty, rooms, step]);
+    const free = shown?.free[day] ?? { state: "error" };
+
+    const strip = Object.fromEntries(
+        days.map((d) => {
+            if (!shown) return [d, null];
+            const count = shown.appointments.filter((a) => a.appointmentDate === d).length;
+            if (d < today) return [d, { text: TEXT.DAY_COUNT(count) }];
+            const f = shown.free[d];
+            if (f?.state === "notOpen") return [d, { text: TEXT.NOT_OPEN }];
+            if (f?.state !== "ok") return [d, { text: TEXT.UNKNOWN }];
+            const dayDuty = shown.duty[d];
+            if (!rooms.some((r) => hasWorkingShift(shiftsOfRoom(dayDuty, r.id)))) return [d, { text: TEXT.NO_SHIFT }];
+            const n = freeCountOfDay(rooms, dayDuty, f.keys);
+            return [d, n ? { text: TEXT.DAY_FREE(n) } : { text: TEXT.DAY_FULL, full: true }];
+        }),
+    );
+
+    const roomName = (a) => rooms.find((r) => r.id === roomIdOf(a, shown?.duty[a.appointmentDate]))?.name ?? a.roomName;
+
+    const openDetail = useRef(null);
+    useEffect(() => {
+        openDetail.current = detail;
+    }, [detail]);
+    const closeDetail = useCallback((returnFocus) => {
+        const open = openDetail.current;
+        setDetail(null);
+        if (open && returnFocus) open.anchor.focus();
     }, []);
 
-    const { today, now } = clock;
-    const current = result?.key === requestKey ? result : null;
-    const booked = (current?.items ?? result?.items ?? []).filter((a) => a.timeSlotStart);
-    const appointments = booked.filter((a) => hasService(a, serviceId));
-    const legend = legendGroups(appointments, today);
-    const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
-    const dayInfo = current?.days ?? result?.days ?? {};
-    const free = Object.values(dayInfo).flatMap((d) => (d.state === "ok" ? d.slots.map(hhmm) : []));
-    const step = slotStep([...free, ...appointments.map((a) => hhmm(a.timeSlotStart))]);
-    const rows = scheduleRows(appointments, free, step);
-    const nowRow = week === mondayOf(today) ? currentRow(rows, now) : null;
-    const inCell = (day, time) => appointments.filter((a) => a.appointmentDate === day && rowOf(a.timeSlotStart, step) === time);
-    const dayName = (day) => `${TEXT.WEEKDAYS[weekdayIndex(day)]} ${ddmm(day)}`;
-
-    // past | loading | unknown (a request failed) | notOpen | noShift | open. Counts every appointment, not only the filtered service
-    const columnOf = (day) => {
-        if (day < today) return "past";
-        const info = current?.days?.[day];
-        if (!info) return "loading";
-        if (info.state === "error" || !current.ok) return "unknown";
-        if (info.state === "notOpen") return "notOpen";
-        const noShift = !info.slots.length && info.shift === false && !booked.some((a) => a.appointmentDate === day);
-        return noShift ? "noShift" : "open";
-    };
-    // The earliest free slot (as the API gives it, HH:mm:ss) that falls on this row
-    const freeSlotAt = (day, time) => {
-        const info = current?.days?.[day];
-        return info?.state === "ok" ? ([...info.slots].sort().find((slot) => rowOf(slot, step) === time) ?? null) : null;
-    };
-
-    const openCell = (day, time, items) => {
-        const slot = slotLabel(items[0]) || time;
-        if (day === today) navigate(ROUTES.RECEPTION_CHECK_IN, { state: { slot, doctor: doctorId } });
-        else navigate(ROUTES.RECEPTION_APPOINTMENTS, { state: { from: day, to: day, slot, doctor: doctorId, status: "" } });
-    };
-
-    const cell = (day, time) => {
-        const items = inCell(day, time);
-        const phase = slotPhase(day, time, today, now, step);
-        const label = `${dayName(day)}, ${time}`;
-        const column = columnOf(day);
-        const closed = column === "noShift" || column === "notOpen";
-        const tdClass = cx(
-            "h-14 border-b border-l border-border p-1 align-top",
-            closed ? "bg-surface-tint" : day === today && "bg-primary-softer",
-            !closed && day === today && phase === "now" && "bg-warning-soft",
-        );
-        const slotStart = column === "open" && phase === "future" && !items.some(isLiveAppointment) ? freeSlotAt(day, time) : null;
-        const addButton = (className) =>
-            slotStart && (
-                <button
-                    type="button"
-                    aria-label={TEXT.ADD_LABEL(dayName(day), hhmm(slotStart))}
-                    onClick={() => setBooking({ date: day, slotStart, doctorId: doctorId ? Number(doctorId) : null })}
-                    className={cx(
-                        "grid w-full place-items-center rounded-lg border border-dashed text-title hover:border-border-strong hover:bg-canvas hover:text-primary focus-visible:border-border-strong focus-visible:text-primary",
-                        className,
-                    )}
-                >
-                    +
-                </button>
-            );
-        if (!items.length) {
-            return (
-                <td key={day} className={tdClass}>
-                    {addButton("h-full min-h-12 border-transparent text-transparent")}
-                </td>
+    const actionsOf = (a, state) => {
+        const list = [];
+        if (state === "late" || state === "notyet") {
+            // Check-in takes only confirmed appointments; one still waiting to be confirmed goes to the confirm page first
+            list.push(
+                a.status === "PENDING"
+                    ? { label: TEXT.OPEN_CONFIRM, to: withAppointment(ROUTES.RECEPTION_APPOINTMENTS, a.id), primary: true }
+                    : { label: TEXT.OPEN_CHECK_IN, to: withAppointment(ROUTES.RECEPTION_CHECK_IN, a.id), primary: true },
             );
         }
-        const counts = CELL_KEYS.map((key) => [key, items.filter((a) => cellKeyOf(a, today) === key).length]).filter(([, n]) => n > 0);
-        const lines = counts.map(([key, n]) => (
-            <span key={key} className="flex items-center gap-1.5 whitespace-nowrap text-caption text-body">
-                <i aria-hidden className={cx("size-2 shrink-0 rounded-full", CELL_DOT[key])} />
-                {n} {TEXT.STATUS[key].toLowerCase()}
-            </span>
-        ));
-        const boxClass = "flex h-full min-h-12 w-full flex-col gap-0.5 rounded-lg border px-2 py-1.5 text-left";
-        if (day < today) {
-            return (
-                <td key={day} className={tdClass}>
-                    <div aria-label={TEXT.CELL_LABEL(dayName(day), time, items.length)} className={cx(boxClass, "border-border bg-surface-tint")}>
-                        {lines}
-                    </div>
-                </td>
-            );
+        if (state === "checkedin" || state === "serving") list.push({ label: TEXT.OPEN_QUEUE, to: withAppointment(ROUTES.RECEPTION_QUEUE, a.id), primary: true });
+        if (state === "pending") list.push({ label: TEXT.OPEN_CONFIRM, to: withAppointment(ROUTES.RECEPTION_APPOINTMENTS, a.id), primary: true });
+        // The confirm page lists only today and later, so a past day still open is settled from the patient's appointments
+        if (state === "open") list.push({ label: TEXT.OPEN_CLOSE_OUT, to: getReceptionPatientRoute(a.patientId, RECEPTION_PATIENT_TABS.APPOINTMENTS), primary: true });
+        if (MOVABLE.includes(state)) {
+            list.push({
+                label: TEXT.RESCHEDULE,
+                onClick: () => {
+                    setDetail(null);
+                    setMoving(a);
+                },
+            });
         }
-        return (
-            <td key={day} className={tdClass}>
-                <button
-                    type="button"
-                    aria-label={TEXT.CELL_LABEL(dayName(day), time, items.length)}
-                    title={label}
-                    onClick={() => openCell(day, time, items)}
-                    className={cx(
-                        boxClass,
-                        phase === "past" ? "border-border bg-surface-tint" : "border-primary bg-primary-soft hover:bg-canvas",
-                        day === today && phase === "now" && "border-warning ring-1 ring-warning",
-                    )}
-                >
-                    {lines}
-                </button>
-                {addButton("mt-1 h-7 border-border text-muted")}
-            </td>
-        );
+        if (a.planSession) list.push({ label: TEXT.TREATMENT_PLAN, to: getReceptionPatientRoute(a.patientId, RECEPTION_PATIENT_TABS.PLANS) });
+        else if (state !== "open") list.push({ label: TEXT.PATIENT_RECORD, to: getReceptionPatientRoute(a.patientId) });
+        return list;
+    };
+
+    const showOn = (saved) => {
+        flashTimer.current && clearTimeout(flashTimer.current);
+        flashTimer.current = null;
+        setFlashId(saved.id ?? null);
+        if (saved.appointmentDate) setDay(saved.appointmentDate);
+        setReload((n) => n + 1);
+    };
+
+    const detailState = detail && displayStateOf(detail.appointment, today, now);
+
+    // The picked session on the grid: its doctor, its kind of room and the slots it fits (none on a past day, none while loading)
+    const pickLoaded = picked && pickFree?.key === `${picked.stageId}|${day}|${reload}`;
+    const pick = picked
+        ? { doctorId: picked.doctorId, roomType: picked.requiredRoomType, keys: day < today ? new Set() : pickLoaded ? pickFree.keys : new Set() }
+        : null;
+    // No shift of the session's doctor in its kind of room the whole week: the doctor may not do this service at all,
+    // which only the planning doctor can change (the front desk cannot give the session to someone else)
+    const pickNoRoomThisWeek =
+        picked && shown && !Object.values(shown.duty).some((list) => list.some((d) => d.doctorId === picked.doctorId && d.roomType === picked.requiredRoomType && d.status !== "OnLeave"));
+    const pickMessage = !picked
+        ? null
+        : pickNoRoomThisWeek
+          ? TEXT.PICK_NO_ROOM_WEEK(picked.doctorName)
+          : day < today || (pickLoaded && pickFree.keys?.size === 0)
+            ? TEXT.PICK_NONE
+            : null;
+
+    const pickSession = (session) => {
+        setDetail(null);
+        setPicked(session);
+        // Open the planned day when it is ahead, otherwise today
+        if (session) setDay(session.scheduledDate && session.scheduledDate >= today ? session.scheduledDate : today);
     };
 
     return (
-        <div className="app-content min-h-full space-y-5">
+        <div className="app-content min-h-full space-y-4">
             <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-64 flex-1">
                     <Breadcrumb items={CRUMBS} className="mb-2" />
                     <h1 className="page-title">{TEXT.TITLE}</h1>
                 </div>
-                <button type="button" className="btn btn-primary" onClick={() => setBooking({})}>
+                <button type="button" className="btn btn-primary" onClick={() => setBooking({ date: day >= today ? day : today })}>
                     {TEXT.BOOK}
                 </button>
             </div>
-            <Card>
-                <div className="flex flex-wrap items-end gap-3 px-4 py-3">
-                    <div className="flex items-center gap-2.5 self-center">
-                        <button type="button" className="btn btn-secondary btn-icon" aria-label={TEXT.PREV_WEEK} onClick={() => setWeek(addDays(week, -7))}>
-                            <ChevronLeft className="size-4" aria-hidden="true" />
-                        </button>
-                        <b className="num whitespace-nowrap text-ink">
-                            {dmy(days[0])} – {dmy(days[6])}
-                        </b>
-                        <button type="button" className="btn btn-secondary btn-icon" aria-label={TEXT.NEXT_WEEK} onClick={() => setWeek(addDays(week, 7))}>
-                            <ChevronRight className="size-4" aria-hidden="true" />
-                        </button>
-                        {week !== mondayOf(today) && (
-                            <button type="button" className="btn btn-secondary h-8 px-3 text-label" onClick={() => setWeek(mondayOf(today))}>
-                                {TEXT.THIS_WEEK}
-                            </button>
-                        )}
-                    </div>
-                    <span className="flex-1" />
-                    <LabeledSelect id="sch-doctor" label={TEXT.DOCTOR} value={doctorId} options={[["", TEXT.ALL_DOCTORS], ...doctors]} onChange={setDoctorId} />
-                    <LabeledSelect id="sch-service" label={TEXT.SERVICE} value={serviceId} options={[["", TEXT.ALL_SERVICES], ...services]} onChange={setServiceId} />
-                </div>
-            </Card>
-            {result && !result.ok && result.key === requestKey && (
+
+            <ScheduleToolbar
+                day={day}
+                today={today}
+                days={{ week: days, prev: addDays(day, -1), next: addDays(day, 1) }}
+                strip={strip}
+                dayCount={dayAppointments.length}
+                onChange={(next) => {
+                    setDetail(null);
+                    setDay(next);
+                }}
+                actions={
+                    <PendingSessionsButton
+                        count={pending.status === "ready" ? pending.sessions.length : null}
+                        open={pendingOpen}
+                        onToggle={() => setPendingOpen((open) => !open)}
+                    />
+                }
+            >
+                {pendingOpen && (
+                    <PendingSessionsList
+                        status={pending.status}
+                        sessions={pending.sessions}
+                        pickedId={picked?.stageId ?? null}
+                        onPick={pickSession}
+                        onRetry={() => setPendingReload((n) => n + 1)}
+                    />
+                )}
+            </ScheduleToolbar>
+
+            {picked && <PickBar session={picked} message={pickMessage} onClear={() => setPicked(null)} />}
+
+            {current && !current.ok && (
                 <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
                     <span className="flex-1">{TEXT.LOAD_ERROR}</span>
                     <button type="button" className="btn btn-secondary h-9" onClick={() => setReload((n) => n + 1)}>
@@ -241,85 +289,80 @@ const ReceptionSchedule = () => {
                     </button>
                 </div>
             )}
-            <Card>
-                <div className={cx("overflow-x-auto", !current && "opacity-60")} aria-busy={!current ? "true" : undefined}>
-                    <table className="w-full min-w-4xl table-fixed border-separate border-spacing-0">
-                        <thead>
-                            <tr>
-                                <th className="w-16 border-b border-border bg-surface-tint" />
-                                {days.map((day) => {
-                                    const column = columnOf(day);
-                                    const status = column === "noShift" ? TEXT.NO_SHIFT : column === "notOpen" ? TEXT.NOT_OPEN : null;
-                                    return (
-                                        <th
-                                            key={day}
-                                            className={cx(
-                                                "border-b border-l border-border px-1.5 py-2.5 text-center font-medium",
-                                                day === today && !status ? "bg-primary-soft" : "bg-surface-tint",
-                                            )}
-                                        >
-                                            <small className="block text-caption text-muted">{TEXT.WEEKDAYS_SHORT[weekdayIndex(day)]}</small>
-                                            <b className={cx("num text-title", day === today ? "text-primary" : "text-ink")}>{day.slice(8)}</b>
-                                            {day === today && <em className="block text-caption not-italic text-primary">{TEXT.TODAY}</em>}
-                                            {status && <em className="block text-caption not-italic text-muted">{status}</em>}
-                                        </th>
-                                    );
-                                })}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.map((time, index) => {
-                                const gap = breakBefore(rows, index, step);
-                                return (
-                                <Fragment key={time}>
-                                    {gap && (
-                                        <tr>
-                                            <th className="border-b border-border" />
-                                            <td colSpan={7} className="border-b border-l border-border bg-surface-tint p-1.5 text-center text-caption text-muted">
-                                                {TEXT.BREAK(gap.lunch, gap.from, gap.to)}
-                                            </td>
-                                        </tr>
-                                    )}
-                                    <tr>
-                                        <th
-                                            scope="row"
-                                            className={cx("num border-b border-border p-2 text-right align-top text-caption font-medium", time === nowRow ? "font-bold text-warning" : "text-muted")}
-                                        >
-                                            {hhmm(time)}
-                                        </th>
-                                        {days.map((day) => cell(day, time))}
-                                    </tr>
-                                </Fragment>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-                {legend.length > 0 && (
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3 text-caption text-muted">
-                        {legend.map(([group, keys]) => (
-                            <span key={group} className="inline-flex flex-wrap items-center gap-x-4 gap-y-1">
-                                <b className="font-semibold text-ink">{LEGEND_TITLES[group]}</b>
-                                {keys.map((key) => (
-                                    <span key={key} className="inline-flex items-center gap-1.5">
-                                        <i aria-hidden className={cx("size-2 rounded-full", CELL_DOT[key])} />
-                                        {TEXT.STATUS[key]}
-                                    </span>
-                                ))}
-                            </span>
-                        ))}
-                    </div>
+
+            <section
+                className={cx("overflow-hidden rounded-xl border border-border bg-canvas", !current && "opacity-60")}
+                aria-busy={!current ? "true" : undefined}
+            >
+                {!shown || rows.length === 0 ? (
+                    <p className="px-6 py-10 text-center text-body-sm text-muted">{shown ? TEXT.EMPTY_DAY : TEXT.LOADING}</p>
+                ) : (
+                    <RoomDayGrid
+                        rooms={rooms}
+                        rows={rows}
+                        step={step}
+                        day={day}
+                        today={today}
+                        now={now}
+                        duty={duty}
+                        appointments={dayAppointments}
+                        free={free}
+                        pick={pick}
+                        flashId={flashId}
+                        onOpen={(appointment, anchor) => setDetail((open) => (open?.appointment.id === appointment.id ? null : { appointment, anchor }))}
+                        onFree={({ shift, time }) =>
+                            setBooking({
+                                date: day,
+                                slotStart: `${time}:00`,
+                                doctorId: shift.doctorId,
+                                ...(picked && {
+                                    stageId: picked.stageId,
+                                    patient: { id: picked.patientId, fullName: picked.patientName, patientCode: picked.patientCode, phoneNumber: picked.patientPhoneNumber },
+                                }),
+                            })
+                        }
+                    />
                 )}
-            </Card>
+            </section>
+
+            {detail && (
+                <AppointmentPopover
+                    appointment={detail.appointment}
+                    anchor={detail.anchor}
+                    state={detailState}
+                    roomName={roomName(detail.appointment)}
+                    actions={actionsOf(detail.appointment, detailState)}
+                    onClose={closeDetail}
+                />
+            )}
+
             {booking && (
                 <BookingDialog
+                    patient={booking.patient ?? null}
                     initial={booking}
                     onClose={() => setBooking(null)}
                     onBooked={(a) => {
-                        toast.success(TEXT.BOOKED(a.patientName, `${TEXT.WEEKDAYS_SHORT[weekdayIndex(a.appointmentDate)]} ${ddmm(a.appointmentDate)}`, hhmm(a.timeSlotStart)), { role: "status" });
+                        const when = `${TEXT.WEEKDAYS_SHORT[weekdayIndex(a.appointmentDate)]} ${ddmm(a.appointmentDate)}`;
+                        // The booking answer has no room yet: it is the room of the doctor's shift at that time
+                        toast.success(TEXT.BOOKED(a.patientName, when, hhmm(a.timeSlotStart), roomName(a)), { role: "status" });
+                        // A session that now has its time leaves "Buổi chờ xếp giờ"
+                        if (a.planSession || booking.stageId) {
+                            setPicked(null);
+                            setPendingReload((n) => n + 1);
+                        }
                         setBooking(null);
-                        setWeek(mondayOf(a.appointmentDate));
-                        setReload((n) => n + 1);
+                        showOn(a);
+                    }}
+                />
+            )}
+
+            {moving && (
+                <RescheduleDialog
+                    appointment={moving}
+                    onClose={() => setMoving(null)}
+                    onDone={(saved) => {
+                        setMoving(null);
+                        showOn({ ...saved, id: saved.id ?? moving.id });
                     }}
                 />
             )}

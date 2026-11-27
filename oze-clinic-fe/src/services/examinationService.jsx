@@ -4,6 +4,7 @@ import { getMyShifts } from "./myScheduleService";
 import { EMPTY_PRESCRIPTION_DRAFT, EMPTY_TREATMENT_DRAFT } from "../utils/data/mockExamination";
 import { icdName, newPlanSession, validatePlan } from "../utils/examination";
 import { formatClock, getClinicDateTimeParts, getClinicToday } from "../utils/format";
+import { ROOM_TYPES } from "../utils/constants/room";
 import { AFTERNOON_STARTS_AT } from "../utils/constants/shift";
 import { imagingTypeLabel } from "../utils/imagingRequest";
 import { QUEUE_STATUS } from "../utils/messages";
@@ -22,6 +23,7 @@ const success = (data, message = null) => ({ success: true, message, data, error
 const failure = (message) => ({ success: false, message, data: null, errors: null });
 
 const MESSAGES = [
+    [/chosen for a session is not an active doctor/i, "Bác sĩ thực hiện đã chọn cho một buổi không còn hoạt động. Hãy chọn bác sĩ khác."],
     [/Patient is not in the waiting queue|not WAITING|is not waiting/i, "Bệnh nhân không còn trong hàng chờ."],
     [/already has an appointment in service|another .*in service/i, "Đang có bệnh nhân trong phòng. Kết thúc lượt khám trước khi gọi người tiếp theo."],
     [/off duty|not on shift|start your shift/i, "Bạn chưa bắt đầu ca làm. Bấm “Bắt đầu ca” trước khi khám."],
@@ -62,6 +64,12 @@ const MESSAGES = [
     [/time slot is no longer available/i, "Giờ tái khám này vừa có người đặt. Vui lòng chọn giờ khác."],
     [/too far in advance/i, "Ngày tái khám vượt quá thời gian mở lịch."],
     [/No doctor profile is linked/i, "Tài khoản chưa được gắn hồ sơ bác sĩ."],
+    // "Chỉ định chuyển phòng · tiểu phẫu"
+    [/Only the patient you are examining can be referred/i, "Chỉ chuyển phòng được bệnh nhân bạn đang khám."],
+    [/waiting for an X-ray\. Refer/i, "Bệnh nhân đang chờ chụp chiếu. Chuyển phòng sau khi có kết quả chụp."],
+    [/Choose another doctor to refer/i, "Chọn bác sĩ khác để chuyển bệnh nhân."],
+    [/no shift in the minor surgery room/i, "Bác sĩ này không có ca ở phòng tiểu phẫu hôm nay."],
+    [/not started the minor surgery shift/i, "Bác sĩ phòng tiểu phẫu chưa bắt đầu ca. Chọn bác sĩ khác hoặc đợi bác sĩ bắt đầu ca."],
 ];
 
 const translate = (response) => {
@@ -185,6 +193,23 @@ const loadPlanTypes = async () => {
 
 const typesOf = (serviceId) => state.types.get(serviceId) ?? [];
 
+// Doctors a session of this service can be given to: [{ doctorId, doctorName, specialization, suggested }], the ones who
+// work in the kind of room the service needs first. Asked once per service; a failed answer is asked again next time.
+const doctorOptions = new Map();
+export const getPlanDoctorOptions = (serviceId) => {
+    const key = String(serviceId ?? "");
+    if (!doctorOptions.has(key)) {
+        const request = call(() => api.get("/api/treatmentplans/doctor-options", { params: { serviceId: serviceId || undefined }, skipErrorPage: true })).then(
+            (response) => {
+                if (!response.success) doctorOptions.delete(key);
+                return response.success && Array.isArray(response.data) ? response.data : [];
+            },
+        );
+        doctorOptions.set(key, request);
+    }
+    return doctorOptions.get(key);
+};
+
 const describeSession = (serviceId, session) => {
     const type = typesOf(serviceId).find((option) => option.id === session.typeId);
     return [type && `${TYPE_LINE}${type.name}`, session.note?.trim()].filter(Boolean).join("\n") || null;
@@ -228,6 +253,8 @@ const planFromApi = (plan, item, doctorName) => {
             date: stage.scheduledDate ?? "",
             cost: stage.estimatedCost == null ? null : Number(stage.estimatedCost),
             status: stage.stageStatus === "Completed" ? "done" : "pending",
+            // "" = the planning doctor; a session given to another doctor keeps that doctor's id
+            doctorId: stage.assignedDoctorId && stage.assignedDoctorId !== plan.createdByDoctorId ? String(stage.assignedDoctorId) : "",
         });
     }
     for (const service of services) service.status = serviceStatusOf(service.sessions, stagesOf.get(service.id));
@@ -267,7 +294,8 @@ const shiftOf = (shifts) => {
 
 const toQueueItem = (item) => {
     const status = queueStatusByApi[item.status] ?? QUEUE_STATUS.WAITING;
-    const badge = status === QUEUE_STATUS.WAITING ? (item.atImaging ? "AT_IMAGING" : item.isReturning ? "RETURNED" : undefined) : undefined;
+    // A visit handed over from another room (item.note "Chuyển từ…") is resumed too, but it is not back from an X-ray
+    const badge = status === QUEUE_STATUS.WAITING ? (item.atImaging ? "AT_IMAGING" : item.isReturning && !item.note ? "RETURNED" : undefined) : undefined;
     return {
         id: item.appointmentId,
         queueNumber: item.queueNumber,
@@ -277,6 +305,14 @@ const toQueueItem = (item) => {
         atImaging: item.atImaging,
         step: status === QUEUE_STATUS.IN_EXAMINATION && item.examinationId ? readStep(item.examinationId) : undefined,
         startedAt: item.startedAt ? Date.parse(item.startedAt) : undefined,
+        // Shown on the doctor's "Hàng chờ" page
+        patientId: item.patientId,
+        patientCode: item.patientCode ?? "",
+        services: (item.services ?? []).map((service) => service.name),
+        priority: item.priority > 0,
+        skipCount: item.skipCount ?? 0,
+        // "Chuyển từ Phòng khám · BS. Lê Thu Hà · Nhổ răng 38" when referred from another room
+        note: item.note ?? "",
     };
 };
 
@@ -303,8 +339,6 @@ const loadWorkspace = async () => {
     };
     return success(state.snapshot);
 };
-
-const snapshotCopy = () => structuredClone(state.snapshot);
 
 // Runs a queue action, then reloads the room so the page shows the new queue.
 const thenReload = async (request, message) => {
@@ -347,13 +381,37 @@ export const startExamination = async (id) => {
     return reloaded.success ? success(reloaded.data, `${item.examinationId ? "Khám tiếp" : "Bắt đầu khám"} ${item.patientName}.`) : reloaded;
 };
 
-// Moves the visit to another step (0-based, see EXAM_STEPS). Kept in the browser: the backend has no step.
-export const setExamStep = async (id, step) => {
+// Doctors with a shift in the minor surgery room today: { doctorId, name, roomName, started, waitingCount }.
+// Only one who has started the shift can take a referred patient.
+export const getSurgeryDoctorsOnDuty = async () => {
+    const response = await call(() => api.get("/api/schedules/doctors-on-duty"));
+    if (!response.success) return translate(response);
+    const doctors = (response.data ?? [])
+        .filter((item) => item.roomType === ROOM_TYPES.MINOR_SURGERY)
+        .map((item) => ({
+            doctorId: item.doctorId,
+            name: item.doctorName,
+            roomName: item.roomName ?? "Phòng tiểu phẫu",
+            started: Boolean(item.actualStartTime) && !item.actualEndTime,
+            waitingCount: item.waitingCount ?? 0,
+        }));
+    // The same doctor may have a morning and an afternoon shift there: one row, started if either is
+    const byDoctor = new Map();
+    doctors.forEach((doctor) => {
+        const seen = byDoctor.get(doctor.doctorId);
+        byDoctor.set(doctor.doctorId, seen ? { ...seen, started: seen.started || doctor.started } : doctor);
+    });
+    return success([...byDoctor.values()]);
+};
+
+// "Chỉ định chuyển phòng · tiểu phẫu": the visit (with its diagnoses and plan) goes to that doctor's queue
+export const referToMinorSurgery = async (id, { surgeryDoctorId, note }) => {
     const item = itemOf(id);
-    if (!item?.examinationId || item.status !== "IN_PROGRESS") return failure("Lượt khám này không còn mở.");
-    writeStep(item.examinationId, Math.max(readStep(item.examinationId), step));
-    state.snapshot.queue = state.snapshot.queue.map((entry) => (entry.id === id ? { ...entry, step: readStep(item.examinationId) } : entry));
-    return success(snapshotCopy());
+    if (!item || item.status !== "IN_PROGRESS") return failure("Chỉ chuyển phòng được bệnh nhân đang khám.");
+    return thenReload(
+        () => api.post(`/api/appointments/${id}/refer-minor-surgery`, { surgeryDoctorId, note: note?.trim() || null }),
+        `Đã chuyển ${item.patientName} sang phòng tiểu phẫu.`,
+    );
 };
 
 export const endExamination = async (id) => {
@@ -420,7 +478,7 @@ const HISTORY_GROUPS = [
 
 const sameTitle = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-const historyFromProfiles = (profiles) => {
+export const historyFromProfiles = (profiles) => {
     const titles = (match) => [...new Set(profiles.filter(match).map((profile) => profile.title?.trim()).filter(Boolean))];
     const isDental = (profile) => profile.recordType === "History" && profile.description === DENTAL_HISTORY_MARK;
     return {
@@ -446,6 +504,14 @@ const loadHistoryAndVisits = async (item) => {
                 summary: [visit.primaryDiagnosis, visit.chiefComplaint].filter(Boolean).join(" · "),
             })),
     };
+};
+
+// "Ê buốt khi ăn nóng / lạnh, Đau khi nhai. Ê buốt răng hàm dưới trái…": the ticked symptoms of an older visit, then its notes
+const symptomsText = (symptoms, notes) => {
+    const ticked = (symptoms ?? []).filter(Boolean).join(", ");
+    const text = (notes ?? "").trim();
+    if (!ticked) return text;
+    return text ? `${ticked}. ${text}` : ticked;
 };
 
 // Everything the exam screen shows about one patient in the queue, including the step 2 draft (record.exam).
@@ -494,8 +560,9 @@ export const getExamRecord = async (id) => {
     const exam = data
         ? {
               chiefComplaint: data.chiefComplaint ?? item.reason ?? "",
-              symptoms: data.symptoms ?? [],
-              note: data.clinicalNotes ?? "",
+              // Symptoms are one free text now (clinicalNotes); a visit saved with ticked symptoms shows them first
+              symptoms: [],
+              note: symptomsText(data.symptoms, data.clinicalNotes),
               entries: (data.toothFindings ?? []).map(toEntry),
               films,
               diagnoses: (data.diagnoses ?? []).map(toDiagnosis),
@@ -783,6 +850,8 @@ const writePlan = async (item, plan) => {
         description: describeSession(service.serviceId, session),
         estimatedCost: Number.isFinite(session.cost) ? session.cost : null,
         scheduledDate: session.date || null,
+        // Left out, the backend gives the session to the doctor making the plan
+        assignedDoctorId: session.doctorId ? Number(session.doctorId) : null,
     }));
     const names = plan.services.filter((service) => service.sessions.length).map((service) => service.name);
     const body = { planName: `Kế hoạch điều trị · ${names.join(", ")}`.slice(0, 200), description: null, stages };

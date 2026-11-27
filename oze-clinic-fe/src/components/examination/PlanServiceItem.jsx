@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
+import usePlanDoctorOptions from "@/hooks/usePlanDoctorOptions";
 import { cx } from "@/utils/cx";
 import { sessionsCost } from "@/utils/examination";
 import { formatNumber } from "@/utils/format";
@@ -41,6 +42,7 @@ const PlanServiceItem = ({
     onRemoveSession,
 }) => {
     const panelId = useId();
+    const doctorOptions = usePlanDoctorOptions(expanded ? service.serviceId : null);
     const ToggleIcon = expanded ? ChevronDown : ChevronRight;
     const hasErrors = Boolean(errors.service) || Object.keys(errors.sessions ?? {}).length > 0;
 
@@ -87,6 +89,7 @@ const PlanServiceItem = ({
                             index={sessionIndex}
                             session={session}
                             typeOptions={typeOptions}
+                            doctorOptions={doctorOptions}
                             errors={errors.sessions?.[session.id]}
                             onChange={(changes) => onChangeSession(session.id, changes)}
                             onRemove={() => onRemoveSession(session.id)}

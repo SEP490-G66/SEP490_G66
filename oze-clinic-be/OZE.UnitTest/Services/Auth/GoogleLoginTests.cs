@@ -9,6 +9,8 @@ using Xunit;
 
 namespace OZE.UnitTest.Services.Auth
 {
+    // OZ-AUTH-12 GoogleLogin
+    [Trait("Tab", "OZ-AUTH-12")]
     public class GoogleLoginTests : AuthServiceTestBase
     {
         private const string GoogleSubject = "google-sub-123";

@@ -20,6 +20,20 @@ namespace OZE.Controllers
             _medicalRecordService = medicalRecordService;
         }
 
+        /// <summary>
+        /// The doctor's "Hồ sơ bệnh án" list: patients the doctor examined or has a confirmed booking with
+        /// (the ones GET patients/{patientId} opens), latest visit first; search by name, patient code or phone.
+        /// </summary>
+        [Authorize(Roles = RoleConstants.DoctorRole)]
+        [HttpGet("patients")]
+        public async Task<ActionResult<ApiResponse<PagedResult<DoctorPatientResponse>>>> GetMyPatientsAsync(
+            [FromQuery] DoctorPatientQuery query,
+            CancellationToken cancellationToken)
+        {
+            var result = await _medicalRecordService.GetMyPatientsAsync(CurrentUserId ?? string.Empty, query, cancellationToken);
+            return Ok(ApiResponse<PagedResult<DoctorPatientResponse>>.SuccessResult(result));
+        }
+
         [Authorize(Roles = RoleConstants.DoctorRole)]
         [HttpGet("patients/{patientId:int}")]
         public async Task<ActionResult<ApiResponse<PatientMedicalRecordResponse>>> GetPatientRecordAsync(int patientId)

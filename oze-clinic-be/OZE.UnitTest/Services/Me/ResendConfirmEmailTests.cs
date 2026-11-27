@@ -6,8 +6,8 @@ using Xunit;
 
 namespace OZE.UnitTest.Services.Me
 {
-    // OZ-ME-05 ResendConfirmEmail — confirmation emails are disabled
-    [Trait("Tab", "OZ-ME-05")]
+    // OZ-ME-03 ResendConfirmEmail — confirmation emails are disabled
+    [Trait("Tab", "OZ-ME-03")]
     public class ResendConfirmEmailTests : UserServiceTestBase
     {
         // UTCID01 (A): feature disabled — always returns NoEmailToConfirm

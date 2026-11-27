@@ -90,8 +90,6 @@ export const getWaitingList = (config = {}) => call(() => api.get("/api/appointm
 export const setPriority = (id, { priority, reason }) =>
     call(() => api.post(`/api/appointments/${id}/priority`, { priority, reason: reason || null }));
 
-export const getNeedsAttention = () => call(() => api.get("/api/appointments/needs-attention"));
-
 // reason is required: it goes into the notification the patient receives
 export const reassignDoctor = (id, doctorId, reason) => call(() => api.post(`/api/appointments/${id}/reassign-doctor`, { doctorId, reason }));
 
@@ -137,6 +135,9 @@ export const getAppointments = ({ fromDate, toDate, date, doctorId, patientId, s
 
 const RANGE_PAGE_LIMIT = 20;
 
+// One appointment (a link from another screen names it by id)
+export const getAppointment = (id, config = {}) => call(() => api.get(`/api/appointments/${id}`, config));
+
 export const getAppointmentsInRange = async ({ fromDate, toDate, doctorId } = {}, config = {}) => {
     const items = [];
     for (let page = 1; page <= RANGE_PAGE_LIMIT; page += 1) {
@@ -163,8 +164,10 @@ export const getAvailableSlots = ({ date, doctorId, serviceIds = [], variantIds 
     return call(() => api.get(`/api/appointments/available-slots?${params}`, config));
 };
 
-export const rescheduleAppointment = (id, { date, slotStart, doctorId, reason }) =>
-    call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null, reason: reason || null }));
+export const rescheduleAppointment = async (id, { date, slotStart, doctorId, reason }) => {
+    const result = await call(() => api.post(`/api/appointments/${id}/reschedule`, { date, slotStart, doctorId: doctorId || null, reason: reason || null }));
+    return result.success ? result : { ...result, message: appointmentErrorText(result) };
+};
 
 export const getPaidInvoices = async () => {
     const results = await Promise.all(
@@ -269,7 +272,8 @@ const PLAN_RUNNING = ["Approved", "InProgress"];
 const STAGE_OPEN = ["Scheduled", "InProgress"];
 
 // Sessions the receptionist can book a visit for: the next open session of each plan being carried out.
-// [{ stageId, planId, planName, doctorName, number, total, name, serviceId, serviceName, scheduledDate }]
+// [{ stageId, planId, planName, doctorId, doctorName, number, total, name, serviceId, serviceName, scheduledDate }].
+// doctorId: the doctor chosen for the session in the plan (the planning doctor when none was chosen); it is booked with them only.
 export const getBookablePlanSessions = async (patientId, config = {}) => {
     const plans = await getPatientTreatmentPlans(patientId, {}, config);
     if (!plans.success) return plans;
@@ -286,7 +290,8 @@ export const getBookablePlanSessions = async (patientId, config = {}) => {
                 stageId: stage.id,
                 planId: plan.treatmentPlanId,
                 planName: plan.planName ?? "Kế hoạch điều trị",
-                doctorName: plan.createdByDoctorName ?? "",
+                doctorId: stage.assignedDoctorId ?? plan.createdByDoctorId ?? null,
+                doctorName: stage.assignedDoctorName ?? plan.createdByDoctorName ?? "",
                 number: index + 1,
                 total: stages.length,
                 name: stage.stageName ?? "",
@@ -298,6 +303,11 @@ export const getBookablePlanSessions = async (patientId, config = {}) => {
     });
     return { ...plans, data: sessions };
 };
+
+// "Buổi chờ xếp giờ": the next session of every plan being carried out that has no appointment yet.
+// [{ stageId, treatmentPlanId, planName, patientId, patientName, patientCode, patientPhoneNumber, stageNumber, totalStages,
+//    stageName, serviceId, serviceName, requiredRoomType, doctorId, doctorName, scheduledDate }]
+export const getPendingPlanSessions = (config = {}) => call(() => api.get("/api/treatmentplans/pending-sessions", config));
 
 // ----- consultation requests from the public site -----
 export const getConsultations = ({ status, keyword, page = 1, pageSize = 10 } = {}) =>

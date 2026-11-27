@@ -97,6 +97,30 @@ namespace OZE.UnitTest.Services.Appointments
 
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.TooFarAhead);
         }
+
+        // UTCID06 (N): a 20-minute service still holds a whole 30-minute slot, so every slot ends on the grid
+        [Fact]
+        public async Task GetAvailableSlotsAsync_ShouldHoldWholeSlot_WhenServiceIsShorter()
+        {
+            _generalExamService.EstimatedMinutes = 20;
+
+            var result = await _service.GetAvailableSlotsAsync(Query(Tomorrow));
+
+            result.Select(x => x.SlotStart).Should().Equal(new TimeOnly(8, 0), new TimeOnly(8, 30), new TimeOnly(9, 0), new TimeOnly(9, 30));
+            result.Should().OnlyContain(x => x.SlotEnd == x.SlotStart.AddMinutes(30));
+        }
+
+        // UTCID07 (N): a 45-minute service holds 60 minutes; the last start that fits the 08:00-10:00 shift is 09:00
+        [Fact]
+        public async Task GetAvailableSlotsAsync_ShouldHoldTwoSlots_WhenServiceIsFortyFiveMinutes()
+        {
+            _generalExamService.EstimatedMinutes = 45;
+
+            var result = await _service.GetAvailableSlotsAsync(Query(Tomorrow));
+
+            result.Select(x => x.SlotStart).Should().Equal(new TimeOnly(8, 0), new TimeOnly(8, 30), new TimeOnly(9, 0));
+            result.Should().OnlyContain(x => x.SlotEnd == x.SlotStart.AddMinutes(60));
+        }
     }
 
     // OZ-APPT-03 BookAsGuest
@@ -161,18 +185,33 @@ namespace OZE.UnitTest.Services.Appointments
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
 
-        // UTCID06 (A): the walk-in record of this phone has a treatment session scheduled, so one booking at a time
+        // UTCID06 (A): the record of this phone is in the middle of a treatment plan, so no new visit
         [Fact]
-        public async Task BookAsGuestAsync_ShouldThrow_WhenTreatmentSessionScheduled()
+        public async Task BookAsGuestAsync_ShouldThrow_WhenTreatmentPlanActive()
         {
             _registrationRepoMock.Setup(r => r.FindUnlinkedPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
             _appointmentRepoMock.Setup(r => r.HasUnfinishedAppointmentAsync(_patient.Id, null)).ReturnsAsync(false);
-            _appointmentRepoMock.Setup(r => r.HasUpcomingTreatmentSessionAsync(_patient.Id)).ReturnsAsync(true);
+            _appointmentRepoMock.Setup(r => r.HasActiveTreatmentPlanAsync(_patient.Id)).ReturnsAsync(true);
 
             var act = () => _service.BookAsGuestAsync(Guest());
 
-            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasActiveTreatmentPlan);
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
+        }
+
+        // UTCID07 (N): the saved booking ends on the slot boundary, while the service line keeps its own 20 minutes
+        [Fact]
+        public async Task BookAsGuestAsync_ShouldSaveRoundedEnd_AndKeepServiceMinutes()
+        {
+            _generalExamService.EstimatedMinutes = 20;
+            Appointment? saved = null;
+            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
+
+            await _service.BookAsGuestAsync(Guest());
+
+            saved!.TimeSlotStart.Should().Be(new TimeOnly(8, 0));
+            saved.TimeSlotEnd.Should().Be(new TimeOnly(8, 30));
+            saved.ServiceItems.Should().ContainSingle().Which.DurationMinutes.Should().Be(20);
         }
     }
 
@@ -245,6 +284,7 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.ServiceInactive);
         }
 
+        // UTCID06 (A): signed-in account has no confirmed phone number
         [Fact]
         public async Task BookAsPatientAsync_ShouldThrow_WhenPhoneNotVerified()
         {
@@ -263,15 +303,15 @@ namespace OZE.UnitTest.Services.Appointments
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
 
-        // UTCID07 (A): the treatment plan of the patient already has a session scheduled, so one booking at a time
+        // UTCID07 (A): the patient's treatment plan is being carried out (even with no session date set), so no new visit
         [Fact]
-        public async Task BookAsPatientAsync_ShouldThrow_WhenTreatmentSessionScheduled()
+        public async Task BookAsPatientAsync_ShouldThrow_WhenTreatmentPlanActive()
         {
-            _appointmentRepoMock.Setup(r => r.HasUpcomingTreatmentSessionAsync(_patient.Id)).ReturnsAsync(true);
+            _appointmentRepoMock.Setup(r => r.HasActiveTreatmentPlanAsync(_patient.Id)).ReturnsAsync(true);
 
             var act = () => _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
 
-            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasActiveTreatmentPlan);
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
 
@@ -372,6 +412,84 @@ namespace OZE.UnitTest.Services.Appointments
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.WalkInPatientInClinic);
         }
 
+        // UTCID07 (N): a pending booking on another day is left as it is when the patient walks in
+        [Fact]
+        public async Task CreateWalkInAsync_ShouldSucceed_WhenPatientHasPendingOnAnotherDay()
+        {
+            _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            _appointmentRepoMock.Setup(r => r.GetPatientAppointmentsOnDateAsync(_patient.Id, Today))
+                .ReturnsAsync(new List<Appointment>());
+            var otherDayPending = new Appointment
+            {
+                Id = 77,
+                PatientId = _patient.Id,
+                AppointmentDate = Tomorrow,
+                Status = AppointmentConstants.PendingStatus
+            };
+
+            var result = await _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
+
+            result.PatientId.Should().Be(_patient.Id);
+            result.Status.Should().Be(AppointmentConstants.CheckedInStatus);
+            otherDayPending.Status.Should().Be(AppointmentConstants.PendingStatus);
+            _auditLogMock.Verify(a => a.LogAsync(AuditConstants.AppointmentCancelled, AuditConstants.AppointmentEntity,
+                It.IsAny<string>(), It.IsAny<object?>(), It.IsAny<object?>(), It.IsAny<string?>()), Times.Never);
+        }
+
+        // UTCID08 (N): a pending booking today is cancelled with reason and audit when walk-in is received
+        [Fact]
+        public async Task CreateWalkInAsync_ShouldCancelPendingToday_WhenPatientWalksIn()
+        {
+            _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            var pendingToday = new Appointment
+            {
+                Id = 88,
+                PatientId = _patient.Id,
+                AppointmentDate = Today,
+                Status = AppointmentConstants.PendingStatus
+            };
+            _appointmentRepoMock.Setup(r => r.GetPatientAppointmentsOnDateAsync(_patient.Id, Today))
+                .ReturnsAsync(new List<Appointment> { pendingToday });
+
+            var result = await _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
+
+            result.Status.Should().Be(AppointmentConstants.CheckedInStatus);
+            pendingToday.Status.Should().Be(AppointmentConstants.CancelledStatus);
+            pendingToday.CancellationReason.Should().Be("Bệnh nhân đến trực tiếp, đã tiếp nhận vãng lai");
+            pendingToday.CancelledByUserId.Should().Be("receptionist-1");
+            _auditLogMock.Verify(a => a.LogAsync(AuditConstants.AppointmentCancelled, AuditConstants.AppointmentEntity, "88",
+                It.IsAny<object?>(), It.IsAny<object?>(), "Bệnh nhân đến trực tiếp, đã tiếp nhận vãng lai"), Times.Once);
+        }
+
+        // UTCID09 (A): a confirmed booking today must be checked in instead of a new walk-in
+        [Fact]
+        public async Task CreateWalkInAsync_ShouldThrow_WhenPatientHasConfirmedToday()
+        {
+            _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            _appointmentRepoMock.Setup(r => r.GetPatientAppointmentsOnDateAsync(_patient.Id, Today))
+                .ReturnsAsync(new List<Appointment>
+                {
+                    new() { Id = 99, PatientId = _patient.Id, AppointmentDate = Today, Status = AppointmentConstants.ConfirmedStatus }
+                });
+
+            var act = () => _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.WalkInPatientHasConfirmedToday);
+        }
+
+        // UTCID06 (A): the existing patient is in the middle of a treatment plan, so no new walk-in visit
+        [Fact]
+        public async Task CreateWalkInAsync_ShouldThrow_WhenTreatmentPlanActive()
+        {
+            _registrationRepoMock.Setup(r => r.FindPatientsByPhoneAsync(It.IsAny<IReadOnlyCollection<string>>())).ReturnsAsync(new List<Patient> { _patient });
+            _appointmentRepoMock.Setup(r => r.HasActiveTreatmentPlanAsync(_patient.Id)).ReturnsAsync(true);
+
+            var act = () => _service.CreateWalkInAsync(WalkIn(), "receptionist-1");
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasActiveTreatmentPlan);
+            _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
+        }
+
         // UTCID04 (A): the phone number is not valid
         [Fact]
         public async Task CreateWalkInAsync_ShouldThrow_WhenPhoneInvalid()
@@ -436,6 +554,61 @@ namespace OZE.UnitTest.Services.Appointments
 
             result.Items.Should().BeEmpty();
             result.TotalCount.Should().Be(0);
+        }
+    }
+
+    // OZ-APPT-22 BookByReceptionist: a patient in the middle of a treatment plan gets only its sessions
+    [Trait("Tab", "OZ-APPT-22")]
+    public class ReceptionBookingTreatmentPlanTests : BookingFlowTestBase
+    {
+        private const long StageId = 7;
+
+        public ReceptionBookingTreatmentPlanTests()
+        {
+            _appointmentRepoMock.Setup(r => r.GetPatientByIdAsync(_patient.Id)).ReturnsAsync(_patient);
+            _appointmentRepoMock.Setup(r => r.HasActiveTreatmentPlanAsync(_patient.Id)).ReturnsAsync(true);
+        }
+
+        private ReceptionBookingRequest Request(long? stageId = null) =>
+            Booking(new ReceptionBookingRequest { PatientId = _patient.Id, TreatmentPlanStageId = stageId });
+
+        // UTCID01 (A): a new visit for a patient whose plan is running is refused
+        [Fact]
+        public async Task BookByReceptionistAsync_ShouldThrow_WhenTreatmentPlanActive()
+        {
+            var act = () => _service.BookByReceptionistAsync(Request(), "receptionist-1");
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasActiveTreatmentPlan);
+            _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
+        }
+
+        // UTCID02 (N): the next session of that plan can be booked
+        [Fact]
+        public async Task BookByReceptionistAsync_ShouldBookPlanSession_WhenTreatmentPlanActive()
+        {
+            // The session is booked with the plan's doctor (SessionDoctorOrRequested), the same one the request asks for
+            var plan = new TreatmentPlan { Id = 3, PatientId = _patient.Id, Status = TreatmentPlanConstants.InProgress, CreatedByDoctorId = DoctorId };
+            var stage = new TreatmentPlanStage { Id = StageId, StageNumber = 2, StageName = "Buoi 2", StageStatus = TreatmentPlanConstants.StageStatus.Scheduled, TreatmentPlan = plan };
+            plan.Stages = new List<TreatmentPlanStage> { stage };
+            _appointmentRepoMock.Setup(r => r.GetTreatmentStageAsync(StageId)).ReturnsAsync(stage);
+            Appointment? saved = null;
+            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
+
+            await _service.BookByReceptionistAsync(Request(StageId), "receptionist-1");
+
+            saved.Should().NotBeNull();
+            saved!.TreatmentPlanStageId.Should().Be(StageId);
+        }
+
+        // UTCID03 (N): once the plan is cancelled (no plan running) the patient can book a new visit
+        [Fact]
+        public async Task BookByReceptionistAsync_ShouldBook_WhenNoTreatmentPlanActive()
+        {
+            _appointmentRepoMock.Setup(r => r.HasActiveTreatmentPlanAsync(_patient.Id)).ReturnsAsync(false);
+
+            await _service.BookByReceptionistAsync(Request(), "receptionist-1");
+
+            _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Once);
         }
     }
 }

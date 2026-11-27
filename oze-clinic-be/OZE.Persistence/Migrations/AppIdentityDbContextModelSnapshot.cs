@@ -3173,6 +3173,9 @@ namespace OZE.Persistence.Migrations
                     b.Property<long?>("AppointmentId")
                         .HasColumnType("bigint");
 
+                    b.Property<int?>("AssignedDoctorId")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -4206,6 +4209,12 @@ namespace OZE.Persistence.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .HasConstraintName("FK_TreatmentPlanStages_Appointments");
 
+                    b.HasOne("OZE.Domain.Entities.StaffProfile", "AssignedDoctor")
+                        .WithMany()
+                        .HasForeignKey("AssignedDoctorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_TreatmentPlanStages_AssignedDoctors");
+
                     b.HasOne("OZE.Domain.Entities.StaffProfile", "PerformedByDoctor")
                         .WithMany()
                         .HasForeignKey("PerformedByDoctorId")
@@ -4226,6 +4235,8 @@ namespace OZE.Persistence.Migrations
                         .HasConstraintName("FK_TreatmentPlanStages_Plans");
 
                     b.Navigation("Appointment");
+
+                    b.Navigation("AssignedDoctor");
 
                     b.Navigation("PerformedByDoctor");
 

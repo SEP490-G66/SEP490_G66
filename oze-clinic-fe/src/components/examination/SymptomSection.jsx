@@ -1,75 +1,27 @@
 import { useId } from "react";
-import { Check } from "lucide-react";
-import { cx } from "@/utils/cx";
-import { EXAM_SYMPTOMS } from "@/utils/messages";
 import ClinicalExamSection from "./ClinicalExamSection";
 
-// Examinations.ChiefComplaint (ExaminationConstants.ChiefComplaintMaxLength)
-const CHIEF_COMPLAINT_MAX = 500;
+// Examinations.ClinicalNotes (ExaminationConstants.ClinicalNotesMaxLength)
+const SYMPTOMS_MAX = 2000;
 
-// "Triệu chứng": the reason for the visit, common symptoms to tick + free-text description.
-// value: the selected symptom labels. chiefComplaint / onChiefComplaintChange: the reason (filled from the booking).
-const SymptomSection = ({ options = EXAM_SYMPTOMS, value = [], note = "", chiefComplaint = "", onChange, onNoteChange, onChiefComplaintChange }) => {
-    const noteId = useId();
-    const reasonId = useId();
-    const toggle = (symptom) => onChange?.(value.includes(symptom) ? value.filter((item) => item !== symptom) : [...value, symptom]);
+// "Triệu chứng" (Figma): what the patient feels and what the doctor notices, in one free text.
+const SymptomSection = ({ value = "", onChange }) => {
+    const id = useId();
 
     return (
-        <ClinicalExamSection
-            title="Triệu chứng"
-            action={value.length > 0 && <span className="num rounded-full bg-primary-soft px-2 py-0.5 text-caption font-medium text-primary">{value.length} đã chọn</span>}
-            bodyClassName="flex flex-col gap-4"
-        >
-            {onChiefComplaintChange && (
-                <div className="field">
-                    <label htmlFor={reasonId} className="label">
-                        Lý do khám
-                    </label>
-                    <input
-                        id={reasonId}
-                        className="input"
-                        maxLength={CHIEF_COMPLAINT_MAX}
-                        placeholder="Ví dụ: Đau răng hàm dưới bên trái 3 ngày"
-                        value={chiefComplaint}
-                        onChange={(event) => onChiefComplaintChange(event.target.value)}
-                    />
-                </div>
-            )}
-            <fieldset>
-                <legend className="mb-2 font-medium text-ink">Triệu chứng thường gặp</legend>
-                <div className="flex flex-wrap gap-2">
-                    {options.map((symptom) => {
-                        const selected = value.includes(symptom);
-                        return (
-                            <button
-                                key={symptom}
-                                type="button"
-                                aria-pressed={selected}
-                                className={cx(
-                                    "flex cursor-pointer items-center gap-1 rounded-full border px-3 py-1 text-caption outline-none transition-colors focus-visible:shadow-focus",
-                                    selected ? "border-primary bg-primary-soft font-medium text-primary" : "border-border-strong bg-canvas text-body hover:border-primary",
-                                )}
-                                onClick={() => toggle(symptom)}
-                            >
-                                {selected && <Check className="size-3.5" aria-hidden="true" />}
-                                {symptom}
-                            </button>
-                        );
-                    })}
-                </div>
-            </fieldset>
-            <div className="field">
-                <label htmlFor={noteId} className="label">
-                    Mô tả thêm
-                </label>
-                <textarea
-                    id={noteId}
-                    className="input"
-                    placeholder="Ví dụ: Ê buốt răng hàm dưới trái khoảng 1 tuần, tăng dần. Gõ dọc răng 36 đau, thử lạnh đau kéo dài trên 10 giây."
-                    value={note}
-                    onChange={(event) => onNoteChange?.(event.target.value)}
-                />
-            </div>
+        <ClinicalExamSection title="Triệu chứng">
+            <label htmlFor={id} className="sr-only">
+                Triệu chứng
+            </label>
+            <textarea
+                id={id}
+                rows={4}
+                maxLength={SYMPTOMS_MAX}
+                className="input h-auto min-h-24 py-2.5"
+                placeholder="Ví dụ: Ê buốt khi ăn nóng / lạnh, đau khi nhai. Ê buốt răng hàm dưới trái khoảng 1 tuần, tăng dần khi ăn đồ lạnh."
+                value={value}
+                onChange={(event) => onChange?.(event.target.value)}
+            />
         </ClinicalExamSection>
     );
 };

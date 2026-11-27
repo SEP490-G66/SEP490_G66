@@ -509,4 +509,78 @@ namespace OZE.UnitTest.Services.Imaging
             }
         }
     }
+
+    // OZ-IMG-07 UploadImagingResult — technician uploads images by hand
+    [Trait("Tab", "OZ-IMG-07")]
+    public class UploadImagingResultTests : ImagingCaptureTestBase
+    {
+        private static UploadedImagingFile Png(string name = "pano.png", byte[]? data = null) =>
+            new(name, "image/png", data ?? new byte[] { 1, 2, 3, 4 });
+
+        // UTCID01 (N): upload one PNG on a pending request → saved and request moves to InProgress
+        [Fact]
+        public async Task UploadAsync_ShouldSaveImage_WhenRequestPending()
+        {
+            List<ImagingResult>? added = null;
+            _files.Setup(f => f.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+                .Returns(Task.CompletedTask);
+            _captures.Setup(r => r.AddResults(It.IsAny<IEnumerable<ImagingResult>>()))
+                .Callback<IEnumerable<ImagingResult>>(rows => added = rows.ToList());
+            _captures.Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+            var result = await _service.UploadAsync(TechnicianUserId, RequestId, new List<UploadedImagingFile> { Png() }, "  note  ");
+
+            result.Should().ContainSingle();
+            result[0].FileName.Should().Be("pano.png");
+            added.Should().ContainSingle();
+            added![0].UploadedByTechnicianId.Should().Be(7);
+            added[0].TechnicianNotes.Should().Be("note");
+            _request.RequestStatus.Should().Be(ImagingRequestConstants.InProgress);
+            _files.Verify(f => f.SaveAsync(It.Is<string>(p => p.EndsWith(".png")), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        // UTCID02 (A): no files chosen
+        [Fact]
+        public async Task UploadAsync_ShouldThrow_WhenNoFiles()
+        {
+            var act = () => _service.UploadAsync(TechnicianUserId, RequestId, new List<UploadedImagingFile>(), null);
+
+            (await act.Should().ThrowAsync<BadRequestException>())
+                .Which.Message.Should().Be(ErrorConstants.ImagingCaptureMessage.UploadFilesRequired);
+        }
+
+        // UTCID03 (A): unsupported extension
+        [Fact]
+        public async Task UploadAsync_ShouldThrow_WhenFileTypeInvalid()
+        {
+            var act = () => _service.UploadAsync(TechnicianUserId, RequestId,
+                new List<UploadedImagingFile> { new("report.pdf", "application/pdf", new byte[] { 1 }) }, null);
+
+            (await act.Should().ThrowAsync<BadRequestException>())
+                .Which.Message.Should().Be(string.Format(ErrorConstants.ImagingCaptureMessage.UploadFileTypeInvalid, "report.pdf"));
+        }
+
+        // UTCID04 (B): empty file bytes
+        [Fact]
+        public async Task UploadAsync_ShouldThrow_WhenFileEmpty()
+        {
+            var act = () => _service.UploadAsync(TechnicianUserId, RequestId,
+                new List<UploadedImagingFile> { Png(data: Array.Empty<byte>()) }, null);
+
+            (await act.Should().ThrowAsync<BadRequestException>())
+                .Which.Message.Should().Be(string.Format(ErrorConstants.ImagingCaptureMessage.UploadFileEmpty, "pano.png"));
+        }
+
+        // UTCID05 (A): imaging request already completed
+        [Fact]
+        public async Task UploadAsync_ShouldThrow_WhenRequestNotOpen()
+        {
+            _request.RequestStatus = ImagingRequestConstants.Completed;
+
+            var act = () => _service.UploadAsync(TechnicianUserId, RequestId, new List<UploadedImagingFile> { Png() }, null);
+
+            (await act.Should().ThrowAsync<BadRequestException>())
+                .Which.Message.Should().Be(string.Format(ErrorConstants.ImagingCaptureMessage.RequestNotOpen, ImagingRequestConstants.Completed));
+        }
+    }
 }

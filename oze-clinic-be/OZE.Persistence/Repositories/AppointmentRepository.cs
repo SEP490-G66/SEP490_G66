@@ -403,17 +403,11 @@ namespace OZE.Persistence.Repositories
                     && x.Status != AppointmentConstants.NoShowStatus);
         }
 
-        public async Task<bool> HasUpcomingTreatmentSessionAsync(int patientId)
+        public async Task<bool> HasActiveTreatmentPlanAsync(int patientId)
         {
-            var today = DateOnly.FromDateTime(ClinicClock.Today);
-            return await _context.TreatmentPlanStages
-                .AnyAsync(s => s.TreatmentPlan.PatientId == patientId
-                    && (s.TreatmentPlan.Status == TreatmentPlanConstants.Approved
-                        || s.TreatmentPlan.Status == TreatmentPlanConstants.InProgress)
-                    && (s.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled
-                        || s.StageStatus == TreatmentPlanConstants.StageStatus.InProgress)
-                    && s.ScheduledDate != null
-                    && s.ScheduledDate >= today);
+            return await _context.TreatmentPlans
+                .AnyAsync(p => p.PatientId == patientId
+                    && (p.Status == TreatmentPlanConstants.Approved || p.Status == TreatmentPlanConstants.InProgress));
         }
 
         public async Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default)

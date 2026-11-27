@@ -1,4 +1,5 @@
-import { ICD10_DENTAL, QUEUE_STATUS } from "./messages";
+import { icd10Name } from "./icd10Dental";
+import { QUEUE_STATUS } from "./messages";
 
 // Queue number box colours: amber while the patient is called, blue when selected otherwise (e.g. being examined).
 export const queueNumberTone = (status, selected) => {
@@ -70,14 +71,15 @@ export const surfacesText = (surfaces) => (surfaces?.length ? surfaces.join(", "
 
 export const CHART_TYPE = { ADULT: "adult", CHILD: "child" };
 
-// "K02.1" -> "Sâu ngà răng" ("" when the code is not in the dental ICD-10 list).
-export const icdName = (code) => ICD10_DENTAL.find((item) => item.code === String(code ?? "").trim().toUpperCase())?.name ?? "";
+// "K02.1" -> "Sâu ngà răng" ("" when the code is not in the dental ICD-10 list, utils/icd10Dental).
+export const icdName = icd10Name;
 
 // ---------- Step 3: treatment plan ----------
 // A planned service: { id, serviceId, name, status (PLAN_SERVICE_STATUS key), sessions: [session] }.
-// A session: { id, title, typeId, date ("yyyy-mm-dd" or ""), cost (VND, null = not set), note, status (PLAN_SESSION_STATUS key) }.
+// A session: { id, title, typeId, date ("yyyy-mm-dd" or ""), cost (VND, null = not set), note, status (PLAN_SESSION_STATUS key),
+// doctorId (the doctor who is to do it, as a string; "" = the doctor making the plan) }.
 
-export const newPlanSession = (id) => ({ id, title: "", typeId: "", date: "", cost: null, note: "", status: "pending" });
+export const newPlanSession = (id) => ({ id, title: "", typeId: "", date: "", cost: null, note: "", status: "pending", doctorId: "" });
 
 // Total planned cost of some sessions (sessions without a cost count as 0).
 export const sessionsCost = (sessions) => sessions.reduce((total, session) => total + (Number.isFinite(session.cost) ? session.cost : 0), 0);

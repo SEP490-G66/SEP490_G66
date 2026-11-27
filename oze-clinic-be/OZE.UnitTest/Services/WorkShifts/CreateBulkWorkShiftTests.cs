@@ -12,7 +12,8 @@ using Xunit;
 
 namespace OZE.UnitTest.Services.WorkShifts
 {
-    // SCRUM-1008 Bulk create / preview work shifts
+    // OZ-WS-07 CreateBulkWorkShift — SCRUM-1008 bulk create / preview work shifts
+    [Trait("Tab", "OZ-WS-07")]
     public class CreateBulkWorkShiftTests : WorkShiftTestBase
     {
         [Fact]
@@ -233,6 +234,25 @@ namespace OZE.UnitTest.Services.WorkShifts
 
             await act.Should().ThrowAsync<BadRequestException>()
                 .WithMessage(ErrorConstants.WorkShiftMessage.BulkShiftNothingToCreate);
+        }
+
+        // UTCID11 (A): one slot of the request starting off the slot boundary stops the whole request
+        [Fact]
+        public async Task PreviewBulkWorkShiftsAsync_ShouldThrow_WhenAnySlotStartsOffBoundary()
+        {
+            SetupValidStaffAndRoom();
+            SetupSlotMinutes("30");
+            var request = CreateValidBulkRequest();
+            request.Slots = new List<BulkWorkShiftSlot>
+            {
+                new() { ShiftStart = new TimeOnly(8, 0), ShiftEnd = new TimeOnly(12, 0) },
+                new() { ShiftStart = new TimeOnly(13, 10), ShiftEnd = new TimeOnly(17, 0) }
+            };
+
+            var act = () => _service.PreviewBulkWorkShiftsAsync(request);
+
+            var error = await act.Should().ThrowAsync<BadRequestException>();
+            error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.ShiftStartOffSlot);
         }
     }
 }

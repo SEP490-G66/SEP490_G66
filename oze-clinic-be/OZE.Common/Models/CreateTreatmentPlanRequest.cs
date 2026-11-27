@@ -35,5 +35,8 @@ namespace OZE.Common.Models
         public decimal? EstimatedCost { get; set; }
 
         public DateOnly? ScheduledDate { get; set; }
+
+        // The doctor who is to do the session; left out, the doctor making the plan does it
+        public int? AssignedDoctorId { get; set; }
     }
 }

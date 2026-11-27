@@ -327,6 +327,7 @@ export const GUEST_BOOKING_TEXT = {
     SUCCESS_TEXT: "Lịch hẹn của bạn đang chờ phòng khám xác nhận. Lễ tân sẽ báo cho bạn qua SMS hoặc email khi lịch được xác nhận. Muốn đổi hoặc hủy lịch, vui lòng gọi hotline.",
     ERROR_PHONE_HAS_ACCOUNT: "Số điện thoại này đã có tài khoản nên hệ thống chưa nhận đặt lịch không cần đăng nhập. Bạn có thể đăng nhập để đặt lịch, hoặc gọi",
     ERROR_HAS_UNFINISHED: "Số điện thoại này đang có một lịch hẹn chưa hoàn tất. Để đổi hoặc hủy lịch đó, vui lòng gọi",
+    ERROR_ACTIVE_PLAN: "Số điện thoại này đang có kế hoạch điều trị chưa hoàn tất nên chưa đặt được lịch khám mới. Để hẹn buổi điều trị tiếp theo, vui lòng gọi",
     ERROR_MULTIPLE_RECORDS: "Số điện thoại này gắn với nhiều hồ sơ bệnh nhân. Để đặt lịch, vui lòng gọi",
     ERROR_PHONE: "Số điện thoại không hợp lệ. Vui lòng kiểm tra lại hoặc gọi",
     ERROR_EMAIL: "Email không hợp lệ. Vui lòng kiểm tra lại hoặc gọi",
@@ -352,15 +353,9 @@ export const EXAM_QUEUE_STATUS = {
     [QUEUE_STATUS.CALLED]: { label: "Đã gọi", badge: "badge-warning" },
     [QUEUE_STATUS.IN_EXAMINATION]: { label: "Đang khám", badge: "badge-info" },
     // Display only (still waiting): sent for an X-ray, or back from it with the visit still open
-    AT_IMAGING: { label: "Đang đi chụp", badge: "badge-warning" },
+    AT_IMAGING: { label: "Chờ chụp chiếu", badge: "badge-warning" },
     RETURNED: { label: "Chụp xong · khám tiếp", badge: "badge-info" },
 };
-
-// Steps of one exam visit, shown by ExamStepper once the exam has started.
-export const EXAM_STEPS = ["Lập hồ sơ bệnh án", "Khám & Chẩn đoán", "Lập kế hoạch điều trị", "Điều trị", "Kê đơn thuốc"];
-
-// Heading of each step's content, same order as EXAM_STEPS.
-export const EXAM_STEP_TITLES = ["Bổ sung tiền sử bệnh", "Khám lâm sàng & chẩn đoán", "Lập kế hoạch điều trị", "Thực hiện điều trị", "Kê đơn thuốc"];
 
 // Medical history checklists of step 1. The doctor can also type items not in the list.
 export const HISTORY_ALLERGY_OPTIONS = [
@@ -403,43 +398,48 @@ export const HISTORY_DENTAL_OPTIONS = [
     "Đau khớp thái dương hàm",
 ];
 
-// Common symptoms the doctor can tick in the "Khám" tab.
-export const EXAM_SYMPTOMS = [
-    "Đau răng",
-    "Ê buốt khi ăn nóng / lạnh",
-    "Đau tự phát về đêm",
-    "Đau khi nhai",
-    "Chảy máu chân răng",
-    "Sưng lợi",
-    "Sưng má / mặt",
-    "Hôi miệng",
-    "Răng lung lay",
-    "Mẻ / vỡ răng",
-    "Lỗ sâu nhìn thấy",
-    "Nhét thức ăn kẽ răng",
-    "Răng đổi màu",
-    "Đau răng khôn",
-    "Đau khớp hàm / há miệng hạn chế",
-    "Loét miệng",
-    "Khô miệng",
-    "Mất răng",
-    "Răng mọc lệch / chen chúc",
-];
-
-// Suggestions for the free-text tooth condition of the exam chart.
+// Suggestions for the free-text tooth condition of the exam chart (the doctor may also type anything else).
 export const TOOTH_CONDITION_SUGGESTIONS = [
-    "Sâu răng",
+    "Sâu men",
+    "Sâu ngà",
+    "Sâu răng lộ tủy",
+    "Sâu chân răng",
+    "Sâu tái phát dưới miếng trám",
     "Mòn cổ răng",
+    "Mòn mặt nhai",
     "Nứt răng",
     "Mẻ răng",
-    "Răng lung lay",
-    "Viêm tủy",
+    "Gãy thân răng",
+    "Gãy chân răng",
+    "Ê buốt ngà",
+    "Viêm tủy có hồi phục",
+    "Viêm tủy không hồi phục",
+    "Tủy hoại tử",
+    "Viêm quanh cuống",
+    "Áp xe quanh cuống",
+    "Nang chân răng",
+    "Viêm lợi",
+    "Viêm quanh răng",
+    "Túi nha chu",
+    "Tụt lợi",
+    "Cao răng",
+    "Răng lung lay độ 1",
+    "Răng lung lay độ 2",
+    "Răng lung lay độ 3",
+    "Răng nhiễm màu",
     "Đã trám",
+    "Miếng trám bong / hở",
     "Đã điều trị tủy",
-    "Mão / cầu sứ",
+    "Mão sứ",
+    "Cầu răng sứ",
+    "Implant",
     "Mất răng",
+    "Chân răng còn sót",
     "Răng mọc lệch",
+    "Răng mọc kẹt",
     "Răng ngầm",
+    "Răng thừa",
+    "Răng sữa chưa thay",
 ];
 
 // Tooth surfaces of the exam chart, in the order of the design.
@@ -480,27 +480,6 @@ export const PLAN_SESSION_STATUS = {
     done: { label: "Đã thực hiện", badge: "badge-success" },
 };
 
-// ICD-10 codes the doctor picks from in "Chẩn đoán xác định" (dental chapter K00–K08, plus tooth fracture).
-export const ICD10_DENTAL = [
-    { code: "K01.1", name: "Răng ngầm" },
-    { code: "K02.0", name: "Sâu men răng" },
-    { code: "K02.1", name: "Sâu ngà răng" },
-    { code: "K02.2", name: "Sâu xê măng" },
-    { code: "K02.3", name: "Sâu răng ngưng tiến triển" },
-    { code: "K03.0", name: "Mòn răng sinh lý quá mức" },
-    { code: "K03.1", name: "Mòn răng cơ học (mòn cổ răng)" },
-    { code: "K03.6", name: "Cặn bám trên răng" },
-    { code: "K04.0", name: "Viêm tủy răng" },
-    { code: "K04.1", name: "Hoại tử tủy răng" },
-    { code: "K04.4", name: "Viêm quanh chóp cấp" },
-    { code: "K04.5", name: "Viêm quanh chóp mạn" },
-    { code: "K05.0", name: "Viêm lợi cấp" },
-    { code: "K05.1", name: "Viêm lợi mạn" },
-    { code: "K05.3", name: "Viêm nha chu mạn" },
-    { code: "K07.3", name: "Bất thường vị trí răng" },
-    { code: "K08.1", name: "Mất răng do nhổ, tai nạn hoặc bệnh nha chu" },
-    { code: "S02.5", name: "Gãy răng" },
-];
 
 export const STAGE_STATUS = { SCHEDULED: "Scheduled", IN_PROGRESS: "InProgress", COMPLETED: "Completed", CANCELLED: "Cancelled" };
 
@@ -836,6 +815,7 @@ export const RECEPTION_BOOKING_TEXT = {
     LOAD_ERROR_TEXT: "Bấm \"Thử lại\" để tải lại dịch vụ và bác sĩ.",
     SUBMIT_ERROR: "Chưa đặt được lịch. Thông tin đã chọn vẫn được giữ, vui lòng bấm \"Đặt lịch\" lại.",
     ERROR_HAS_UNFINISHED: "Bệnh nhân đang có một lịch hẹn chưa khám xong. Hủy hoặc dời lịch đó trước khi đặt lịch mới.",
+    ERROR_ACTIVE_PLAN: "Bệnh nhân đang thực hiện kế hoạch điều trị. Đặt lịch cho buổi tiếp theo của kế hoạch, hoặc huỷ kế hoạch trước khi đặt lịch khám mới.",
     ERROR_PATIENT_GONE: "Hồ sơ bệnh nhân này không còn. Tìm lại hồ sơ rồi đặt lịch.",
     ERROR_MULTIPLE_RECORDS: "Số điện thoại này gắn với nhiều hồ sơ. Mở Hồ sơ bệnh nhân để chọn đúng người.",
     ERROR_PHONE: "Số điện thoại không hợp lệ.",
@@ -850,6 +830,8 @@ export const RECEPTION_BOOKING_TEXT = {
     ERROR_STAGE_NOT_FOUND: "Buổi điều trị không thuộc bệnh nhân này. Tải lại hộp đặt lịch rồi chọn lại.",
     ERROR_STAGE_NOT_OPEN: "Buổi này đã làm xong hoặc đã huỷ, hoặc kế hoạch không còn đang điều trị.",
     ERROR_STAGE_BOOKED: "Buổi này đã có lịch hẹn khác. Đổi giờ lịch đó thay vì đặt mới.",
+    ERROR_SURGERY_NEEDS_PLAN: "Dịch vụ tiểu phẫu chỉ đặt được cho buổi điều trị bác sĩ đã lập trong kế hoạch. Chọn buổi đó, hoặc bỏ dịch vụ tiểu phẫu.",
+    ERROR_STAGE_DOCTOR: "Buổi điều trị chỉ được đặt với bác sĩ thực hiện đã chọn trong kế hoạch.",
 };
 
 export const BOOKING_TEXT = {
@@ -884,6 +866,7 @@ export const BOOKING_TEXT = {
     SERVICE_REMOVED: (label) => `Đã bỏ ${label}.`,
     DOCTOR: "Bác sĩ",
     ANY_DOCTOR: "Không yêu cầu",
+    DOCTOR_LOCKED: "Buổi điều trị được đặt với bác sĩ thực hiện đã chọn trong kế hoạch.",
     CLINIC_ASSIGNS: "Phòng khám sắp xếp",
     DAY: "Ngày khám",
     WEEK_TEXT: (from, to) => `Tuần (${from} – ${to})`,
@@ -932,6 +915,8 @@ export const BOOKING_TEXT = {
     SUBMIT_SLOT_TAKEN: (range) => `Chưa đặt được lịch: ca ${range} vừa hết chỗ. Vui lòng chọn ca khác rồi bấm "Đặt lịch khám" lại.`,
     SUBMIT_PAST_DATE: "Chưa đặt được lịch: ngày đã chọn không còn đặt được (chỉ đặt trước tối đa 30 ngày). Vui lòng chọn ngày và ca khác.",
     SUBMIT_ERROR: "Chưa đặt được lịch do lỗi kết nối. Thông tin bạn chọn vẫn được giữ, vui lòng bấm \"Đặt lịch khám\" lại. Nếu vẫn lỗi, gọi",
+    // Followed by the hotline
+    ERROR_ACTIVE_PLAN: "Bạn đang trong kế hoạch điều trị nên chưa đặt được lịch khám mới. Buổi điều trị tiếp theo do phòng khám hẹn; để đổi lịch hoặc huỷ kế hoạch, vui lòng gọi",
     SUBMIT: "Đặt lịch khám",
     SUBMITTING: "Đang đặt lịch…",
     LOAD_ERROR_TITLE: "Không thể tải thông tin đặt lịch",
@@ -1427,10 +1412,12 @@ export const FOLLOW_UP_TEXT = {
 };
 
 export const APPOINTMENT_ERROR_TEXT = [
+    ["booked with the doctor chosen for it", "Buổi điều trị chỉ được đặt với bác sĩ thực hiện đã chọn trong kế hoạch."],
     ["time slot is no longer available", "Khung giờ này vừa có người đặt. Vui lòng chọn giờ khác."],
     ["too far in advance", "Ngày hẹn vượt quá thời gian mở lịch."],
     ["date cannot be in the past", "Ngày hẹn đã qua."],
     ["not finished", "Bệnh nhân đang có một lịch hẹn chưa xong nên không đặt thêm được."],
+    ["undergoing a treatment plan", "Bệnh nhân đang thực hiện kế hoạch điều trị. Đặt lịch cho buổi tiếp theo của kế hoạch, hoặc huỷ kế hoạch trước khi đặt lịch khám mới."],
     ["follow-up appointment has already been scheduled", "Lượt khám này đã có lịch tái khám. Vui lòng tải lại danh sách."],
     ["follow-up date must be in the future", "Ngày tái khám phải sau ngày khám."],
     ["waiting for confirmation can be confirmed", "Lịch này không còn ở trạng thái chờ xác nhận. Vui lòng tải lại danh sách."],
@@ -1450,37 +1437,81 @@ export const SCHEDULE_TEXT = {
     CRUMB: "Lịch hẹn",
     DOC_TITLE: "Quản lý lịch hẹn – OZE",
     BOOK: "Đặt lịch",
-    PREV_WEEK: "Tuần trước",
-    NEXT_WEEK: "Tuần sau",
-    THIS_WEEK: "Tuần này",
-    DOCTOR: "Bác sĩ",
-    ALL_DOCTORS: "Tất cả bác sĩ",
-    SERVICE: "Dịch vụ",
-    ALL_SERVICES: "Tất cả dịch vụ",
+    PREV_DAY: "Ngày trước",
+    NEXT_DAY: "Ngày sau",
+    TODAY: "Hôm nay",
+    PICK_DATE: "Chọn ngày",
+    DAYS_OF_WEEK: "Ngày trong tuần",
+    MONTH_SHORT: (month) => `TH ${month}`,
     WEEKDAYS_SHORT: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
     WEEKDAYS: ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ nhật"],
-    TODAY: "Hôm nay",
+    DAY_TITLE: (weekday, date) => `${weekday}, ${date}`,
+    DAY_SUB: (when, n) => `${when ? `${when} · ` : ""}${n} lịch hẹn`,
+    WHEN_TODAY: "Hôm nay",
+    WHEN_PAST: "Đã qua",
+    // Day strip
+    DAY_COUNT: (n) => `${n} lịch`,
+    DAY_FREE: (n) => `Còn ${n} chỗ`,
+    DAY_FULL: "Kín lịch",
     NO_SHIFT: "Không có ca",
     NOT_OPEN: "Chưa mở lịch",
+    UNKNOWN: "—",
+    // Room header
+    SURGERY_TAG: "Tiểu phẫu",
+    SESSION: { day: "Cả ngày", am: "Sáng", pm: "Chiều" },
+    ON_LEAVE: (name) => `${name} (nghỉ)`,
+    ROOM_FREE: (n) => `Còn ${n} chỗ`,
+    ROOM_FULL: "Kín lịch",
+    ROOM_ENDED: "Hết ca",
+    ROOM_SURGERY: "Theo kế hoạch điều trị",
+    // Grid
     BREAK: (lunch, from, to) => `${lunch ? "Nghỉ trưa" : "Nghỉ"} ${from} – ${to}`,
-    CELL_LABEL: (day, time, n) => `${day}, ${time}: ${n} lịch hẹn`,
-    ADD_LABEL: (day, time) => `Đặt lịch vào ${day}, ${time}`,
+    FREE: (time) => `Trống ${time}`,
+    FREE_HOVER: "· Đặt lịch",
+    FREE_LABEL: (room, day, time) => `Đặt lịch ${room}, ${day} ${time}`,
+    NOW: "Bây giờ",
+    EMPTY_DAY: "Không có ca làm việc nào trong ngày này.",
+    LOADING: "Đang tải lịch…",
+    APPOINTMENT_LABEL: (name, time, state) => `${name}, ${time}, ${state}`,
     STATUS: {
-        done: "Đã khám",
-        noshow: "Không đến",
-        cancelled: "Đã hủy",
-        serving: "Đang khám",
-        checkedin: "Đã check-in",
+        late: "Quá giờ, chưa đến",
+        open: "Chưa kết thúc",
         notyet: "Chưa đến",
+        checkedin: "Đã check-in",
+        serving: "Đang khám",
         pending: "Chờ xác nhận",
         confirmed: "Đã xác nhận",
+        done: "Đã khám",
+        noshow: "Không đến",
     },
-    LEGEND_PAST: "Ngày đã qua, ca đã qua:",
-    LEGEND_TODAY: "Hôm nay:",
-    LEGEND_FUTURE: "Ngày tới:",
+    // Quick detail
+    DETAIL: "Chi tiết lịch hẹn",
+    CLOSE: "Đóng",
+    FIELDS: { time: "Giờ", service: "Dịch vụ", room: "Phòng", doctor: "Bác sĩ", phone: "SĐT", code: "Mã BN" },
+    OPEN_CHECK_IN: "Mở ở Check-in",
+    OPEN_QUEUE: "Mở ở Hàng chờ",
+    OPEN_CONFIRM: "Mở ở Xác nhận lịch hẹn",
+    OPEN_CLOSE_OUT: "Mở hồ sơ để chốt trạng thái",
+    RESCHEDULE: "Đổi giờ",
+    PATIENT_RECORD: "Hồ sơ bệnh nhân",
+    TREATMENT_PLAN: "Kế hoạch điều trị",
+    // Treatment plan sessions
+    SESSION_TAG: (n, total) => `B${n}/${total}`,
+    SESSION_OF: (n, total) => `Buổi ${n}/${total}`,
+    PENDING_BUTTON: "Buổi chờ xếp giờ",
+    PENDING_LOADING: "Đang tải các buổi chờ xếp giờ…",
+    PENDING_ERROR: "Không tải được các buổi chờ xếp giờ.",
+    PENDING_EMPTY: "Không có buổi điều trị nào đang chờ xếp giờ.",
+    PENDING_DUE: (date) => `dự kiến ${date}`,
+    PICK_BAR: (name, session, service, doctor) => `Chọn giờ cho ${name} · ${session}${service ? ` · ${service}` : ""}${doctor ? ` · ${doctor}` : ""}`,
+    PICK_NONE: "Bác sĩ thực hiện không có giờ phù hợp trong ngày này. Chọn ngày khác.",
+    PICK_NO_ROOM_WEEK: (doctor) =>
+        `${doctor || "Bác sĩ thực hiện"} không có ca ở phòng phù hợp dịch vụ này trong tuần. Chọn tuần khác, hoặc báo bác sĩ lập kế hoạch đổi bác sĩ thực hiện nếu bác sĩ này không làm dịch vụ này.`,
+    PICK_LABEL: (room, day, time) => `Đặt giờ cho buổi điều trị: ${room}, ${day} ${time}`,
+    UNPICK: "Bỏ chọn",
     LOAD_ERROR: "Không tải được lịch hẹn của tuần này.",
     RETRY: "Thử lại",
-    BOOKED: (name, day, time) => `Đã đặt lịch cho ${name}: ${day} ${time}`,
+    BOOKED: (name, day, time, room) => `Đã đặt lịch cho ${name}: ${day} ${time}${room ? `, ${room}` : ""}`,
 };
 
 export const CHECK_IN_TEXT = {
@@ -1571,6 +1602,7 @@ export const RESCHEDULE_TEXT = {
     DOCTOR: "Bác sĩ",
     ANY_DOCTOR: "Bác sĩ nào cũng được",
     CURRENT_DOCTOR: (name) => `${name} (bác sĩ đang hẹn)`,
+    DOCTOR_LOCKED: "Buổi điều trị theo kế hoạch giữ bác sĩ thực hiện đã chọn; chỉ đổi ngày giờ.",
     SLOTS: "Giờ còn trống",
     SLOTS_LOADING: "Đang tìm giờ trống…",
     SLOTS_EMPTY: "Không còn giờ trống ngày này. Chọn ngày hoặc bác sĩ khác.",

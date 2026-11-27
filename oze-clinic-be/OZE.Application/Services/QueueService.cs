@@ -314,6 +314,33 @@ namespace OZE.Application.Services
             return entry;
         }
 
+        public async Task<QueueEntry?> TransferAsync(
+            long appointmentId,
+            string queueType,
+            int? roomId,
+            int assignedStaffId,
+            string? notes,
+            CancellationToken cancellationToken = default)
+        {
+            var entry = await _queueRepository.GetActiveByAppointmentAndTypeAsync(appointmentId, queueType, cancellationToken);
+            if (entry == null)
+            {
+                return null;
+            }
+
+            entry.RoomId = roomId;
+            entry.AssignedStaffId = assignedStaffId;
+            entry.Status = QueueConstants.Waiting;
+            entry.CalledAt = null;
+            entry.StartedAt = null;
+            entry.Notes = notes;
+
+            await _queueRepository.UpdateAsync(entry, cancellationToken);
+            _logger.LogInformation("Queue entry {QueueId} of appointment {AppointmentId} transferred to staff {StaffId} in room {RoomId}",
+                entry.Id, appointmentId, assignedStaffId, roomId);
+            return entry;
+        }
+
         public Task<QueueEntry?> GetActiveEntryAsync(long appointmentId, string queueType, CancellationToken cancellationToken = default)
         {
             return _queueRepository.GetActiveByAppointmentAndTypeAsync(appointmentId, queueType, cancellationToken);

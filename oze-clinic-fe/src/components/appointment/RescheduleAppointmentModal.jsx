@@ -209,6 +209,9 @@ const RescheduleAppointmentModal = ({ appointment, onClose, onRescheduled, onNot
             case APPOINTMENT_ACTION_CODE.NOT_ALLOWED:
                 setFormAlert({ message: NOT_ALLOWED_MESSAGE, refetch: true });
                 return;
+            case APPOINTMENT_ACTION_CODE.ACTIVE_PLAN:
+                setFormAlert({ message: `${BOOKING_TEXT.ERROR_ACTIVE_PLAN} ${CLINIC_HOTLINE.DISPLAY}.`, refetch: false });
+                return;
             default:
                 setFormAlert({ message: GENERIC_ERROR_MESSAGE, refetch: false });
         }

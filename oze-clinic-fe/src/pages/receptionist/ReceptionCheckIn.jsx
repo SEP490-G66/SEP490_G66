@@ -9,6 +9,7 @@ import CheckInDialog from "@/components/reception/CheckInDialog";
 import ServiceCell from "@/components/reception/ServiceCell";
 import { Card, CancelDialog, RescheduleDialog, WalkInDialog } from "@/components/reception/shared";
 import { clinicClock, clockOf, phoneText, report, useDoctorsOnDuty, usePaging, weekdayDate } from "@/components/reception/receptionUtils";
+import useAppointmentLink from "@/hooks/useAppointmentLink";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
     cancelAppointment,
@@ -49,9 +50,8 @@ const IN_CLINIC = ["checkedin", "serving"];
 
 const ReceptionCheckIn = () => {
     const { state: navState } = useLocation();
-    // Other pages open one appointment here with ?appointment=<id> (and may preset ?slot= / ?doctor=)
+    // Other pages may preset ?slot= / ?doctor=; ?appointment= is handled by useAppointmentLink
     const [params] = useSearchParams();
-    const linkedId = params.get("appointment");
     const [result, setResult] = useState(null);
     const [version, setVersion] = useState(0);
     const [dialog, setDialog] = useState(null);
@@ -154,16 +154,6 @@ const ReceptionCheckIn = () => {
         ),
     );
     const { pageItems, footer, setPage, start } = usePaging(shown, PAGE_SIZE);
-    const linkedIndex = linkedId ? shown.findIndex((x) => String(x.id) === linkedId) : -1;
-
-    // The linked appointment: open its page once and bring its row into view
-    const linkedShown = useRef(false);
-    useEffect(() => {
-        if (linkedShown.current || linkedIndex < 0) return;
-        linkedShown.current = true;
-        setPage(Math.floor(linkedIndex / PAGE_SIZE) + 1);
-        requestAnimationFrame(() => document.getElementById(`checkin-row-${linkedId}`)?.scrollIntoView({ block: "center" }));
-    }, [linkedIndex, linkedId, setPage]);
     const filtered = isFilteredCheckIn(filters);
     const setFilter = (key) => (value) => {
         setFilters((current) => ({ ...current, [key]: value }));
@@ -173,6 +163,13 @@ const ReceptionCheckIn = () => {
         setFilters(EMPTY_CHECK_IN_FILTERS);
         setPage(1);
     };
+    // "?appointment=" from the appointment grid: clear the filters and open the page that holds the row
+    const { highlightId } = useAppointmentLink(sortCheckIn(appointments), {
+        reveal: (_, index) => {
+            setFilters(EMPTY_CHECK_IN_FILTERS);
+            setPage(Math.floor(index / PAGE_SIZE) + 1);
+        },
+    });
 
     const body = () => {
         if (!result) return <p className="px-6 py-10 text-center text-body-sm text-muted">{TEXT.LOADING}</p>;
@@ -212,11 +209,7 @@ const ReceptionCheckIn = () => {
                             const done = DONE_STATES.includes(state);
                             const session = a.planSession;
                             return (
-                                <tr
-                                    key={a.id}
-                                    id={`checkin-row-${a.id}`}
-                                    className={cx(done && "text-muted", String(a.id) === linkedId && "bg-primary-softer [&>td:first-child]:shadow-[inset_3px_0_0_var(--color-primary)]")}
-                                >
+                                <tr key={a.id} data-appointment-row={a.id} className={cx(done && "text-muted", highlightId === a.id && "bg-warning-soft")}>
                                     <td data-label={TEXT.COLUMNS[0]} className="num text-muted">
                                         {start + index + 1}
                                     </td>

@@ -4,10 +4,12 @@ using OZE.Application.Middlewares;
 using OZE.Common.Constants;
 using OZE.Common.Exceptions;
 using OZE.Common.Models;
+using OZE.Common.Models.Base;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,6 +24,43 @@ namespace OZE.Application.Services
         {
             _medicalRecordRepository = medicalRecordRepository;
             _staffRepository = staffRepository;
+        }
+
+        public async Task<PagedResult<DoctorPatientResponse>> GetMyPatientsAsync(string userId, DoctorPatientQuery query, CancellationToken cancellationToken = default)
+        {
+            var doctor = await _staffRepository.GetByUserIdAsync(userId);
+            ConditionGuard.Ensure<NotFoundException>(doctor != null, ErrorConstants.MedicalRecordMessage.DoctorNotFound);
+
+            var keyword = string.IsNullOrWhiteSpace(query.SearchKeyword) ? null : query.SearchKeyword.Trim();
+            return await _medicalRecordRepository.GetDoctorPatientsAsync(
+                doctor!.Id, keyword, PhoneDigitsOf(keyword), query.PageNumber, query.PageSize, cancellationToken);
+        }
+
+        // Phones are stored as +84…: "0912 345", "+84912" or "912345" all search the digits after the prefix.
+        // Null when the keyword is not a phone number (a name or a patient code).
+        internal static string? PhoneDigitsOf(string? keyword)
+        {
+            if (keyword == null)
+            {
+                return null;
+            }
+
+            var digits = Regex.Replace(keyword, @"[\s.\-]", string.Empty);
+            if (!Regex.IsMatch(digits, @"^\+?\d{3,}$"))
+            {
+                return null;
+            }
+
+            if (digits.StartsWith("+84"))
+            {
+                digits = digits[3..];
+            }
+            else if (digits.StartsWith('0'))
+            {
+                digits = digits[1..];
+            }
+
+            return digits.Length > 0 ? digits : null;
         }
 
         public async Task<PatientMedicalRecordResponse> GetPatientRecordAsync(string userId, int patientId)

@@ -1,25 +1,25 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
 import useAutosave from "@/hooks/useAutosave";
-import { finalizePrescription, reopenPrescription, savePrescriptionDraft } from "@/services/examinationService";
+import useExamDraft from "@/hooks/useExamDraft";
+import { reopenPrescription, savePrescriptionDraft } from "@/services/examinationService";
 import { GENERIC_ERROR_MESSAGE } from "@/utils/messages";
-import AllergyAlert from "@/components/examination/AllergyAlert";
+import PrescriptionContextCards from "@/components/examination/PrescriptionContextCards";
 import PrescriptionErrorAlert from "@/components/examination/PrescriptionErrorAlert";
 import PrescriptionItemDeleteDialog from "@/components/examination/PrescriptionItemDeleteDialog";
 import PrescriptionItemDialog from "@/components/examination/PrescriptionItemDialog";
 import PrescriptionNoteCard from "@/components/examination/PrescriptionNoteCard";
 import PrescriptionTable from "@/components/examination/PrescriptionTable";
-import StepActionBar from "@/components/examination/StepActionBar";
 
 // TODO(api): contraindication warnings come from the AI check ({ [itemId]: message }); none until it is connected.
 const NO_WARNINGS = {};
 
-// Step 5 "Kê đơn thuốc", the last step: the medicines of this visit and the prescription's note.
-// record.prescription is the visit's prescription ({ items, notes, status: "Draft" | "Finalized" }); changes are saved to
-// the backend automatically and passed to onPrescriptionChange. "Hoàn tất & kết thúc lượt khám" saves and finalizes it
-// (the visit cannot end on a draft with medicines), then onEnd (the page confirms the end). A visit without medicine
-// can be completed too. A finalized prescription is read only until "Mở lại đơn".
-const PrescriptionTab = ({ queueId, record, busy = false, onPrescriptionChange, onEnd }) => {
+// Step "Kê đơn thuốc": the medicines of this visit and the prescription's note, with the patient's allergies,
+// the diagnoses and today's treatment beside them (Figma). record.prescription is the visit's prescription
+// ({ items, notes, status: "Draft" | "Finalized" }); changes are saved to the backend automatically and passed to
+// onPrescriptionChange. "Kết thúc lượt khám" in the visit header finalizes it (ExaminationPage). A finalized
+// prescription is read only until "Mở lại đơn". draft: the header's "Lưu nháp" and status (useExamDraft).
+const PrescriptionTab = ({ queueId, record, busy = false, onPrescriptionChange, draft }) => {
     const { value: prescription, setValue: setPrescription, statusText, saveNow } = useAutosave(
         (value) => savePrescriptionDraft(queueId, value),
         record.prescription,
@@ -54,17 +54,10 @@ const PrescriptionTab = ({ queueId, record, busy = false, onPrescriptionChange, 
         return response.success;
     };
 
-    const finish = async () => {
-        setWorking(true);
-        const response = await finalizePrescription(queueId, prescription);
-        setWorking(false);
-        if (!response.success) {
-            setSaveError(response.message ?? GENERIC_ERROR_MESSAGE);
-            return;
-        }
-        setSaveError("");
-        setPrescription(response.data);
-        onEnd();
+    const saveDraft = async () => {
+        const saved = await save();
+        if (saved) toast.success("Đã lưu đơn thuốc.");
+        return { success: saved };
     };
 
     const reopen = async () => {
@@ -82,6 +75,8 @@ const PrescriptionTab = ({ queueId, record, busy = false, onPrescriptionChange, 
     const disabled = busy || working;
     const finalized = prescription.status === "Finalized";
 
+    useExamDraft(draft, saveNow, finalized ? "Đơn thuốc đã chốt" : statusText);
+
     return (
         <>
             <PrescriptionErrorAlert message={saveError} />
@@ -93,27 +88,28 @@ const PrescriptionTab = ({ queueId, record, busy = false, onPrescriptionChange, 
                     </button>
                 </div>
             )}
-            <AllergyAlert allergies={record.history.allergies} />
-            {/* A finalized prescription is shown with every field and button turned off */}
-            <fieldset disabled={finalized} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
-                <PrescriptionTable
-                    items={prescription.items}
-                    warnings={NO_WARNINGS}
-                    onAdd={() => setDialog({ type: "add" })}
-                    onEdit={(item) => setDialog({ type: "edit", item })}
-                    onRemove={(item) => setDialog({ type: "delete", item })}
-                />
-                <PrescriptionNoteCard value={prescription.notes} onChange={(notes) => setPrescription({ ...prescription, notes })} />
-            </fieldset>
-            <StepActionBar status={finalized ? "Đơn thuốc đã chốt" : statusText}>
-                <button type="button" className="btn btn-secondary" disabled={disabled || finalized} onClick={save}>
-                    Lưu nháp
-                </button>
-                <button type="button" className="btn btn-primary" disabled={disabled} onClick={finish}>
-                    {working && <span className="btn-spinner" aria-hidden="true" />}
-                    Hoàn tất & kết thúc lượt khám
-                </button>
-            </StepActionBar>
+            <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18.75rem]">
+                {/* A finalized prescription is shown with every field and button turned off */}
+                <fieldset disabled={finalized} className="m-0 flex min-w-0 flex-col gap-5 border-0 p-0">
+                    <PrescriptionTable
+                        items={prescription.items}
+                        warnings={NO_WARNINGS}
+                        onAdd={() => setDialog({ type: "add" })}
+                        onEdit={(item) => setDialog({ type: "edit", item })}
+                        onRemove={(item) => setDialog({ type: "delete", item })}
+                    />
+                    <PrescriptionNoteCard value={prescription.notes} onChange={(notes) => setPrescription({ ...prescription, notes })} />
+                    {/* The prescription is finalized by "Kết thúc lượt khám" in the visit header */}
+                    <div className="flex justify-end">
+                        <button type="button" className="btn btn-primary" disabled={disabled} onClick={saveDraft}>
+                            Lưu đơn thuốc
+                        </button>
+                    </div>
+                </fieldset>
+                <div className="lg:sticky lg:top-4">
+                    <PrescriptionContextCards allergies={record.history.allergies} diagnoses={record.exam.diagnoses} treatments={record.treatment.items} />
+                </div>
+            </div>
 
             {(dialog?.type === "add" || dialog?.type === "edit") && <PrescriptionItemDialog item={dialog.item ?? null} onSave={saveItem} onClose={() => setDialog(null)} />}
             {dialog?.type === "delete" && <PrescriptionItemDeleteDialog item={dialog.item} onConfirm={removeItem} onClose={() => setDialog(null)} />}

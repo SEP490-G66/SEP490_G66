@@ -14,12 +14,12 @@ import StepActionBar from "@/components/examination/StepActionBar";
 
 // Step 1 "Lập hồ sơ bệnh án": read-only identity, medical history the doctor completes (each new item is saved to the
 // patient's record shortly after the change), previous visits. Items already in the record are locked: the record
-// keeps them (record.historySaved, then what each save answers). onHistoryChange gets every edit; onNext / onEnd
-// receive the latest history. "Yêu cầu bổ sung tài liệu" asks the patient for a document (uploaded from the medical book);
+// keeps them (record.historySaved, then what each save answers). onHistoryChange gets every edit; onNext
+// receives the latest history ("Kết thúc lượt khám" is in the visit header). "Yêu cầu bổ sung tài liệu" asks the patient for a document (uploaded from the medical book);
 // every request of the patient is listed under the previous visits, this visit's first, then earlier visits' (files sent
 // after a visit ended are read here at the next one), then the documents the patient uploaded without a request.
 // They never block moving on or ending the visit.
-const PatientRecordTab = ({ queueId, record, busy = false, onHistoryChange, onNext, onEnd }) => {
+const PatientRecordTab = ({ queueId, record, busy = false, onHistoryChange, onNext }) => {
     const [saved, setSaved] = useState(record.historySaved);
     const { history, setHistory, statusText } = useHistoryAutosave(queueId, record.history, onHistoryChange, setSaved);
     // { examinationId (this visit), requests } once loaded; error: why the list could not be loaded
@@ -141,11 +141,8 @@ const PatientRecordTab = ({ queueId, record, busy = false, onHistoryChange, onNe
                 <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setRequestOpen(true)}>
                     Yêu cầu bổ sung tài liệu
                 </button>
-                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => onEnd?.(history)}>
-                    Kết thúc lượt khám
-                </button>
                 <button type="button" className="btn btn-primary" disabled={busy} onClick={() => onNext?.(history)}>
-                    Chuyển sang Khám
+                    Lưu & chuyển sang Khám & chẩn đoán
                 </button>
             </StepActionBar>
             {requestOpen && (
