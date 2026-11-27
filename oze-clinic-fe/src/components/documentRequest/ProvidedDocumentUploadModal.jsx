@@ -86,7 +86,7 @@ const ProvidedDocumentUploadModal = ({ request = null, onSubmit, onClose }) => {
             maxFiles={request ? DOCUMENT_UPLOAD_MAX_FILES : PROVIDED_DOCUMENT_MAX_FILES}
             fileLabel="tệp"
             withNote={false}
-            withCamera
+            withImagePicker
             fieldsAfterFiles
             onFilesChange={filesChanged}
             submitLabel="Gửi cho bác sĩ"

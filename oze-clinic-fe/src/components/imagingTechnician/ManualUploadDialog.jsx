@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from "react";
-import { Camera, Upload } from "lucide-react";
+import { ImageIcon, Upload } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { DialogActions } from "@/components/reception/shared";
 import { useSubmit } from "@/components/reception/receptionUtils";
@@ -25,7 +25,7 @@ const problemOf = (file, extensions, maxMb) => {
 // children: extra fields shown above the file box (e.g. the document name), or below the file list with
 // fieldsAfterFiles; validate(): checks them on submit, false keeps the dialog open without sending.
 // onFilesChange(files): the valid files after every change (e.g. to name the document after the first file).
-// submitLabel: the button text instead of "Tải lên (n)". withCamera: a "Chụp ảnh" button that opens the phone camera.
+// submitLabel: the button text instead of "Tải lên (n)". withImagePicker: a "Chọn ảnh" button that opens the photo library (pictures only).
 const ManualUploadDialog = ({
     subtitle,
     title = "Tải ảnh thủ công",
@@ -39,12 +39,12 @@ const ManualUploadDialog = ({
     fieldsAfterFiles = false,
     onFilesChange,
     submitLabel,
-    withCamera = false,
+    withImagePicker = false,
     onSubmit,
     onClose,
 }) => {
     const inputRef = useRef(null);
-    const cameraRef = useRef(null);
+    const imageRef = useRef(null);
     const noteId = useId();
     const [items, setItems] = useState([]);
     const [note, setNote] = useState("");
@@ -113,17 +113,17 @@ const ManualUploadDialog = ({
                     }}
                 />
 
-                {withCamera && (
+                {withImagePicker && (
                     <>
-                        <button type="button" className="btn btn-secondary self-center" onClick={() => cameraRef.current?.click()}>
-                            <Camera className="size-4" aria-hidden="true" />
-                            Chụp ảnh
+                        <button type="button" className="btn btn-secondary self-center" onClick={() => imageRef.current?.click()}>
+                            <ImageIcon className="size-4" aria-hidden="true" />
+                            Chọn ảnh
                         </button>
                         <input
-                            ref={cameraRef}
+                            ref={imageRef}
                             type="file"
-                            accept="image/*"
-                            capture="environment"
+                            multiple
+                            accept="image/jpeg,image/png"
                             className="sr-only"
                             tabIndex={-1}
                             onChange={(event) => {
