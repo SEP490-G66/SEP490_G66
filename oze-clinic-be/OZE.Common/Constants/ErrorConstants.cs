@@ -175,6 +175,7 @@ namespace OZE.Common.Constants
             public const string RoomNotFound = "Room not found";
             public const string RoomNotActive = "Room is not active";
             public const string InvalidTimeRange = "Shift start time must be earlier than end time";
+            public const string ShiftStartOffSlot = "Shift start time must fall on a booking slot boundary";
             public const string PastDate = "Shift date cannot be in the past";
             public const string ShiftOverlap = "This staff member already has a shift that overlaps this time";
             public const string RoomOverlap = "This room is already used by another shift at that time";
