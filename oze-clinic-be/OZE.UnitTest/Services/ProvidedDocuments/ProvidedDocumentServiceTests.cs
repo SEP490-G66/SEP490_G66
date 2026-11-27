@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Moq;
 using OZE.Application.Interfaces;
 using OZE.Application.Services;
@@ -33,8 +33,9 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
 
         private static UploadedImagingFile File(string name, int size = 16) => new(name, null, new byte[size]);
 
-        private static CreateProvidedDocumentRequest Request(string? name = "Xét nghiệm công thức máu", string? address = "Bệnh viện Bạch Mai", DateOnly? performedOn = null) =>
-            new() { DocumentName = name, ProviderAddress = address, PerformedOn = performedOn };
+        private static CreateProvidedDocumentRequest Request(string? name = "Xét nghiệm công thức máu", string? address = "Bệnh viện Bạch Mai", DateOnly? performedOn = null,
+            string? category = ProvidedDocumentConstants.Category.LabResult, string? note = null) =>
+            new() { DocumentName = name, ProviderAddress = address, PerformedOn = performedOn ?? new DateOnly(2025, 5, 2), Category = category, Note = note ?? "Bác sĩ xem giúp" };
 
         private static PatientDocument Stored(Guid group, long id, string ownerUserId = PatientUserId) => new()
         {
@@ -63,7 +64,7 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
                 .Returns(Task.CompletedTask);
             var performedOn = new DateOnly(2024, 5, 2);
 
-            var result = await _service.CreateAsync(PatientUserId, Request(" Xét nghiệm máu ", " BV Bạch Mai ", performedOn), new List<UploadedImagingFile>
+            var result = await _service.CreateAsync(PatientUserId, Request(" Xét nghiệm máu ", " BV Bạch Mai ", performedOn, note: " Chụp trước khi nhổ răng "), new List<UploadedImagingFile>
             {
                 File("ket-qua.PDF"),
                 File("../../phim.dcm")
@@ -73,7 +74,8 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
             added!.Select(d => d.UploadGroupId).Distinct().Should().ContainSingle().Which.Should().Be(result.Id);
             added.Should().OnlyContain(d =>
                 d.PatientId == PatientId && d.DocumentRequestId == null && d.DocumentType == ProvidedDocumentConstants.DocumentType &&
-                d.Description == "Xét nghiệm máu" && d.ProviderAddress == "BV Bạch Mai" && d.PerformedOn == performedOn && d.UploadedByUserId == PatientUserId);
+                d.Description == "Xét nghiệm máu" && d.ProviderAddress == "BV Bạch Mai" && d.PerformedOn == performedOn && d.UploadedByUserId == PatientUserId &&
+                d.Category == ProvidedDocumentConstants.Category.LabResult && d.Note == "Chụp trước khi nhổ răng" && d.SeenAt == null);
             added[1].FileName.Should().Be("phim.dcm");
             added[1].MimeType.Should().Be("application/dicom");
             savedPaths.Should().OnlyContain(p => p.StartsWith("documents/") && p.Contains("/PD-") && !p.Contains(".."));
@@ -83,15 +85,27 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
         }
 
         [Theory]
-        [InlineData(null, "BV", ErrorConstants.ProvidedDocumentMessage.DocumentNameRequired)]
-        [InlineData("   ", "BV", ErrorConstants.ProvidedDocumentMessage.DocumentNameRequired)]
-        [InlineData("Tên", null, ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired)]
-        [InlineData("Tên", " ", ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired)]
-        public async Task CreateAsync_ShouldRequireNameAndAddress(string? name, string? address, string message)
+        [InlineData(null, ProvidedDocumentConstants.Category.Imaging, ErrorConstants.ProvidedDocumentMessage.DocumentNameRequired)]
+        [InlineData("   ", ProvidedDocumentConstants.Category.Imaging, ErrorConstants.ProvidedDocumentMessage.DocumentNameRequired)]
+        [InlineData("Tên", null, ErrorConstants.ProvidedDocumentMessage.CategoryInvalid)]
+        [InlineData("Tên", "Video", ErrorConstants.ProvidedDocumentMessage.CategoryInvalid)]
+        public async Task CreateAsync_ShouldRequireNameAndKnownCategory(string? name, string? category, string message)
         {
-            var act = () => _service.CreateAsync(PatientUserId, Request(name, address), new List<UploadedImagingFile> { File("a.pdf") });
+            var act = () => _service.CreateAsync(PatientUserId, Request(name, category: category), new List<UploadedImagingFile> { File("a.pdf") });
 
             (await act.Should().ThrowAsync<BadRequestException>()).WithMessage(message);
+            _fileStore.Verify(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ShouldRequireWhenAndWhere()
+        {
+            var files = new List<UploadedImagingFile> { File("a.pdf") };
+            var noDate = () => _service.CreateAsync(PatientUserId, new CreateProvidedDocumentRequest { DocumentName = "Phim", Category = ProvidedDocumentConstants.Category.Imaging, ProviderAddress = "BV", Note = "Ghi chú" }, files);
+            var noPlace = () => _service.CreateAsync(PatientUserId, Request(address: "  "), files);
+
+            (await noDate.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.PerformedOnRequired);
+            (await noPlace.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired);
             _fileStore.Verify(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
@@ -102,7 +116,10 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
             var longAddress = () => _service.CreateAsync(PatientUserId, Request(address: new string('a', 301)), new List<UploadedImagingFile> { File("a.pdf") });
 
             (await longName.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.DocumentNameInvalid);
+            var longNote = () => _service.CreateAsync(PatientUserId, Request(note: new string('a', 501)), new List<UploadedImagingFile> { File("a.pdf") });
+
             (await longAddress.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.ProviderAddressInvalid);
+            (await longNote.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.NoteInvalid);
         }
 
         [Fact]
@@ -182,6 +199,20 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
         }
 
         [Fact]
+        public async Task DeleteAsync_ShouldRefuse_WhenADoctorHasSeenIt()
+        {
+            var group = Guid.NewGuid();
+            var seen = Stored(group, 1);
+            seen.SeenAt = DateTimeOffset.UtcNow;
+            _repository.Setup(r => r.GetProvidedGroupAsync(group, It.IsAny<CancellationToken>())).ReturnsAsync(new List<PatientDocument> { seen, Stored(group, 2) });
+
+            var act = () => _service.DeleteAsync(PatientUserId, group);
+
+            (await act.Should().ThrowAsync<ForbiddenException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.CannotDeleteSeen);
+            _repository.Verify(r => r.RemoveDocuments(It.IsAny<IEnumerable<PatientDocument>>()), Times.Never);
+        }
+
+        [Fact]
         public async Task DeleteAsync_ShouldFail_WhenTheUploadDoesNotExist()
         {
             _repository.Setup(r => r.GetProvidedGroupAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>())).ReturnsAsync(new List<PatientDocument>());
@@ -219,6 +250,56 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
             var result = await _service.GetByExaminationAsync(DoctorUserId, ExaminationId);
 
             result.Should().ContainSingle().Which.Id.Should().Be(group);
+        }
+
+        [Fact]
+        public async Task GetByExaminationAsync_ShouldMarkUnseenUploadsSeenByTheDoctor()
+        {
+            var group = Guid.NewGuid();
+            var earlier = DateTimeOffset.UtcNow.AddDays(-3);
+            var doctor = new StaffProfile { Id = DoctorId, UserId = DoctorUserId, FullName = "BS. Trần Minh Khoa" };
+            var otherDoctor = new StaffProfile { Id = DoctorId + 1, FullName = "BS. Lê Thu Hà" };
+            var alreadySeen = Stored(Guid.NewGuid(), 2);
+            alreadySeen.SeenAt = earlier;
+            alreadySeen.SeenByDoctorId = otherDoctor.Id;
+            alreadySeen.SeenByDoctor = otherDoctor;
+            var unseen = Stored(group, 1);
+            _staffRepository.Setup(r => r.GetByUserIdAsync(DoctorUserId)).ReturnsAsync(doctor);
+            _repository
+                .Setup(r => r.GetExaminationAsync(ExaminationId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Examination { Id = ExaminationId, PatientId = PatientId, DoctorId = DoctorId });
+            _repository
+                .Setup(r => r.GetProvidedByPatientIdAsync(PatientId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<PatientDocument> { unseen, alreadySeen });
+
+            var result = await _service.GetByExaminationAsync(DoctorUserId, ExaminationId);
+
+            unseen.SeenAt.Should().NotBeNull();
+            unseen.SeenByDoctorId.Should().Be(DoctorId);
+            alreadySeen.SeenAt.Should().Be(earlier);
+            alreadySeen.SeenByDoctorId.Should().Be(otherDoctor.Id);
+            var mine = result.Single(d => d.Id == group);
+            mine.SeenByDoctorName.Should().Be("BS. Trần Minh Khoa");
+            mine.CanDelete.Should().BeFalse();
+            _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetMineAsync_ShouldLetThePatientDeleteOnlyUnseenUploads()
+        {
+            var unseenGroup = Guid.NewGuid();
+            var seenGroup = Guid.NewGuid();
+            var seen = Stored(seenGroup, 2);
+            seen.SeenAt = DateTimeOffset.UtcNow;
+            _repository
+                .Setup(r => r.GetProvidedByPatientIdAsync(PatientId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<PatientDocument> { Stored(unseenGroup, 1), seen });
+
+            var result = await _service.GetMineAsync(PatientUserId);
+
+            result.Single(d => d.Id == unseenGroup).CanDelete.Should().BeTrue();
+            result.Single(d => d.Id == seenGroup).CanDelete.Should().BeFalse();
+            _repository.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
         }
     }
 }

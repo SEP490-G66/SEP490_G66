@@ -140,6 +140,7 @@ const SIDEBAR_MENU = {
             children: [
                 { key: "consultations", label: "Yêu cầu tư vấn", to: ROUTES.RECEPTION_CONSULTATIONS },
                 { key: "follow-ups", label: "Nhắc tái khám", to: ROUTES.RECEPTION_FOLLOW_UPS },
+                { key: "change-requests", label: "Yêu cầu đổi / huỷ lịch", to: ROUTES.RECEPTION_CHANGE_REQUESTS },
             ],
         },
         {

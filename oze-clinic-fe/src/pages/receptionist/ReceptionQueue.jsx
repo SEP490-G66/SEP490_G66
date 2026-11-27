@@ -8,6 +8,7 @@ import QueueMoveDialog from "@/components/reception/QueueMoveDialog";
 import QueuePriorityDialog from "@/components/reception/QueuePriorityDialog";
 import { Card, WalkInDialog } from "@/components/reception/shared";
 import { PRIORITY_BADGE, PRIORITY_LABEL, clockOf, report, useDoctorsOnDuty, usePaging } from "@/components/reception/receptionUtils";
+import useAppointmentLink from "@/hooks/useAppointmentLink";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
     createWalkIn,
@@ -164,6 +165,20 @@ const ReceptionQueue = () => {
         setFilters(EMPTY_QUEUE_FILTERS);
         setPage(1);
     };
+    // "?appointment=" from the appointment grid: open the tab and page that hold the patient's row
+    const { highlightId } = useAppointmentLink(allRows, {
+        idOf: (row) => row.appointmentId,
+        reveal: (row) => {
+            const next = roomOf.get(row.roomKey)?.tab ?? tab;
+            const list = orderRows(
+                allRows.filter((r) => roomOf.get(r.roomKey)?.tab === next),
+                allRooms.filter((r) => r.tab === next),
+            );
+            setTab(next);
+            setFilters(EMPTY_QUEUE_FILTERS);
+            setPage(Math.floor(Math.max(0, list.indexOf(row)) / 10) + 1);
+        },
+    });
     const onTabKey = (event) => {
         const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
         if (!step) return;
@@ -265,7 +280,11 @@ const ReceptionQueue = () => {
                             const decide = needsDecision(r);
                             const menu = menuOf(r);
                             return (
-                                <tr key={r.key} className={r.state === "serving" ? "bg-primary-softer" : decide ? "bg-warning-soft" : undefined}>
+                                <tr
+                                    key={r.key}
+                                    data-appointment-row={r.appointmentId}
+                                    className={cx(r.state === "serving" ? "bg-primary-softer" : decide && "bg-warning-soft", highlightId === r.appointmentId && "bg-warning-soft ring-2 ring-inset ring-warning-solid")}
+                                >
                                     <td data-label={columns[0]} className="num font-semibold text-ink">
                                         {r.position ? String(r.position).padStart(2, "0") : "—"}
                                     </td>

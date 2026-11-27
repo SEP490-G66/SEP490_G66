@@ -60,8 +60,8 @@ namespace OZE.Application.Services
             for (var day = from; day <= to; day = day.AddDays(1))
             {
                 var rows = byDay.TryGetValue(day, out var found) ? found : new List<ConfirmedPaymentRow>();
-                var cash = Round(rows.Where(x => x.PaymentMethod == PaymentConstants.Cash).Sum(x => x.Amount));
-                var transfer = Round(rows.Where(x => x.PaymentMethod != PaymentConstants.Cash).Sum(x => x.Amount));
+                var cash = MoneyHelper.Round(rows.Where(x => x.PaymentMethod == PaymentConstants.Cash).Sum(x => x.Amount));
+                var transfer = MoneyHelper.Round(rows.Where(x => x.PaymentMethod != PaymentConstants.Cash).Sum(x => x.Amount));
                 days.Add(new RevenueDay
                 {
                     Date = day,
@@ -82,8 +82,6 @@ namespace OZE.Application.Services
                 Days = days
             };
         }
-
-        private static decimal Round(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
 
         private async Task<InvoiceReportResponse> BuildReportAsync(
             DateOnly fromDate,
@@ -111,10 +109,7 @@ namespace OZE.Application.Services
                 asOfDate,
                 cancellationToken);
 
-            var collectionsTotal = decimal.Round(
-                totalsByMethod.Sum(x => x.Amount),
-                2,
-                MidpointRounding.AwayFromZero);
+            var collectionsTotal = MoneyHelper.Round(totalsByMethod.Sum(x => x.Amount));
 
             return new InvoiceReportResponse
             {

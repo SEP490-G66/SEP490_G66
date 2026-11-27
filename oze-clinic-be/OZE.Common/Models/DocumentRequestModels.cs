@@ -5,6 +5,16 @@ namespace OZE.Common.Models
     {
         public string? DocumentName { get; set; }
         public string? Note { get; set; }
+        // Imaging, LabResult, Prescription, MedicalPaper, Other (empty = Other)
+        public string? Category { get; set; }
+    }
+
+    /// <summary>Thông tin bệnh nhân điền kèm khi gửi tài liệu theo yêu cầu (đều không bắt buộc).</summary>
+    public class SubmitDocumentRequestDetails
+    {
+        public string? Note { get; set; }
+        public DateOnly? PerformedOn { get; set; }
+        public string? ProviderAddress { get; set; }
     }
 
     /// <summary>Dữ liệu phản hồi thông tin yêu cầu bổ sung tài liệu y tế.</summary>
@@ -17,6 +27,11 @@ namespace OZE.Common.Models
         public int PatientId { get; set; }
         public string DocumentName { get; set; } = string.Empty;
         public string? Note { get; set; }
+        public string Category { get; set; } = string.Empty;
+        // What the patient filled in when sending the files
+        public string? PatientNote { get; set; }
+        public DateOnly? PerformedOn { get; set; }
+        public string? ProviderAddress { get; set; }
         public string Status { get; set; } = string.Empty;
         public string DoctorName { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; }

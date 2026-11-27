@@ -254,7 +254,7 @@ namespace OZE.Persistence.Seed
             (ConfigKeyConstants.BookingPendingConfirmHours, "4", "Int", "Lịch chờ xác nhận quá số giờ này thì cảnh báo lễ tân (giờ)"),
             (ConfigKeyConstants.BookingPendingVisitSoonHours, "24", "Int", "Lịch chờ xác nhận sắp tới giờ khám trong số giờ này thì cảnh báo lễ tân (giờ)"),
             ("CheckIn.EarlyMinutes", "30", "Int", "Cho check-in sớm tối đa (phút)"),
-            (ConfigKeyConstants.CheckInLateMinutes, "15", "Int", "Trễ quá thì đánh dấu NO_SHOW (phút)"),
+            (ConfigKeyConstants.CheckInLateMinutes, "15", "Int", "Đến trễ quá số phút này thì vẫn check-in, xếp sau người đến đúng giờ (phút)"),
             ("Queue.AutoExpireMinutes", "60", "Int", "Chờ quá thì tự huỷ khỏi hàng chờ (phút)"),
             ("Clinic.WorkStartTime", "08:00", "String", "Giờ mở cửa"),
             ("Clinic.WorkEndTime", "17:00", "String", "Giờ đóng cửa"),
@@ -527,6 +527,12 @@ namespace OZE.Persistence.Seed
                     {
                         // The sample appointments all start with DV001, so the booking flow must use it too
                         config.ConfigValue = row.Value;
+                        config.UpdatedAt = now;
+                    }
+                    else if (row.Key == ConfigKeyConstants.CheckInLateMinutes && config.Description != row.Description)
+                    {
+                        // A late patient is still checked in and seen after the on-time ones, never marked NO_SHOW
+                        config.Description = row.Description;
                         config.UpdatedAt = now;
                     }
                 }

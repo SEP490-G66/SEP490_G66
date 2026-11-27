@@ -83,6 +83,7 @@ namespace OZE.Controllers
         public async Task<ActionResult<ApiResponse<DocumentRequestResponse>>> SubmitAsync(
             long id,
             [FromForm] List<IFormFile> files,
+            [FromForm] SubmitDocumentRequestDetails? details,
             CancellationToken cancellationToken)
         {
             var uploaded = new List<UploadedImagingFile>();
@@ -93,7 +94,7 @@ namespace OZE.Controllers
                 uploaded.Add(new UploadedImagingFile(file.FileName, file.ContentType, stream.ToArray()));
             }
 
-            var submitted = await _documentRequestService.SubmitAsync(CurrentUserId ?? string.Empty, id, uploaded, cancellationToken);
+            var submitted = await _documentRequestService.SubmitAsync(CurrentUserId ?? string.Empty, id, uploaded, details, cancellationToken);
             return Ok(ApiResponse<DocumentRequestResponse>.SuccessResult(submitted, ErrorConstants.DocumentRequestMessage.FilesUploaded));
         }
 

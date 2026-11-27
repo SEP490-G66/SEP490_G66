@@ -9,11 +9,13 @@ import ConfirmAppointmentDialog from "@/components/reception/ConfirmAppointmentD
 import ServiceCell from "@/components/reception/ServiceCell";
 import { Card, CancelDialog, RescheduleDialog } from "@/components/reception/shared";
 import { phoneText, report, usePaging } from "@/components/reception/receptionUtils";
+import useAppointmentLink from "@/hooks/useAppointmentLink";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
 import {
     cancelAppointment,
     clinicToday,
     confirmAppointment,
+    getAppointment,
     getAppointmentsInRange,
     getDoctorOptions,
 } from "@/services/receptionService";
@@ -97,6 +99,23 @@ const ReceptionConfirm = () => {
         setFilters(defaults);
         setPage(1);
     };
+    // "?appointment=" from the appointment grid: widen the dates to its day, clear the other filters, open its page
+    const { linkedId, highlightId } = useAppointmentLink(sortByVisit(appointments), {
+        reveal: (_, index) => {
+            setFilters((f) => ({ ...f, slot: "", doctor: "", status: "", keyword: "" }));
+            setPage(Math.floor(index / 10) + 1);
+        },
+    });
+    useEffect(() => {
+        if (!linkedId) return undefined;
+        const controller = new AbortController();
+        getAppointment(linkedId, { ...READ, signal: controller.signal }).then((response) => {
+            const date = response?.success ? response.data?.appointmentDate : null;
+            if (controller.signal.aborted || !date) return;
+            setFilters((f) => ({ ...f, from: date < f.from && date >= today ? date : f.from, to: date > f.to ? date : f.to }));
+        });
+        return () => controller.abort();
+    }, [linkedId, today]);
 
     const act = async (request, successText) => {
         if (report(await request, successText)) {
@@ -154,7 +173,7 @@ const ReceptionConfirm = () => {
                             const [label, badge] = TEXT.STATES[state];
                             const allergies = allergiesOf(row);
                             return (
-                                <tr key={row.id} className={state === "cancelled" ? "opacity-60" : undefined}>
+                                <tr key={row.id} data-appointment-row={row.id} className={cx(state === "cancelled" && "opacity-60", highlightId === row.id && "bg-warning-soft")}>
                                     <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
                                         <div>
                                             <span className="font-semibold text-ink">{shortDate(row.appointmentDate)}</span>

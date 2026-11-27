@@ -1,8 +1,9 @@
 import { FileText } from "lucide-react";
+import { providedCategoryOf } from "@/utils/constants/providedDocument";
 import { formatDate, formatDateTime } from "@/utils/format";
 
 // Read-only list of the documents the patient provided themselves (doctor, step 1 of the examination).
-// documents: [{ id, documentName, providerAddress, performedOn, createdAt, files }]; onOpen(file) opens one file.
+// documents: [{ id, documentName, category, note, providerAddress, performedOn, createdAt, files }]; onOpen(file) opens one file.
 const ProvidedDocumentList = ({ documents, onOpen }) => (
     <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
         {documents.map((document) => (
@@ -12,8 +13,11 @@ const ProvidedDocumentList = ({ documents, onOpen }) => (
                     <span className="num text-caption text-muted">Tải lên {formatDateTime(document.createdAt)}</span>
                 </div>
                 <p className="text-caption text-muted">
-                    {[document.providerAddress, document.performedOn && `Thực hiện ${formatDate(document.performedOn)}`].filter(Boolean).join(" · ")}
+                    {[providedCategoryOf(document.category)?.label, document.providerAddress, document.performedOn && `Thực hiện ${formatDate(document.performedOn)}`]
+                        .filter(Boolean)
+                        .join(" · ")}
                 </p>
+                {document.note && <p className="text-body-sm text-ink">Bệnh nhân ghi chú: {document.note}</p>}
                 <ul className="flex flex-wrap gap-x-4 gap-y-1">
                     {document.files.map((file) => (
                         <li key={file.id}>

@@ -385,14 +385,8 @@ namespace OZE.Persistence.Repositories
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
-        public Task<string?> GetConfigValueAsync(string key, CancellationToken cancellationToken = default)
-        {
-            return _context.SystemConfigurations
-                .AsNoTracking()
-                .Where(c => c.ConfigKey == key)
-                .Select(c => (string?)c.ConfigValue)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
+        public Task<string?> GetConfigValueAsync(string key, CancellationToken cancellationToken = default) =>
+            _context.SystemConfigurations.ValueOfAsync(key, cancellationToken);
 
         public Task<bool> ReceiptCodeExistsAsync(string code, CancellationToken cancellationToken = default)
         {

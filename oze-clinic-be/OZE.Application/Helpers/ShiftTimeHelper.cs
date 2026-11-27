@@ -1,3 +1,4 @@
+using OZE.Common.Constants;
 using OZE.Domain.Entities;
 
 namespace OZE.Application.Helpers
@@ -10,6 +11,14 @@ namespace OZE.Application.Helpers
         {
             return appointment.TimeSlotStart
                 ?? (appointment.CheckInAt.HasValue ? TimeOnly.FromDateTime(ClinicClock.ToClinicTime(appointment.CheckInAt.Value)) : null);
+        }
+
+        // The first day (WorkShiftConstants.WeekStartDay) of the week the date falls in
+        public static DateOnly StartOfWeek(DateOnly date)
+        {
+            var daysSinceWeekStart = ((int)date.DayOfWeek - (int)WorkShiftConstants.WeekStartDay + WorkShiftConstants.DaysInWeek)
+                                     % WorkShiftConstants.DaysInWeek;
+            return date.AddDays(-daysSinceWeekStart);
         }
 
         public static bool IsInShift(Appointment appointment, StaffSchedule shift)

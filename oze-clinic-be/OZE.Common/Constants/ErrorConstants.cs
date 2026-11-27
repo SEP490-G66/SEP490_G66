@@ -175,6 +175,7 @@ namespace OZE.Common.Constants
             public const string RoomNotFound = "Room not found";
             public const string RoomNotActive = "Room is not active";
             public const string InvalidTimeRange = "Shift start time must be earlier than end time";
+            public const string ShiftStartOffSlot = "Shift start time must fall on a booking slot boundary";
             public const string PastDate = "Shift date cannot be in the past";
             public const string ShiftOverlap = "This staff member already has a shift that overlaps this time";
             public const string RoomOverlap = "This room is already used by another shift at that time";
@@ -289,8 +290,30 @@ namespace OZE.Common.Constants
             public const string StageAlreadyCompleted = "This treatment stage is already completed.";
             public const string FollowUpAppointmentOrPlanRequired = "Either a previous appointment ID or a treatment plan ID is required.";
         }
+        public static class AppointmentChangeRequestMessage
+        {
+            public const string PatientNotFound = "Patient profile not found.";
+            public const string TargetRequired = "Please choose the visit to change.";
+            public const string VisitNotFound = "Visit not found.";
+            public const string BookedByPatient = "You booked this appointment yourself, change or cancel it directly.";
+            public const string VisitNotOpen = "This visit can no longer be changed.";
+            public const string TypeInvalid = "Please choose reschedule or cancel.";
+            public const string ReasonRequired = "Please give a reason.";
+            public const string ReasonInvalid = "Reason must be at most 200 characters.";
+            public const string NoteInvalid = "Note must be at most 500 characters.";
+            public const string PreferredTimesInvalid = "You can give at most 3 preferred times, 50 characters each.";
+            public const string AlreadyRequested = "You already sent a request for this visit, the front desk will call you.";
+            public const string RequestNotFound = "Request not found.";
+            public const string NotPending = "This request has already been handled.";
+            public const string OutcomeInvalid = "Please choose what was done: rescheduled, cancelled or kept.";
+            public const string Created = "Request sent. The front desk will call you.";
+            public const string Withdrawn = "Request withdrawn.";
+            public const string Resolved = "Request handled.";
+        }
+
         public static class AppointmentMessage
         {
+            public const string ArrangedByClinic = "This visit was arranged by the clinic. Please send a change request instead.";
             public const string RecordChangedMeanwhile = "This record was changed by someone else. Please reload and try again";
             public const string ServiceNotFound = "Service not found";
             public const string ServiceInactive = "This service is not available for booking";
@@ -538,7 +561,11 @@ namespace OZE.Common.Constants
         {
             public const string DocumentNameRequired = "Please enter document name.";
             public const string DocumentNameInvalid = "Document name must be at most 200 characters.";
-            public const string ProviderAddressRequired = "Please enter provider address.";
+            public const string CategoryInvalid = "Please choose the document type.";
+            public const string PerformedOnRequired = "Please choose the date it was done.";
+            public const string ProviderAddressRequired = "Please enter where it was done.";
+            public const string NoteInvalid = "Note must be at most 500 characters.";
+            public const string CannotDeleteSeen = "A doctor has already seen this document, it can no longer be deleted.";
             public const string ProviderAddressInvalid = "Provider address must be at most 300 characters.";
             public const string PerformedOnInFuture = "Performed date cannot be in the future.";
             public const string UploadFilesRequired = "Please choose at least one file.";

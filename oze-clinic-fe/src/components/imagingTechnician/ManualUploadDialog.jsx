@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { FolderOpen, Upload } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { DialogActions } from "@/components/reception/shared";
 import { useSubmit } from "@/components/reception/receptionUtils";
@@ -22,8 +22,10 @@ const problemOf = (file, extensions, maxMb) => {
 // an invalid file stays in the list, marked, and blocks the upload until it is removed.
 // Reused for other uploads: title, the accepted extensions, the size and count limits (maxFiles: none by default),
 // the word for one file in the hint ("ảnh") and whether there is a note can be changed.
-// children: extra fields shown above the file box (e.g. the document name); validate(): checks them on submit,
-// false keeps the dialog open without sending.
+// children: extra fields shown above the file box (e.g. the document name), or below the file list with
+// fieldsAfterFiles; validate(): checks them on submit, false keeps the dialog open without sending.
+// onFilesChange(files): the valid files after every change (e.g. to name the document after the first file).
+// submitLabel: the button text instead of "Tải lên (n)". withImagePicker: a "Chọn tài liệu" button that opens the file / photo library (same file types).
 const ManualUploadDialog = ({
     subtitle,
     title = "Tải ảnh thủ công",
@@ -34,19 +36,28 @@ const ManualUploadDialog = ({
     withNote = true,
     validate,
     children,
+    fieldsAfterFiles = false,
+    onFilesChange,
+    submitLabel,
+    withImagePicker = false,
     onSubmit,
     onClose,
 }) => {
     const inputRef = useRef(null);
+    const imageRef = useRef(null);
     const noteId = useId();
     const [items, setItems] = useState([]);
     const [note, setNote] = useState("");
     const [dragging, setDragging] = useState(false);
     const [busy, submit] = useSubmit(onSubmit);
 
+    const update = (next) => {
+        setItems(next);
+        onFilesChange?.(next.filter((item) => !item.problem).map((item) => item.file));
+    };
     const add = (fileList) => {
         const next = Array.from(fileList ?? []).map((file) => ({ key: `${file.name}-${file.size}-${file.lastModified}`, file, problem: problemOf(file, extensions, maxMb) }));
-        setItems((current) => [...current, ...next.filter((item) => !current.some((existing) => existing.key === item.key))]);
+        update([...items, ...next.filter((item) => !items.some((existing) => existing.key === item.key))]);
     };
     const invalid = items.some((item) => item.problem);
     const tooMany = maxFiles != null && items.length > maxFiles;
@@ -63,7 +74,7 @@ const ManualUploadDialog = ({
                     if (canSubmit && !busy) submit({ files: items.map((item) => item.file), note: withNote ? note.trim() : "" });
                 }}
             >
-                {children}
+                {!fieldsAfterFiles && children}
                 <button
                     type="button"
                     className={cx(
@@ -102,6 +113,27 @@ const ManualUploadDialog = ({
                     }}
                 />
 
+                {withImagePicker && (
+                    <>
+                        <button type="button" className="btn btn-secondary self-center" onClick={() => imageRef.current?.click()}>
+                            <FolderOpen className="size-4" aria-hidden="true" />
+                            Chọn tài liệu
+                        </button>
+                        <input
+                            ref={imageRef}
+                            type="file"
+                            multiple
+                            accept={extensions.join(",")}
+                            className="sr-only"
+                            tabIndex={-1}
+                            onChange={(event) => {
+                                add(event.target.files);
+                                event.target.value = "";
+                            }}
+                        />
+                    </>
+                )}
+
                 {items.length > 0 && (
                     <ul className="flex flex-col gap-2">
                         {items.map((item) => (
@@ -113,7 +145,7 @@ const ManualUploadDialog = ({
                                     type="button"
                                     className="shrink-0 cursor-pointer text-caption font-medium text-danger hover:underline"
                                     aria-label={`Xoá ${item.file.name}`}
-                                    onClick={() => setItems((current) => current.filter((other) => other.key !== item.key))}
+                                    onClick={() => update(items.filter((other) => other.key !== item.key))}
                                 >
                                     Xoá
                                 </button>
@@ -132,6 +164,8 @@ const ManualUploadDialog = ({
                     </p>
                 )}
 
+                {fieldsAfterFiles && children}
+
                 {withNote && (
                     <div className="field">
                         <label htmlFor={noteId} className="label">
@@ -149,7 +183,7 @@ const ManualUploadDialog = ({
                     </div>
                 )}
 
-                <DialogActions onClose={onClose} closeLabel="Huỷ" submitLabel={`Tải lên${items.length ? ` (${items.length})` : ""}`} disabled={!canSubmit} busy={busy} closeDisabled={busy} />
+                <DialogActions onClose={onClose} closeLabel="Huỷ" submitLabel={submitLabel ?? `Tải lên${items.length ? ` (${items.length})` : ""}`} disabled={!canSubmit} busy={busy} closeDisabled={busy} />
             </form>
         </Modal>
     );

@@ -439,6 +439,81 @@ namespace OZE.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OZE.Domain.Entities.AppointmentChangeRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AppointmentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SYSDATETIMEOFFSET()");
+
+                    b.Property<DateTimeOffset?>("HandledAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("HandledByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("HandlerNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PreferredTimes")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RequestType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Pending");
+
+                    b.Property<long?>("TreatmentPlanStageId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppointmentId")
+                        .HasDatabaseName("IX_AppointmentChangeRequests_AppointmentId");
+
+                    b.HasIndex("PatientId")
+                        .HasDatabaseName("IX_AppointmentChangeRequests_PatientId");
+
+                    b.HasIndex("TreatmentPlanStageId")
+                        .HasDatabaseName("IX_AppointmentChangeRequests_TreatmentPlanStageId");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .HasDatabaseName("IX_AppointmentChangeRequests_Status_CreatedAt");
+
+                    b.ToTable("AppointmentChangeRequests", (string)null);
+                });
+
             modelBuilder.Entity("OZE.Domain.Entities.AppointmentServiceItem", b =>
                 {
                     b.Property<long>("Id")
@@ -976,6 +1051,10 @@ namespace OZE.Persistence.Migrations
                         .HasColumnType("bigint");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -1951,6 +2030,10 @@ namespace OZE.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetimeoffset")
@@ -1984,6 +2067,10 @@ namespace OZE.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int>("PatientId")
                         .HasColumnType("int");
 
@@ -1993,6 +2080,12 @@ namespace OZE.Persistence.Migrations
                     b.Property<string>("ProviderAddress")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset?>("SeenAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("SeenByDoctorId")
+                        .HasColumnType("int");
 
                     b.Property<Guid?>("UploadGroupId")
                         .HasColumnType("uniqueidentifier");
@@ -3295,6 +3388,34 @@ namespace OZE.Persistence.Migrations
                     b.Navigation("TreatmentPlanStage");
                 });
 
+            modelBuilder.Entity("OZE.Domain.Entities.AppointmentChangeRequest", b =>
+                {
+                    b.HasOne("OZE.Domain.Entities.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_AppointmentChangeRequests_Appointments");
+
+                    b.HasOne("OZE.Domain.Entities.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("FK_AppointmentChangeRequests_Patients");
+
+                    b.HasOne("OZE.Domain.Entities.TreatmentPlanStage", "TreatmentPlanStage")
+                        .WithMany()
+                        .HasForeignKey("TreatmentPlanStageId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_AppointmentChangeRequests_TreatmentPlanStages");
+
+                    b.Navigation("Appointment");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("TreatmentPlanStage");
+                });
+
             modelBuilder.Entity("OZE.Domain.Entities.AppointmentServiceItem", b =>
                 {
                     b.HasOne("OZE.Domain.Entities.Appointment", "Appointment")
@@ -3788,6 +3909,12 @@ namespace OZE.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_PatientDocuments_Patients");
 
+                    b.HasOne("OZE.Domain.Entities.StaffProfile", "SeenByDoctor")
+                        .WithMany()
+                        .HasForeignKey("SeenByDoctorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_PatientDocuments_SeenByDoctor");
+
                     b.HasOne("OZE.Domain.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UploadedByUserId")
@@ -3797,6 +3924,8 @@ namespace OZE.Persistence.Migrations
                     b.Navigation("DocumentRequest");
 
                     b.Navigation("Patient");
+
+                    b.Navigation("SeenByDoctor");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.PatientMedicalProfile", b =>

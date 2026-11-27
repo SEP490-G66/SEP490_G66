@@ -269,5 +269,36 @@ namespace OZE.UnitTest.Services.WorkShifts
             shift.IsPresent.Should().BeFalse();
             shift.AbsenceReason.Should().Be("Nghỉ phép: Việc gia đình");
         }
+
+        // UTCID18 (A): moving the shift to a start between two 30-minute slots is refused
+        [Fact]
+        public async Task UpdateWorkShiftAsync_ShouldThrow_WhenNewStartOffSlotBoundary()
+        {
+            SetupExistingShift();
+            SetupSlotMinutes("30");
+            var request = Request(TomorrowDate);
+            request.ShiftStart = new TimeOnly(8, 45);
+
+            var act = () => _service.UpdateWorkShiftAsync(ShiftId, request);
+
+            var error = await act.Should().ThrowAsync<BadRequestException>();
+            error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.ShiftStartOffSlot);
+        }
+
+        // UTCID19 (B): an old shift that already starts off the grid can still be edited while its start stays the same
+        [Fact]
+        public async Task UpdateWorkShiftAsync_ShouldAllowEdit_WhenOffBoundaryStartIsUnchanged()
+        {
+            var shift = SetupExistingShift();
+            shift.ShiftStart = new TimeOnly(8, 15);
+            SetupSlotMinutes("30");
+            var request = Request(TomorrowDate);
+            request.ShiftStart = new TimeOnly(8, 15);
+
+            var result = await _service.UpdateWorkShiftAsync(ShiftId, request);
+
+            result.Notes.Should().Be("Doi phan cong");
+            _workShiftRepositoryMock.Verify(r => r.Update(shift), Times.Once);
+        }
     }
 }

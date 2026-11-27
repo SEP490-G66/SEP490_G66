@@ -66,6 +66,10 @@ const toAppointment = (item, mandatoryIds = new Set()) => {
         notes: item.notes ?? "",
         createdAt: item.createdAt ?? null,
         parentAppointmentId: item.parentAppointmentId ?? null,
+        // The plan session it is for (front desk booking), and whether the patient booked it themselves (then they
+        // can change it online; a visit the clinic arranged goes through a change request)
+        planSession: item.planSession ?? null,
+        bookedByPatient: item.bookedByPatient === true,
     };
 };
 

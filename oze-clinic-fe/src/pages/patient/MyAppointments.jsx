@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { CalendarDays, CircleAlert } from "lucide-react";
+import { CalendarClock, CalendarDays, CalendarX2, CircleAlert, Phone } from "lucide-react";
+import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import AppointmentInfoCard from "@/components/appointment/AppointmentInfoCard";
 import CancelAppointmentModal from "@/components/appointment/CancelAppointmentModal";
+import ChangeRequestModal from "@/components/appointment/ChangeRequestModal";
 import CurrentAppointmentSection from "@/components/appointment/CurrentAppointmentSection";
 import PlanProgressSteps from "@/components/appointment/PlanProgressSteps";
 import PlanSessionSection from "@/components/appointment/PlanSessionSection";
@@ -12,11 +14,13 @@ import { Hotline } from "@/components/booking/BookingSchedule";
 import BookingStateBox from "@/components/booking/BookingStateBox";
 import PageHeader from "@/components/ui/PageHeader";
 import useAsync from "@/hooks/useAsync";
+import { CHANGE_REQUEST_STATUS, CHANGE_REQUEST_TYPE, getMyChangeRequests, withdrawChangeRequest } from "@/services/appointmentChangeRequestService";
 import { getMyAppointments } from "@/services/appointmentService";
 import { getMyTreatmentPlans } from "@/services/medicalBookService";
-import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, GENERIC_ERROR_MESSAGE } from "@/utils/messages";
+import { formatDate, formatTimeRange, formatWeekday } from "@/utils/format";
+import { APPOINTMENT_STATUS, BOOKING_ERROR_CODE, BOOKING_TEXT, CLINIC_HOTLINE, GENERIC_ERROR_MESSAGE } from "@/utils/messages";
 import { ROUTES, getAppointmentDetailRoute, getTreatmentPlanRoute } from "@/utils/routes";
-import { buildUpcomingVisits, findAppointmentSession, findNextSession } from "@/utils/upcomingVisits";
+import { buildUpcomingVisits, findAppointmentSession, findNextSession, visitDoctor, visitSource, visitTitle } from "@/utils/upcomingVisits";
 
 const TITLE_ID = "my-appointments-title";
 const MODAL = { CANCEL: "cancel", RESCHEDULE: "reschedule" };
@@ -38,6 +42,51 @@ const toResource = ({ loading, error, value }) => {
 // Plans are extra context: if they fail to load the page still shows the appointment.
 const toPlans = ({ loading, value }) => (!loading && value?.success && Array.isArray(value.data) ? value.data : []);
 
+// The patient's pending change requests, keyed by the visit they are about
+const toRequests = ({ loading, value }) => {
+    const list = !loading && value?.success && Array.isArray(value.data) ? value.data : [];
+    return Object.fromEntries(
+        list
+            .filter((request) => request.status === CHANGE_REQUEST_STATUS.PENDING)
+            .map((request) => [request.appointmentId ? `appt-${request.appointmentId}` : `stage-${request.treatmentPlanStageId}`, request]),
+    );
+};
+
+// What the request dialog shows about a visit (a row of buildUpcomingVisits)
+const visitOfRow = (row) => ({
+    title: visitTitle(row),
+    dateText: row.date ? `${formatWeekday(row.date)}, ${formatDate(row.date)}` : "Chưa có ngày",
+    timeText: row.appointment ? formatTimeRange(row.appointment.timeSlotStart, row.appointment.timeSlotEnd) : "Chờ chốt giờ",
+    doctorName: visitDoctor(row),
+    sourceText: [visitSource(row), row.plan?.planName].filter(Boolean).join(" · "),
+    appointmentId: row.appointment?.id ?? null,
+    treatmentPlanStageId: row.appointment ? null : row.stage?.stageId,
+    isSession: Boolean(row.stage || row.appointment?.planSession),
+});
+
+// A visit the clinic arranged: the patient asks the front desk instead of changing it
+const clinicNotice = (appointment, request) =>
+    request
+        ? {
+              tone: "neutral",
+              content: (
+                  <>
+                      <strong>Đã gửi yêu cầu {request.type === CHANGE_REQUEST_TYPE.CANCEL ? "huỷ" : "đổi lịch"}</strong> lúc {formatDate(request.createdAt)}
+                      {request.preferredTimes?.length > 0 && ` (mong muốn: ${request.preferredTimes.join(", ")})`}. Lễ tân sẽ gọi cho bạn; lịch{" "}
+                      <strong>vẫn giữ nguyên</strong> đến khi lễ tân xác nhận.
+                  </>
+              ),
+          }
+        : {
+              tone: "warning",
+              content: (
+                  <>
+                      {appointment.planSession ? "Buổi điều trị" : "Lịch này"} do <strong>bác sĩ và lễ tân sắp xếp</strong> nên bạn không tự đổi được. Nếu bận, bấm{" "}
+                      <strong>Xin đổi lịch</strong>, lễ tân sẽ gọi lại để chọn giờ khác.
+                  </>
+              ),
+          };
+
 const getNotice = (appointment) => {
     switch (appointment.status) {
         case APPOINTMENT_STATUS.PENDING:
@@ -54,7 +103,7 @@ const getNotice = (appointment) => {
                 tone: "success",
                 content: (
                     <>
-                        Lịch hẹn <strong>đã được xác nhận</strong>. Để đổi hoặc huỷ, vui lòng liên hệ lễ tân.
+                        Lịch hẹn <strong>đã được xác nhận</strong>. Bạn tự đặt lịch này nên vẫn có thể đổi hoặc huỷ trước giờ hẹn.
                     </>
                 ),
             };
@@ -86,6 +135,8 @@ const MyAppointments = () => {
     const [modal, setModal] = useState(null);
     const resource = toResource(useAsync(getMyAppointments, [version]));
     const plans = toPlans(useAsync(getMyTreatmentPlans, [version]));
+    const requests = toRequests(useAsync(getMyChangeRequests, [version]));
+    const [asking, setAsking] = useState(null);
     const { current } = resource;
     const ready = !resource.loading && !resource.failed && !resource.unlinked;
     const session = findAppointmentSession(current, plans);
@@ -99,6 +150,47 @@ const MyAppointments = () => {
     };
 
     const closeModal = ({ refetch }) => (refetch ? reload() : setModal(null));
+
+    const own = current?.bookedByPatient === true;
+    const currentRequest = current ? requests[`appt-${current.id}`] : null;
+    const currentVisit = current && {
+        ...visitOfRow({ appointment: current, date: String(current.appointmentDate ?? "").slice(0, 10), state: "appointment" }),
+        title: session ? session.stage.stageName || current.serviceName : current.serviceName,
+        sourceText: sourceOf(current, session) ?? "Lễ tân đặt hộ",
+    };
+
+    const withdraw = async (request) => {
+        const response = await withdrawChangeRequest(request.id);
+        if (!response.success) {
+            toast.error(response.message);
+            return;
+        }
+        toast.success(response.message);
+        reload();
+    };
+
+    const askActions = currentRequest ? (
+        <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-secondary min-h-11 md:min-h-0" onClick={() => withdraw(currentRequest)}>
+                Rút yêu cầu
+            </button>
+            <a href={`tel:${CLINIC_HOTLINE.TEL}`} className="btn btn-primary min-h-11 md:min-h-0">
+                <Phone className="size-4" aria-hidden="true" />
+                Gọi lễ tân
+            </a>
+        </div>
+    ) : (
+        <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-primary min-h-11 md:min-h-0" onClick={() => setAsking({ visit: currentVisit, type: CHANGE_REQUEST_TYPE.RESCHEDULE })}>
+                <CalendarClock className="size-4" aria-hidden="true" />
+                Xin đổi lịch
+            </button>
+            <button type="button" className="btn btn-secondary min-h-11 text-danger md:min-h-0" onClick={() => setAsking({ visit: currentVisit, type: CHANGE_REQUEST_TYPE.CANCEL })}>
+                <CalendarX2 className="size-4" aria-hidden="true" />
+                Xin huỷ
+            </button>
+        </div>
+    );
 
     return (
         <>
@@ -139,8 +231,9 @@ const MyAppointments = () => {
                             <CurrentAppointmentSection
                                 appointment={current}
                                 source={sourceOf(current, session)}
-                                canChange={current.status === APPOINTMENT_STATUS.PENDING}
-                                notice={getNotice(current)}
+                                canChange={own && [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(current.status)}
+                                actions={!own && [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(current.status) ? askActions : undefined}
+                                notice={own || ![APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.CONFIRMED].includes(current.status) ? getNotice(current) : clinicNotice(current, currentRequest)}
                                 onReschedule={() => setModal(MODAL.RESCHEDULE)}
                                 onCancel={() => setModal(MODAL.CANCEL)}
                             >
@@ -164,10 +257,28 @@ const MyAppointments = () => {
                         </>
                     )}
                     {nextSession && <PlanSessionSection session={nextSession} />}
-                    {hasPlanVisits && <UpcomingVisitsSection rows={visits} />}
+                    {hasPlanVisits && (
+                        <UpcomingVisitsSection
+                            rows={visits}
+                            requests={requests}
+                            onRequest={(row) => setAsking({ visit: visitOfRow(row), type: CHANGE_REQUEST_TYPE.RESCHEDULE })}
+                            onWithdraw={withdraw}
+                        />
+                    )}
                 </div>
             )}
             {current && modal === MODAL.CANCEL && <CancelAppointmentModal appointment={current} onClose={closeModal} onCancelled={reload} onNotFound={reload} />}
+            {asking && (
+                <ChangeRequestModal
+                    visit={asking.visit}
+                    type={asking.type}
+                    onSent={() => {
+                        setAsking(null);
+                        reload();
+                    }}
+                    onClose={() => setAsking(null)}
+                />
+            )}
             {current && modal === MODAL.RESCHEDULE && <RescheduleAppointmentModal appointment={current} onClose={closeModal} onRescheduled={reload} onNotFound={reload} />}
         </>
     );

@@ -44,6 +44,7 @@ namespace OZE.Application.Services
 
             ConditionGuard.Ensure(shiftStart < shiftEnd, ErrorConstants.WorkShiftMessage.InvalidTimeRange);
             ConditionGuard.Ensure(scheduleDate >= DateOnly.FromDateTime(ClinicClock.Today), ErrorConstants.WorkShiftMessage.PastDate);
+            await EnsureStartsOnSlotAsync(shiftStart);
 
             var staff = await _staffRepository.GetByUserIdAsync(request.StaffUserId);
             ConditionGuard.Ensure<NotFoundException>(staff != null, ErrorConstants.WorkShiftMessage.StaffNotFound);
@@ -194,6 +195,7 @@ namespace OZE.Application.Services
                 ErrorConstants.WorkShiftMessage.BulkShiftInvalidDaysOfWeek);
 
             var slots = ValidateAndNormalizeSlots(request.Slots);
+            await EnsureStartsOnSlotAsync(slots.Select(s => s.Start).ToArray());
 
             var excluded = new HashSet<DateOnly>(request.ExcludedDates ?? new List<DateOnly>());
             var skippedKeys = applySkippedItems
@@ -277,6 +279,19 @@ namespace OZE.Application.Services
             }
 
             return new BulkEvaluation(items, valid, items.Where(i => !i.Valid).ToList(), room);
+        }
+
+        // R4: a shift starts on a booking slot boundary (Clinic.SlotDurationMinutes), otherwise its slots and the bookings
+        // in it do not line up with the rest of the day. Without a usable setting there is nothing to check against.
+        private async Task EnsureStartsOnSlotAsync(params TimeOnly[] starts)
+        {
+            var value = await _workShipRepository.GetConfigValueAsync(ConfigKeyConstants.SlotDurationMinutes);
+            if (!int.TryParse(value, out var slotMinutes) || slotMinutes <= 0)
+            {
+                return;
+            }
+
+            ConditionGuard.Ensure(starts.All(start => SlotTimeHelper.IsOnSlot(start, slotMinutes)), ErrorConstants.WorkShiftMessage.ShiftStartOffSlot);
         }
 
         private static List<(TimeOnly Start, TimeOnly End)> ValidateAndNormalizeSlots(List<BulkWorkShiftSlot>? requestSlots)
@@ -385,7 +400,7 @@ namespace OZE.Application.Services
 
         public async Task<List<WorkShipResponse>> GetWorkShiftsAsync(WorkShiftQueryRequest query)
         {
-            var fromDate = query.FromDate ?? GetStartOfWeek(DateOnly.FromDateTime(ClinicClock.Today));
+            var fromDate = query.FromDate ?? ShiftTimeHelper.StartOfWeek(DateOnly.FromDateTime(ClinicClock.Today));
             var toDate = query.ToDate ?? fromDate.AddDays(WorkShiftConstants.DaysInWeek - 1);
 
             ConditionGuard.Ensure(fromDate <= toDate, ErrorConstants.WorkShiftMessage.InvalidDateRange);
@@ -422,13 +437,6 @@ namespace OZE.Application.Services
                 new NotificationContent(NotificationConstants.Text.WorkShiftRemovedTitle, removedText, NotificationConstants.Reference.WorkShift, null)));
         }
 
-        private static DateOnly GetStartOfWeek(DateOnly date)
-        {
-            var daysSinceWeekStart = ((int)date.DayOfWeek - (int)WorkShiftConstants.WeekStartDay + WorkShiftConstants.DaysInWeek)
-                                     % WorkShiftConstants.DaysInWeek;
-            return date.AddDays(-daysSinceWeekStart);
-        }
-
         public async Task<WorkShipResponse> UpdateWorkShiftAsync(long id, UpdateWorkShiftRequest request)
         {
             var shift = await _workShipRepository.GetByIdAsync(id);
@@ -456,6 +464,12 @@ namespace OZE.Application.Services
                 room = await _roomRepository.GetByIdAsync(request.RoomId.Value);
                 ConditionGuard.Ensure<NotFoundException>(room != null, ErrorConstants.WorkShiftMessage.RoomNotFound);
                 ConditionGuard.Ensure(room!.Status == RoomConstants.ActiveStatus, ErrorConstants.WorkShiftMessage.RoomNotActive);
+            }
+
+            // An existing shift that starts off the grid can still be edited as long as its start is not changed
+            if (shiftStart != shift.ShiftStart)
+            {
+                await EnsureStartsOnSlotAsync(shiftStart);
             }
 
             var oldStaffId = shift.StaffProfileId;

@@ -20,7 +20,7 @@ namespace OZE.Application.Interfaces
         Task<DocumentRequestResponse> CancelAsync(string doctorUserId, long id, CancellationToken cancellationToken = default);
 
         /// <summary>Bệnh nhân tải lên và gửi tài liệu đáp ứng yêu cầu của bác sĩ.</summary>
-        Task<DocumentRequestResponse> SubmitAsync(string patientUserId, long id, List<UploadedImagingFile> files, CancellationToken cancellationToken = default);
+        Task<DocumentRequestResponse> SubmitAsync(string patientUserId, long id, List<UploadedImagingFile> files, SubmitDocumentRequestDetails? details = null, CancellationToken cancellationToken = default);
 
         /// <summary>Tải tệp tài liệu y tế (có kiểm tra quyền sở hữu hồ sơ bệnh nhân).</summary>
         Task<ImagingFileResult> GetFileAsync(string userId, bool isPatient, long documentId, CancellationToken cancellationToken = default);
