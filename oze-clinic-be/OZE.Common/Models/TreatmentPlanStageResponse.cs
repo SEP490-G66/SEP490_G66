@@ -14,6 +14,9 @@ namespace OZE.Common.Models
         public DateOnly? ScheduledDate { get; set; }
         public DateOnly? ActualDate { get; set; }
         public int? PerformedByDoctorId { get; set; }
+        // The doctor who is to do the session (the planning doctor for sessions saved before this was chosen)
+        public int? AssignedDoctorId { get; set; }
+        public string? AssignedDoctorName { get; set; }
         public string? Notes { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
     }

@@ -256,6 +256,7 @@ namespace OZE.Common.Constants
         // Track Treatment Progress (UC-52 / SCRUM-351). Texts follow System Messages where applicable.
         public static class TreatmentPlanMessage
         {
+            public const string AssignedDoctorInvalid = "The doctor chosen for a session is not an active doctor";
             public const string NoAccess = "You do not have access to this patient's treatment plan";
             // MSG67
             public const string PlanNotFound = "Treatment plan not found.";
@@ -340,6 +341,7 @@ namespace OZE.Common.Constants
             public const string TreatmentStageNotFound = "This treatment plan session was not found for the patient";
             public const string TreatmentStageNotOpen = "This treatment plan session is already done or cancelled, or its plan is not being carried out";
             public const string TreatmentStageAlreadyBooked = "This treatment plan session already has an appointment";
+            public const string TreatmentStageDoctorMismatch = "A treatment plan session is booked with the doctor chosen for it in the plan";
             public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";

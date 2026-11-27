@@ -17,6 +17,10 @@ namespace OZE.Common.Constants
         };
 
         // A plan in one of these is still being worked on; an examination holds at most one
+        // A doctor is suggested for a session when they have shifts in the service's kind of room in this window
+        public const int DoctorSuggestionPastDays = 90;
+        public const int DoctorSuggestionFutureDays = 60;
+
         public static readonly string[] OpenStatuses = { Draft, Proposed, Approved, InProgress };
 
         // Must match CK_TreatmentPlanStages_Status in TreatmentPlanStageConfiguration
