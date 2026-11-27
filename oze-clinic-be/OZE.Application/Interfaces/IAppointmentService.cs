@@ -51,6 +51,8 @@ namespace OZE.Application.Interfaces
         // Moves a waiting patient to another doctor who has a shift to offer today: the patient goes to that doctor's room
         // and gets a new number at the end of that doctor's queue
         Task<AppointmentResponse> ReassignDoctorAsync(long id, ReassignDoctorRequest request, CancellationToken cancellationToken = default);
+        // The doctor hands the visit being examined to a doctor on shift in the minor surgery room
+        Task<AppointmentResponse> ReferToMinorSurgeryAsync(long id, ReferMinorSurgeryRequest request, string doctorUserId, CancellationToken cancellationToken = default);
 
         // A checked-in patient who left without being seen: NO_SHOW, out of the queue (any day, so an old one can be closed too)
         Task<AppointmentResponse> MarkNoShowAsync(long id, MarkNoShowRequest? request, CancellationToken cancellationToken = default);

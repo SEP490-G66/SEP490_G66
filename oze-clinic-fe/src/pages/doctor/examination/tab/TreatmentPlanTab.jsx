@@ -7,7 +7,8 @@ import { planSummary, validatePlan } from "@/utils/examination";
 import { formatNumber, getClinicToday } from "@/utils/format";
 import PlanServiceList from "@/components/examination/PlanServiceList";
 import PlanSummaryCard from "@/components/examination/PlanSummaryCard";
-import StepActionBar from "@/components/examination/StepActionBar";
+import StepBlockedCard from "@/components/examination/StepBlockedCard";
+import useExamDraft from "@/hooks/useExamDraft";
 
 const NO_SERVICE_HINT = "Chưa có dịch vụ nào trong kế hoạch. Thêm dịch vụ từ danh mục để lập kế hoạch.";
 
@@ -20,7 +21,9 @@ const LOCKED_STATUSES = ["Approved", "InProgress", "Completed"];
 // (treatment plan and its stages) and passed to onPlanChange. record.planTypes: { [serviceId]: [{ id, name, price }] },
 // the service's variants offered as "Loại dịch vụ". The plan is checked (validatePlan) before "Hoàn thành", which asks
 // the doctor to confirm the patient agreed, then proposes and approves it and goes to the treatment room (onComplete).
-const TreatmentPlanTab = ({ queueId, record, busy = false, onPlanChange, onComplete, onEnd }) => {
+// Without a diagnosis (and no plan yet) the step only points back to "Khám & chẩn đoán" (onToDiagnosis).
+// draft: the visit header's "Lưu nháp" and status (useExamDraft).
+const TreatmentPlanTab = ({ queueId, record, busy = false, onPlanChange, onComplete, onToDiagnosis, draft }) => {
     const { value: plan, setValue: setPlan, statusText, saveNow } = useAutosave((draft) => saveTreatmentPlan(queueId, draft), record.plan, onPlanChange);
     const locked = LOCKED_STATUSES.includes(plan.status);
     const typeOptionsOf = (service) => record.planTypes?.[service.serviceId] ?? [];
@@ -87,6 +90,19 @@ const TreatmentPlanTab = ({ queueId, record, busy = false, onPlanChange, onCompl
             : statusText;
     const sessionCount = plan.services.reduce((total, service) => total + service.sessions.length, 0);
 
+    useExamDraft(draft, saveNow, status);
+
+    if (!plan.planId && !record.exam.diagnoses.length) {
+        return (
+            <StepBlockedCard
+                title="Chưa có chẩn đoán"
+                text="Ghi nhận ít nhất 1 chẩn đoán trước khi lập kế hoạch điều trị."
+                actionLabel="Về Khám & chẩn đoán"
+                onAction={onToDiagnosis}
+            />
+        );
+    }
+
     return (
         <>
             {locked && (
@@ -96,36 +112,32 @@ const TreatmentPlanTab = ({ queueId, record, busy = false, onPlanChange, onCompl
             )}
             <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18.75rem]">
                 {/* An agreed plan is shown with every field and button turned off */}
-                <fieldset disabled={locked} className="m-0 min-w-0 border-0 p-0">
-                    <PlanServiceList
-                        services={plan.services}
-                        catalog={record.planCatalog ?? []}
-                        typeOptionsOf={typeOptionsOf}
-                        expandedIds={expandedIds}
-                        errors={errors}
-                        onToggle={toggleService}
-                        onChange={changeServices}
-                        onAdd={(service) => setExpandedIds((current) => [...current, service.id])}
-                    />
-                </fieldset>
+                <div className="flex min-w-0 flex-col gap-4">
+                    <fieldset disabled={locked} className="m-0 min-w-0 border-0 p-0">
+                        <PlanServiceList
+                            services={plan.services}
+                            catalog={record.planCatalog ?? []}
+                            typeOptionsOf={typeOptionsOf}
+                            expandedIds={expandedIds}
+                            errors={errors}
+                            onToggle={toggleService}
+                            onChange={changeServices}
+                            onAdd={(service) => setExpandedIds((current) => [...current, service.id])}
+                        />
+                    </fieldset>
+                    {/* Saving asks the doctor to confirm the patient agreed, then the plan is followed in "Điều trị" */}
+                    {!locked && (
+                        <div className="flex justify-end">
+                            <button type="button" className="btn btn-primary" disabled={busy || !hasServices} onClick={askAgreement}>
+                                Lưu kế hoạch
+                            </button>
+                        </div>
+                    )}
+                </div>
                 <div className="lg:sticky lg:top-4">
                     <PlanSummaryCard services={plan.services} />
                 </div>
             </div>
-            <StepActionBar status={status}>
-                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => onEnd?.(plan)}>
-                    Kết thúc lượt khám
-                </button>
-                <button
-                    type="button"
-                    className="btn btn-primary h-auto min-h-control py-2 text-center whitespace-normal"
-                    disabled={busy || !hasServices}
-                    onClick={askAgreement}
-                >
-                    {locked ? "Chuyển sang phòng điều trị" : "Hoàn thành · chuyển sang phòng điều trị"}
-                </button>
-            </StepActionBar>
-
             {confirming && (
                 <ConfirmActionDialog
                     title="Bệnh nhân đồng ý kế hoạch điều trị?"

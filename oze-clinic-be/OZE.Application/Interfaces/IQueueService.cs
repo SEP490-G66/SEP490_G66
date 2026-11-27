@@ -63,6 +63,16 @@ namespace OZE.Application.Interfaces
             int? assignedStaffId,
             CancellationToken cancellationToken = default);
 
+        // Hands the open entry to another doctor and room as a patient waiting there (also from IN_PROGRESS: the visit is
+        // handed over), keeping its number and priority; notes is shown in the new doctor's queue. Null when not queued
+        Task<QueueEntry?> TransferAsync(
+            long appointmentId,
+            string queueType,
+            int? roomId,
+            int assignedStaffId,
+            string? notes,
+            CancellationToken cancellationToken = default);
+
         // The open entry of that queue (null when not queued)
         Task<QueueEntry?> GetActiveEntryAsync(
             long appointmentId,

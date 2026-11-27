@@ -332,10 +332,25 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(stageInProgress, ErrorConstants.TreatmentPlanMessage.StageStillInProgress);
 
             var now = DateTimeOffset.UtcNow;
-            foreach (var stage in plan.Stages.Where(s => s.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled))
+            var cancelledStages = plan.Stages.Where(s => s.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled).ToList();
+            foreach (var stage in cancelledStages)
             {
                 stage.StageStatus = TreatmentPlanConstants.StageStatus.Cancelled;
                 stage.UpdatedAt = now;
+            }
+
+            // The visits booked for those sessions go too, so the patient can book a new visit at once
+            if (cancelledStages.Count > 0)
+            {
+                var appointments = await _treatmentPlanRepository.GetOpenSessionAppointmentsAsync(cancelledStages.Select(s => s.Id).ToList(), cancellationToken);
+                foreach (var appointment in appointments)
+                {
+                    appointment.Status = AppointmentConstants.CancelledStatus;
+                    appointment.CancellationReason = TreatmentPlanConstants.SessionAppointmentCancelReason;
+                    appointment.CancelledAt = now;
+                    appointment.CancelledByUserId = userId;
+                    appointment.UpdatedAt = now;
+                }
             }
 
             plan.Status = TreatmentPlanConstants.Cancelled;

@@ -17,6 +17,14 @@ namespace OZE.Persistence.Repositories
             _context = context;
         }
 
+        public Task<List<Appointment>> GetOpenSessionAppointmentsAsync(IReadOnlyCollection<long> stageIds, CancellationToken cancellationToken = default)
+        {
+            return _context.Appointments
+                .Where(x => x.TreatmentPlanStageId != null && stageIds.Contains(x.TreatmentPlanStageId.Value)
+                    && (x.Status == AppointmentConstants.PendingStatus || x.Status == AppointmentConstants.ConfirmedStatus))
+                .ToListAsync(cancellationToken);
+        }
+
         public async Task<TreatmentPlan?> GetByIdWithStagesAsync(long id, CancellationToken cancellationToken = default)
         {
             return await _context.TreatmentPlans

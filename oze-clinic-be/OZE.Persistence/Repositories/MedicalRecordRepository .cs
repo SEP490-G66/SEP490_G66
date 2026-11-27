@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OZE.Application.Interfaces;
 using OZE.Common.Constants;
+using OZE.Common.Models;
+using OZE.Common.Models.Base;
 using OZE.Domain.Entities;
 using OZE.Persistence.DbContexts;
 using System;
@@ -68,7 +70,54 @@ namespace OZE.Persistence.Repositories
                 .FirstOrDefaultAsync(x => x.Id == examinationId && x.Patient.DeletedAt == null);
         }
 
-       
+        // Same rule as HasDoctorAccessAsync, so every patient listed opens; never examined patients come last
+        public async Task<PagedResult<DoctorPatientResponse>> GetDoctorPatientsAsync(
+            int doctorId, string? keyword, string? phoneDigits, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+        {
+            var statuses = MedicalRecordConstants.AccessAppointmentStatuses;
+            var query = _context.Patients
+                .AsNoTracking()
+                .Where(p => p.DeletedAt == null
+                    && (_context.Examinations.Any(e => e.PatientId == p.Id && e.DoctorId == doctorId)
+                        || _context.Appointments.Any(a => a.PatientId == p.Id && a.DoctorId == doctorId && statuses.Contains(a.Status))));
+
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                query = query.Where(p => p.FullName.Contains(keyword)
+                    || p.PatientCode.Contains(keyword)
+                    || (p.PhoneNumber != null && (p.PhoneNumber.Contains(keyword) || (phoneDigits != null && p.PhoneNumber.Contains(phoneDigits)))));
+            }
+
+            var totalCount = await query.CountAsync(cancellationToken);
+            var items = await query
+                .Select(p => new DoctorPatientResponse
+                {
+                    PatientId = p.Id,
+                    PatientCode = p.PatientCode,
+                    FullName = p.FullName,
+                    Gender = p.Gender,
+                    DateOfBirth = p.DateOfBirth,
+                    PhoneNumber = p.PhoneNumber,
+                    LastVisitDate = _context.Examinations
+                        .Where(e => e.PatientId == p.Id)
+                        .Max(e => (DateOnly?)e.Appointment.AppointmentDate)
+                })
+                // SQL Server sorts NULL lowest, so patients never examined end the list
+                .OrderByDescending(x => x.LastVisitDate)
+                .ThenBy(x => x.FullName)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return new PagedResult<DoctorPatientResponse>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
+
         public async Task<bool> HasDoctorAccessAsync(int doctorId, int patientId)
         {
             var hasExamined = await _context.Examinations

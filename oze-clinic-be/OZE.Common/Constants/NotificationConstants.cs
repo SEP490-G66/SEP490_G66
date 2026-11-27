@@ -113,6 +113,8 @@ namespace OZE.Common.Constants
             public const string AppointmentCancelledForDoctorMessage = "Lịch hẹn của {0} lúc {1} ngày {2} đã bị hủy.";
             public const string PatientReassignedTitle = "Có bệnh nhân được chuyển sang bạn";
             public const string PatientReassignedMessage = "{0} đã được chuyển sang hàng chờ của bạn.";
+            public const string PatientReferredTitle = "Có bệnh nhân chuyển sang phòng tiểu phẫu";
+            public const string PatientReferredMessage = "{0} được {1} chuyển sang hàng chờ của bạn để tiểu phẫu.";
             public const string ImagingCompletedTitle = "Đã có kết quả chụp phim";
             public const string ImagingCompletedMessage = "Phim {0} của {1} đã chụp xong.";
             public const string TreatmentPlanApprovedTitle = "Bệnh nhân đã đồng ý kế hoạch điều trị";

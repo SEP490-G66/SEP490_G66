@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import useAutosave from "@/hooks/useAutosave";
+import useExamDraft from "@/hooks/useExamDraft";
 import useSession from "@/hooks/useSession";
 import { requestXray, saveExamDraft } from "@/services/examinationService";
 import { CHART_TYPE, CHILD_CHART_MAX_AGE, isPrimaryTooth } from "@/utils/examination";
 import DiagnosisDialog from "@/components/examination/DiagnosisDialog";
 import DiagnosisSection from "@/components/examination/DiagnosisSection";
 import ExamDentalChart from "@/components/examination/ExamDentalChart";
-import StepActionBar from "@/components/examination/StepActionBar";
 import SymptomSection from "@/components/examination/SymptomSection";
 import ToothConditionTable from "@/components/examination/ToothConditionTable";
 import ToothEntryDialog from "@/components/examination/ToothEntryDialog";
@@ -17,18 +17,17 @@ import XrayRequestDialog from "@/components/examination/XrayRequestDialog";
 import XraySection from "@/components/examination/XraySection";
 import { ROUTES } from "@/utils/routes";
 
-const COMPLETE_HINT = "Cần ít nhất một chẩn đoán xác định để chuyển sang lập kế hoạch điều trị.";
-
 const newId = (prefix) => `${prefix}-${Date.now()}`;
 
-// Step 2 "Khám & Chẩn đoán": reason and symptoms, dental chart findings, X-ray orders and final diagnoses.
+// Step 2 "Khám & Chẩn đoán": symptoms (one free text, exam.note), dental chart findings, X-ray orders and final diagnoses.
 // record.exam is the saved draft ({ chiefComplaint, symptoms, note, entries, films, diagnoses }); every change is saved
 // automatically and passed to onExamChange so the page keeps it when the doctor moves between steps.
 // onXraySent: the patient has left for the imaging room, the page reloads the queue.
-const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComplete, onEnd, onXraySent }) => {
+// draft: the visit header's "Lưu nháp" and autosave status (useExamDraft). "Lập kế hoạch điều trị" needs a diagnosis.
+const ClinicalExamTab = ({ queueId, record, onExamChange, onXraySent, draft }) => {
     const navigate = useNavigate();
     const { userName } = useSession();
-    const { value: exam, setValue: setExam, statusText, saving, saveNow } = useAutosave((draft) => saveExamDraft(queueId, draft), record.exam, onExamChange);
+    const { value: exam, setValue: setExam, statusText, saveNow } = useAutosave((value) => saveExamDraft(queueId, value), record.exam, onExamChange);
     const [chartType, setChartType] = useState(record.patient.age <= CHILD_CHART_MAX_AGE ? CHART_TYPE.CHILD : CHART_TYPE.ADULT);
     const [selectedTooth, setSelectedTooth] = useState(null);
     const [editingEntry, setEditingEntry] = useState(null);
@@ -87,31 +86,13 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
         onXraySent?.();
     };
 
-    const saveDraft = async () => {
-        const response = await saveNow();
-        if (response.success) toast.success("Đã lưu nháp.");
-        else toast.error("Chưa lưu được nháp, thử lại sau.");
-    };
-
-    const complete = async () => {
-        const response = await saveNow();
-        if (response.success) onComplete?.(exam);
-        else toast.error("Chưa lưu được nháp, thử lại sau.");
-    };
+    useExamDraft(draft, saveNow, statusText);
 
     const birthYear = record.patient.birthdate?.slice(0, 4);
-    const canComplete = exam.diagnoses.length > 0;
 
     return (
         <>
-            <SymptomSection
-                value={exam.symptoms}
-                note={exam.note}
-                chiefComplaint={exam.chiefComplaint ?? ""}
-                onChange={(symptoms) => set("symptoms", symptoms)}
-                onNoteChange={(note) => set("note", note)}
-                onChiefComplaintChange={(chiefComplaint) => set("chiefComplaint", chiefComplaint)}
-            />
+            <SymptomSection value={exam.note} onChange={(note) => set("note", note)} />
             <ExamDentalChart
                 entries={exam.entries}
                 chartType={chartType}
@@ -146,23 +127,6 @@ const ClinicalExamTab = ({ queueId, record, busy = false, onExamChange, onComple
                     toast.success(`Đã xoá chẩn đoán ${diagnosis.code}.`);
                 }}
             />
-            <StepActionBar status={canComplete ? statusText : `${statusText} · ${COMPLETE_HINT}`}>
-                <button type="button" className="btn btn-secondary" disabled={busy || saving} onClick={saveDraft}>
-                    Lưu nháp
-                </button>
-                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => onEnd?.(exam)}>
-                    Kết thúc lượt khám
-                </button>
-                <button
-                    type="button"
-                    className="btn btn-primary h-auto min-h-control py-2 text-center whitespace-normal"
-                    disabled={busy || !canComplete}
-                    onClick={complete}
-                >
-                    Hoàn thành & chuyển sang Lập kế hoạch điều trị
-                </button>
-            </StepActionBar>
-
             {editingEntry && <ToothEntryDialog entry={editingEntry} onSave={saveEntry} onClose={() => setEditingEntry(null)} />}
             {diagnosisDialog && (
                 <DiagnosisDialog

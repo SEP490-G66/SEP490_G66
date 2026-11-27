@@ -17,6 +17,8 @@ namespace OZE.Application.Interfaces
         Task<TreatmentPlanStage?> GetStageByIdAsync(long stageId, CancellationToken cancellationToken = default);
         Task<TreatmentPlan?> GetByStageIdWithStagesAsync(long stageId, CancellationToken cancellationToken = default);
         Task<bool> IsInvoicedAsync(long treatmentPlanId, CancellationToken cancellationToken = default);
+        // Appointments booked for these sessions and not held yet (PENDING / CONFIRMED), tracked so they can be cancelled
+        Task<List<Appointment>> GetOpenSessionAppointmentsAsync(IReadOnlyCollection<long> stageIds, CancellationToken cancellationToken = default);
         // The ids among these that belong to active staff with the Doctor role
         Task<List<int>> GetActiveDoctorIdsAsync(IReadOnlyCollection<int> staffIds, CancellationToken cancellationToken = default);
         // The next open session of every plan being carried out that has no active appointment yet

@@ -121,6 +121,7 @@ const SidebarLink = ({ item, collapsed, drawer, active = false, count = 0 }) => 
     return (
         <NavLink
             to={item.to}
+            end={item.end}
             className={cx(
                 "sidebar-item group relative",
                 active && "sidebar-item-active",

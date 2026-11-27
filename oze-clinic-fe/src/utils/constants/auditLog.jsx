@@ -16,6 +16,7 @@ export const AUDIT_ACTION_LABELS = {
     APPOINTMENT_NO_SHOW: { label: "Đánh dấu lỡ hẹn", variant: "danger" },
     APPOINTMENT_NO_SHOW_REVERTED: { label: "Bỏ đánh dấu lỡ hẹn", variant: "warning" },
     APPOINTMENT_DOCTOR_REASSIGNED: { label: "Đổi bác sĩ", variant: "warning" },
+    APPOINTMENT_REFERRED_MINOR_SURGERY: { label: "Chuyển phòng tiểu phẫu", variant: "warning" },
     APPOINTMENT_FOLLOW_UP_SCHEDULED: { label: "Đặt lịch tái khám", variant: "success" },
     STAFF_SHIFT_STARTED: { label: "Vào ca", variant: "info" },
     STAFF_SHIFT_ENDED: { label: "Kết thúc ca", variant: "info" },

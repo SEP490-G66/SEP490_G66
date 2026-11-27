@@ -38,6 +38,7 @@ export const ROUTES = {
     DOCTOR_PATIENTS: "/doctor/patients",
     DOCTOR_TREATMENT_PLANS: "/doctor/treatment-plans",
     DOCTOR_IMAGING_REQUESTS: "/doctor/imaging-requests",
+    DOCTOR_QUEUE: "/doctor/queue",
     DOCTOR_EXAMINATION: "/doctor/examination",
     DOCTOR_IMAGING_REVIEWS: "/doctor/imaging-reviews",
     TECHNICIAN_IMAGING_REQUESTS: "/technician/imaging-requests",
@@ -83,6 +84,7 @@ export const ROLE_ROUTES = [
     {
         roles: [USER_ROLES.DOCTOR],
         paths: [
+            ROUTES.DOCTOR_QUEUE,
             ROUTES.DOCTOR_EXAMINATION,
             ROUTES.DOCTOR_IMAGING_REVIEWS,
             ROUTES.DOCTOR_APPOINTMENTS,
@@ -120,6 +122,19 @@ export const ROLE_ROUTES = [
         paths: [ROUTES.WORK_SCHEDULE]
     }
 ];
+
+// The steps of a visit on the doctor's exam page, by step index (history, exam, plan, treatment, prescription):
+// /doctor/examination/<path> opens that step, so the sidebar can link to each one.
+export const DOCTOR_EXAM_STEP_PATHS = ["history", "diagnosis", "plan", "treatment", "prescription"];
+
+export const getDoctorExamStepRoute = (step) => `${ROUTES.DOCTOR_EXAMINATION}/${DOCTOR_EXAM_STEP_PATHS[step]}`;
+
+// Doctor's "Hồ sơ bệnh án" of one patient (patient id)
+export const getDoctorPatientRoute = (patientId) => `${ROUTES.DOCTOR_PATIENTS}/${patientId}`;
+
+// During a visit "Hồ sơ bệnh án" opens the patient being examined; this query shows the list anyway (?all=1)
+export const DOCTOR_PATIENTS_ALL_PARAM = "all";
+export const DOCTOR_PATIENTS_LIST_ROUTE = `${ROUTES.DOCTOR_PATIENTS}?${DOCTOR_PATIENTS_ALL_PARAM}=1`;
 
 // slug of a public service, e.g. "nieng-rang" (utils/data/publicServices.jsx)
 export const getServiceDetailRoute = (serviceSlug) => generatePath(ROUTES.SERVICE_DETAIL, { serviceSlug });

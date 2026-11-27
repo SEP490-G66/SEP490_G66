@@ -4,7 +4,8 @@ import VisitDetailDialog from "./VisitDetailDialog";
 
 // "Các lần khám trước". visits: [{ id, date, doctor, summary }].
 // queueId: patient in the queue; "Xem chi tiết" opens the visit's diagnoses, plan, progress and prescription.
-const PreviousVisitsCard = ({ queueId, visits = [] }) => {
+// onAddendum (optional): "Bổ sung" on the visits canAddendum(visit) allows.
+const PreviousVisitsCard = ({ queueId, visits = [], canAddendum, onAddendum }) => {
     const [openVisit, setOpenVisit] = useState(null);
 
     return (
@@ -21,6 +22,11 @@ const PreviousVisitsCard = ({ queueId, visits = [] }) => {
                                 </p>
                                 <p className="text-caption text-muted">{visit.summary}</p>
                             </div>
+                            {onAddendum && canAddendum?.(visit) && (
+                                <button type="button" className="btn btn-link" onClick={() => onAddendum(visit)}>
+                                    Bổ sung
+                                </button>
+                            )}
                             <button type="button" className="btn btn-secondary" onClick={() => setOpenVisit(visit)}>
                                 Xem chi tiết
                             </button>

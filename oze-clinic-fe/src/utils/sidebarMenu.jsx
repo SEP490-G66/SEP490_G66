@@ -5,12 +5,13 @@ import {
     ChartColumn,
     ClipboardList,
     CreditCard,
+    FileText,
     Heart,
     HeartHandshake,
     History,
-    Image,
     Landmark,
     LayoutDashboard,
+    Rows3,
     ScanLine,
     Shield,
     Stethoscope,
@@ -19,10 +20,10 @@ import {
     Wallet,
 } from "lucide-react";
 import { USER_ROLES } from "./messages";
-import { ROUTES } from "./routes";
+import { ROUTES, getDoctorExamStepRoute } from "./routes";
 
 // Sidebar tree per role. A node is either
-//   a link:  { key, label, icon, to, badge? }
+//   a link:  { key, label, icon, to, badge?, end? }   (end: lit only on that exact path, not the pages below it)
 //   a group: { key, label, icon, children: [{ key, label, to, badge? }] }
 // badge names a count the sidebar looks up (see useSidebarBadges in Sidebar.jsx); 0 shows nothing.
 // A new page also needs its path in ROUTES / ROLE_ROUTES (utils/routes.jsx).
@@ -88,9 +89,21 @@ const SIDEBAR_MENU = {
     ],
     [USER_ROLES.DOCTOR]: [
         DASHBOARD_LINK,
-        { key: "examination", label: "Khám bệnh", icon: Stethoscope, to: ROUTES.DOCTOR_EXAMINATION },
-        { key: "imaging-reviews", label: "Duyệt kết quả chụp", icon: Image, to: ROUTES.DOCTOR_IMAGING_REVIEWS },
-        { ...ACCOUNT_GROUP, children: [...WORK_GROUP.children, ...ACCOUNT_GROUP.children] },
+        { key: "work-schedule", label: "Lịch làm việc", icon: CalendarDays, to: ROUTES.WORK_SCHEDULE },
+        { key: "queue", label: "Hàng chờ", icon: Rows3, to: ROUTES.DOCTOR_QUEUE },
+        { key: "patients", label: "Hồ sơ bệnh án", icon: FileText, to: ROUTES.DOCTOR_PATIENTS },
+        {
+            key: "examination",
+            label: "Khám & Điều trị",
+            icon: Stethoscope,
+            children: [
+                { key: "diagnosis", label: "Khám & chẩn đoán", to: getDoctorExamStepRoute(1) },
+                { key: "plan", label: "Lập kế hoạch điều trị", to: getDoctorExamStepRoute(2) },
+                { key: "treatment", label: "Điều trị", to: getDoctorExamStepRoute(3) },
+                { key: "prescription", label: "Kê đơn thuốc", to: getDoctorExamStepRoute(4) },
+            ],
+        },
+        { ...ACCOUNT_GROUP, label: "Tài khoản" },
     ],
     // No overview page: the technician works from the imaging queue (also where /dashboard leads, see DashboardPage)
     [USER_ROLES.DENTAL_IMAGING_TECHNICIAN]: [

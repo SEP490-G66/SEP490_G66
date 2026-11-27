@@ -1,16 +1,19 @@
 import { useId, useState } from "react";
 import { X } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import SuggestInput from "@/components/ui/SuggestInput";
 import { cx } from "@/utils/cx";
 import { icdName, isValidToothCode } from "@/utils/examination";
-import { ICD10_DENTAL } from "@/utils/messages";
+import { ICD10_DENTAL } from "@/utils/icd10Dental";
+
+// Searched by code, name or group ("K02", "sâu ngà", "viem loi")
+const ICD_OPTIONS = ICD10_DENTAL.map((item) => ({ value: item.code, label: item.name, detail: item.group }));
 
 // "Thêm chẩn đoán" / "Sửa chẩn đoán". diagnosis: the one being edited, or null.
 // recordedTeeth: teeth with findings on the chart, offered as one-click picks. usedCodes: codes already in the list.
 // onSave receives { ...diagnosis, code, teeth, note }.
 const DiagnosisDialog = ({ diagnosis = null, recordedTeeth = [], usedCodes = [], onSave, onClose }) => {
     const codeId = useId();
-    const codeListId = useId();
     const codeHelpId = useId();
     const toothId = useId();
     const toothErrorId = useId();
@@ -52,31 +55,25 @@ const DiagnosisDialog = ({ diagnosis = null, recordedTeeth = [], usedCodes = [],
                     <label htmlFor={codeId} className="label">
                         Mã ICD-10 <span className="text-danger-solid">*</span>
                     </label>
-                    <input
+                    <SuggestInput
                         id={codeId}
-                        className="input"
-                        list={codeListId}
-                        placeholder="Ví dụ: K02.1"
+                        options={ICD_OPTIONS}
+                        placeholder="Gõ mã hoặc tên bệnh, ví dụ: K02.1 hoặc sâu ngà"
                         value={form.code}
                         aria-invalid={errors.code ? true : undefined}
                         aria-describedby={codeHelpId}
-                        onChange={(event) => {
-                            update({ code: event.target.value });
+                        onChange={(next) => {
+                            update({ code: next });
                             if (errors.code) setErrors((current) => ({ ...current, code: null }));
                         }}
                     />
-                    <datalist id={codeListId}>
-                        {ICD10_DENTAL.map((item) => (
-                            <option key={item.code} value={item.code} label={item.name} />
-                        ))}
-                    </datalist>
                     <p id={codeHelpId} className={cx("text-caption", errors.code ? "error-text" : "text-muted")}>
                         {errors.code ?? (name ? (
                             <>
                                 <b className="font-semibold text-ink">{code}</b> · {name}
                             </>
                         ) : (
-                            "Nhập mã hoặc chọn từ danh sách gợi ý"
+                            "Gõ mã hoặc tên bệnh rồi chọn trong gợi ý (ICD-10 răng hàm mặt)"
                         ))}
                     </p>
                 </div>

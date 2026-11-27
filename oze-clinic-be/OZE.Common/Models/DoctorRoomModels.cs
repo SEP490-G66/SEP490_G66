@@ -29,6 +29,8 @@ namespace OZE.Common.Models
         public DateTimeOffset? CheckInAt { get; set; }
         public TimeOnly? TimeSlotStart { get; set; }
         public string? Reason { get; set; }
+        // Note of the queue entry, e.g. "Chuyển từ Phòng khám · BS. Lê Thu Hà" for a patient referred to the minor surgery room
+        public string? Note { get; set; }
         public int PatientId { get; set; }
         public string PatientCode { get; set; } = string.Empty;
         public string PatientName { get; set; } = string.Empty;

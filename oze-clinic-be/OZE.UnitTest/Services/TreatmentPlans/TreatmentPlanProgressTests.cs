@@ -459,4 +459,43 @@ namespace OZE.UnitTest.Services.TreatmentPlans
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.TreatmentPlanMessage.ScheduledDateInvalid);
         }
     }
+
+    // OZ-TP CancelTreatmentPlan: cancelling the plan frees the patient to book a new visit
+    [Trait("Tab", "OZ-TP-CANCEL")]
+    public class CancelTreatmentPlanTests : TreatmentPlanTestBase
+    {
+        private static readonly CancelTreatmentPlanRequest Request = new() { Reason = "Benh nhan doi y" };
+
+        // UTCID01 (N): the scheduled sessions and the visits booked for them are cancelled
+        [Fact]
+        public async Task CancelAsync_ShouldCancelSessionAppointments()
+        {
+            var booked = new Appointment { Id = 900, TreatmentPlanStageId = _stage2.Id, Status = AppointmentConstants.ConfirmedStatus };
+            IReadOnlyCollection<long>? asked = null;
+            _planRepo.Setup(r => r.GetOpenSessionAppointmentsAsync(It.IsAny<IReadOnlyCollection<long>>(), It.IsAny<CancellationToken>()))
+                .Callback<IReadOnlyCollection<long>, CancellationToken>((ids, _) => asked = ids)
+                .ReturnsAsync(new List<Appointment> { booked });
+
+            await _service.CancelAsync(PlanId, Request, DoctorUserId, canViewAll: true);
+
+            _plan.Status.Should().Be(TreatmentPlanConstants.Cancelled);
+            asked.Should().BeEquivalentTo(new[] { _stage1.Id, _stage2.Id });
+            booked.Status.Should().Be(AppointmentConstants.CancelledStatus);
+            booked.CancellationReason.Should().Be(TreatmentPlanConstants.SessionAppointmentCancelReason);
+            booked.CancelledByUserId.Should().Be(DoctorUserId);
+            _planRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        // UTCID02 (A): a session being treated cannot be stopped, and no visit is touched
+        [Fact]
+        public async Task CancelAsync_ShouldThrow_WhenStageInProgress()
+        {
+            InProgress(_stage1);
+
+            var act = () => _service.CancelAsync(PlanId, Request, DoctorUserId, canViewAll: true);
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.TreatmentPlanMessage.StageStillInProgress);
+            _planRepo.Verify(r => r.GetOpenSessionAppointmentsAsync(It.IsAny<IReadOnlyCollection<long>>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+    }
 }
