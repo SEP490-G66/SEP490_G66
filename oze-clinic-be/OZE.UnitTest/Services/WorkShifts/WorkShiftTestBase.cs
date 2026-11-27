@@ -53,6 +53,10 @@ namespace OZE.UnitTest.Services.WorkShifts
             }
         }
 
+        // Clinic.SlotDurationMinutes as the repository returns it (null = not set)
+        protected void SetupSlotMinutes(string? value) =>
+            _workShiftRepositoryMock.Setup(r => r.GetConfigValueAsync(ConfigKeyConstants.SlotDurationMinutes)).ReturnsAsync(value);
+
         protected StaffProfile CreateSampleStaff(bool isActive = true)
         {
             return new StaffProfile

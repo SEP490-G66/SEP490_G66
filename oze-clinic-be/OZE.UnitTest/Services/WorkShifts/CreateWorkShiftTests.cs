@@ -307,5 +307,67 @@ namespace OZE.UnitTest.Services.WorkShifts
             error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.RoomOverlap);
             _workShiftRepositoryMock.Verify(r => r.AddAsync(It.IsAny<StaffSchedule>()), Times.Never);
         }
+
+        // UTCID14 (N): a shift starting 08:30 is on a 30-minute slot boundary
+        [Fact]
+        public async Task CreateWorkShiftAsync_ShouldCreate_WhenStartOnSlotBoundary()
+        {
+            SetupValidStaffAndRoom();
+            SetupSlotMinutes("30");
+            var request = CreateValidRequest();
+            request.ShiftStart = new TimeOnly(8, 30);
+
+            var result = await _service.CreateWorkShipAsync(request);
+
+            result.ShiftStart.Should().Be(new TimeOnly(8, 30));
+            _workShiftRepositoryMock.Verify(r => r.AddAsync(It.IsAny<StaffSchedule>()), Times.Once);
+        }
+
+        // UTCID15 (A): a shift starting 08:15 falls between two 30-minute slots
+        [Fact]
+        public async Task CreateWorkShiftAsync_ShouldThrow_WhenStartOffSlotBoundary()
+        {
+            SetupValidStaffAndRoom();
+            SetupSlotMinutes("30");
+            var request = CreateValidRequest();
+            request.ShiftStart = new TimeOnly(8, 15);
+
+            var act = () => _service.CreateWorkShipAsync(request);
+
+            var error = await act.Should().ThrowAsync<BadRequestException>();
+            error.Which.Message.Should().Be(ErrorConstants.WorkShiftMessage.ShiftStartOffSlot);
+            _workShiftRepositoryMock.Verify(r => r.AddAsync(It.IsAny<StaffSchedule>()), Times.Never);
+        }
+
+        // UTCID16 (B): the same 08:15 is fine once the slots are 15 minutes
+        [Fact]
+        public async Task CreateWorkShiftAsync_ShouldCreate_WhenSlotIsFifteenMinutes()
+        {
+            SetupValidStaffAndRoom();
+            SetupSlotMinutes("15");
+            var request = CreateValidRequest();
+            request.ShiftStart = new TimeOnly(8, 15);
+
+            var result = await _service.CreateWorkShipAsync(request);
+
+            result.ShiftStart.Should().Be(new TimeOnly(8, 15));
+        }
+
+        // UTCID17 (B): without a usable slot setting there is nothing to check against
+        [Theory]
+        [InlineData(null)]
+        [InlineData("abc")]
+        [InlineData("0")]
+        public async Task CreateWorkShiftAsync_ShouldSkipSlotCheck_WhenSettingMissing(string? value)
+        {
+            SetupValidStaffAndRoom();
+            SetupSlotMinutes(value);
+            var request = CreateValidRequest();
+            request.ShiftStart = new TimeOnly(8, 15);
+
+            var result = await _service.CreateWorkShipAsync(request);
+
+            result.ShiftStart.Should().Be(new TimeOnly(8, 15));
+        }
     }
 }
