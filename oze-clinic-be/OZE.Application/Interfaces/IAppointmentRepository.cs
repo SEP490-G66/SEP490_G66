@@ -55,8 +55,6 @@ namespace OZE.Application.Interfaces
         Task<TreatmentPlanStage?> GetTreatmentStageAsync(long stageId);
         // True when an appointment that is not cancelled or no-show is booked for this session
         Task<bool> IsTreatmentStageBookedAsync(long stageId, long? excludeAppointmentId = null);
-        // True when the patient has come to the clinic at least once: an appointment of the patient is COMPLETED
-        Task<bool> HasCompletedVisitAsync(int patientId);
         Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default);
         Task UpdateAsync(Appointment appointment);
 

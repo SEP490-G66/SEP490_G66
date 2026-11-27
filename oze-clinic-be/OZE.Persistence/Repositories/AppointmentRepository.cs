@@ -403,12 +403,6 @@ namespace OZE.Persistence.Repositories
                     && x.Status != AppointmentConstants.NoShowStatus);
         }
 
-        public async Task<bool> HasCompletedVisitAsync(int patientId)
-        {
-            return await _context.Appointments
-                .AnyAsync(x => x.PatientId == patientId && x.Status == AppointmentConstants.CompletedStatus);
-        }
-
         public async Task<bool> HasActiveTreatmentPlanAsync(int patientId)
         {
             return await _context.TreatmentPlans

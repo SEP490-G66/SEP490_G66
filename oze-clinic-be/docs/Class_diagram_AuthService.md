@@ -18,17 +18,6 @@ classDiagram
     class AuthController
     class IAuthService {
         <<interface>>
-        +RegisterAsync(request, baseUrl)
-        +ResendOtpAsync(request)
-        +VerifyOtpAsync(request, baseUrl)
-        +LoginAsync(request)
-        +RefreshTokenAsync(request)
-        +LogoutAsync(userId, refreshToken)
-        +ChangePasswordAsync(userId, request)
-        +ConfirmEmailAsync(userId, code)
-        +ForgotPasswordAsync(request)
-        +VerifyResetOtpAsync(request)
-        +ResetPasswordAsync(request)
     }
     class AuthService
 
@@ -89,43 +78,24 @@ classDiagram
 
     class IUserRefreshTokenRepository {
         <<interface>>
-        +GetByTokenAsync(refreshToken)
-        +GetActiveTokenAsync(refreshToken)
-        +AddAsync(refreshToken)
-        +RevokeUserTokensAsync(userId)
     }
     class IRegistrationRepository {
         <<interface>>
-        +FindUserByPhoneAsync(phoneNumbers)
-        +FindUnlinkedPatientsByPhoneAsync(phoneNumbers)
-        +ExecuteInTransactionAsync(action, shouldCommit)
     }
     class IJwtTokenGenerator {
         <<interface>>
-        +GenerateTokenAsync(user)
-        +GenerateRefreshToken()
     }
     class IEmailSender {
         <<interface>>
-        +SendEmailAsync(toEmail, subject, message)
-        +SendRegistrationOtpAsync(toEmail, fullName, otp, expiresInMinutes)
-        +SendEmailVerificationAsync(user, callbackUrl)
     }
     class ISmsSender {
         <<interface>>
-        +SendSmsAsync(toPhoneNumber, message)
     }
     class IPendingRegistrationStore {
         <<interface>>
-        +Save(registration, timeToLive)
-        +Get(sessionId)
-        +Remove(sessionId)
     }
     class IPasswordResetStore {
         <<interface>>
-        +Save(session, timeToLive)
-        +Get(sessionId)
-        +Remove(sessionId)
     }
 
     class UserRefreshTokenRepository

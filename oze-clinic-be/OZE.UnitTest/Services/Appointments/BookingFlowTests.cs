@@ -315,83 +315,36 @@ namespace OZE.UnitTest.Services.Appointments
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
         }
 
-        // UTCID08 (N): a returning patient (one COMPLETED visit) is confirmed at once, no call back needed
+        // UTCID08 (N): every online booking waits for the front desk call, returning patient or not
         [Fact]
-        public async Task BookAsPatientAsync_ShouldConfirmAtOnce_WhenReturningPatient()
+        public async Task BookAsPatientAsync_ShouldStayPending_WhenPatientBooksOnline()
         {
             Appointment? saved = null;
             _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
-            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
 
             var result = await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
 
-            saved!.Status.Should().Be(AppointmentConstants.ConfirmedStatus);
-            result.Status.Should().Be(AppointmentConstants.ConfirmedStatus);
-        }
-
-        // UTCID09 (N): a patient who has never come to the clinic still waits for the front desk call
-        [Fact]
-        public async Task BookAsPatientAsync_ShouldStayPending_WhenNoCompletedVisit()
-        {
-            Appointment? saved = null;
-            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
-            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
-
-            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
-
             saved!.Status.Should().Be(AppointmentConstants.PendingStatus);
+            result.Status.Should().Be(AppointmentConstants.PendingStatus);
         }
 
-        // UTCID10 (N): a returning patient gets the "confirmed" email, not "the receptionist will call to confirm" (no SMS any more)
+        // UTCID09 (N): the patient is told by email that the request was received and the receptionist will call
         [Fact]
-        public async Task BookAsPatientAsync_ShouldSendConfirmedEmail_WhenReturningPatient()
+        public async Task BookAsPatientAsync_ShouldSendRequestReceivedEmail()
         {
             _patient.Email = "benhnhan@oze.vn";
-            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
-
-            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
-
-            _emailSenderMock.Verify(s => s.SendEmailAsync(_patient.Email, PatientEmailTemplates.SubjectAppointmentConfirmed, It.IsAny<string>()), Times.Once);
-            _emailSenderMock.Verify(s => s.SendEmailAsync(It.IsAny<string>(), PatientEmailTemplates.SubjectAppointmentRequest, It.IsAny<string>()), Times.Never);
-            _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
-        }
-
-        // UTCID11 (N): a new patient is told by email that the request was received and the receptionist will call
-        [Fact]
-        public async Task BookAsPatientAsync_ShouldSendRequestReceivedEmail_WhenNewPatient()
-        {
-            _patient.Email = "benhnhan@oze.vn";
-            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
 
             await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
 
             _emailSenderMock.Verify(s => s.SendEmailAsync(_patient.Email, PatientEmailTemplates.SubjectAppointmentRequest, It.IsAny<string>()), Times.Once);
+            _emailSenderMock.Verify(s => s.SendEmailAsync(It.IsAny<string>(), PatientEmailTemplates.SubjectAppointmentConfirmed, It.IsAny<string>()), Times.Never);
             _smsSenderMock.Verify(s => s.SendSmsAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
-        // UTCID12 (N): for a returning patient the receptionists are told no call is needed, and the doctor is told at once
+        // UTCID10 (N): the receptionists get the "call to confirm" task; the doctor hears only once it is confirmed
         [Fact]
-        public async Task BookAsPatientAsync_ShouldNotifyNoCallNeeded_WhenReturningPatient()
+        public async Task BookAsPatientAsync_ShouldAskReceptionToCall()
         {
-            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(true);
-
-            await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
-
-            _notificationsMock.Verify(n => n.NotifyPatientAsync(_patient.Id,
-                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.ReturningBookingConfirmedTitle), It.IsAny<CancellationToken>()), Times.Once);
-            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
-                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.ReturningOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
-            _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
-                It.Is<NotificationContent>(c => c.Title == NotificationConstants.Text.NewOnlineBookingTitle), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
-            _notificationsMock.Verify(n => n.NotifyStaffAsync(DoctorId, It.IsAny<NotificationContent>(), It.IsAny<CancellationToken>()), Times.Once);
-        }
-
-        // UTCID13 (N): for a new patient the receptionists still get the "call to confirm" task
-        [Fact]
-        public async Task BookAsPatientAsync_ShouldAskReceptionToCall_WhenNewPatient()
-        {
-            _appointmentRepoMock.Setup(r => r.HasCompletedVisitAsync(_patient.Id)).ReturnsAsync(false);
-
             await _service.BookAsPatientAsync(Booking(new BookingRequest()), UserId);
 
             _notificationsMock.Verify(n => n.NotifyRolesAsync(It.IsAny<IReadOnlyCollection<string>>(),
