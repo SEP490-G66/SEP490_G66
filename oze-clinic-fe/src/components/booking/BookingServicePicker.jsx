@@ -31,7 +31,8 @@ const VariantOptions = ({ service }) => {
     );
 };
 
-const BookingServicePicker = ({ services, items, pickService, pickVariant, error, goneMessages, onPickService, onPickVariant, onAdd, onRemove }) => {
+// showTitle false: a section heading above already says "Dịch vụ", the group keeps its name for screen readers only
+const BookingServicePicker = ({ services, items, pickService, pickVariant, error, goneMessages, onPickService, onPickVariant, onAdd, onRemove, showTitle = true }) => {
     const service = findService(services, pickService);
     const hasVariants = Boolean(service?.variants.length);
     const canAdd = canAddSelection(service, pickVariant, items);
@@ -39,11 +40,8 @@ const BookingServicePicker = ({ services, items, pickService, pickVariant, error
 
     return (
         <div role="group" aria-labelledby={LABEL_ID} aria-describedby={HELP_ID}>
-            <span id={LABEL_ID} className="mt-7 mb-2.5 block font-heading text-heading-3 text-ink">
+            <span id={LABEL_ID} className={showTitle ? "mt-5 mb-2 block font-heading text-heading-3 text-ink" : "sr-only"}>
                 {BOOKING_TEXT.SERVICE}
-                <span className="text-danger" aria-hidden="true">
-                    {" *"}
-                </span>
             </span>
             <span id={HELP_ID} className="sr-only">
                 {BOOKING_TEXT.SERVICE_HELP}

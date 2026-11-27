@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using OZE.Application.Helpers;
@@ -65,10 +64,12 @@ namespace OZE.Application.Services
                 .Select(s => new BookableServiceResponse
                 {
                     ServiceId = s.Id,
+                    ServiceCode = s.ServiceCode,
                     ServiceName = s.ServiceName,
                     Description = s.Description,
                     ReferencePrice = s.ReferencePrice,
                     EstimatedMinutes = s.EstimatedMinutes,
+                    RequiredRoomType = s.RequiredRoomType,
                     IsMandatory = s.ServiceCode == examServiceCode,
                     Variants = s.Variants.Select(v => new BookableVariantResponse
                     {
@@ -122,7 +123,7 @@ namespace OZE.Application.Services
                     {
                         patient = new Patient
                         {
-                            PatientCode = GeneratePatientCode(),
+                            PatientCode = PatientCodeHelper.Generate(),
                             FullName = request.FullName.Trim(),
                             PhoneNumber = phone,
                             Email = email,
@@ -201,7 +202,22 @@ namespace OZE.Application.Services
                 ErrorConstants.PatientMessage.InvalidDateOfBirth);
             var address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
 
-            var lines = await ResolveBookingLinesAsync(request.ServiceId, request.VariantId);
+            // A visit for a treatment plan session: the session must belong to this patient and still be ahead
+            TreatmentPlanStage? stage = null;
+            if (request.TreatmentPlanStageId.HasValue)
+            {
+                ConditionGuard.Ensure(known != null, ErrorConstants.AppointmentMessage.TreatmentStageNeedsPatient);
+                stage = await _appointmentRepository.GetTreatmentStageAsync(request.TreatmentPlanStageId.Value);
+                ConditionGuard.Ensure<NotFoundException>(stage != null && stage.TreatmentPlan.PatientId == known!.Id,
+                    ErrorConstants.AppointmentMessage.TreatmentStageNotFound);
+                ConditionGuard.Ensure(IsOpenSession(stage!), ErrorConstants.AppointmentMessage.TreatmentStageNotOpen);
+            }
+
+            // No service picked: book the service of the session
+            var serviceIds = stage?.ServiceId != null && request.ServiceId.Count == 0 && request.VariantId.Count == 0
+                ? new List<int> { stage.ServiceId.Value }
+                : request.ServiceId;
+            var lines = await ResolveBookingLinesAsync(serviceIds, request.VariantId);
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
                 request.DoctorId, request.Note, receptionistUserId, async () =>
                 {
@@ -227,7 +243,7 @@ namespace OZE.Application.Services
                     {
                         patient = new Patient
                         {
-                            PatientCode = GeneratePatientCode(),
+                            PatientCode = PatientCodeHelper.Generate(),
                             FullName = request.FullName!.Trim(),
                             PhoneNumber = phone,
                             Email = email,
@@ -240,13 +256,46 @@ namespace OZE.Application.Services
                     }
 
                     return patient;
-                }, initialStatus: AppointmentConstants.ConfirmedStatus);
+                }, initialStatus: AppointmentConstants.ConfirmedStatus, treatmentPlanStageId: stage?.Id);
 
             await SendBookingEmailAsync(appointment, patient.Email, patient.FullName, lines.Select(l => l.DisplayName), confirmed: true);
             await NotifyAsync(n => n.NotifyPatientAsync(patient.Id, Content(NotificationConstants.Text.AppointmentBookedByClinicTitle, NotificationConstants.Text.AppointmentBookedByClinicMessage, appointment)));
             await NotifyDoctorOfNewAppointmentAsync(appointment, patient.FullName);
             await LogCreatedAsync(appointment, lines);
-            return ToResponse(appointment, patient, slot, lines);
+            var response = ToResponse(appointment, patient, slot, lines);
+            response.PlanSession = ToPlanSession(stage);
+            return response;
+        }
+
+        // A session can be booked while its plan is being carried out and the session is not done or cancelled
+        private static bool IsOpenSession(TreatmentPlanStage stage) =>
+            (stage.TreatmentPlan.Status == TreatmentPlanConstants.Approved || stage.TreatmentPlan.Status == TreatmentPlanConstants.InProgress)
+            && (stage.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled || stage.StageStatus == TreatmentPlanConstants.StageStatus.InProgress);
+
+        // "Buổi 4/6": the position among the plan's sessions that are not cancelled
+        private static AppointmentPlanSessionResponse? ToPlanSession(TreatmentPlanStage? stage)
+        {
+            if (stage == null)
+            {
+                return null;
+            }
+
+            // The appointment list loads the plan without its sessions: then the stored number and total are used
+            var counted = (stage.TreatmentPlan?.Stages ?? new List<TreatmentPlanStage>())
+                .Where(s => s.StageStatus != TreatmentPlanConstants.StageStatus.Cancelled)
+                .OrderBy(s => s.StageNumber)
+                .ToList();
+            var position = counted.FindIndex(s => s.Id == stage.Id);
+            return new AppointmentPlanSessionResponse
+            {
+                TreatmentPlanId = stage.TreatmentPlanId,
+                PlanName = stage.TreatmentPlan?.PlanName,
+                StageId = stage.Id,
+                StageNumber = position >= 0 ? position + 1 : stage.StageNumber,
+                StageName = stage.StageName,
+                TotalStages = counted.Count > 0 ? counted.Count : stage.TreatmentPlan?.TotalStages ?? 0,
+                StageStatus = stage.StageStatus
+            };
         }
 
         // Booking email to the patient: "confirmed" when the visit is CONFIRMED, otherwise "request received, we will call".
@@ -289,7 +338,7 @@ namespace OZE.Application.Services
         private async Task<(Appointment Appointment, Patient Patient, AvailableSlotResponse Slot)> CreateBookingAsync(
             List<BookingLine> lines, DateOnly date, TimeOnly slotStart, int? doctorId, string? note,
             string? createdByUserId, Func<Task<Patient>> getPatientAsync, long? excludeAppointmentId = null, long? parentAppointmentId = null,
-            string initialStatus = AppointmentConstants.PendingStatus, bool selfBooking = false)
+            string initialStatus = AppointmentConstants.PendingStatus, bool selfBooking = false, long? treatmentPlanStageId = null)
         {
             var slotMinutes = await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes);
 
@@ -320,6 +369,13 @@ namespace OZE.Application.Services
                     }
                 }
 
+                // One appointment per session; checked inside the transaction so two bookings cannot both take it
+                if (treatmentPlanStageId.HasValue)
+                {
+                    ConditionGuard.ThrowIf(await _appointmentRepository.IsTreatmentStageBookedAsync(treatmentPlanStageId.Value, excludeAppointmentId),
+                        ErrorConstants.AppointmentMessage.TreatmentStageAlreadyBooked);
+                }
+
                 var appointment = new Appointment
                 {
                     Patient = patient,
@@ -333,6 +389,7 @@ namespace OZE.Application.Services
                     Status = initialStatus,
                     Notes = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
                     ParentAppointmentId = parentAppointmentId,
+                    TreatmentPlanStageId = treatmentPlanStageId,
                     CreatedAt = DateTimeOffset.UtcNow,
                     CreatedByUserId = createdByUserId,
                     // Saved together with the appointment in the same transaction
@@ -436,10 +493,14 @@ namespace OZE.Application.Services
                 today.AddDays(maxDaysAhead),
                 slotMinutes,
                 ClinicClock.Now.AddHours(minHoursAhead),
-                // Services are done one after another, so the slot must fit their total time
-                TimeSpan.FromMinutes(lines.Sum(l => l.GetMinutes(slotMinutes))),
+                // Services are done one after another, so the slot must fit their total time. The booking holds whole
+                // slots (45 min with 30-min slots holds 60), so every start and end stays on the slot grid
+                TimeSpan.FromMinutes(RoundUpToSlot(lines.Sum(l => l.GetMinutes(slotMinutes)), slotMinutes)),
                 RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)));
         }
+
+        private static int RoundUpToSlot(int minutes, int slotMinutes) =>
+            slotMinutes <= 0 ? minutes : (minutes + slotMinutes - 1) / slotMinutes * slotMinutes;
 
         // The free slots of one day: each slot of each shift that fits the total time, is not taken and is not too soon
         private static List<AvailableSlotResponse> BuildSlots(DateOnly date, List<StaffSchedule> shifts, List<Appointment> booked, SlotRules rules)
@@ -504,6 +565,10 @@ namespace OZE.Application.Services
                 (Variant != null ? Variant.EstimatedMinutes : Service.EstimatedMinutes) ?? slotMinutes;
         }
 
+        // "Service" or "Service - Variant" of each line, for the audit log
+        private static List<string> DescribeServices(IEnumerable<AppointmentServiceItem> items) =>
+            items.Select(i => i.Variant == null ? i.Service?.ServiceName ?? i.ServiceId.ToString() : $"{i.Service?.ServiceName} - {i.Variant.VariantName}").ToList();
+
         // The general exam comes first, then the services and variants the patient picked, without duplicates
         private async Task<List<BookingLine>> ResolveBookingLinesAsync(
             IReadOnlyCollection<int> pickedServiceIds, IReadOnlyCollection<int> pickedVariantIds)
@@ -567,9 +632,22 @@ namespace OZE.Application.Services
             return lines;
         }
 
+        // Settings already read in this request (the service is scoped): booking reads the slot length more than once
+        private readonly Dictionary<string, string?> _configCache = new();
+
+        private async Task<string?> GetConfigValueAsync(string configKey)
+        {
+            if (!_configCache.TryGetValue(configKey, out var value))
+            {
+                value = await _appointmentRepository.GetConfigValueAsync(configKey);
+                _configCache[configKey] = value;
+            }
+            return value;
+        }
+
         private async Task<string> GetStringConfigAsync(string configKey)
         {
-            var value = await _appointmentRepository.GetConfigValueAsync(configKey);
+            var value = await GetConfigValueAsync(configKey);
             ConditionGuard.Ensure(!string.IsNullOrWhiteSpace(value),
                 string.Format(ErrorConstants.AppointmentMessage.ConfigMissing, configKey));
             return value!;
@@ -578,18 +656,12 @@ namespace OZE.Application.Services
 
         private async Task<int> GetIntConfigAsync(string configKey)
         {
-            var value = await _appointmentRepository.GetConfigValueAsync(configKey);
+            var value = await GetConfigValueAsync(configKey);
             ConditionGuard.Ensure(int.TryParse(value, out var result),
                 string.Format(ErrorConstants.AppointmentMessage.ConfigMissing, configKey));
             return result;
         }
 
-
-        // Same format as AuthService.GeneratePatientCode
-        private static string GeneratePatientCode()
-        {
-            return $"BN-{DateTime.UtcNow:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
-        }
 
         private static AppointmentResponse ToResponse(Appointment appointment, Patient patient,
             AvailableSlotResponse slot, List<BookingLine> lines)
@@ -624,6 +696,7 @@ namespace OZE.Application.Services
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt,
                 ParentAppointmentId = appointment.ParentAppointmentId,
+                BookedByPatient = AppointmentOwnershipHelper.IsBookedByPatient(appointment),
                 ExaminationId = appointment.Examination?.Id,
                 ExaminationStatus = appointment.Examination?.ExaminationStatus,
                 FollowUp = appointment.Examination.ToFollowUpSummary()
@@ -741,9 +814,11 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(!IsOpen(appointment!), ErrorConstants.AppointmentMessage.OnlyOpenCanBeCancelled);
 
             // Staff can cancel at any time (a patient may phone just before the visit).
-            // A patient can cancel a pending or confirmed appointment online, before the cutoff
+            // A patient can cancel a pending or confirmed appointment online, before the cutoff, if they booked it
+            // themselves; a visit the clinic arranged goes through a change request
             if (ownerUserId != null)
             {
+                ConditionGuard.Ensure(AppointmentOwnershipHelper.IsBookedByPatient(appointment!), ErrorConstants.AppointmentMessage.ArrangedByClinic);
                 await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.CancelDeadlinePassed);
             }
 
@@ -800,13 +875,21 @@ namespace OZE.Application.Services
             var isPatient = ownerUserId != null;
             if (isPatient)
             {
+                // Only their own booking; a visit the clinic arranged goes through a change request
+                ConditionGuard.Ensure(AppointmentOwnershipHelper.IsBookedByPatient(appointment!), ErrorConstants.AppointmentMessage.ArrangedByClinic);
                 // A pending or confirmed appointment can be moved online, before the cutoff; it goes back to pending
                 await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
             }
 
-            // The services stay the same, so the new slot must fit the same total time and room type
-            var lines = appointment!.ServiceItems.Select(i => new BookingLine(i.Service, i.Variant)).ToList();
+            // New services sent: checked like a booking. None sent: the services stay, so the new slot must fit the same
+            // total time and room type
+            var changeServices = request.ServiceId != null || request.VariantId != null;
+            var lines = changeServices
+                ? await ResolveBookingLinesAsync(request.ServiceId ?? new List<int>(), request.VariantId ?? new List<int>())
+                : appointment!.ServiceItems.Select(i => new BookingLine(i.Service, i.Variant)).ToList();
             ConditionGuard.Ensure(lines.Count > 0, ErrorConstants.AppointmentMessage.ServiceNotFound);
+            var slotMinutes = changeServices ? await GetIntConfigAsync(ConfigKeyConstants.SlotDurationMinutes) : 0;
+            var servicesBefore = DescribeServices(appointment!.ServiceItems);
 
             var date = request.Date!.Value;
             var slotStart = request.SlotStart!.Value;
@@ -830,6 +913,19 @@ namespace OZE.Application.Services
                 appointment.TimeSlotStart = slot.SlotStart;
                 appointment.TimeSlotEnd = slot.SlotEnd;
                 appointment.DoctorId = slot.DoctorId;
+                if (changeServices)
+                {
+                    // Price and time copied now, like a new booking
+                    _appointmentRepository.ReplaceServiceItems(appointment, lines.Select(l => new AppointmentServiceItem
+                    {
+                        AppointmentId = appointment.Id,
+                        ServiceId = l.Service.Id,
+                        VariantId = l.Variant?.Id,
+                        DurationMinutes = l.GetMinutes(slotMinutes),
+                        PriceAtBooking = l.Price,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    }));
+                }
                 // A patient's change still needs the receptionist's call; staff changed it after talking to the patient
                 appointment.Status = isPatient ? AppointmentConstants.PendingStatus : AppointmentConstants.ConfirmedStatus;
                 appointment.UpdatedAt = DateTimeOffset.UtcNow;
@@ -845,9 +941,17 @@ namespace OZE.Application.Services
                 return slot;
             });
 
+            if (changeServices)
+            {
+                // The new lines only carry ids; read the appointment again for the service names of the answer
+                appointment = await _appointmentRepository.GetByIdWithDetailsAsync(id, cancellationToken) ?? appointment;
+            }
+
             var reason = string.IsNullOrWhiteSpace(request.Reason) ? null : request.Reason.Trim();
             await _auditLogService.LogAsync(AuditConstants.AppointmentRescheduled, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
-                before, new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId }, reason);
+                new { before.Status, before.AppointmentDate, before.TimeSlotStart, before.TimeSlotEnd, before.DoctorId, Services = servicesBefore },
+                new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId, Services = DescribeServices(appointment.ServiceItems) },
+                reason);
 
             if (!isPatient)
             {
@@ -1237,7 +1341,7 @@ namespace OZE.Application.Services
                 {
                     patient = new Patient
                     {
-                        PatientCode = GeneratePatientCode(),
+                        PatientCode = PatientCodeHelper.Generate(),
                         FullName = request.FullName.Trim(),
                         PhoneNumber = phone,
                         Email = email,
@@ -1658,10 +1762,7 @@ namespace OZE.Application.Services
                 var outstanding = await _invoiceRepository.GetOutstandingForPatientAsync(patientId, cancellationToken);
                 foreach (var invoice in outstanding)
                 {
-                    var remaining = decimal.Round(
-                        Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount),
-                        2,
-                        MidpointRounding.AwayFromZero);
+                    var remaining = MoneyHelper.Round(Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount));
                     if (remaining <= 0)
                     {
                         continue;
@@ -1900,9 +2001,20 @@ namespace OZE.Application.Services
         private static AppointmentResponse MapToResponse(Appointment appointment)
         {
             var firstItem = appointment.ServiceItems.FirstOrDefault();
+            // Room and queue number while the patient is in the clinic for this visit (only when the queue entries are loaded)
+            var inClinic = appointment.Status == AppointmentConstants.CheckedInStatus || appointment.Status == AppointmentConstants.InServiceStatus;
+            var entry = inClinic
+                ? appointment.QueueEntries?
+                    .Where(q => q.QueueType == QueueConstants.ExaminationType && QueueConstants.ActiveStatuses.Contains(q.Status))
+                    .OrderByDescending(q => q.CreatedAt)
+                    .FirstOrDefault()
+                : null;
             return new AppointmentResponse
             {
                 Id = appointment.Id,
+                RoomId = entry?.RoomId,
+                RoomName = entry?.Room?.RoomName,
+                QueueNumber = entry?.QueueNumber,
                 PatientId = appointment.PatientId,
                 PatientCode = appointment.Patient?.PatientCode ?? string.Empty,
                 PatientName = appointment.Patient?.FullName ?? string.Empty,
@@ -1931,6 +2043,8 @@ namespace OZE.Application.Services
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt,
                 ParentAppointmentId = appointment.ParentAppointmentId,
+                BookedByPatient = AppointmentOwnershipHelper.IsBookedByPatient(appointment),
+                PlanSession = ToPlanSession(appointment.TreatmentPlanStage),
                 ExaminationId = appointment.Examination?.Id,
                 ExaminationStatus = appointment.Examination?.ExaminationStatus,
                 FollowUp = appointment.Examination.ToFollowUpSummary()

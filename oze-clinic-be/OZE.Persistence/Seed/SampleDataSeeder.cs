@@ -159,7 +159,7 @@ namespace OZE.Persistence.Seed
             new("DV024", "Nha khoa tổng quát", "Điều trị nha khoa cơ bản: nhổ răng, trám răng, lấy cao răng, điều trị tủy, tẩy trắng, phục hình và bệnh nướu", 400000, 30, RoomTypeConstants.GeneralTreatment, 6),
             new("DV007", "Chụp Panorama", "Phim toàn cảnh hai hàm", 250000, 15, RoomTypeConstants.XRay),
             new("DV011", "Chụp X-quang quanh chóp", "Phim quanh chóp một răng", 100000, 15, RoomTypeConstants.XRay),
-            new("DV008", "Scan răng iTero", "Quét dấu răng kỹ thuật số", 800000, 30, RoomTypeConstants.GeneralTreatment),
+            new("DV008", "Scan răng iTero", "Quét dấu răng kỹ thuật số", 800000, 30, RoomTypeConstants.GeneralTreatment, Active: false),
 
             // Old flat list, now variants of the services above
             new("DV002", "Lấy cao răng", "Làm sạch cao răng, đánh bóng", 150000, 30, RoomTypeConstants.GeneralTreatment, 6, Active: false),
@@ -254,7 +254,7 @@ namespace OZE.Persistence.Seed
             (ConfigKeyConstants.BookingPendingConfirmHours, "4", "Int", "Lịch chờ xác nhận quá số giờ này thì cảnh báo lễ tân (giờ)"),
             (ConfigKeyConstants.BookingPendingVisitSoonHours, "24", "Int", "Lịch chờ xác nhận sắp tới giờ khám trong số giờ này thì cảnh báo lễ tân (giờ)"),
             ("CheckIn.EarlyMinutes", "30", "Int", "Cho check-in sớm tối đa (phút)"),
-            (ConfigKeyConstants.CheckInLateMinutes, "15", "Int", "Trễ quá thì đánh dấu NO_SHOW (phút)"),
+            (ConfigKeyConstants.CheckInLateMinutes, "15", "Int", "Đến trễ quá số phút này thì vẫn check-in, xếp sau người đến đúng giờ (phút)"),
             ("Queue.AutoExpireMinutes", "60", "Int", "Chờ quá thì tự huỷ khỏi hàng chờ (phút)"),
             ("Clinic.WorkStartTime", "08:00", "String", "Giờ mở cửa"),
             ("Clinic.WorkEndTime", "17:00", "String", "Giờ đóng cửa"),
@@ -527,6 +527,12 @@ namespace OZE.Persistence.Seed
                     {
                         // The sample appointments all start with DV001, so the booking flow must use it too
                         config.ConfigValue = row.Value;
+                        config.UpdatedAt = now;
+                    }
+                    else if (row.Key == ConfigKeyConstants.CheckInLateMinutes && config.Description != row.Description)
+                    {
+                        // A late patient is still checked in and seen after the on-time ones, never marked NO_SHOW
+                        config.Description = row.Description;
                         config.UpdatedAt = now;
                     }
                 }

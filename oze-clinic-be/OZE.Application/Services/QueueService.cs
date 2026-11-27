@@ -193,7 +193,7 @@ namespace OZE.Application.Services
             }
 
             // Numbers of earlier days are history, they cannot be called any more
-            ConditionGuard.Ensure(DateOnly.FromDateTime(entry!.CreatedAt.LocalDateTime) == DateOnly.FromDateTime(ClinicClock.Today), ErrorConstants.QueueMessage.NotInTodayQueue);
+            ConditionGuard.Ensure(DateOnly.FromDateTime(ClinicClock.ToClinicTime(entry!.CreatedAt)) == DateOnly.FromDateTime(ClinicClock.Today), ErrorConstants.QueueMessage.NotInTodayQueue);
             ConditionGuard.Ensure(entry.Status == QueueConstants.Waiting, ErrorConstants.QueueMessage.OnlyWaitingCanBeCalled);
 
             var calledAt = DateTimeOffset.UtcNow;

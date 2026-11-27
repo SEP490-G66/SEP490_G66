@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using AutoMapper;
 using Microsoft.Extensions.Logging;
 using OZE.Application.Helpers;
@@ -115,7 +114,7 @@ namespace OZE.Application.Services
             string patientCode;
             do
             {
-                patientCode = GeneratePatientCode();
+                patientCode = PatientCodeHelper.Generate();
             }
             while (await _patientRepository.ExistsByCodeAsync(patientCode, cancellationToken));
 
@@ -300,11 +299,6 @@ namespace OZE.Application.Services
 
             var dto = _mapper.Map<PatientMedicalProfileDto>(profile);
             return ApiResponse<PatientMedicalProfileDto>.SuccessResult(dto, "Medical profile added successfully");
-        }
-
-        private static string GeneratePatientCode()
-        {
-            return $"BN-{DateTime.UtcNow:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
         }
     }
 }

@@ -42,10 +42,16 @@ namespace OZE.Application.Services
 
             var name = request?.DocumentName?.Trim() ?? string.Empty;
             var address = request?.ProviderAddress?.Trim() ?? string.Empty;
+            var category = request?.Category?.Trim() ?? string.Empty;
+            var note = request?.Note?.Trim() ?? string.Empty;
             ConditionGuard.Ensure(name.Length > 0, ErrorConstants.ProvidedDocumentMessage.DocumentNameRequired);
             ConditionGuard.Ensure(name.Length <= ProvidedDocumentConstants.DocumentNameMaxLength, ErrorConstants.ProvidedDocumentMessage.DocumentNameInvalid);
+            ConditionGuard.Ensure(ProvidedDocumentConstants.Categories.Contains(category), ErrorConstants.ProvidedDocumentMessage.CategoryInvalid);
+            // When and where are required; the note for the doctor is optional
+            ConditionGuard.Ensure(request!.PerformedOn != null, ErrorConstants.ProvidedDocumentMessage.PerformedOnRequired);
             ConditionGuard.Ensure(address.Length > 0, ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired);
             ConditionGuard.Ensure(address.Length <= ProvidedDocumentConstants.ProviderAddressMaxLength, ErrorConstants.ProvidedDocumentMessage.ProviderAddressInvalid);
+            ConditionGuard.Ensure(note.Length <= ProvidedDocumentConstants.NoteMaxLength, ErrorConstants.ProvidedDocumentMessage.NoteInvalid);
             ConditionGuard.Ensure(
                 request!.PerformedOn == null || request.PerformedOn.Value <= DateOnly.FromDateTime(ClinicClock.Today),
                 ErrorConstants.ProvidedDocumentMessage.PerformedOnInFuture);
@@ -89,14 +95,16 @@ namespace OZE.Application.Services
                     DocumentType = ProvidedDocumentConstants.DocumentType,
                     UploadGroupId = groupId,
                     Description = name,
-                    ProviderAddress = address,
+                    ProviderAddress = address.Length > 0 ? address : null,
                     PerformedOn = request.PerformedOn,
+                    Category = category,
+                    Note = note.Length > 0 ? note : null,
                     FileName = originalName.Length > DocumentRequestConstants.FileNameMaxLength
                         ? originalName[..DocumentRequestConstants.FileNameMaxLength]
                         : originalName,
                     FilePath = relativePath,
                     FileSize = file.Data.LongLength,
-                    MimeType = MimeTypeOf(extension),
+                    MimeType = FileMimeTypeHelper.Of(extension),
                     UploadedByUserId = patientUserId,
                     CreatedAt = now
                 });
@@ -122,6 +130,10 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure<ForbiddenException>(
                 !string.IsNullOrEmpty(patientUserId) && documents.All(d => d.Patient?.UserId == patientUserId),
                 ErrorConstants.ProvidedDocumentMessage.CannotDelete);
+            // Once a doctor has read it, it is part of what the doctor relied on
+            ConditionGuard.Ensure<ForbiddenException>(
+                documents.All(d => d.SeenAt == null),
+                ErrorConstants.ProvidedDocumentMessage.CannotDeleteSeen);
 
             _repository.RemoveDocuments(documents);
             await _repository.SaveChangesAsync(cancellationToken);
@@ -156,17 +168,24 @@ namespace OZE.Application.Services
                 examination!.DoctorId == doctor!.Id,
                 ErrorConstants.DocumentRequestMessage.CannotViewRequests);
 
-            return ToResponses(await _repository.GetProvidedByPatientIdAsync(examination.PatientId, cancellationToken));
-        }
+            var documents = await _repository.GetProvidedByPatientIdAsync(examination.PatientId, cancellationToken);
 
-        private static string MimeTypeOf(string extension) => extension switch
-        {
-            ".pdf" => "application/pdf",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".dcm" => "application/dicom",
-            _ => "application/octet-stream"
-        };
+            // The doctor of the visit now has them in front of them: the patient sees "Bác sĩ đã xem"
+            var unseen = documents.Where(d => d.SeenAt == null).ToList();
+            if (unseen.Count > 0)
+            {
+                var now = DateTimeOffset.UtcNow;
+                foreach (var document in unseen)
+                {
+                    document.SeenAt = now;
+                    document.SeenByDoctorId = doctor.Id;
+                    document.SeenByDoctor = doctor;
+                }
+                await _repository.SaveChangesAsync(cancellationToken);
+            }
+
+            return ToResponses(documents);
+        }
 
         // One response per upload, newest upload first
         private static List<ProvidedDocumentResponse> ToResponses(IEnumerable<PatientDocument> documents) =>
@@ -175,12 +194,18 @@ namespace OZE.Application.Services
                 .Select(group =>
                 {
                     var first = group.OrderBy(d => d.Id).First();
+                    var seen = group.Where(d => d.SeenAt != null).OrderBy(d => d.SeenAt).FirstOrDefault();
                     return new ProvidedDocumentResponse
                     {
                         Id = group.Key,
                         DocumentName = first.Description ?? string.Empty,
                         PerformedOn = first.PerformedOn,
                         ProviderAddress = first.ProviderAddress ?? string.Empty,
+                        Category = first.Category,
+                        Note = first.Note,
+                        SeenAt = seen?.SeenAt,
+                        SeenByDoctorName = seen?.SeenByDoctor?.FullName,
+                        CanDelete = seen == null,
                         CreatedAt = group.Max(d => d.CreatedAt),
                         Files = group
                             .OrderBy(d => d.Id)

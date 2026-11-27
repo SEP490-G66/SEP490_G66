@@ -44,6 +44,38 @@ namespace OZE.UnitTest.Services.DocumentRequests
         }
 
         [Theory]
+        [InlineData(ProvidedDocumentConstants.Category.Imaging, ProvidedDocumentConstants.Category.Imaging)]
+        [InlineData(null, ProvidedDocumentConstants.Category.Other)]
+        [InlineData("  ", ProvidedDocumentConstants.Category.Other)]
+        public async Task CreateAsync_ShouldKeepTheDocumentType(string? category, string expected)
+        {
+            SetupDoctor();
+            SetupExamination();
+            DocumentRequest? saved = null;
+            _repository
+                .Setup(r => r.AddAsync(It.IsAny<DocumentRequest>(), It.IsAny<CancellationToken>()))
+                .Callback<DocumentRequest, CancellationToken>((request, _) => saved = request)
+                .Returns(Task.CompletedTask);
+
+            var result = await _service.CreateAsync(DoctorUserId, ExaminationId, new CreateDocumentRequest { DocumentName = "Phim CT", Category = category });
+
+            saved!.Category.Should().Be(expected);
+            result.Category.Should().Be(expected);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ShouldRejectAnUnknownDocumentType()
+        {
+            SetupDoctor();
+            SetupExamination();
+
+            var act = () => _service.CreateAsync(DoctorUserId, ExaminationId, new CreateDocumentRequest { DocumentName = "Phim CT", Category = "Video" });
+
+            (await act.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.CategoryInvalid);
+            _repository.Verify(r => r.AddAsync(It.IsAny<DocumentRequest>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Theory]
         [InlineData(null)]
         [InlineData("")]
         [InlineData("   ")]

@@ -1,9 +1,10 @@
-import { Image as ImageIcon } from "lucide-react";
-import { Navigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { CalendarCheck, Clock, Image as ImageIcon } from "lucide-react";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ImageCard from "@/components/ui/ImageCard";
-import { getServiceBySlug } from "@/services/dentalService";
+import { getServiceBySlug, isMenuSlug, loadMenuService } from "@/services/dentalService";
 import { PUBLIC_SERVICE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES, getErrorRoute } from "@/utils/routes";
 
@@ -23,9 +24,17 @@ const TypesSection = ({ types }) => (
     <section aria-labelledby={TYPES_TITLE_ID} className={SECTION_CLASS}>
         <SectionHeading id={TYPES_TITLE_ID}>{TEXT.TYPES_TITLE}</SectionHeading>
         <ul className={`grid grid-cols-1 gap-6 ${typeColumns(types.length)}`}>
-            {types.map(({ name, description, imageUrl }) => (
-                <li key={name} className="flex">
-                    <ImageCard imageUrl={imageUrl} imageAlt={name} title={name} description={description} imageClassName="aspect-4/3" className="w-full" />
+            {types.map(({ id, name, description, imageUrl, minutes }) => (
+                <li key={name} id={id ? `variant-${id}` : undefined} className="flex scroll-mt-24">
+                    <ImageCard imageUrl={imageUrl} imageAlt={name} title={name} description={description} imageClassName="aspect-4/3" className="w-full" hideEmptyImage>
+                        {minutes && (
+                            <p className="mt-auto flex items-center gap-1.5 pt-2 text-label text-muted">
+                                <Clock className="size-4" aria-hidden="true" />
+                                <span className="sr-only">{TEXT.DURATION}: </span>
+                                {TEXT.MINUTES(minutes)}
+                            </p>
+                        )}
+                    </ImageCard>
                 </li>
             ))}
         </ul>
@@ -79,10 +88,41 @@ const StepsSection = ({ steps }) => (
     </section>
 );
 
+// A service of the header menu is read from the database; the other pages keep the website content
+const useService = (slug) => {
+    const fromMenu = isMenuSlug(slug);
+    const [loaded, setLoaded] = useState({ slug: null, service: null });
+
+    useEffect(() => {
+        if (!fromMenu) return undefined;
+        let active = true;
+        loadMenuService(slug).then((service) => active && setLoaded({ slug, service }));
+        return () => {
+            active = false;
+        };
+    }, [slug, fromMenu]);
+
+    if (!fromMenu) return getServiceBySlug(slug);
+    return loaded.slug === slug ? loaded.service : undefined;
+};
+
 const ServiceDetail = () => {
     const { serviceSlug } = useParams();
-    const service = getServiceBySlug(serviceSlug);
+    const service = useService(serviceSlug);
+    const { hash } = useLocation();
 
+    // A variant picked in the service bar opens the page at that variant
+    useEffect(() => {
+        if (service && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start" });
+    }, [service, hash]);
+
+    if (service === undefined) {
+        return (
+            <div className="container-public py-16 text-center text-body" role="status">
+                {TEXT.LOADING}
+            </div>
+        );
+    }
     if (!service) return <Navigate to={getErrorRoute(404)} replace />;
 
     const breadcrumbItems = [
@@ -111,7 +151,21 @@ const ServiceDetail = () => {
                             <ImageIcon className="size-12 text-placeholder" aria-hidden="true" />
                         </div>
                     )}
-                    <p className="text-body-lg text-body">{service.intro}</p>
+                    <div className="flex flex-col gap-5">
+                        <p className="text-body-lg text-ink">{service.intro}</p>
+                        {service.details && <p className="text-body-md text-body">{service.details}</p>}
+                        <div className="flex flex-wrap gap-3">
+                            <Link to={ROUTES.BOOK_APPOINTMENT} className="btn btn-primary">
+                                <CalendarCheck className="size-4" aria-hidden="true" />
+                                {TEXT.BOOK}
+                            </Link>
+                            {service.types.length > 0 && (
+                                <a href="#service-types-title" className="btn btn-secondary">
+                                    {TEXT.VIEW_TYPES}
+                                </a>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </section>
 

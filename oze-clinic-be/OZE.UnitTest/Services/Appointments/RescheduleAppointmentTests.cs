@@ -65,5 +65,84 @@ namespace OZE.UnitTest.Services.Appointments
             followUpAppointment.AppointmentDate.Should().Be(newDate);
             original.Examination.FollowUpDate.Should().Be(newDate);
         }
+
+        private (Appointment Appointment, DateOnly NewDate) MovableAppointment()
+        {
+            var newDate = DateOnly.FromDateTime(ClinicClock.Today.AddDays(10));
+            var appointment = new Appointment
+            {
+                Id = 889,
+                Status = AppointmentConstants.ConfirmedStatus,
+                AppointmentDate = DateOnly.FromDateTime(ClinicClock.Today.AddDays(5)),
+                TimeSlotStart = new TimeOnly(8, 0),
+                TimeSlotEnd = new TimeOnly(8, 30),
+                DoctorId = DoctorId,
+                ServiceItems = new List<AppointmentServiceItem>
+                {
+                    new() { Service = _generalExamService, ServiceId = _generalExamService.Id }
+                }
+            };
+            _appointmentRepoMock
+                .Setup(r => r.GetByIdWithDetailsAsync(889, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(appointment);
+            SetupDoctorShift(newDate, new TimeOnly(8, 0), new TimeOnly(12, 0));
+            _appointmentRepoMock
+                .Setup(r => r.ExecuteSerializableAsync(It.IsAny<Func<Task<AvailableSlotResponse>>>()))
+                .Returns<Func<Task<AvailableSlotResponse>>>(action => action());
+            return (appointment, newDate);
+        }
+
+        // UTCID02 (N): no services sent keeps the lines of the appointment
+        [Fact]
+        public async Task RescheduleAppointmentAsync_ShouldKeepServices_WhenNoneAreSent()
+        {
+            var (appointment, newDate) = MovableAppointment();
+
+            await _service.RescheduleAppointmentAsync(889, new RescheduleAppointmentRequest { Date = newDate, SlotStart = new TimeOnly(9, 0), DoctorId = DoctorId }, null);
+
+            _appointmentRepoMock.Verify(r => r.ReplaceServiceItems(It.IsAny<Appointment>(), It.IsAny<IEnumerable<AppointmentServiceItem>>()), Times.Never);
+            appointment.ServiceItems.Should().ContainSingle();
+        }
+
+        // UTCID03 (N): new services sent replace the lines, the general exam first, with the price of now
+        [Fact]
+        public async Task RescheduleAppointmentAsync_ShouldReplaceServices_WhenNewOnesAreSent()
+        {
+            var (appointment, newDate) = MovableAppointment();
+            var scaling = new Service { Id = 7, ServiceName = "Lay cao rang", ReferencePrice = 300000, EstimatedMinutes = 30, IsActive = true };
+            _appointmentRepoMock
+                .Setup(r => r.GetServicesByIdsAsync(It.Is<IReadOnlyCollection<int>>(ids => ids.Contains(7))))
+                .ReturnsAsync(new List<Service> { scaling });
+            List<AppointmentServiceItem>? saved = null;
+            _appointmentRepoMock
+                .Setup(r => r.ReplaceServiceItems(appointment, It.IsAny<IEnumerable<AppointmentServiceItem>>()))
+                .Callback<Appointment, IEnumerable<AppointmentServiceItem>>((_, items) => saved = items.ToList());
+
+            await _service.RescheduleAppointmentAsync(889, new RescheduleAppointmentRequest
+            {
+                Date = newDate, SlotStart = new TimeOnly(9, 0), DoctorId = DoctorId, ServiceId = new List<int> { 7 }
+            }, null);
+
+            saved.Should().NotBeNull();
+            saved!.Select(i => i.ServiceId).Should().Equal(_generalExamService.Id, 7);
+            saved[1].PriceAtBooking.Should().Be(300000);
+        }
+
+        // UTCID04 (A): an inactive service cannot be moved into the appointment
+        [Fact]
+        public async Task RescheduleAppointmentAsync_ShouldThrow_WhenNewServiceIsInactive()
+        {
+            var (_, newDate) = MovableAppointment();
+            _appointmentRepoMock
+                .Setup(r => r.GetServicesByIdsAsync(It.Is<IReadOnlyCollection<int>>(ids => ids.Contains(7))))
+                .ReturnsAsync(new List<Service> { new() { Id = 7, ServiceName = "Cu", IsActive = false } });
+
+            var act = () => _service.RescheduleAppointmentAsync(889, new RescheduleAppointmentRequest
+            {
+                Date = newDate, SlotStart = new TimeOnly(9, 0), DoctorId = DoctorId, ServiceId = new List<int> { 7 }
+            }, null);
+
+            (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.ServiceInactive);
+        }
     }
 }

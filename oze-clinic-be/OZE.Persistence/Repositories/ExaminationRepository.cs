@@ -66,14 +66,8 @@ namespace OZE.Persistence.Repositories
             return _context.ServiceVariants.FirstOrDefaultAsync(x => x.Id == variantId, cancellationToken);
         }
 
-        public async Task<string?> GetConfigValueAsync(string configKey)
-        {
-            return await _context.SystemConfigurations
-                .AsNoTracking()
-                .Where(x => x.ConfigKey == configKey)
-                .Select(x => x.ConfigValue)
-                .FirstOrDefaultAsync();
-        }
+        public Task<string?> GetConfigValueAsync(string configKey) =>
+            _context.SystemConfigurations.ValueOfAsync(configKey);
 
         public void RemoveServiceItem(AppointmentServiceItem item)
         {

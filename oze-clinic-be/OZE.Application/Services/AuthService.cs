@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
@@ -319,7 +318,7 @@ namespace OZE.Application.Services
         {
             return new Patient
             {
-                PatientCode = GeneratePatientCode(),
+                PatientCode = PatientCodeHelper.Generate(),
                 FullName = pending.FullName,
                 DateOfBirth = pending.DateOfBirth,
                 Gender = pending.Gender,
@@ -612,7 +611,7 @@ namespace OZE.Application.Services
 
             user.Patient = new Patient
             {
-                PatientCode = GeneratePatientCode(),
+                PatientCode = PatientCodeHelper.Generate(),
                 FullName = fullName,
                 Email = email,
                 PhoneNumber = null,
@@ -1025,12 +1024,6 @@ namespace OZE.Application.Services
             await _refreshTokenRepository.SaveChangesAsync();
 
             return ApiResponse.SuccessResult("Password has been reset successfully");
-        }
-
-        // Format: BN-yyMMdd-XXXXXX (fits Patients.PatientCode NVARCHAR(20)).
-        private static string GeneratePatientCode()
-        {
-            return $"BN-{DateTime.UtcNow:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
         }
     }
 }

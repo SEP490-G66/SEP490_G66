@@ -71,16 +71,16 @@ namespace OZE.UnitTest.Services.Caching
 
         // UTCID04 (N): a signed-out token is refused until it expires; others are not
         [Fact]
-        public void TokenRevocation_RevokedTokenIsRefused()
+        public async Task TokenRevocation_RevokedTokenIsRefused()
         {
             var store = new AccessTokenRevocationStore(_cache);
 
             store.Revoke("jti-1", DateTimeOffset.UtcNow.AddMinutes(30));
             store.Revoke("jti-old", DateTimeOffset.UtcNow.AddMinutes(-1));
 
-            store.IsRevoked("jti-1").Should().BeTrue();
-            store.IsRevoked("jti-old").Should().BeFalse();
-            store.IsRevoked("jti-2").Should().BeFalse();
+            (await store.IsRevokedAsync("jti-1")).Should().BeTrue();
+            (await store.IsRevokedAsync("jti-old")).Should().BeFalse();
+            (await store.IsRevokedAsync("jti-2")).Should().BeFalse();
         }
 
         // UTCID05 (A): one more code than allowed in the window is refused; another contact is counted apart

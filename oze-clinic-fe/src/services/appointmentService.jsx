@@ -1,6 +1,7 @@
 import api from "./api";
 import { getBookingDays, getBookingSlots } from "./bookingService";
 import { call } from "./receptionService";
+import { loadCatalog } from "./dentalService";
 import { BOOKING_ERROR_CODE } from "../utils/messages";
 
 const READ = { skipErrorPage: true };
@@ -34,8 +35,14 @@ const messageOf = (result) => String(result?.message ?? "").toLowerCase();
 
 const serviceLabel = (line) => (line.variantName ? `${line.serviceName} · ${line.variantName}` : line.serviceName);
 
-const toAppointment = (item) => {
+// The general exam is in every appointment, so the patient's screens show only the services the patient picked
+const loadMandatoryIds = async () => new Set(((await loadCatalog()) ?? []).filter((service) => service.isMandatory).map((service) => service.serviceId));
+
+const toAppointment = (item, mandatoryIds = new Set()) => {
     const services = (item.services ?? []).map((line) => ({ serviceId: line.serviceId, variantId: line.variantId ?? null, label: serviceLabel(line) }));
+    const picked = services.filter((line) => !mandatoryIds.has(line.serviceId));
+    // Only the general exam booked: that is what the patient sees
+    const shown = picked.length ? picked : services;
     return {
         id: item.id,
         appointmentCode: item.appointmentCode ?? "",
@@ -46,7 +53,7 @@ const toAppointment = (item) => {
         doctorId: item.doctorId ?? null,
         doctorName: item.doctorName ?? "",
         services,
-        serviceName: services.length ? services.map((line) => line.label).join(", ") : (item.serviceName ?? ""),
+        serviceName: shown.length ? shown.map((line) => line.label).join(", ") : (item.serviceName ?? ""),
         checkInAt: item.checkInAt ?? null,
         roomName: item.roomName ?? "",
         cancellationReason: item.cancellationReason ?? "",
@@ -56,6 +63,10 @@ const toAppointment = (item) => {
         notes: item.notes ?? "",
         createdAt: item.createdAt ?? null,
         parentAppointmentId: item.parentAppointmentId ?? null,
+        // The plan session it is for (front desk booking), and whether the patient booked it themselves (then they
+        // can change it online; a visit the clinic arranged goes through a change request)
+        planSession: item.planSession ?? null,
+        bookedByPatient: item.bookedByPatient === true,
     };
 };
 
@@ -71,18 +82,19 @@ export const getMyAppointments = async ({ signal } = {}) => {
         items.push(...rows);
         if (!rows.length || items.length >= (result.data?.totalCount ?? 0)) break;
     }
-    return success(items.map(toAppointment));
+    const mandatoryIds = await loadMandatoryIds();
+    return success(items.map((item) => toAppointment(item, mandatoryIds)));
 };
 
-const toDetail = (result) => {
-    if (result.success) return success({ appointment: toAppointment(result.data ?? {}) });
+const toDetail = async (result) => {
+    if (result.success) return success({ appointment: toAppointment(result.data ?? {}, await loadMandatoryIds()) });
     return result.status === 404 ? success(null) : failure();
 };
 
 export const getMyAppointmentDetail = async (appointmentId) => toDetail(await call(() => api.get(`/api/appointments/${appointmentId}`, READ)));
 
-const toActionResult = (result) => {
-    if (result.success) return success({ appointment: toAppointment(result.data ?? {}) });
+const toActionResult = async (result) => {
+    if (result.success) return success({ appointment: toAppointment(result.data ?? {}, await loadMandatoryIds()) });
     if (result.status === 404) return failure(APPOINTMENT_ACTION_CODE.NOT_FOUND);
     const message = messageOf(result);
     const known = ACTION_ERRORS.find(([text]) => message.includes(text));
@@ -92,17 +104,27 @@ const toActionResult = (result) => {
 export const cancelMyAppointment = async (appointmentId, { reason }) =>
     toActionResult(await call(() => api.post(`/api/appointments/${appointmentId}/cancel`, { reason: reason.trim() }, READ)));
 
-export const rescheduleMyAppointment = async (appointmentId, { date, slotStart, doctorId }) =>
-    toActionResult(await call(() => api.post(`/api/appointments/${appointmentId}/reschedule`, { date, slotStart, doctorId: doctorId ? Number(doctorId) : null }, READ)));
+// services: { ServiceId, VariantId } when the patient changed them; left out keeps the services of the appointment
+export const rescheduleMyAppointment = async (appointmentId, { date, slotStart, doctorId, services }) =>
+    toActionResult(
+        await call(() =>
+            api.post(
+                `/api/appointments/${appointmentId}/reschedule`,
+                { date, slotStart, doctorId: doctorId ? Number(doctorId) : null, ...(services && { serviceId: services.ServiceId, variantId: services.VariantId }) },
+                READ
+            )
+        )
+    );
 
-const toServiceParams = (appointment) => ({
+// The services of an appointment as booking parameters (the general exam is left out by the server)
+export const appointmentServiceParams = (appointment) => ({
     ServiceId: [...new Set(appointment.services.filter((line) => line.variantId === null).map((line) => line.serviceId))],
     VariantId: [...new Set(appointment.services.filter((line) => line.variantId !== null).map((line) => line.variantId))],
 });
 
-export const getRescheduleSlots = (appointment, { date, doctorId }) =>
-    getBookingSlots({ date, doctorId: doctorId ? Number(doctorId) : null, services: toServiceParams(appointment) });
+export const getRescheduleSlots = (services, { date, doctorId }) =>
+    getBookingSlots({ date, doctorId: doctorId ? Number(doctorId) : null, services });
 
 // Free-slot count per day for the reschedule week view (same data as the booking page).
-export const getRescheduleDays = (appointment, { from, to, doctorId, signal }) =>
-    getBookingDays({ from, to, doctorId: doctorId ? Number(doctorId) : null, services: toServiceParams(appointment), signal });
+export const getRescheduleDays = (services, { from, to, doctorId, signal }) =>
+    getBookingDays({ from, to, doctorId: doctorId ? Number(doctorId) : null, services, signal });

@@ -49,6 +49,12 @@ namespace OZE.Persistence.Configurations
                    .HasForeignKey(x => x.ParentAppointmentId)
                    .HasConstraintName("FK_Appointments_ParentAppointment")
                    .OnDelete(DeleteBehavior.NoAction);
+            // Separate from TreatmentPlanStage.AppointmentId (the visit the session was done in, set on completion)
+            builder.HasOne(x => x.TreatmentPlanStage)
+                   .WithMany()
+                   .HasForeignKey(x => x.TreatmentPlanStageId)
+                   .HasConstraintName("FK_Appointments_TreatmentPlanStages")
+                   .OnDelete(DeleteBehavior.NoAction);
 
             builder.HasIndex(x => new { x.PatientId, x.AppointmentDate })
                    .HasDatabaseName("IX_Appointments_PatientId_Date")
@@ -62,6 +68,9 @@ namespace OZE.Persistence.Configurations
                    .HasFilter("[Status] IN ('PENDING', 'CONFIRMED')");
             builder.HasIndex(x => x.ParentAppointmentId)
                    .HasDatabaseName("IX_Appointments_ParentAppointmentId");
+            builder.HasIndex(x => x.TreatmentPlanStageId)
+                   .HasDatabaseName("IX_Appointments_TreatmentPlanStageId")
+                   .HasFilter("[TreatmentPlanStageId] IS NOT NULL");
         }
     }
 }

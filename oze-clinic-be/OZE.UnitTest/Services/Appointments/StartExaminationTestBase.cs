@@ -1,3 +1,4 @@
+using OZE.Application.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -54,7 +55,7 @@ namespace OZE.UnitTest.Services.Appointments
                 PatientId = 20,
                 DoctorId = doctorId,
                 Status = status,
-                AppointmentDate = date ?? DateOnly.FromDateTime(DateTime.Today),
+                AppointmentDate = date ?? DateOnly.FromDateTime(ClinicClock.Today),
                 Notes = notes,
                 Patient = new Patient { FullName = "Tran Thi B" }
             };

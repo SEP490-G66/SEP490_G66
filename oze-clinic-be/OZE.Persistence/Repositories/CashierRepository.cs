@@ -355,6 +355,19 @@ namespace OZE.Persistence.Repositories
             return await query.Where(p => p.ReceiptCode == receiptId).OrderBy(p => p.Id).ToListAsync(cancellationToken);
         }
 
+        public Task<long?> FindBookedSessionAppointmentIdAsync(long stageId, CancellationToken cancellationToken = default)
+        {
+            return _context.Appointments
+                .AsNoTracking()
+                .Where(a => a.TreatmentPlanStageId == stageId
+                    && (a.Status == AppointmentConstants.InServiceStatus
+                        || a.Status == AppointmentConstants.CheckedInStatus
+                        || a.Status == AppointmentConstants.CompletedStatus))
+                .OrderBy(a => a.Status == AppointmentConstants.InServiceStatus ? 0 : a.Status == AppointmentConstants.CheckedInStatus ? 1 : 2)
+                .Select(a => (long?)a.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         public Task<long?> FindSessionAppointmentIdAsync(int patientId, int doctorId, DateOnly date, CancellationToken cancellationToken = default)
         {
             // In service first, then any visit of the day with that doctor that is still open or just finished
@@ -372,14 +385,8 @@ namespace OZE.Persistence.Repositories
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
-        public Task<string?> GetConfigValueAsync(string key, CancellationToken cancellationToken = default)
-        {
-            return _context.SystemConfigurations
-                .AsNoTracking()
-                .Where(c => c.ConfigKey == key)
-                .Select(c => (string?)c.ConfigValue)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
+        public Task<string?> GetConfigValueAsync(string key, CancellationToken cancellationToken = default) =>
+            _context.SystemConfigurations.ValueOfAsync(key, cancellationToken);
 
         public Task<bool> ReceiptCodeExistsAsync(string code, CancellationToken cancellationToken = default)
         {

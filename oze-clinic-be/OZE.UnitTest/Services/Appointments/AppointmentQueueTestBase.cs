@@ -1,3 +1,4 @@
+using OZE.Application.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +23,7 @@ namespace OZE.UnitTest.Services.Appointments
     {
         protected const int DoctorId = 10;
         protected const string DoctorUserId = "doc-user-10";
-        protected static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.Today);
+        protected static readonly DateOnly Today = DateOnly.FromDateTime(ClinicClock.Today);
 
         protected readonly Mock<IAppointmentRepository> _appointmentRepoMock = new();
         protected readonly Mock<IAuditLogService> _auditLogMock = new();

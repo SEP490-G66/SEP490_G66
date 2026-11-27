@@ -106,7 +106,7 @@ export const usePaging = (items, pageSize = 10) => {
                 {totalPages > 1 && <Pagination page={current} totalPages={totalPages} onChange={setPage} />}
             </div>
         ) : null;
-    return { setPage, pageItems, footer };
+    return { setPage, pageItems, footer, start };
 };
 
 // Doctors with a shift today, one row per doctor (the shift that matters now), and the ones still able to take patients

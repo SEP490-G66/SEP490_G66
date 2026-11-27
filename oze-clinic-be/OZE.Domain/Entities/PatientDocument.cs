@@ -18,9 +18,16 @@ namespace OZE.Domain.Entities
         public Guid? UploadGroupId { get; set; }
         public string? ProviderAddress { get; set; }
         public DateOnly? PerformedOn { get; set; }
+        // Provided documents only: kind of document (ProvidedDocumentConstants.Categories) and the patient's note for the doctor
+        public string? Category { get; set; }
+        public string? Note { get; set; }
+        // Provided documents only: the first time a doctor opened the patient's documents after this upload
+        public DateTimeOffset? SeenAt { get; set; }
+        public int? SeenByDoctorId { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
 
         public virtual Patient Patient { get; set; } = null!;
         public virtual DocumentRequest? DocumentRequest { get; set; }
+        public virtual StaffProfile? SeenByDoctor { get; set; }
     }
 }

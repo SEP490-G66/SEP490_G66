@@ -24,12 +24,13 @@ const BookingPatientCard = ({ patient, note, onNoteChange, showNote }) => (
         </div>
         {showNote && (
             <>
-                <label htmlFor={NOTE_ID} className="mt-7 mb-2.5 block font-heading text-heading-3 text-ink">
+                <label htmlFor={NOTE_ID} className="mt-5 mb-2 block font-heading text-heading-3 text-ink">
                     {BOOKING_TEXT.NOTE} <span className="font-sans text-body-sm font-normal text-muted">{BOOKING_TEXT.OPTIONAL}</span>
                 </label>
                 <textarea
                     id={NOTE_ID}
                     className="input placeholder:text-muted"
+                    rows={3}
                     value={note}
                     maxLength={BOOKING_NOTE_MAX_LENGTH}
                     placeholder={BOOKING_TEXT.NOTE_PLACEHOLDER}

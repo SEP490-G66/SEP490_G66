@@ -27,10 +27,14 @@ namespace OZE.Domain.Entities
         // Links to the previous appointment if this is a follow-up visit
         public long? ParentAppointmentId { get; set; }
 
+        // The treatment plan session this visit is booked for; null for a visit outside a plan
+        public long? TreatmentPlanStageId { get; set; }
+
         public virtual Patient Patient { get; set; } = null!;
         public virtual StaffProfile? Doctor { get; set; }
         public virtual Examination? Examination { get; set; }
         public virtual Appointment? ParentAppointment { get; set; }
+        public virtual TreatmentPlanStage? TreatmentPlanStage { get; set; }
         public virtual ICollection<QueueEntry> QueueEntries { get; set; } = new List<QueueEntry>();
         public virtual ICollection<AppointmentServiceItem> ServiceItems { get; set; } = new List<AppointmentServiceItem>();
     }

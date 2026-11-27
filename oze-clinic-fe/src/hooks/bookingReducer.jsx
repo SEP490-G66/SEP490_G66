@@ -97,7 +97,7 @@ const relocate = (state) => {
     const { today, range, cause } = state;
     const earliest = getEarliest(today, range.days);
     if (!earliest) {
-        const next = { ...state, day: null, slot: null, autoPick: "earliest", cause: null, formShown: true };
+        const next = { ...state, day: null, slot: null, weekStart: weekStartOf(today), autoPick: "earliest", cause: null, formShown: true };
         return isChoiceCause(cause) ? next : requestFocus(next, [BOOKING_IDS.STATE_TITLE]);
     }
     let next = { ...state, formShown: true };

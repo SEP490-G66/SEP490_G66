@@ -60,15 +60,6 @@ namespace OZE.Persistence.Repositories
                 .Include(x => x.Room)
                 .FirstOrDefaultAsync(x => x.Id == id);
         }
-
-        public async Task<string?> GetConfigValueAsync(string configKey)
-        {
-            return await context.SystemConfigurations
-                .AsNoTracking()
-                .Where(x => x.ConfigKey == configKey)
-                .Select(x => x.ConfigValue)
-                .FirstOrDefaultAsync();
-        }
             
         public async Task<bool> HasRunningShiftInRoomAsync(int roomId, DateOnly scheduleDate, long excludeShiftId)
         {

@@ -9,6 +9,8 @@ namespace OZE.Domain.Entities
         public int RequestedByDoctorId { get; set; }
         public string DocumentName { get; set; } = string.Empty;
         public string? Note { get; set; }
+        // Kind of document asked for (ProvidedDocumentConstants.Categories), so both lists of the patient share the types
+        public string? Category { get; set; }
         public string Status { get; set; } = "Pending";
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }

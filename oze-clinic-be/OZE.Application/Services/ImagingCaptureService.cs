@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using OZE.Application.Helpers;
 using OZE.Application.Interfaces;
 using OZE.Application.Middlewares;
 using OZE.Common.Constants;
@@ -169,7 +170,7 @@ namespace OZE.Application.Services
                         ? originalName[..ImagingCaptureConstants.FileNameMaxLength]
                         : originalName,
                     FileSize = file.Data.LongLength,
-                    MimeType = MimeTypeOf(extension),
+                    MimeType = FileMimeTypeHelper.Of(extension, ImagingRequestConstants.DicomMimeType),
                     TechnicianNotes = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
                     ReviewStatus = MedicalRecordConstants.PendingImageStatus,
                     CreatedAt = now
@@ -192,13 +193,6 @@ namespace OZE.Application.Services
                 FileUrl = $"/api/imaging-results/{r.Id}/file"
             }).ToList();
         }
-
-        private static string MimeTypeOf(string extension) => extension switch
-        {
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            _ => ImagingRequestConstants.DicomMimeType
-        };
 
         public async Task<ImagingCaptureResponse> GetAsync(long imagingRequestId, string simulationId, CancellationToken cancellationToken = default)
         {

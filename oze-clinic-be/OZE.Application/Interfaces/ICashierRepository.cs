@@ -37,6 +37,8 @@ namespace OZE.Application.Interfaces
 
         /// <summary>Tìm Id lịch hẹn hôm nay để liên kết phiên điều trị với buổi khám thực tế.</summary>
         Task<long?> FindSessionAppointmentIdAsync(int patientId, int doctorId, DateOnly date, CancellationToken cancellationToken = default);
+        // The visit booked for this session (Appointment.TreatmentPlanStageId) that the patient came to, if any
+        Task<long?> FindBookedSessionAppointmentIdAsync(long stageId, CancellationToken cancellationToken = default);
 
         /// <summary>Lấy giá trị cấu hình hệ thống theo khóa.</summary>
         Task<string?> GetConfigValueAsync(string key, CancellationToken cancellationToken = default);

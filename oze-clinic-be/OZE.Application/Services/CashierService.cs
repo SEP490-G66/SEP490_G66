@@ -186,7 +186,7 @@ namespace OZE.Application.Services
 
                 var patient = await _cashierRepository.GetPatientAsync(request.PatientId, cancellationToken);
                 ConditionGuard.Ensure<NotFoundException>(patient != null, ErrorConstants.CashierMessage.PatientNotFound);
-                var method = NormalizeMethod(request.PaymentMethod);
+                var method = PaymentMethodHelper.Normalize(request.PaymentMethod);
                 var lines = request.Lines ?? new List<CreateReceiptLineRequest>();
 
                 // Same checks as the FE, on the data as it is now (pending transfers count against the ceiling)
@@ -312,10 +312,15 @@ namespace OZE.Application.Services
                 }
 
                 // The visit the session was done in, so its services are not collected again as a walk-in
-                if (stage.StageStatus == TreatmentPlanConstants.StageStatus.Completed && stage.AppointmentId == null && doctorId.HasValue)
+                // The visit booked for the session comes first; only a session without one is matched by patient, doctor and day
+                if (stage.StageStatus == TreatmentPlanConstants.StageStatus.Completed && stage.AppointmentId == null)
                 {
-                    var date = stage.ActualDate ?? DateOnly.FromDateTime(ClinicClock.Today);
-                    stage.AppointmentId = await _cashierRepository.FindSessionAppointmentIdAsync(plan.PatientId, doctorId.Value, date, cancellationToken);
+                    stage.AppointmentId = await _cashierRepository.FindBookedSessionAppointmentIdAsync(stage.Id, cancellationToken);
+                    if (stage.AppointmentId == null && doctorId.HasValue)
+                    {
+                        var date = stage.ActualDate ?? DateOnly.FromDateTime(ClinicClock.Today);
+                        stage.AppointmentId = await _cashierRepository.FindSessionAppointmentIdAsync(plan.PatientId, doctorId.Value, date, cancellationToken);
+                    }
                 }
 
                 if (plan.PaymentOption != null)
@@ -413,7 +418,7 @@ namespace OZE.Application.Services
                 .ToList();
             ConditionGuard.Ensure(items.Count > 0, ErrorConstants.CashierMessage.VisitHasNoServices);
 
-            var total = decimal.Round(items.Sum(i => i.Amount), 2, MidpointRounding.AwayFromZero);
+            var total = MoneyHelper.Round(items.Sum(i => i.Amount));
             var invoice = new Invoice
             {
                 InvoiceNumber = await NewInvoiceNumberAsync(cancellationToken),
@@ -450,7 +455,7 @@ namespace OZE.Application.Services
 
             foreach (var (stage, index) in stages.Select((s, i) => (s, i)))
             {
-                var amount = decimal.Round(stage.EstimatedCost + CashierCalculator.ExtraOf(stage), 2, MidpointRounding.AwayFromZero);
+                var amount = MoneyHelper.Round(stage.EstimatedCost + CashierCalculator.ExtraOf(stage));
                 var item = invoice.Items.FirstOrDefault(i => i.TreatmentPlanStageId == stage.Id);
                 if (item == null)
                 {
@@ -465,7 +470,7 @@ namespace OZE.Application.Services
                 item.SortOrder = index;
             }
 
-            invoice.TotalAmount = decimal.Round(invoice.Items.Sum(i => i.Amount), 2, MidpointRounding.AwayFromZero);
+            invoice.TotalAmount = MoneyHelper.Round(invoice.Items.Sum(i => i.Amount));
             invoice.DiscountAmount = Math.Min(invoice.DiscountAmount, invoice.TotalAmount);
             invoice.FinalAmount = invoice.TotalAmount - invoice.DiscountAmount;
             InvoiceMoneyHelper.Recalculate(invoice);
@@ -529,13 +534,6 @@ namespace OZE.Application.Services
                 }
             }
             throw new BadRequestException("Could not generate a unique invoice number. Please try again.");
-        }
-
-        private static string NormalizeMethod(string? method)
-        {
-            var normalized = method?.Trim().ToUpperInvariant() ?? string.Empty;
-            ConditionGuard.Ensure(PaymentConstants.Methods.Contains(normalized), ErrorConstants.PaymentMessage.MethodInvalid);
-            return normalized;
         }
 
         private static string? Clean(string? text)
