@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -239,10 +239,13 @@ namespace OZE.Persistence.Seed
             public async Task AddDocumentsAsync(IImagingFileStore fileStore)
             {
                 await Provided(fileStore, "Phim X-quang toàn cảnh", "Bệnh viện Răng Hàm Mặt Trung ương", -45, -44,
+                    ProvidedDocumentConstants.Category.Imaging, "Bác sĩ bên viện nói răng 38 mọc lệch, nên nhổ.", _khoa,
                     ("panorama_toan_canh.pdf", "PHIM X-QUANG TOAN CANH"), ("ket_luan_phim.pdf", "KET LUAN CHAN DOAN HINH ANH"));
                 await Provided(fileStore, "Kết quả xét nghiệm công thức máu", "Bệnh viện Bạch Mai", -15, -14,
+                    ProvidedDocumentConstants.Category.LabResult, null, null,
                     ("xet_nghiem_cong_thuc_mau.pdf", "PHIEU KET QUA XET NGHIEM HUYET HOC"));
                 await Provided(fileStore, "Đơn thuốc huyết áp đang dùng", "Phòng khám Đa khoa Medlatec", null, -5,
+                    ProvidedDocumentConstants.Category.Prescription, "Đang uống Amlodipin 5mg mỗi sáng.", _ha,
                     ("don_thuoc_huyet_ap.pdf", "DON THUOC"));
 
                 if (_requestDocument is { } request)
@@ -275,8 +278,9 @@ namespace OZE.Persistence.Seed
                 }
             }
 
+            // seenBy: the doctor who has already opened it (null = still waiting for a doctor)
             private async Task Provided(IImagingFileStore fileStore, string name, string address, int? performedDay, int uploadedDay,
-                params (string FileName, string Title)[] files)
+                string category, string? note, StaffProfile? seenBy, params (string FileName, string Title)[] files)
             {
                 var group = Guid.NewGuid();
                 var at = At(uploadedDay, "21:00");
@@ -295,6 +299,10 @@ namespace OZE.Persistence.Seed
                         Description = name,
                         ProviderAddress = address,
                         PerformedOn = performedDay is int d ? _today.AddDays(d) : null,
+                        Category = category,
+                        Note = note,
+                        SeenAt = seenBy != null ? at.AddHours(12) : null,
+                        SeenByDoctor = seenBy,
                         FileName = fileName,
                         FilePath = path,
                         FileSize = data.LongLength,

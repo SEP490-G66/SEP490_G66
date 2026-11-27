@@ -9,6 +9,19 @@ namespace OZE.Common.Constants
 
         public const int DocumentNameMaxLength = 200;
         public const int ProviderAddressMaxLength = 300;
+        public const int NoteMaxLength = 500;
+
+        // PatientDocuments.Category: what kind of document it is (the FE shows them as Phim chụp, Xét nghiệm...)
+        public static class Category
+        {
+            public const string Imaging = "Imaging";
+            public const string LabResult = "LabResult";
+            public const string Prescription = "Prescription";
+            public const string MedicalPaper = "MedicalPaper";
+            public const string Other = "Other";
+        }
+
+        public static readonly string[] Categories = { Category.Imaging, Category.LabResult, Category.Prescription, Category.MedicalPaper, Category.Other };
 
         public static readonly string[] UploadExtensions = { ".pdf", ".jpg", ".jpeg", ".png", ".dcm" };
         public const int UploadMaxFiles = 5;

@@ -1951,6 +1951,10 @@ namespace OZE.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("Category")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetimeoffset")
@@ -1984,6 +1988,10 @@ namespace OZE.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<int>("PatientId")
                         .HasColumnType("int");
 
@@ -1993,6 +2001,12 @@ namespace OZE.Persistence.Migrations
                     b.Property<string>("ProviderAddress")
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTimeOffset?>("SeenAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int?>("SeenByDoctorId")
+                        .HasColumnType("int");
 
                     b.Property<Guid?>("UploadGroupId")
                         .HasColumnType("uniqueidentifier");
@@ -3788,6 +3802,12 @@ namespace OZE.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("FK_PatientDocuments_Patients");
 
+                    b.HasOne("OZE.Domain.Entities.StaffProfile", "SeenByDoctor")
+                        .WithMany()
+                        .HasForeignKey("SeenByDoctorId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("FK_PatientDocuments_SeenByDoctor");
+
                     b.HasOne("OZE.Domain.Entities.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UploadedByUserId")
@@ -3797,6 +3817,8 @@ namespace OZE.Persistence.Migrations
                     b.Navigation("DocumentRequest");
 
                     b.Navigation("Patient");
+
+                    b.Navigation("SeenByDoctor");
                 });
 
             modelBuilder.Entity("OZE.Domain.Entities.PatientMedicalProfile", b =>
