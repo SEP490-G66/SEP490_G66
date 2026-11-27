@@ -17,9 +17,14 @@ const FieldError = ({ id, message }) =>
 // One treatment session of a planned service ("Buổi 1"): content, service type, planned date, cost, description.
 // session: see utils/examination (newPlanSession). typeOptions: [{ id, name, price }] of the service (its variants);
 // a service without variants has no type field. errors: { title?, typeId?, date? } from validatePlan.
-// onChange receives the changed fields; picking a type fills an empty cost.
-const PlanSessionForm = ({ index, session, typeOptions = [], errors = {}, onChange, onRemove }) => {
-    const ids = { title: useId(), type: useId(), date: useId(), cost: useId(), note: useId(), titleError: useId(), typeError: useId(), dateError: useId() };
+// doctorOptions: [{ doctorId, doctorName, suggested }] the session can be given to (getPlanDoctorOptions); the front desk
+// books the session with the chosen doctor only. onChange receives the changed fields; picking a type fills an empty cost.
+const PlanSessionForm = ({ index, session, typeOptions = [], doctorOptions = [], errors = {}, onChange, onRemove }) => {
+    const ids = { title: useId(), type: useId(), doctor: useId(), doctorHelp: useId(), date: useId(), cost: useId(), note: useId(), titleError: useId(), typeError: useId(), dateError: useId() };
+    const suggested = doctorOptions.filter((doctor) => doctor.suggested);
+    const others = doctorOptions.filter((doctor) => !doctor.suggested);
+    // A doctor chosen before who is no longer in the list (left the clinic) is still shown, so the value is not lost
+    const missing = session.doctorId && !doctorOptions.some((doctor) => String(doctor.doctorId) === session.doctorId);
 
     const changeType = (typeId) => {
         const type = typeOptions.find((option) => option.id === typeId);
@@ -78,6 +83,45 @@ const PlanSessionForm = ({ index, session, typeOptions = [], errors = {}, onChan
                     <FieldError id={ids.typeError} message={errors.typeId} />
                 </div>
             )}
+
+            <div className="field">
+                <label htmlFor={ids.doctor} className="label">
+                    Bác sĩ thực hiện
+                </label>
+                <select
+                    id={ids.doctor}
+                    className="input"
+                    value={session.doctorId ?? ""}
+                    aria-describedby={ids.doctorHelp}
+                    onChange={(event) => onChange({ doctorId: event.target.value })}
+                >
+                    <option value="">Bác sĩ lập kế hoạch (tôi)</option>
+                    {missing && <option value={session.doctorId}>Bác sĩ đã chọn trước đó</option>}
+                    {suggested.length > 0 && (
+                        <optgroup label="Gợi ý: có ca ở phòng phù hợp dịch vụ">
+                            {suggested.map((doctor) => (
+                                <option key={doctor.doctorId} value={String(doctor.doctorId)}>
+                                    {doctor.doctorName}
+                                    {doctor.specialization ? ` · ${doctor.specialization}` : ""}
+                                </option>
+                            ))}
+                        </optgroup>
+                    )}
+                    {others.length > 0 && (
+                        <optgroup label="Bác sĩ khác">
+                            {others.map((doctor) => (
+                                <option key={doctor.doctorId} value={String(doctor.doctorId)}>
+                                    {doctor.doctorName}
+                                    {doctor.specialization ? ` · ${doctor.specialization}` : ""}
+                                </option>
+                            ))}
+                        </optgroup>
+                    )}
+                </select>
+                <p id={ids.doctorHelp} className="help-text">
+                    Lễ tân sẽ xếp giờ buổi này theo lịch trực của bác sĩ được chọn.
+                </p>
+            </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="field">
