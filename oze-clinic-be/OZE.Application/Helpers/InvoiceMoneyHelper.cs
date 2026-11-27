@@ -7,30 +7,24 @@ namespace OZE.Application.Helpers
     {
         // Distinct: a payment added by hand and also attached by EF Core's fix-up is still one payment
         public static decimal GetConfirmedSum(Invoice invoice) =>
-            decimal.Round(
-                invoice.Payments
-                    .Distinct()
-                    .Where(p => p.PaymentStatus == PaymentConstants.Confirmed)
-                    .Sum(p => p.Amount),
-                2,
-                MidpointRounding.AwayFromZero);
+            MoneyHelper.Round(invoice.Payments
+                .Distinct()
+                .Where(p => p.PaymentStatus == PaymentConstants.Confirmed)
+                .Sum(p => p.Amount));
 
         public static decimal GetRefundedSum(Invoice invoice) =>
-            decimal.Round(
-                invoice.RefundAdjustmentRequests
-                    .Where(r =>
-                        r.RequestType == PaymentConstants.RefundRequestType.Refund
-                        && (r.Status == PaymentConstants.RefundRequestStatus.Approved
-                            || r.Status == PaymentConstants.RefundRequestStatus.Processed))
-                    .Sum(r => r.Amount),
-                2,
-                MidpointRounding.AwayFromZero);
+            MoneyHelper.Round(invoice.RefundAdjustmentRequests
+                .Where(r =>
+                    r.RequestType == PaymentConstants.RefundRequestType.Refund
+                    && (r.Status == PaymentConstants.RefundRequestStatus.Approved
+                        || r.Status == PaymentConstants.RefundRequestStatus.Processed))
+                .Sum(r => r.Amount));
 
         public static decimal GetNetPaidAmount(Invoice invoice) =>
-            decimal.Round(Math.Max(0m, GetConfirmedSum(invoice) - GetRefundedSum(invoice)), 2, MidpointRounding.AwayFromZero);
+            MoneyHelper.Round(Math.Max(0m, GetConfirmedSum(invoice) - GetRefundedSum(invoice)));
 
         public static decimal GetRemaining(Invoice invoice) =>
-            decimal.Round(Math.Max(0m, invoice.FinalAmount - GetNetPaidAmount(invoice)), 2, MidpointRounding.AwayFromZero);
+            MoneyHelper.Round(Math.Max(0m, invoice.FinalAmount - GetNetPaidAmount(invoice)));
 
         /// <summary>
         /// Open-P3: keep payment rows; PaidAmount = confirmed − refunded; status reflects refund when any.
@@ -44,7 +38,7 @@ namespace OZE.Application.Helpers
 
             var confirmedSum = GetConfirmedSum(invoice);
             var refundedSum = GetRefundedSum(invoice);
-            var netPaid = decimal.Round(Math.Max(0m, confirmedSum - refundedSum), 2, MidpointRounding.AwayFromZero);
+            var netPaid = MoneyHelper.Round(Math.Max(0m, confirmedSum - refundedSum));
             invoice.PaidAmount = netPaid;
 
             var hasPending = invoice.Payments.Any(p => p.PaymentStatus == PaymentConstants.Pending);

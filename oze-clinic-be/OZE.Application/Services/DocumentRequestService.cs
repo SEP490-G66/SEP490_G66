@@ -224,7 +224,7 @@ namespace OZE.Application.Services
                         : originalName,
                     FilePath = relativePath,
                     FileSize = file.Data.LongLength,
-                    MimeType = MimeTypeOf(extension),
+                    MimeType = FileMimeTypeHelper.Of(extension),
                     Description = request.DocumentName,
                     Category = request.Category,
                     Note = patientNote.Length > 0 ? patientNote : null,
@@ -278,7 +278,7 @@ namespace OZE.Application.Services
             {
                 Data = data!,
                 ContentType = string.IsNullOrWhiteSpace(document.MimeType)
-                    ? MimeTypeOf(Path.GetExtension(document.FilePath).ToLowerInvariant())
+                    ? FileMimeTypeHelper.Of(Path.GetExtension(document.FilePath).ToLowerInvariant())
                     : document.MimeType!,
                 FileName = document.FileName
             };
@@ -289,14 +289,6 @@ namespace OZE.Application.Services
 
         private static string DoctorTitle(string? fullName) =>
             string.IsNullOrWhiteSpace(fullName) ? "Bác sĩ" : $"BS. {fullName.Trim()}";
-
-        private static string MimeTypeOf(string extension) => extension switch
-        {
-            ".pdf" => "application/pdf",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            _ => "application/octet-stream"
-        };
 
         private static DocumentRequestResponse ToResponse(DocumentRequest request)
         {

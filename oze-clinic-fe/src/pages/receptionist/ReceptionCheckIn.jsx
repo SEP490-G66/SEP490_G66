@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Breadcrumb from "@/components/navigation/Breadcrumb";
 import LabeledSelect from "@/components/ui/LabeledSelect";
@@ -23,7 +23,6 @@ import { hhmm } from "@/utils/calendar";
 import {
     EMPTY_CHECK_IN_FILTERS,
     STATE_ORDER,
-    allergiesOf,
     appointmentMenu,
     isDoctorAway,
     isFilteredCheckIn,
@@ -42,18 +41,28 @@ const READ = { skipErrorPage: true };
 // Rows with nothing left to do recede, so the ones that need action stand out
 const DONE_STATES = ["checkedin", "serving", "done", "noshow", "cancelled"];
 const STATUS_OPTIONS = [["", TEXT.ALL_STATUSES], ...STATE_ORDER.map((key) => [key, TEXT.STATES[key][0]])];
-const WIDTHS = ["120px", "", "136px", "180px", "", "150px", "150px"];
+const WIDTHS = ["56px", "120px", "", "136px", "180px", "", "170px", "150px"];
 const REFRESH_MS = 20_000;
+const PAGE_SIZE = 10;
+// Patients in the clinic for this visit: they have a room and a queue number
+const IN_CLINIC = ["checkedin", "serving"];
 
 const ReceptionCheckIn = () => {
     const { state: navState } = useLocation();
+    // Other pages open one appointment here with ?appointment=<id> (and may preset ?slot= / ?doctor=)
+    const [params] = useSearchParams();
+    const linkedId = params.get("appointment");
     const [result, setResult] = useState(null);
     const [version, setVersion] = useState(0);
     const [dialog, setDialog] = useState(null);
     const [waiting, setWaiting] = useState([]);
     const [doctorList, setDoctorList] = useState([]);
     const [filtersOpen, setFiltersOpen] = useState(false);
-    const [filters, setFilters] = useState(() => ({ ...EMPTY_CHECK_IN_FILTERS, slot: navState?.slot ?? "", doctor: navState?.doctor ?? "" }));
+    const [filters, setFilters] = useState(() => ({
+        ...EMPTY_CHECK_IN_FILTERS,
+        slot: params.get("slot") ?? navState?.slot ?? "",
+        doctor: params.get("doctor") ?? navState?.doctor ?? "",
+    }));
     const { doctors, available, loaded: doctorsLoaded } = useDoctorsOnDuty(version);
     const doctorOf = new Map(doctors.map((d) => [d.id, d]));
     const acting = useRef(false);
@@ -144,7 +153,17 @@ const ReceptionCheckIn = () => {
                 (!filters.status || stateOf(a) === filters.status),
         ),
     );
-    const { pageItems, footer, setPage } = usePaging(shown, 10);
+    const { pageItems, footer, setPage, start } = usePaging(shown, PAGE_SIZE);
+    const linkedIndex = linkedId ? shown.findIndex((x) => String(x.id) === linkedId) : -1;
+
+    // The linked appointment: open its page once and bring its row into view
+    const linkedShown = useRef(false);
+    useEffect(() => {
+        if (linkedShown.current || linkedIndex < 0) return;
+        linkedShown.current = true;
+        setPage(Math.floor(linkedIndex / PAGE_SIZE) + 1);
+        requestAnimationFrame(() => document.getElementById(`checkin-row-${linkedId}`)?.scrollIntoView({ block: "center" }));
+    }, [linkedIndex, linkedId, setPage]);
     const filtered = isFilteredCheckIn(filters);
     const setFilter = (key) => (value) => {
         setFilters((current) => ({ ...current, [key]: value }));
@@ -186,27 +205,34 @@ const ReceptionCheckIn = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {pageItems.map((a) => {
+                        {pageItems.map((a, index) => {
                             const state = stateOf(a);
                             const [label, badge] = TEXT.STATES[state];
-                            const allergies = allergiesOf(a);
                             const doctor = doctorOf.get(a.doctorId);
                             const done = DONE_STATES.includes(state);
+                            const session = a.planSession;
                             return (
-                                <tr key={a.id} className={cx(done && "text-muted")}>
-                                    <td data-label={TEXT.COLUMNS[0]} className="num whitespace-nowrap [overflow-wrap:normal]">
+                                <tr
+                                    key={a.id}
+                                    id={`checkin-row-${a.id}`}
+                                    className={cx(done && "text-muted", String(a.id) === linkedId && "bg-primary-softer [&>td:first-child]:shadow-[inset_3px_0_0_var(--color-primary)]")}
+                                >
+                                    <td data-label={TEXT.COLUMNS[0]} className="num text-muted">
+                                        {start + index + 1}
+                                    </td>
+                                    <td data-label={TEXT.COLUMNS[1]} className="num whitespace-nowrap [overflow-wrap:normal]">
                                         <span className={done ? "text-muted" : "font-semibold text-ink"}>{slotOf(a) || TEXT.WALK_IN_SLOT}</span>
                                         {isLate(a, now) && <small className="block font-normal text-caption text-warning">{TEXT.LATE}</small>}
                                     </td>
                                     <td data-primary>
-                                        <span className={cx("cell-primary block", done && "font-normal text-body", state === "cancelled" && "line-through")}>{a.patientName}</span>
+                                        <span className={cx("cell-primary", done && "font-normal text-body", state === "cancelled" && "line-through")}>{a.patientName}</span>
+                                        {session && <span className="badge badge-info ml-2 align-middle">{TEXT.PLAN_SESSION(session.stageNumber, session.totalStages)}</span>}
                                         {a.patientCode && <small className="block text-caption text-muted">{a.patientCode}</small>}
-                                        {allergies.length > 0 && <span className="badge badge-danger mt-1 flex w-fit whitespace-normal">{TEXT.ALLERGY(allergies.join(", "))}</span>}
                                     </td>
-                                    <td data-label={TEXT.COLUMNS[2]} className="num whitespace-nowrap [overflow-wrap:normal]">
+                                    <td data-label={TEXT.COLUMNS[3]} className="num whitespace-nowrap [overflow-wrap:normal]">
                                         {phoneText(a.patientPhoneNumber)}
                                     </td>
-                                    <td data-label={TEXT.COLUMNS[3]}>
+                                    <td data-label={TEXT.COLUMNS[4]}>
                                         <div>
                                             {a.doctorName ?? TEXT.NO_DOCTOR}
                                             {state === "notyet" && doctor?.status === "Ended" && (
@@ -217,11 +243,14 @@ const ReceptionCheckIn = () => {
                                             )}
                                         </div>
                                     </td>
-                                    <td data-label={TEXT.COLUMNS[4]}>
+                                    <td data-label={TEXT.COLUMNS[5]}>
                                         <ServiceCell names={serviceNames(a)} />
                                     </td>
-                                    <td data-label={TEXT.COLUMNS[5]}>
+                                    <td data-label={TEXT.COLUMNS[6]}>
                                         <span className={cx("badge", badge)}>{label}</span>
+                                        {IN_CLINIC.includes(state) && (a.roomName || a.queueNumber != null) && (
+                                            <small className="mt-1 block text-caption text-muted">{TEXT.QUEUE_PLACE(a.roomName, a.queueNumber)}</small>
+                                        )}
                                     </td>
                                     <td data-actions>
                                         {state === "notyet" && (
@@ -262,10 +291,9 @@ const ReceptionCheckIn = () => {
                     <button type="button" className="btn btn-secondary" onClick={() => setDialog({ type: "book" })}>
                         {TEXT.BOOK}
                     </button>
-                    {/* On this screen the row "Check-in" buttons are the main action, so walk-in is secondary */}
                     <button
                         type="button"
-                        className="btn btn-secondary aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+                        className="btn btn-primary aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
                         onClick={() => available.length > 0 && setDialog({ type: "walkIn" })}
                         aria-disabled={available.length === 0}
                         aria-describedby={doctorsLoaded && available.length === 0 ? "checkin-walkin-hint" : undefined}

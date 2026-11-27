@@ -104,7 +104,7 @@ namespace OZE.Application.Services
                         : originalName,
                     FilePath = relativePath,
                     FileSize = file.Data.LongLength,
-                    MimeType = MimeTypeOf(extension),
+                    MimeType = FileMimeTypeHelper.Of(extension),
                     UploadedByUserId = patientUserId,
                     CreatedAt = now
                 });
@@ -186,15 +186,6 @@ namespace OZE.Application.Services
 
             return ToResponses(documents);
         }
-
-        private static string MimeTypeOf(string extension) => extension switch
-        {
-            ".pdf" => "application/pdf",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".dcm" => "application/dicom",
-            _ => "application/octet-stream"
-        };
 
         // One response per upload, newest upload first
         private static List<ProvidedDocumentResponse> ToResponses(IEnumerable<PatientDocument> documents) =>

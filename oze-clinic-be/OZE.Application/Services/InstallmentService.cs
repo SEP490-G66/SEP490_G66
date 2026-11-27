@@ -59,7 +59,7 @@ namespace OZE.Application.Services
             foreach (var item in periodRequests.OrderBy(p => p.Sequence))
             {
                 ConditionGuard.Ensure(item.Sequence > 0, ErrorConstants.InstallmentMessage.PeriodSequenceInvalid);
-                var amount = decimal.Round(item.Amount, 2, MidpointRounding.AwayFromZero);
+                var amount = MoneyHelper.Round(item.Amount);
                 ConditionGuard.Ensure(amount > 0, ErrorConstants.InstallmentMessage.PeriodAmountInvalid);
                 ConditionGuard.Ensure(item.DueDate >= clinicToday, ErrorConstants.InstallmentMessage.PeriodDueDateInvalid);
 
@@ -73,8 +73,8 @@ namespace OZE.Application.Services
                 });
             }
 
-            periodsSum = decimal.Round(periodsSum, 2, MidpointRounding.AwayFromZero);
-            var remaining = GetRemainingBalance(invoice);
+            periodsSum = MoneyHelper.Round(periodsSum);
+            var remaining = InvoiceMoneyHelper.GetRemaining(invoice);
             // Open-P2: sum(periods) ≤ remaining at plan create
             ConditionGuard.Ensure(periodsSum <= remaining, ErrorConstants.InstallmentMessage.PeriodsExceedRemaining);
 
@@ -147,8 +147,6 @@ namespace OZE.Application.Services
             return changed;
         }
 
-        private static decimal GetRemainingBalance(Invoice invoice) => InvoiceMoneyHelper.GetRemaining(invoice);
-
         private async Task EnsureOwnedByAsync(Invoice invoice, string? ownerUserId, CancellationToken cancellationToken)
         {
             if (ownerUserId is null)
@@ -184,7 +182,7 @@ namespace OZE.Application.Services
                 Notes = plan.Notes,
                 CreatedAt = plan.CreatedAt,
                 CreatedByUserId = plan.CreatedByUserId,
-                PeriodsTotalAmount = decimal.Round(periods.Sum(p => p.Amount), 2, MidpointRounding.AwayFromZero),
+                PeriodsTotalAmount = MoneyHelper.Round(periods.Sum(p => p.Amount)),
                 Periods = periods
             };
         }

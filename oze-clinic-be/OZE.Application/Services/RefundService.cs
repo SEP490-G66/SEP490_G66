@@ -136,7 +136,7 @@ namespace OZE.Application.Services
 
                 var invoice = refundRequest.Invoice;
                 var netPaid = InvoiceMoneyHelper.GetNetPaidAmount(invoice);
-                var workDone = decimal.Round(request.WorkDoneAmount, 2, MidpointRounding.AwayFromZero);
+                var workDone = MoneyHelper.Round(request.WorkDoneAmount);
                 ConditionGuard.Ensure(workDone >= 0, ErrorConstants.RefundMessage.WorkDoneAmountInvalid);
                 // Must leave a positive refund amount (CK_RefundAdjustments_Amount: Amount > 0)
                 ConditionGuard.Ensure(workDone < netPaid, ErrorConstants.RefundMessage.WorkDoneExceedsPaid);
@@ -180,11 +180,11 @@ namespace OZE.Application.Services
                 var invoice = refundRequest.Invoice;
                 // Net before this pending request (pending Amount is provisional and not counted)
                 var netPaid = InvoiceMoneyHelper.GetNetPaidAmount(invoice);
-                var workDone = decimal.Round(refundRequest.WorkDoneAmount!.Value, 2, MidpointRounding.AwayFromZero);
+                var workDone = MoneyHelper.Round(refundRequest.WorkDoneAmount!.Value);
                 ConditionGuard.Ensure(workDone >= 0, ErrorConstants.RefundMessage.WorkDoneAmountInvalid);
                 ConditionGuard.Ensure(workDone < netPaid, ErrorConstants.RefundMessage.WorkDoneExceedsPaid);
 
-                var refundAmount = decimal.Round(netPaid - workDone, 2, MidpointRounding.AwayFromZero);
+                var refundAmount = MoneyHelper.Round(netPaid - workDone);
 
                 var now = DateTimeOffset.UtcNow;
                 refundRequest.Amount = refundAmount;

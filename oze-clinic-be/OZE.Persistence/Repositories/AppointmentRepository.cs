@@ -99,14 +99,8 @@ namespace OZE.Persistence.Repositories
                 .ToListAsync();
         }
 
-        public async Task<string?> GetConfigValueAsync(string configKey)
-        {
-            return await _context.SystemConfigurations
-                .AsNoTracking()
-                .Where(x => x.ConfigKey == configKey)
-                .Select(x => x.ConfigValue)
-                .FirstOrDefaultAsync();
-        }
+        public Task<string?> GetConfigValueAsync(string configKey) =>
+            _context.SystemConfigurations.ValueOfAsync(configKey);
 
         public async Task<List<Appointment>> GetDoctorAppointmentsAsync(int doctorId, DateOnly fromDate, DateOnly toDate)
         {
@@ -446,6 +440,9 @@ namespace OZE.Persistence.Repositories
                 // The session and its plan only; the plan's sessions are loaded after the page (LoadPlanSessionsAsync)
                 .Include(x => x.TreatmentPlanStage)
                     .ThenInclude(x => x!.TreatmentPlan)
+                // The active examination entry only: room and queue number of a patient in the clinic
+                .Include(x => x.QueueEntries.Where(q => q.QueueType == QueueConstants.ExaminationType && QueueConstants.ActiveStatuses.Contains(q.Status)))
+                    .ThenInclude(q => q.Room)
                 .AsQueryable();
 
             if (parameters.Date.HasValue)

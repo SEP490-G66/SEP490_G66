@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using OZE.Application.Helpers;
@@ -124,7 +123,7 @@ namespace OZE.Application.Services
                     {
                         patient = new Patient
                         {
-                            PatientCode = GeneratePatientCode(),
+                            PatientCode = PatientCodeHelper.Generate(),
                             FullName = request.FullName.Trim(),
                             PhoneNumber = phone,
                             Email = email,
@@ -244,7 +243,7 @@ namespace OZE.Application.Services
                     {
                         patient = new Patient
                         {
-                            PatientCode = GeneratePatientCode(),
+                            PatientCode = PatientCodeHelper.Generate(),
                             FullName = request.FullName!.Trim(),
                             PhoneNumber = phone,
                             Email = email,
@@ -494,10 +493,14 @@ namespace OZE.Application.Services
                 today.AddDays(maxDaysAhead),
                 slotMinutes,
                 ClinicClock.Now.AddHours(minHoursAhead),
-                // Services are done one after another, so the slot must fit their total time
-                TimeSpan.FromMinutes(lines.Sum(l => l.GetMinutes(slotMinutes))),
+                // Services are done one after another, so the slot must fit their total time. The booking holds whole
+                // slots (45 min with 30-min slots holds 60), so every start and end stays on the slot grid
+                TimeSpan.FromMinutes(RoundUpToSlot(lines.Sum(l => l.GetMinutes(slotMinutes)), slotMinutes)),
                 RequiredRoomTypeOf(lines.Select(l => l.Service.RequiredRoomType)));
         }
+
+        private static int RoundUpToSlot(int minutes, int slotMinutes) =>
+            slotMinutes <= 0 ? minutes : (minutes + slotMinutes - 1) / slotMinutes * slotMinutes;
 
         // The free slots of one day: each slot of each shift that fits the total time, is not taken and is not too soon
         private static List<AvailableSlotResponse> BuildSlots(DateOnly date, List<StaffSchedule> shifts, List<Appointment> booked, SlotRules rules)
@@ -629,9 +632,22 @@ namespace OZE.Application.Services
             return lines;
         }
 
+        // Settings already read in this request (the service is scoped): booking reads the slot length more than once
+        private readonly Dictionary<string, string?> _configCache = new();
+
+        private async Task<string?> GetConfigValueAsync(string configKey)
+        {
+            if (!_configCache.TryGetValue(configKey, out var value))
+            {
+                value = await _appointmentRepository.GetConfigValueAsync(configKey);
+                _configCache[configKey] = value;
+            }
+            return value;
+        }
+
         private async Task<string> GetStringConfigAsync(string configKey)
         {
-            var value = await _appointmentRepository.GetConfigValueAsync(configKey);
+            var value = await GetConfigValueAsync(configKey);
             ConditionGuard.Ensure(!string.IsNullOrWhiteSpace(value),
                 string.Format(ErrorConstants.AppointmentMessage.ConfigMissing, configKey));
             return value!;
@@ -640,18 +656,12 @@ namespace OZE.Application.Services
 
         private async Task<int> GetIntConfigAsync(string configKey)
         {
-            var value = await _appointmentRepository.GetConfigValueAsync(configKey);
+            var value = await GetConfigValueAsync(configKey);
             ConditionGuard.Ensure(int.TryParse(value, out var result),
                 string.Format(ErrorConstants.AppointmentMessage.ConfigMissing, configKey));
             return result;
         }
 
-
-        // Same format as AuthService.GeneratePatientCode
-        private static string GeneratePatientCode()
-        {
-            return $"BN-{DateTime.UtcNow:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
-        }
 
         private static AppointmentResponse ToResponse(Appointment appointment, Patient patient,
             AvailableSlotResponse slot, List<BookingLine> lines)
@@ -1331,7 +1341,7 @@ namespace OZE.Application.Services
                 {
                     patient = new Patient
                     {
-                        PatientCode = GeneratePatientCode(),
+                        PatientCode = PatientCodeHelper.Generate(),
                         FullName = request.FullName.Trim(),
                         PhoneNumber = phone,
                         Email = email,
@@ -1752,10 +1762,7 @@ namespace OZE.Application.Services
                 var outstanding = await _invoiceRepository.GetOutstandingForPatientAsync(patientId, cancellationToken);
                 foreach (var invoice in outstanding)
                 {
-                    var remaining = decimal.Round(
-                        Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount),
-                        2,
-                        MidpointRounding.AwayFromZero);
+                    var remaining = MoneyHelper.Round(Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount));
                     if (remaining <= 0)
                     {
                         continue;
@@ -1994,9 +2001,20 @@ namespace OZE.Application.Services
         private static AppointmentResponse MapToResponse(Appointment appointment)
         {
             var firstItem = appointment.ServiceItems.FirstOrDefault();
+            // Room and queue number while the patient is in the clinic for this visit (only when the queue entries are loaded)
+            var inClinic = appointment.Status == AppointmentConstants.CheckedInStatus || appointment.Status == AppointmentConstants.InServiceStatus;
+            var entry = inClinic
+                ? appointment.QueueEntries?
+                    .Where(q => q.QueueType == QueueConstants.ExaminationType && QueueConstants.ActiveStatuses.Contains(q.Status))
+                    .OrderByDescending(q => q.CreatedAt)
+                    .FirstOrDefault()
+                : null;
             return new AppointmentResponse
             {
                 Id = appointment.Id,
+                RoomId = entry?.RoomId,
+                RoomName = entry?.Room?.RoomName,
+                QueueNumber = entry?.QueueNumber,
                 PatientId = appointment.PatientId,
                 PatientCode = appointment.Patient?.PatientCode ?? string.Empty,
                 PatientName = appointment.Patient?.FullName ?? string.Empty,
