@@ -686,6 +686,7 @@ namespace OZE.Application.Services
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt,
                 ParentAppointmentId = appointment.ParentAppointmentId,
+                BookedByPatient = AppointmentOwnershipHelper.IsBookedByPatient(appointment),
                 ExaminationId = appointment.Examination?.Id,
                 ExaminationStatus = appointment.Examination?.ExaminationStatus,
                 FollowUp = appointment.Examination.ToFollowUpSummary()
@@ -803,9 +804,11 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(!IsOpen(appointment!), ErrorConstants.AppointmentMessage.OnlyOpenCanBeCancelled);
 
             // Staff can cancel at any time (a patient may phone just before the visit).
-            // A patient can cancel a pending or confirmed appointment online, before the cutoff
+            // A patient can cancel a pending or confirmed appointment online, before the cutoff, if they booked it
+            // themselves; a visit the clinic arranged goes through a change request
             if (ownerUserId != null)
             {
+                ConditionGuard.Ensure(AppointmentOwnershipHelper.IsBookedByPatient(appointment!), ErrorConstants.AppointmentMessage.ArrangedByClinic);
                 await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.CancelDeadlinePassed);
             }
 
@@ -862,6 +865,8 @@ namespace OZE.Application.Services
             var isPatient = ownerUserId != null;
             if (isPatient)
             {
+                // Only their own booking; a visit the clinic arranged goes through a change request
+                ConditionGuard.Ensure(AppointmentOwnershipHelper.IsBookedByPatient(appointment!), ErrorConstants.AppointmentMessage.ArrangedByClinic);
                 // A pending or confirmed appointment can be moved online, before the cutoff; it goes back to pending
                 await EnsureBeforeCutoffAsync(appointment!, ErrorConstants.AppointmentMessage.RescheduleDeadlinePassed);
             }
@@ -2020,6 +2025,7 @@ namespace OZE.Application.Services
                 Notes = appointment.Notes,
                 CreatedAt = appointment.CreatedAt,
                 ParentAppointmentId = appointment.ParentAppointmentId,
+                BookedByPatient = AppointmentOwnershipHelper.IsBookedByPatient(appointment),
                 PlanSession = ToPlanSession(appointment.TreatmentPlanStage),
                 ExaminationId = appointment.Examination?.Id,
                 ExaminationStatus = appointment.Examination?.ExaminationStatus,

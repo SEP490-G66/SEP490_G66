@@ -219,7 +219,7 @@ namespace OZE.Persistence.Seed
                 _sessionVisit.ParentAppointment = pulp2;
                 _sessionStage = stage3;
                 pulp2Exam.FollowUpAppointment = _sessionVisit;
-                NewAppointment(20, "14:00", _ha, new[] { "DV001" }, AppointmentConstants.PendingStatus, "Kiểm tra lại răng 46 sau bọc sứ");
+                NewAppointment(20, "14:00", _ha, new[] { "DV001" }, AppointmentConstants.PendingStatus, "Kiểm tra lại răng 46 sau bọc sứ", byPatient: true);
 
                 // Requests for documents: one sent, one still waiting
                 var sent = Request(wisdomExam, _ha, "Xét nghiệm đông máu", "Cần có trước khi nhổ răng khôn.", DocumentRequestConstants.Submitted, -14);
@@ -354,7 +354,7 @@ namespace OZE.Persistence.Seed
                 return appointment;
             }
 
-            private Appointment NewAppointment(int day, string time, StaffProfile doctor, string[] codes, string status, string? notes)
+            private Appointment NewAppointment(int day, string time, StaffProfile doctor, string[] codes, string status, string? notes, bool byPatient = false)
             {
                 var start = TimeOnly.ParseExact(time, "HH:mm", CultureInfo.InvariantCulture);
                 var createdAt = At(day - 5, "20:00");
@@ -378,7 +378,8 @@ namespace OZE.Persistence.Seed
                     Status = status,
                     CheckInAt = arrived ? At(day, time).AddMinutes(-10) : null,
                     Notes = notes,
-                    CreatedByUserId = _patientUserId,
+                    // Only the visits the patient booked online are theirs to change; the rest the front desk arranged
+                    CreatedByUserId = byPatient ? _patientUserId : _cashier?.UserId,
                     CreatedAt = createdAt,
                     UpdatedAt = arrived ? At(day, time).AddMinutes(45) : null,
                     ServiceItems = items

@@ -35,6 +35,9 @@ namespace OZE.Common.Models
         public string? Notes { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public long? ParentAppointmentId { get; set; }
+        // True when the patient booked it themselves: they can move or cancel it online; otherwise the clinic arranged it
+        // (a treatment session, a follow-up) and they send a change request instead
+        public bool BookedByPatient { get; set; }
         // Set when the visit is booked for a session of a treatment plan
         public AppointmentPlanSessionResponse? PlanSession { get; set; }
         public long? ExaminationId { get; set; }
