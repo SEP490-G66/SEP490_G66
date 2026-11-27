@@ -35,7 +35,7 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
 
         private static CreateProvidedDocumentRequest Request(string? name = "Xét nghiệm công thức máu", string? address = "Bệnh viện Bạch Mai", DateOnly? performedOn = null,
             string? category = ProvidedDocumentConstants.Category.LabResult, string? note = null) =>
-            new() { DocumentName = name, ProviderAddress = address, PerformedOn = performedOn, Category = category, Note = note };
+            new() { DocumentName = name, ProviderAddress = address, PerformedOn = performedOn ?? new DateOnly(2025, 5, 2), Category = category, Note = note ?? "Bác sĩ xem giúp" };
 
         private static PatientDocument Stored(Guid group, long id, string ownerUserId = PatientUserId) => new()
         {
@@ -97,20 +97,16 @@ namespace OZE.UnitTest.Services.ProvidedDocuments
             _fileStore.Verify(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
-        [Theory]
-        [InlineData(null)]
-        [InlineData("  ")]
-        public async Task CreateAsync_ShouldAcceptNoProvider(string? address)
+        [Fact]
+        public async Task CreateAsync_ShouldRequireWhenAndWhere()
         {
-            List<PatientDocument>? added = null;
-            _repository
-                .Setup(r => r.AddDocuments(It.IsAny<IEnumerable<PatientDocument>>()))
-                .Callback<IEnumerable<PatientDocument>>(documents => added = documents.ToList());
+            var files = new List<UploadedImagingFile> { File("a.pdf") };
+            var noDate = () => _service.CreateAsync(PatientUserId, new CreateProvidedDocumentRequest { DocumentName = "Phim", Category = ProvidedDocumentConstants.Category.Imaging, ProviderAddress = "BV", Note = "Ghi chú" }, files);
+            var noPlace = () => _service.CreateAsync(PatientUserId, Request(address: "  "), files);
 
-            var result = await _service.CreateAsync(PatientUserId, Request(address: address), new List<UploadedImagingFile> { File("a.pdf") });
-
-            added.Should().ContainSingle().Which.ProviderAddress.Should().BeNull();
-            result.ProviderAddress.Should().BeEmpty();
+            (await noDate.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.PerformedOnRequired);
+            (await noPlace.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired);
+            _fileStore.Verify(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
         [Fact]

@@ -29,7 +29,7 @@ namespace OZE.UnitTest.Services.DocumentRequests
             {
                 File("ket-qua.PDF"),
                 File("../../phim.jpeg")
-            });
+            }, Details());
 
             request.Status.Should().Be(DocumentRequestConstants.Submitted);
             request.UpdatedAt.Should().NotBeNull();
@@ -79,9 +79,23 @@ namespace OZE.UnitTest.Services.DocumentRequests
             SetupRequest();
 
             var act = () => _service.SubmitAsync(PatientUserId, RequestId, new List<UploadedImagingFile> { File("a.png") },
-                new SubmitDocumentRequestDetails { PerformedOn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)) });
+                new SubmitDocumentRequestDetails { PerformedOn = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)), ProviderAddress = "BV", Note = "x" });
 
             (await act.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.PerformedOnInFuture);
+            _fileStore.Verify(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SubmitAsync_ShouldRequireWhenAndWhere()
+        {
+            SetupRequest();
+            var files = new List<UploadedImagingFile> { File("a.png") };
+
+            var none = () => _service.SubmitAsync(PatientUserId, RequestId, files);
+            var noPlace = () => _service.SubmitAsync(PatientUserId, RequestId, files, new SubmitDocumentRequestDetails { PerformedOn = new DateOnly(2025, 1, 1), Note = "x" });
+
+            (await none.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.PerformedOnRequired);
+            (await noPlace.Should().ThrowAsync<BadRequestException>()).WithMessage(ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired);
             _fileStore.Verify(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
@@ -91,7 +105,7 @@ namespace OZE.UnitTest.Services.DocumentRequests
             // The examination state is never checked when the patient submits
             SetupRequest();
 
-            var result = await _service.SubmitAsync(PatientUserId, RequestId, new List<UploadedImagingFile> { File("a.png") });
+            var result = await _service.SubmitAsync(PatientUserId, RequestId, new List<UploadedImagingFile> { File("a.png") }, Details());
 
             result.Status.Should().Be(DocumentRequestConstants.Submitted);
             _repository.Verify(r => r.GetExaminationAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -128,7 +142,7 @@ namespace OZE.UnitTest.Services.DocumentRequests
             SetupRequest();
             var files = Enumerable.Range(1, 10).Select(i => File($"f{i}.png", i == 1 ? (int)DocumentRequestConstants.UploadMaxFileBytes : 16)).ToList();
 
-            var result = await _service.SubmitAsync(PatientUserId, RequestId, files);
+            var result = await _service.SubmitAsync(PatientUserId, RequestId, files, Details());
 
             result.Files.Should().HaveCount(10);
         }

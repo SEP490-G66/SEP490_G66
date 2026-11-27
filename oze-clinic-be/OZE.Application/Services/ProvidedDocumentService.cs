@@ -47,7 +47,9 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(name.Length > 0, ErrorConstants.ProvidedDocumentMessage.DocumentNameRequired);
             ConditionGuard.Ensure(name.Length <= ProvidedDocumentConstants.DocumentNameMaxLength, ErrorConstants.ProvidedDocumentMessage.DocumentNameInvalid);
             ConditionGuard.Ensure(ProvidedDocumentConstants.Categories.Contains(category), ErrorConstants.ProvidedDocumentMessage.CategoryInvalid);
-            // The provider is optional: the patient may not know or the paper may not say
+            // When and where are required; the note for the doctor is optional
+            ConditionGuard.Ensure(request!.PerformedOn != null, ErrorConstants.ProvidedDocumentMessage.PerformedOnRequired);
+            ConditionGuard.Ensure(address.Length > 0, ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired);
             ConditionGuard.Ensure(address.Length <= ProvidedDocumentConstants.ProviderAddressMaxLength, ErrorConstants.ProvidedDocumentMessage.ProviderAddressInvalid);
             ConditionGuard.Ensure(note.Length <= ProvidedDocumentConstants.NoteMaxLength, ErrorConstants.ProvidedDocumentMessage.NoteInvalid);
             ConditionGuard.Ensure(
