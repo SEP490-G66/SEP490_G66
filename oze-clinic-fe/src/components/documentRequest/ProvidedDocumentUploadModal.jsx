@@ -30,7 +30,7 @@ const nameFromFile = (fileName) => {
 // - request null: a document the patient brings on their own; it goes to their record, shared by every visit;
 // - request (a DocumentRequestResponse): the document a doctor asked for at one visit; its name and type are the
 //   doctor's and cannot be changed, the files go to that visit only.
-// Files first, then name, type, where and when it was done (optional) and a note for the doctor.
+// Files first, then name, type, where and when it was done and a note for the doctor (the note is optional).
 // onSubmit({ documentName, category, performedOn, providerAddress, note, files }).
 const ProvidedDocumentUploadModal = ({ request = null, onSubmit, onClose }) => {
     const [today] = useState(getClinicToday);
@@ -58,10 +58,16 @@ const ProvidedDocumentUploadModal = ({ request = null, onSubmit, onClose }) => {
         const next = {
             documentName: values.documentName.trim() ? null : "Nhập tên tài liệu.",
             category: values.category ? null : "Chọn loại tài liệu.",
-            performedOn: values.performedOn && values.performedOn > today ? "Ngày thực hiện không được sau hôm nay." : null,
+            performedOn: !values.performedOn ? "Chọn ngày thực hiện." : values.performedOn > today ? "Ngày thực hiện không được sau hôm nay." : null,
+            providerAddress: values.providerAddress.trim() ? null : "Nhập nơi thực hiện.",
         };
         setErrors(next);
-        const first = [[NAME_ID, next.documentName], [`${CATEGORY_ID}-Imaging`, next.category], [DATE_ID, next.performedOn]].find(([, error]) => error);
+        const first = [
+            [NAME_ID, next.documentName],
+            [`${CATEGORY_ID}-Imaging`, next.category],
+            [DATE_ID, next.performedOn],
+            [ADDRESS_ID, next.providerAddress],
+        ].find(([, error]) => error);
         if (first) document.getElementById(first[0])?.focus();
         return !first;
     };
@@ -80,7 +86,7 @@ const ProvidedDocumentUploadModal = ({ request = null, onSubmit, onClose }) => {
     return (
         <ManualUploadDialog
             title={request ? `Gửi tài liệu cho ${visit}` : "Tải lên tài liệu"}
-            subtitle={request ? `Theo yêu cầu của ${doctorTitle(request.doctorName)}. Tài liệu chỉ gửi cho lần khám này.` : "Tài liệu lưu trong hồ sơ của bạn, bác sĩ xem được ở mọi lần khám."}
+            subtitle={request ? `Theo yêu cầu của ${doctorTitle(request.doctorName)}` : undefined}
             extensions={request ? DOCUMENT_UPLOAD_EXTENSIONS : PROVIDED_DOCUMENT_EXTENSIONS}
             maxMb={PROVIDED_DOCUMENT_MAX_MB}
             maxFiles={request ? DOCUMENT_UPLOAD_MAX_FILES : PROVIDED_DOCUMENT_MAX_FILES}
@@ -101,7 +107,7 @@ const ProvidedDocumentUploadModal = ({ request = null, onSubmit, onClose }) => {
                 </p>
             )}
 
-            <FormField id={NAME_ID} label="Tên tài liệu" required error={errors.documentName}>
+            <FormField id={NAME_ID} label="Tên tài liệu" error={errors.documentName}>
                 <input
                     {...field(NAME_ID, "documentName", errors.documentName)}
                     readOnly={Boolean(request)}
@@ -110,33 +116,23 @@ const ProvidedDocumentUploadModal = ({ request = null, onSubmit, onClose }) => {
                         set("documentName", event.target.value);
                     }}
                     maxLength={PROVIDED_DOCUMENT_NAME_MAX}
-                    placeholder="Ví dụ: Phim X-quang toàn cảnh"
                 />
-                {!request && !nameEdited && values.documentName && <p className="text-caption text-muted">Tự điền theo tên tệp, bạn có thể sửa.</p>}
             </FormField>
 
-            <DocumentCategoryPicker id={CATEGORY_ID} value={values.category} onChange={(value) => set("category", value)} error={errors.category} disabled={Boolean(request)} />
+            <DocumentCategoryPicker id={CATEGORY_ID} value={values.category} onChange={(value) => set("category", value)} error={errors.category} disabled={Boolean(request)} marked={false} />
 
             <div className="grid gap-4 sm:grid-cols-2">
-                <FormField id={DATE_ID} label="Ngày thực hiện (không bắt buộc)" error={errors.performedOn}>
+                <FormField id={DATE_ID} label="Ngày thực hiện" error={errors.performedOn}>
                     <input {...field(DATE_ID, "performedOn", errors.performedOn)} type="date" max={today} />
                 </FormField>
-                <FormField id={ADDRESS_ID} label="Nơi thực hiện (không bắt buộc)">
-                    <input {...field(ADDRESS_ID, "providerAddress")} maxLength={PROVIDED_DOCUMENT_ADDRESS_MAX} placeholder="Ví dụ: Bệnh viện Bạch Mai" />
+                <FormField id={ADDRESS_ID} label="Nơi thực hiện" error={errors.providerAddress}>
+                    <input {...field(ADDRESS_ID, "providerAddress", errors.providerAddress)} maxLength={PROVIDED_DOCUMENT_ADDRESS_MAX} />
                 </FormField>
             </div>
 
-            <FormField id={NOTE_ID} label="Ghi chú cho bác sĩ (không bắt buộc)">
-                <textarea
-                    {...field(NOTE_ID, "note")}
-                    rows={3}
-                    maxLength={PROVIDED_DOCUMENT_NOTE_MAX}
-                    className="input h-auto min-h-20 py-2"
-                    placeholder="Ví dụ: Phim chụp ở bệnh viện trước khi nhổ răng khôn"
-                />
+            <FormField id={NOTE_ID} label="Ghi chú cho bác sĩ">
+                <textarea {...field(NOTE_ID, "note")} rows={3} maxLength={PROVIDED_DOCUMENT_NOTE_MAX} className="input h-auto min-h-20 py-2" />
             </FormField>
-
-            <p className="text-caption text-muted">🔒 Chỉ bác sĩ của phòng khám xem được.</p>
         </ManualUploadDialog>
     );
 };

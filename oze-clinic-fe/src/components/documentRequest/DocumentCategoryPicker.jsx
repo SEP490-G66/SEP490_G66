@@ -6,9 +6,10 @@ export const CATEGORY_ICONS = { Imaging: ScanLine, LabResult: FlaskConical, Pres
 
 // "Loại tài liệu": one tile per type with its icon, shared by the patient's upload form and the doctor's request.
 // value: a PROVIDED_DOCUMENT_CATEGORIES value. disabled: shown but fixed (the doctor already chose it).
-const DocumentCategoryPicker = ({ id, value, onChange, error, disabled = false, label = "Loại tài liệu" }) => (
+// marked: the red * of a required field (off where the form shows none).
+const DocumentCategoryPicker = ({ id, value, onChange, error, disabled = false, label = "Loại tài liệu", marked = true }) => (
     <fieldset className="field" aria-describedby={error ? `${id}-error` : undefined}>
-        <legend className="label label-required">{label}</legend>
+        <legend className={cx("label", marked && "label-required")}>{label}</legend>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {PROVIDED_DOCUMENT_CATEGORIES.map((category) => {
                 const Icon = CATEGORY_ICONS[category.value];

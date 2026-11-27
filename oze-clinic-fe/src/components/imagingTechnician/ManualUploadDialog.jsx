@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from "react";
-import { ImageIcon, Upload } from "lucide-react";
+import { FolderOpen, Upload } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import { DialogActions } from "@/components/reception/shared";
 import { useSubmit } from "@/components/reception/receptionUtils";
@@ -25,7 +25,7 @@ const problemOf = (file, extensions, maxMb) => {
 // children: extra fields shown above the file box (e.g. the document name), or below the file list with
 // fieldsAfterFiles; validate(): checks them on submit, false keeps the dialog open without sending.
 // onFilesChange(files): the valid files after every change (e.g. to name the document after the first file).
-// submitLabel: the button text instead of "Tải lên (n)". withImagePicker: a "Chọn ảnh" button that opens the photo library (pictures only).
+// submitLabel: the button text instead of "Tải lên (n)". withImagePicker: a "Chọn tài liệu" button that opens the file / photo library (same file types).
 const ManualUploadDialog = ({
     subtitle,
     title = "Tải ảnh thủ công",
@@ -116,14 +116,14 @@ const ManualUploadDialog = ({
                 {withImagePicker && (
                     <>
                         <button type="button" className="btn btn-secondary self-center" onClick={() => imageRef.current?.click()}>
-                            <ImageIcon className="size-4" aria-hidden="true" />
-                            Chọn ảnh
+                            <FolderOpen className="size-4" aria-hidden="true" />
+                            Chọn tài liệu
                         </button>
                         <input
                             ref={imageRef}
                             type="file"
                             multiple
-                            accept="image/jpeg,image/png"
+                            accept={extensions.join(",")}
                             className="sr-only"
                             tabIndex={-1}
                             onChange={(event) => {

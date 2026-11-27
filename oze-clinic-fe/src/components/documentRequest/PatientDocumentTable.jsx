@@ -36,7 +36,8 @@ const PatientDocumentTable = ({ documents = [], loading = false, busyIds = [], l
                     <div className="flex justify-end gap-2">
                         <IconLinkButton icon={Eye} label={`Xem tài liệu ${doc.name}`} onClick={() => onView(doc)} />
                         {doc.canUpload && onUpload && <IconLinkButton icon={Upload} label={`Gửi tài liệu ${doc.name}`} disabled={busy} onClick={() => onUpload(doc)} />}
-                        {doc.canDelete && onDelete && <IconLinkButton icon={Trash2} label={`Xoá tài liệu ${doc.name}`} disabled={busy} onClick={() => onDelete(doc)} />}
+                        {/* The delete slot keeps its place so every row lines up */}
+                        {doc.canDelete && onDelete ? <IconLinkButton icon={Trash2} label={`Xoá tài liệu ${doc.name}`} disabled={busy} onClick={() => onDelete(doc)} /> : onDelete && <span aria-hidden="true" className="inline-block size-9 max-md:size-11" />}
                     </div>
                 );
             },
