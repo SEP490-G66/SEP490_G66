@@ -5,10 +5,11 @@ import BookingDialog from "@/components/reception/BookingDialog";
 import { RescheduleDialog } from "@/components/reception/shared";
 import { clinicClock } from "@/components/reception/receptionUtils";
 import AppointmentPopover from "@/components/schedule/AppointmentPopover";
+import { PendingSessionsButton, PendingSessionsList, PickBar } from "@/components/schedule/PendingSessionsBar";
 import RoomDayGrid from "@/components/schedule/RoomDayGrid";
 import ScheduleToolbar from "@/components/schedule/ScheduleToolbar";
 import { usePageTitle } from "@/hooks/usePatientRecordNav";
-import { clinicToday, getAppointmentsInRange, getAvailableSlots, getDoctorsOnDuty } from "@/services/receptionService";
+import { clinicToday, getAppointmentsInRange, getAvailableSlots, getDoctorsOnDuty, getPendingPlanSessions } from "@/services/receptionService";
 import { addDays, ddmm, hhmm, mondayOf, weekdayIndex } from "@/utils/calendar";
 import { SCHEDULE_TEXT as TEXT } from "@/utils/messages";
 import {
@@ -72,6 +73,12 @@ const ReceptionSchedule = () => {
     const [detail, setDetail] = useState(null);
     const [flashId, setFlashId] = useState(null);
     const flashTimer = useRef(null);
+    // "Buổi chờ xếp giờ": the sessions, whether the list is open, the one being given a time and its fitting slots
+    const [pending, setPending] = useState({ status: "loading", sessions: [] });
+    const [pendingReload, setPendingReload] = useState(0);
+    const [pendingOpen, setPendingOpen] = useState(false);
+    const [picked, setPicked] = useState(null);
+    const [pickFree, setPickFree] = useState(null);
 
     usePageTitle(TEXT.DOC_TITLE);
 
@@ -93,6 +100,28 @@ const ReceptionSchedule = () => {
         });
         return () => controller.abort();
     }, [week, requestKey]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        getPendingPlanSessions({ ...READ, signal: controller.signal }).then((response) => {
+            if (response.aborted || controller.signal.aborted) return;
+            setPending(response.success ? { status: "ready", sessions: Array.isArray(response.data) ? response.data : [] } : { status: "error", sessions: [] });
+        });
+        return () => controller.abort();
+    }, [pendingReload]);
+
+    // The picked session's free slots that day, with its own service and doctor. A service with kinds (variants) needs one
+    // chosen before the API can answer: then keys is null and the grid works the fit out from the shifts.
+    useEffect(() => {
+        if (!picked || day < clinicToday()) return undefined;
+        const controller = new AbortController();
+        const serviceIds = picked.serviceId ? [picked.serviceId] : [];
+        getAvailableSlots({ date: day, doctorId: picked.doctorId, serviceIds }, { ...READ, signal: controller.signal }).then((response) => {
+            if (response.aborted || controller.signal.aborted) return;
+            setPickFree({ key: `${picked.stageId}|${day}|${reload}`, keys: response.success ? freeKeysOf(Array.isArray(response.data) ? response.data : []) : null });
+        });
+        return () => controller.abort();
+    }, [picked, day, reload]);
 
     // The appointment just booked or moved flashes once it is on the grid
     useEffect(() => {
@@ -170,7 +199,8 @@ const ReceptionSchedule = () => {
                 },
             });
         }
-        if (state !== "open") list.push({ label: TEXT.PATIENT_RECORD, to: getReceptionPatientRoute(a.patientId) });
+        if (a.planSession) list.push({ label: TEXT.TREATMENT_PLAN, to: getReceptionPatientRoute(a.patientId, RECEPTION_PATIENT_TABS.PLANS) });
+        else if (state !== "open") list.push({ label: TEXT.PATIENT_RECORD, to: getReceptionPatientRoute(a.patientId) });
         return list;
     };
 
@@ -183,6 +213,30 @@ const ReceptionSchedule = () => {
     };
 
     const detailState = detail && displayStateOf(detail.appointment, today, now);
+
+    // The picked session on the grid: its doctor, its kind of room and the slots it fits (none on a past day, none while loading)
+    const pickLoaded = picked && pickFree?.key === `${picked.stageId}|${day}|${reload}`;
+    const pick = picked
+        ? { doctorId: picked.doctorId, roomType: picked.requiredRoomType, keys: day < today ? new Set() : pickLoaded ? pickFree.keys : new Set() }
+        : null;
+    // No shift of the session's doctor in its kind of room the whole week: the doctor may not do this service at all,
+    // which only the planning doctor can change (the front desk cannot give the session to someone else)
+    const pickNoRoomThisWeek =
+        picked && shown && !Object.values(shown.duty).some((list) => list.some((d) => d.doctorId === picked.doctorId && d.roomType === picked.requiredRoomType && d.status !== "OnLeave"));
+    const pickMessage = !picked
+        ? null
+        : pickNoRoomThisWeek
+          ? TEXT.PICK_NO_ROOM_WEEK(picked.doctorName)
+          : day < today || (pickLoaded && pickFree.keys?.size === 0)
+            ? TEXT.PICK_NONE
+            : null;
+
+    const pickSession = (session) => {
+        setDetail(null);
+        setPicked(session);
+        // Open the planned day when it is ahead, otherwise today
+        if (session) setDay(session.scheduledDate && session.scheduledDate >= today ? session.scheduledDate : today);
+    };
 
     return (
         <div className="app-content min-h-full space-y-4">
@@ -206,7 +260,26 @@ const ReceptionSchedule = () => {
                     setDetail(null);
                     setDay(next);
                 }}
-            />
+                actions={
+                    <PendingSessionsButton
+                        count={pending.status === "ready" ? pending.sessions.length : null}
+                        open={pendingOpen}
+                        onToggle={() => setPendingOpen((open) => !open)}
+                    />
+                }
+            >
+                {pendingOpen && (
+                    <PendingSessionsList
+                        status={pending.status}
+                        sessions={pending.sessions}
+                        pickedId={picked?.stageId ?? null}
+                        onPick={pickSession}
+                        onRetry={() => setPendingReload((n) => n + 1)}
+                    />
+                )}
+            </ScheduleToolbar>
+
+            {picked && <PickBar session={picked} message={pickMessage} onClear={() => setPicked(null)} />}
 
             {current && !current.ok && (
                 <div role="alert" className="alert alert-danger flex flex-wrap items-center gap-3">
@@ -234,9 +307,20 @@ const ReceptionSchedule = () => {
                         duty={duty}
                         appointments={dayAppointments}
                         free={free}
+                        pick={pick}
                         flashId={flashId}
                         onOpen={(appointment, anchor) => setDetail((open) => (open?.appointment.id === appointment.id ? null : { appointment, anchor }))}
-                        onFree={({ shift, time }) => setBooking({ date: day, slotStart: `${time}:00`, doctorId: shift.doctorId })}
+                        onFree={({ shift, time }) =>
+                            setBooking({
+                                date: day,
+                                slotStart: `${time}:00`,
+                                doctorId: shift.doctorId,
+                                ...(picked && {
+                                    stageId: picked.stageId,
+                                    patient: { id: picked.patientId, fullName: picked.patientName, patientCode: picked.patientCode, phoneNumber: picked.patientPhoneNumber },
+                                }),
+                            })
+                        }
                     />
                 )}
             </section>
@@ -254,12 +338,18 @@ const ReceptionSchedule = () => {
 
             {booking && (
                 <BookingDialog
+                    patient={booking.patient ?? null}
                     initial={booking}
                     onClose={() => setBooking(null)}
                     onBooked={(a) => {
                         const when = `${TEXT.WEEKDAYS_SHORT[weekdayIndex(a.appointmentDate)]} ${ddmm(a.appointmentDate)}`;
                         // The booking answer has no room yet: it is the room of the doctor's shift at that time
                         toast.success(TEXT.BOOKED(a.patientName, when, hhmm(a.timeSlotStart), roomName(a)), { role: "status" });
+                        // A session that now has its time leaves "Buổi chờ xếp giờ"
+                        if (a.planSession || booking.stageId) {
+                            setPicked(null);
+                            setPendingReload((n) => n + 1);
+                        }
                         setBooking(null);
                         showOn(a);
                     }}

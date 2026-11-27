@@ -144,10 +144,12 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
     });
     const { state, actions } = form;
 
-    // Picking a session books its service: pick it in the service box, and add it when it has no variant to choose
+    // Picking a session books its service with the doctor chosen for it in the plan: pick the service in the service box
+    // (added at once when it has no variant to choose) and that doctor, who cannot be changed while the session is picked
     const pickSession = (stageId, sessions = plan.sessions) => {
         setPlan((current) => ({ ...current, stageId }));
         const session = sessions.find((item) => item.stageId === stageId);
+        if (session?.doctorId != null && state.doctorId !== session.doctorId) actions.changeDoctor(session.doctorId);
         const service = session?.serviceId != null ? form.services.find((item) => item.id === session.serviceId) : null;
         if (!service || state.items.some((item) => item.serviceId === service.id)) return;
         actions.pickService(service.id);
@@ -167,13 +169,18 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
             }
             setPlan({ patientId: foundId, status: "ready", sessions: result.data, stageId: null });
             // A patient under treatment usually comes for the next session: choose it already
-            if (result.data.length) pickSession(result.data[0].stageId, result.data);
+            // (or the session picked on the appointment grid)
+            const wanted = result.data.find((session) => session.stageId === initial.stageId) ?? result.data[0];
+            if (wanted) pickSession(wanted.stageId, result.data);
         });
         return () => {
             active = false;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [foundId, servicesReady]);
+
+    const pickedSession = plan.patientId === foundId ? plan.sessions.find((session) => session.stageId === plan.stageId) : null;
+    const lockedDoctor = pickedSession?.doctorId != null;
 
     const changeValue = (key, value) => {
         const next = { ...values, [key]: value };
@@ -280,7 +287,7 @@ const BookingDialog = ({ patient: givenPatient = null, initial = {}, onClose, on
                 <hr className="border-border" />
                 <section>
                     <SectionHeading number={2} title={BOOKING_TEXT.SCHEDULE_SECTION} />
-                    <BookingSchedule form={form} staff onCancel={onClose} />
+                    <BookingSchedule form={form} staff doctorLocked={lockedDoctor} onCancel={onClose} />
                 </section>
             </div>
             <p className="sr-only" aria-live="polite">

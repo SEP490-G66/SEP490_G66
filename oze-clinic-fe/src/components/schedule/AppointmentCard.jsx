@@ -23,7 +23,14 @@ const AppointmentCard = ({ appointment: a, state, tall, flash, onOpen }) => {
                 flash && "ring-3 ring-warning-solid",
             )}
         >
-            <span className="truncate text-body-sm font-semibold text-ink">{a.patientName}</span>
+            <span className="flex min-w-0 items-center gap-1">
+                <span className="truncate text-body-sm font-semibold text-ink">{a.patientName}</span>
+                {a.planSession && (
+                    <span className="num shrink-0 rounded-full bg-primary-soft px-1.5 text-[11px] font-semibold text-primary" title={TEXT.SESSION_OF(a.planSession.stageNumber, a.planSession.totalStages)}>
+                        {TEXT.SESSION_TAG(a.planSession.stageNumber, a.planSession.totalStages)}
+                    </span>
+                )}
+            </span>
             <span className="num truncate text-caption text-muted">
                 {time} · <b className={cx("font-semibold", STATE_TEXT[state])}>{label}</b>
             </span>

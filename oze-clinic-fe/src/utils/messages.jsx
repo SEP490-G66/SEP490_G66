@@ -884,6 +884,7 @@ export const BOOKING_TEXT = {
     SERVICE_REMOVED: (label) => `Đã bỏ ${label}.`,
     DOCTOR: "Bác sĩ",
     ANY_DOCTOR: "Không yêu cầu",
+    DOCTOR_LOCKED: "Buổi điều trị được đặt với bác sĩ thực hiện đã chọn trong kế hoạch.",
     CLINIC_ASSIGNS: "Phòng khám sắp xếp",
     DAY: "Ngày khám",
     WEEK_TEXT: (from, to) => `Tuần (${from} – ${to})`,
@@ -1427,6 +1428,7 @@ export const FOLLOW_UP_TEXT = {
 };
 
 export const APPOINTMENT_ERROR_TEXT = [
+    ["booked with the doctor chosen for it", "Buổi điều trị chỉ được đặt với bác sĩ thực hiện đã chọn trong kế hoạch."],
     ["time slot is no longer available", "Khung giờ này vừa có người đặt. Vui lòng chọn giờ khác."],
     ["too far in advance", "Ngày hẹn vượt quá thời gian mở lịch."],
     ["date cannot be in the past", "Ngày hẹn đã qua."],
@@ -1507,6 +1509,21 @@ export const SCHEDULE_TEXT = {
     OPEN_CLOSE_OUT: "Mở hồ sơ để chốt trạng thái",
     RESCHEDULE: "Đổi giờ",
     PATIENT_RECORD: "Hồ sơ bệnh nhân",
+    TREATMENT_PLAN: "Kế hoạch điều trị",
+    // Treatment plan sessions
+    SESSION_TAG: (n, total) => `B${n}/${total}`,
+    SESSION_OF: (n, total) => `Buổi ${n}/${total}`,
+    PENDING_BUTTON: "Buổi chờ xếp giờ",
+    PENDING_LOADING: "Đang tải các buổi chờ xếp giờ…",
+    PENDING_ERROR: "Không tải được các buổi chờ xếp giờ.",
+    PENDING_EMPTY: "Không có buổi điều trị nào đang chờ xếp giờ.",
+    PENDING_DUE: (date) => `dự kiến ${date}`,
+    PICK_BAR: (name, session, service, doctor) => `Chọn giờ cho ${name} · ${session}${service ? ` · ${service}` : ""}${doctor ? ` · ${doctor}` : ""}`,
+    PICK_NONE: "Bác sĩ thực hiện không có giờ phù hợp trong ngày này. Chọn ngày khác.",
+    PICK_NO_ROOM_WEEK: (doctor) =>
+        `${doctor || "Bác sĩ thực hiện"} không có ca ở phòng phù hợp dịch vụ này trong tuần. Chọn tuần khác, hoặc báo bác sĩ lập kế hoạch đổi bác sĩ thực hiện nếu bác sĩ này không làm dịch vụ này.`,
+    PICK_LABEL: (room, day, time) => `Đặt giờ cho buổi điều trị: ${room}, ${day} ${time}`,
+    UNPICK: "Bỏ chọn",
     LOAD_ERROR: "Không tải được lịch hẹn của tuần này.",
     RETRY: "Thử lại",
     BOOKED: (name, day, time, room) => `Đã đặt lịch cho ${name}: ${day} ${time}${room ? `, ${room}` : ""}`,
@@ -1600,6 +1617,7 @@ export const RESCHEDULE_TEXT = {
     DOCTOR: "Bác sĩ",
     ANY_DOCTOR: "Bác sĩ nào cũng được",
     CURRENT_DOCTOR: (name) => `${name} (bác sĩ đang hẹn)`,
+    DOCTOR_LOCKED: "Buổi điều trị theo kế hoạch giữ bác sĩ thực hiện đã chọn; chỉ đổi ngày giờ.",
     SLOTS: "Giờ còn trống",
     SLOTS_LOADING: "Đang tìm giờ trống…",
     SLOTS_EMPTY: "Không còn giờ trống ngày này. Chọn ngày hoặc bác sĩ khác.",
