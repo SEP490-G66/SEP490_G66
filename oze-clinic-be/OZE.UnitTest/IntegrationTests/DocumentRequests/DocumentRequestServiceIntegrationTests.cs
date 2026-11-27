@@ -75,7 +75,7 @@ namespace OZE.UnitTest.IntegrationTests.DocumentRequests
             {
                 new("ket-qua.pdf", "application/pdf", new byte[] { 1, 2, 3 }),
                 new("phim.png", "image/png", new byte[] { 4, 5 })
-            });
+            }, new SubmitDocumentRequestDetails { Note = "Bác sĩ xem giúp", PerformedOn = new DateOnly(2025, 5, 2), ProviderAddress = "BV Bạch Mai" });
 
             submitted.Status.Should().Be(DocumentRequestConstants.Submitted);
             submitted.Files.Should().HaveCount(2);

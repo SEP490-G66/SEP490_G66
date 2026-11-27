@@ -400,7 +400,7 @@ namespace OZE.Application.Services
 
         public async Task<List<WorkShipResponse>> GetWorkShiftsAsync(WorkShiftQueryRequest query)
         {
-            var fromDate = query.FromDate ?? GetStartOfWeek(DateOnly.FromDateTime(ClinicClock.Today));
+            var fromDate = query.FromDate ?? ShiftTimeHelper.StartOfWeek(DateOnly.FromDateTime(ClinicClock.Today));
             var toDate = query.ToDate ?? fromDate.AddDays(WorkShiftConstants.DaysInWeek - 1);
 
             ConditionGuard.Ensure(fromDate <= toDate, ErrorConstants.WorkShiftMessage.InvalidDateRange);
@@ -435,13 +435,6 @@ namespace OZE.Application.Services
             await _workShipRepository.SaveChangesAsync();
             await NotifyAsync(n => n.NotifyStaffAsync(removedStaffId,
                 new NotificationContent(NotificationConstants.Text.WorkShiftRemovedTitle, removedText, NotificationConstants.Reference.WorkShift, null)));
-        }
-
-        private static DateOnly GetStartOfWeek(DateOnly date)
-        {
-            var daysSinceWeekStart = ((int)date.DayOfWeek - (int)WorkShiftConstants.WeekStartDay + WorkShiftConstants.DaysInWeek)
-                                     % WorkShiftConstants.DaysInWeek;
-            return date.AddDays(-daysSinceWeekStart);
         }
 
         public async Task<WorkShipResponse> UpdateWorkShiftAsync(long id, UpdateWorkShiftRequest request)

@@ -1,4 +1,5 @@
-using System.Globalization;
+﻿using System.Globalization;
+using OZE.Application.Helpers;
 using OZE.Application.Interfaces;
 using OZE.Application.Middlewares;
 using OZE.Common.Constants;
@@ -59,6 +60,8 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(
                 note == null || note.Length <= DocumentRequestConstants.NoteMaxLength,
                 ErrorConstants.DocumentRequestMessage.NoteInvalid);
+            var category = string.IsNullOrWhiteSpace(request.Category) ? ProvidedDocumentConstants.Category.Other : request.Category.Trim();
+            ConditionGuard.Ensure(ProvidedDocumentConstants.Categories.Contains(category), ErrorConstants.ProvidedDocumentMessage.CategoryInvalid);
 
             var documentRequest = new DocumentRequest
             {
@@ -67,6 +70,7 @@ namespace OZE.Application.Services
                 RequestedByDoctorId = doctor.Id,
                 DocumentName = documentName,
                 Note = note,
+                Category = category,
                 Status = DocumentRequestConstants.Pending,
                 CreatedAt = DateTimeOffset.UtcNow
             };
@@ -154,6 +158,7 @@ namespace OZE.Application.Services
             string patientUserId,
             long id,
             List<UploadedImagingFile> files,
+            SubmitDocumentRequestDetails? details = null,
             CancellationToken cancellationToken = default)
         {
             var request = await _repository.GetTrackedByIdAsync(id, cancellationToken);
@@ -183,6 +188,17 @@ namespace OZE.Application.Services
                     string.Format(ErrorConstants.DocumentRequestMessage.UploadFileTooLarge, file.FileName));
             }
 
+            // Same details as a document the patient provides on their own: when and where required, note optional
+            var patientNote = details?.Note?.Trim() ?? string.Empty;
+            var address = details?.ProviderAddress?.Trim() ?? string.Empty;
+            ConditionGuard.Ensure(details?.PerformedOn != null, ErrorConstants.ProvidedDocumentMessage.PerformedOnRequired);
+            ConditionGuard.Ensure(
+                details!.PerformedOn!.Value <= DateOnly.FromDateTime(ClinicClock.Today),
+                ErrorConstants.ProvidedDocumentMessage.PerformedOnInFuture);
+            ConditionGuard.Ensure(address.Length > 0, ErrorConstants.ProvidedDocumentMessage.ProviderAddressRequired);
+            ConditionGuard.Ensure(address.Length <= ProvidedDocumentConstants.ProviderAddressMaxLength, ErrorConstants.ProvidedDocumentMessage.ProviderAddressInvalid);
+            ConditionGuard.Ensure(patientNote.Length <= ProvidedDocumentConstants.NoteMaxLength, ErrorConstants.ProvidedDocumentMessage.NoteInvalid);
+
             var now = DateTimeOffset.UtcNow;
             var documents = new List<PatientDocument>();
             foreach (var file in files)
@@ -208,8 +224,12 @@ namespace OZE.Application.Services
                         : originalName,
                     FilePath = relativePath,
                     FileSize = file.Data.LongLength,
-                    MimeType = MimeTypeOf(extension),
+                    MimeType = FileMimeTypeHelper.Of(extension),
                     Description = request.DocumentName,
+                    Category = request.Category,
+                    Note = patientNote.Length > 0 ? patientNote : null,
+                    PerformedOn = details?.PerformedOn,
+                    ProviderAddress = address.Length > 0 ? address : null,
                     UploadedByUserId = patientUserId,
                     CreatedAt = now
                 });
@@ -258,7 +278,7 @@ namespace OZE.Application.Services
             {
                 Data = data!,
                 ContentType = string.IsNullOrWhiteSpace(document.MimeType)
-                    ? MimeTypeOf(Path.GetExtension(document.FilePath).ToLowerInvariant())
+                    ? FileMimeTypeHelper.Of(Path.GetExtension(document.FilePath).ToLowerInvariant())
                     : document.MimeType!,
                 FileName = document.FileName
             };
@@ -270,17 +290,17 @@ namespace OZE.Application.Services
         private static string DoctorTitle(string? fullName) =>
             string.IsNullOrWhiteSpace(fullName) ? "Bác sĩ" : $"BS. {fullName.Trim()}";
 
-        private static string MimeTypeOf(string extension) => extension switch
+        private static DocumentRequestResponse ToResponse(DocumentRequest request)
         {
-            ".pdf" => "application/pdf",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            _ => "application/octet-stream"
-        };
-
-        private static DocumentRequestResponse ToResponse(DocumentRequest request) => new()
-        {
+            // The details the patient filled in are kept on every file of the last sending
+            var sent = request.Documents.OrderByDescending(d => d.CreatedAt).ThenByDescending(d => d.Id).FirstOrDefault();
+            return new DocumentRequestResponse
+            {
             Id = request.Id,
+            Category = request.Category ?? ProvidedDocumentConstants.Category.Other,
+            PatientNote = sent?.Note,
+            PerformedOn = sent?.PerformedOn,
+            ProviderAddress = sent?.ProviderAddress,
             ExaminationId = request.ExaminationId,
             ExaminationDate = request.Examination?.CreatedAt,
             PatientId = request.PatientId,
@@ -302,5 +322,6 @@ namespace OZE.Application.Services
                 })
                 .ToList()
         };
+        }
     }
 }

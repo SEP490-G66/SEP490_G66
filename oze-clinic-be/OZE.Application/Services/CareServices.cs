@@ -383,8 +383,8 @@ namespace OZE.Application.Services
                 cancellationToken);
 
             var closed = sessions.Where(x => x.Status == CashSessionConstants.Closed).ToList();
-            var cashCollected = Round(payments.Where(x => x.PaymentMethod == PaymentConstants.Cash).Sum(x => x.Amount));
-            var cashInSessions = Round(closed.Sum(x => x.CashCollected ?? 0));
+            var cashCollected = MoneyHelper.Round(payments.Where(x => x.PaymentMethod == PaymentConstants.Cash).Sum(x => x.Amount));
+            var cashInSessions = MoneyHelper.Round(closed.Sum(x => x.CashCollected ?? 0));
 
             return new DailyReconciliationResponse
             {
@@ -412,14 +412,14 @@ namespace OZE.Application.Services
                 CashCollected = cashCollected,
                 // An open drawer has no frozen total yet, so "outside the drawers" is only known once all are closed
                 CashOutsideSessions = closed.Count == sessions.Count ? Math.Max(0, cashCollected - cashInSessions) : 0,
-                CashExpected = Round(closed.Sum(x => x.ExpectedCash ?? 0)),
-                CashCounted = Round(closed.Sum(x => x.CountedCash ?? 0)),
-                CashDifference = Round(closed.Sum(x => x.Difference ?? 0)),
-                TransferConfirmed = Round(payments.Where(x => x.PaymentMethod != PaymentConstants.Cash).Sum(x => x.Amount)),
+                CashExpected = MoneyHelper.Round(closed.Sum(x => x.ExpectedCash ?? 0)),
+                CashCounted = MoneyHelper.Round(closed.Sum(x => x.CountedCash ?? 0)),
+                CashDifference = MoneyHelper.Round(closed.Sum(x => x.Difference ?? 0)),
+                TransferConfirmed = MoneyHelper.Round(payments.Where(x => x.PaymentMethod != PaymentConstants.Cash).Sum(x => x.Amount)),
                 PendingTransfers = pending,
-                PendingTransferAmount = Round(pending.Sum(x => x.Amount)),
+                PendingTransferAmount = MoneyHelper.Round(pending.Sum(x => x.Amount)),
                 Refunds = refunds,
-                RefundTotal = Round(refunds.Sum(x => x.Amount))
+                RefundTotal = MoneyHelper.Round(refunds.Sum(x => x.Amount))
             };
         }
 
@@ -464,7 +464,5 @@ namespace OZE.Application.Services
             var start = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(ClinicTimeConstants.UtcOffsetHours));
             return (start, start.AddDays(1));
         }
-
-        private static decimal Round(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
     }
 }

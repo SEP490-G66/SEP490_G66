@@ -43,9 +43,9 @@ namespace OZE.Application.Services
                 var payableInvoice = invoice!;
                 EnsureInvoicePayable(payableInvoice);
 
-                var method = NormalizeMethod(request.PaymentMethod);
+                var method = PaymentMethodHelper.Normalize(request.PaymentMethod);
                 var purpose = NormalizePurpose(request.Purpose);
-                var amount = decimal.Round(request.Amount, 2, MidpointRounding.AwayFromZero);
+                var amount = MoneyHelper.Round(request.Amount);
                 ConditionGuard.Ensure(amount > 0, ErrorConstants.PaymentMessage.AmountInvalid);
 
                 long? periodId = null;
@@ -103,7 +103,7 @@ namespace OZE.Application.Services
                     ApplyConfirmedPaymentEffects(payableInvoice, payment, now);
                 }
 
-                RecalculateInvoiceMoney(payableInvoice);
+                InvoiceMoneyHelper.Recalculate(payableInvoice);
                 payableInvoice.UpdatedAt = now;
                 _invoiceRepository.Update(payableInvoice);
                 await _paymentRepository.SaveChangesAsync(cancellationToken);
@@ -155,7 +155,7 @@ namespace OZE.Application.Services
                 payment.ConfirmedByUserId = string.IsNullOrWhiteSpace(confirmedByUserId) ? null : confirmedByUserId;
 
                 ApplyConfirmedPaymentEffects(invoice, payment, now);
-                RecalculateInvoiceMoney(invoice);
+                InvoiceMoneyHelper.Recalculate(invoice);
                 invoice.UpdatedAt = now;
                 _invoiceRepository.Update(invoice);
                 await _paymentRepository.SaveChangesAsync(cancellationToken);
@@ -203,7 +203,7 @@ namespace OZE.Application.Services
                 payment.PaymentStatus = PaymentConstants.Failed;
                 ClearInstallmentPeriodLink(invoice, payment);
 
-                RecalculateInvoiceMoney(invoice);
+                InvoiceMoneyHelper.Recalculate(invoice);
                 invoice.UpdatedAt = DateTimeOffset.UtcNow;
                 _invoiceRepository.Update(invoice);
                 await _paymentRepository.SaveChangesAsync(cancellationToken);
@@ -227,15 +227,6 @@ namespace OZE.Application.Services
                 ErrorConstants.PaymentMessage.InvoiceNotPayable);
         }
 
-        private static string NormalizeMethod(string? method)
-        {
-            var normalized = method?.Trim().ToUpperInvariant() ?? string.Empty;
-            ConditionGuard.Ensure(
-                PaymentConstants.Methods.Contains(normalized),
-                ErrorConstants.PaymentMessage.MethodInvalid);
-            return normalized;
-        }
-
         private static string NormalizePurpose(string? purpose)
         {
             // Purpose values are PascalCase (Deposit|Regular|Installment)
@@ -248,11 +239,9 @@ namespace OZE.Application.Services
 
         private static void EnsureNotOverpay(Invoice invoice, decimal amount)
         {
-            var remaining = GetRemaining(invoice);
+            var remaining = InvoiceMoneyHelper.GetRemaining(invoice);
             ConditionGuard.Ensure(amount <= remaining, ErrorConstants.PaymentMessage.AmountExceedsRemaining);
         }
-
-        private static decimal GetRemaining(Invoice invoice) => InvoiceMoneyHelper.GetRemaining(invoice);
 
         private static void EnsureInstallmentPeriodPayable(Invoice invoice, long periodId)
         {
@@ -315,8 +304,6 @@ namespace OZE.Application.Services
             }
         }
 
-        private static void RecalculateInvoiceMoney(Invoice invoice) => InvoiceMoneyHelper.Recalculate(invoice);
-
         private async Task SafeAuditAsync(string action, string entityId, object? oldValues, object? newValues)
         {
             try
@@ -331,7 +318,7 @@ namespace OZE.Application.Services
 
         private static PaymentResponse ToResponse(Payment payment, Invoice invoice)
         {
-            var remaining = decimal.Round(Math.Max(0m, invoice.FinalAmount - invoice.PaidAmount), 2, MidpointRounding.AwayFromZero);
+            var remaining = InvoiceMoneyHelper.GetRemaining(invoice);
             return new PaymentResponse
             {
                 Id = payment.Id,

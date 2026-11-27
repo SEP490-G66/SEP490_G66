@@ -35,7 +35,7 @@ namespace OZE.Application.Services
             OpenCashSessionRequest request,
             CancellationToken cancellationToken = default)
         {
-            var openingCash = Round(request.OpeningCash ?? 0m);
+            var openingCash = MoneyHelper.Round(request.OpeningCash ?? 0m);
             ConditionGuard.Ensure(openingCash >= 0, ErrorConstants.CashSessionMessage.OpeningCashInvalid);
 
             var existing = await _cashSessionRepository.GetOpenByUserAsync(userId, cancellationToken);
@@ -77,7 +77,7 @@ namespace OZE.Application.Services
         {
             var session = await LoadOpenAsync(userId, cancellationToken);
 
-            var amount = Round(request.Amount ?? 0m);
+            var amount = MoneyHelper.Round(request.Amount ?? 0m);
             ConditionGuard.Ensure(amount > 0, ErrorConstants.CashSessionMessage.ExpenseAmountInvalid);
             var description = request.Description?.Trim() ?? string.Empty;
             ConditionGuard.Ensure(description.Length > 0, ErrorConstants.CashSessionMessage.ExpenseDescriptionRequired);
@@ -134,10 +134,10 @@ namespace OZE.Application.Services
                 throw new ConflictException(ErrorConstants.CashSessionMessage.SessionChanged, CashSessionConstants.SessionChangedCode);
             }
 
-            var counted = Round(request.CountedCash ?? -1m);
+            var counted = MoneyHelper.Round(request.CountedCash ?? -1m);
             ConditionGuard.Ensure(counted >= 0, ErrorConstants.CashSessionMessage.CountedCashInvalid);
             var denominations = ValidDenominations(request.Denominations, counted);
-            decimal? countedTransfer = request.CountedTransfer.HasValue ? Round(request.CountedTransfer.Value) : null;
+            decimal? countedTransfer = request.CountedTransfer.HasValue ? MoneyHelper.Round(request.CountedTransfer.Value) : null;
             ConditionGuard.Ensure(countedTransfer is null or >= 0m, ErrorConstants.CashSessionMessage.CountedCashInvalid);
 
             string? handoverTo = null;
@@ -153,8 +153,8 @@ namespace OZE.Application.Services
             var now = DateTimeOffset.UtcNow;
             var numbers = await ComputeAsync(session, now, cancellationToken);
             // A payment, expense or refund came in while the drawer was being counted: count again on the new figures
-            var figuresChanged = (request.ExpectedCash.HasValue && Round(request.ExpectedCash.Value) != numbers.ExpectedCash)
-                || (request.ExpectedTransfer.HasValue && Round(request.ExpectedTransfer.Value) != numbers.TransferConfirmed);
+            var figuresChanged = (request.ExpectedCash.HasValue && MoneyHelper.Round(request.ExpectedCash.Value) != numbers.ExpectedCash)
+                || (request.ExpectedTransfer.HasValue && MoneyHelper.Round(request.ExpectedTransfer.Value) != numbers.TransferConfirmed);
             if (figuresChanged)
             {
                 throw new ConflictException(ErrorConstants.CashSessionMessage.FiguresChanged, CashSessionConstants.FiguresChangedCode);
@@ -315,10 +315,10 @@ namespace OZE.Application.Services
                 session.OpenedByUserId, session.OpenedAt, until, cancellationToken) ?? new List<CashSessionPaymentItem>();
             var refunds = await _cashSessionRepository.GetRefundsPaidOutByAsync(
                 session.OpenedByUserId, session.OpenedAt, until, cancellationToken) ?? new List<CashSessionRefundItem>();
-            var cash = Round(payments.Where(x => x.PaymentMethod == PaymentConstants.Cash).Sum(x => x.Amount));
-            var transfer = Round(payments.Where(x => x.PaymentMethod != PaymentConstants.Cash).Sum(x => x.Amount));
-            var expenses = Round(session.Expenses.Sum(x => x.Amount));
-            var refunded = Round(refunds.Sum(x => x.Amount));
+            var cash = MoneyHelper.Round(payments.Where(x => x.PaymentMethod == PaymentConstants.Cash).Sum(x => x.Amount));
+            var transfer = MoneyHelper.Round(payments.Where(x => x.PaymentMethod != PaymentConstants.Cash).Sum(x => x.Amount));
+            var expenses = MoneyHelper.Round(session.Expenses.Sum(x => x.Amount));
+            var refunded = MoneyHelper.Round(refunds.Sum(x => x.Amount));
             return new Numbers(cash, transfer, expenses, refunded, session.OpeningCash + cash - expenses - refunded, payments, refunds);
         }
 
@@ -434,7 +434,5 @@ namespace OZE.Application.Services
         }
 
         private static string? Trimmed(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-        private static decimal Round(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
     }
 }

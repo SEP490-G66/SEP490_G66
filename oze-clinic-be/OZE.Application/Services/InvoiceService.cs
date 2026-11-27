@@ -88,9 +88,9 @@ namespace OZE.Application.Services
                 (items, totalAmount) = await BuildItemsAsync(itemRequests, treatmentPlan, cancellationToken);
             }
 
-            var discountAmount = decimal.Round(request.DiscountAmount, 2, MidpointRounding.AwayFromZero);
+            var discountAmount = MoneyHelper.Round(request.DiscountAmount);
             ConditionGuard.Ensure(discountAmount <= totalAmount, ErrorConstants.InvoiceMessage.DiscountExceedsTotal);
-            var finalAmount = decimal.Round(totalAmount - discountAmount, 2, MidpointRounding.AwayFromZero);
+            var finalAmount = MoneyHelper.Round(totalAmount - discountAmount);
 
             var invoice = new Invoice
             {
@@ -216,20 +216,20 @@ namespace OZE.Application.Services
 
                 invoice.TotalAmount = totalAmount;
                 var discount = request.DiscountAmount.HasValue
-                    ? decimal.Round(request.DiscountAmount.Value, 2, MidpointRounding.AwayFromZero)
+                    ? MoneyHelper.Round(request.DiscountAmount.Value)
                     : invoice.DiscountAmount;
                 ConditionGuard.Ensure(discount >= 0, ErrorConstants.InvoiceMessage.DiscountInvalid);
                 ConditionGuard.Ensure(discount <= totalAmount, ErrorConstants.InvoiceMessage.DiscountExceedsTotal);
                 invoice.DiscountAmount = discount;
-                invoice.FinalAmount = decimal.Round(totalAmount - discount, 2, MidpointRounding.AwayFromZero);
+                invoice.FinalAmount = MoneyHelper.Round(totalAmount - discount);
             }
             else if (request.DiscountAmount.HasValue)
             {
-                var discount = decimal.Round(request.DiscountAmount.Value, 2, MidpointRounding.AwayFromZero);
+                var discount = MoneyHelper.Round(request.DiscountAmount.Value);
                 ConditionGuard.Ensure(discount >= 0, ErrorConstants.InvoiceMessage.DiscountInvalid);
                 ConditionGuard.Ensure(discount <= invoice.TotalAmount, ErrorConstants.InvoiceMessage.DiscountExceedsTotal);
                 invoice.DiscountAmount = discount;
-                invoice.FinalAmount = decimal.Round(invoice.TotalAmount - discount, 2, MidpointRounding.AwayFromZero);
+                invoice.FinalAmount = MoneyHelper.Round(invoice.TotalAmount - discount);
             }
 
             invoice.UpdatedAt = DateTimeOffset.UtcNow;
@@ -292,12 +292,12 @@ namespace OZE.Application.Services
             decimal packageTotal;
             if (requestedTotalAmount.HasValue)
             {
-                packageTotal = decimal.Round(requestedTotalAmount.Value, 2, MidpointRounding.AwayFromZero);
+                packageTotal = MoneyHelper.Round(requestedTotalAmount.Value);
                 ConditionGuard.Ensure(packageTotal > 0, ErrorConstants.InvoiceMessage.PlanPackageTotalInvalid);
             }
             else
             {
-                packageTotal = decimal.Round(treatmentPlan.EstimatedTotalCost, 2, MidpointRounding.AwayFromZero);
+                packageTotal = MoneyHelper.Round(treatmentPlan.EstimatedTotalCost);
                 ConditionGuard.Ensure(packageTotal > 0, ErrorConstants.InvoiceMessage.PlanPackageTotalRequired);
             }
 
@@ -367,7 +367,7 @@ namespace OZE.Application.Services
                         ErrorConstants.InvoiceMessage.StagePlanMismatch);
                 }
 
-                var amount = decimal.Round(unitPrice * itemRequest.Quantity, 2, MidpointRounding.AwayFromZero);
+                var amount = MoneyHelper.Round(unitPrice * itemRequest.Quantity);
                 totalAmount += amount;
 
                 items.Add(new InvoiceItem
@@ -383,7 +383,7 @@ namespace OZE.Application.Services
                 });
             }
 
-            totalAmount = decimal.Round(totalAmount, 2, MidpointRounding.AwayFromZero);
+            totalAmount = MoneyHelper.Round(totalAmount);
             return (items, totalAmount);
         }
 

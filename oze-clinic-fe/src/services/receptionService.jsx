@@ -137,6 +137,9 @@ export const getAppointments = ({ fromDate, toDate, date, doctorId, patientId, s
 
 const RANGE_PAGE_LIMIT = 20;
 
+// One appointment (a link from another screen names it by id)
+export const getAppointment = (id, config = {}) => call(() => api.get(`/api/appointments/${id}`, config));
+
 export const getAppointmentsInRange = async ({ fromDate, toDate, doctorId } = {}, config = {}) => {
     const items = [];
     for (let page = 1; page <= RANGE_PAGE_LIMIT; page += 1) {
@@ -264,6 +267,40 @@ export const getPatientInvoices = (patientId, query = { pageSize: 50 }, config =
 
 export const getPatientTreatmentPlans = (patientId, query = {}, config = {}) =>
     call(() => api.get(`/api/patients/${patientId}/treatment-plans`, { ...config, params: query }));
+
+const PLAN_RUNNING = ["Approved", "InProgress"];
+const STAGE_OPEN = ["Scheduled", "InProgress"];
+
+// Sessions the receptionist can book a visit for: the next open session of each plan being carried out.
+// [{ stageId, planId, planName, doctorName, number, total, name, serviceId, serviceName, scheduledDate }]
+export const getBookablePlanSessions = async (patientId, config = {}) => {
+    const plans = await getPatientTreatmentPlans(patientId, {}, config);
+    if (!plans.success) return plans;
+    const running = (Array.isArray(plans.data) ? plans.data : []).filter((plan) => PLAN_RUNNING.includes(plan.status));
+    const details = await Promise.all(running.map((plan) => call(() => api.get(`/api/treatmentplans/${plan.id}`, config))));
+    if (details.some((detail) => !detail.success)) return details.find((detail) => !detail.success);
+    const sessions = details.flatMap(({ data: plan }) => {
+        const stages = (plan.stages ?? []).filter((stage) => stage.stageStatus !== "Cancelled").sort((a, b) => a.stageNumber - b.stageNumber);
+        const index = stages.findIndex((stage) => STAGE_OPEN.includes(stage.stageStatus));
+        if (index < 0) return [];
+        const stage = stages[index];
+        return [
+            {
+                stageId: stage.id,
+                planId: plan.treatmentPlanId,
+                planName: plan.planName ?? "Kế hoạch điều trị",
+                doctorName: plan.createdByDoctorName ?? "",
+                number: index + 1,
+                total: stages.length,
+                name: stage.stageName ?? "",
+                serviceId: stage.serviceId ?? null,
+                serviceName: stage.serviceName ?? "",
+                scheduledDate: stage.scheduledDate ?? null,
+            },
+        ];
+    });
+    return { ...plans, data: sessions };
+};
 
 // ----- consultation requests from the public site -----
 export const getConsultations = ({ status, keyword, page = 1, pageSize = 10 } = {}) =>

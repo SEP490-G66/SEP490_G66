@@ -56,7 +56,7 @@ namespace OZE.Application.Services
         {
             var doctor = await GetDoctorAsync(userId);
 
-            var fromDate = query.FromDate ?? GetStartOfWeek(DateOnly.FromDateTime(ClinicClock.Today));
+            var fromDate = query.FromDate ?? ShiftTimeHelper.StartOfWeek(DateOnly.FromDateTime(ClinicClock.Today));
             var toDate = query.ToDate ?? fromDate.AddDays(WorkShiftConstants.DaysInWeek - 1);
             ConditionGuard.Ensure(fromDate <= toDate, ErrorConstants.DoctorScheduleMessage.InvalidDateRange);
             ConditionGuard.Ensure(toDate.DayNumber - fromDate.DayNumber < WorkShiftConstants.DaysInWeek,
@@ -387,13 +387,6 @@ namespace OZE.Application.Services
                 AppointmentCount = inShift.Count,
                 Appointments = inShift
             };
-        }
-
-        private static DateOnly GetStartOfWeek(DateOnly date)
-        {
-            var diff = ((int)date.DayOfWeek - (int)WorkShiftConstants.WeekStartDay + WorkShiftConstants.DaysInWeek)
-                       % WorkShiftConstants.DaysInWeek;
-            return date.AddDays(-diff);
         }
     }
 }

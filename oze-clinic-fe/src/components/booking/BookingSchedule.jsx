@@ -69,10 +69,11 @@ const BlockedBox = ({ appointment }) => (
     </BookingStateBox>
 );
 
-const NoSlotsBox = ({ showAllDoctors, onAllDoctors, staff }) => (
+// doctorName: the doctor the visitor chose; the message then says it is that doctor who has no long enough gap
+const NoSlotsBox = ({ showAllDoctors, onAllDoctors, staff, doctorName }) => (
     <BookingStateBox
         icon={CalendarDays}
-        title={BOOKING_TEXT.NO_SLOTS_TITLE}
+        title={doctorName ? BOOKING_TEXT.NO_SLOTS_DOCTOR_TITLE(doctorName) : BOOKING_TEXT.NO_SLOTS_TITLE}
         headingId={BOOKING_IDS.STATE_TITLE}
         action={
             showAllDoctors && (
@@ -82,10 +83,11 @@ const NoSlotsBox = ({ showAllDoctors, onAllDoctors, staff }) => (
             )
         }
     >
+        {doctorName && <p className="mb-2">{BOOKING_TEXT.NO_SLOTS_DOCTOR_TEXT}</p>}
         {staff ? RECEPTION_BOOKING_TEXT.NO_SLOTS_TEXT : (
-            <>
+            <p>
                 {BOOKING_TEXT.NO_SLOTS_TEXT} <Hotline /> {BOOKING_TEXT.NO_SLOTS_TEXT_END}
-            </>
+            </p>
         )}
     </BookingStateBox>
 );
@@ -178,8 +180,16 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
                     </p>
                 )}
                 {doctorSelect}
-                {weekPicker}
-                {noSlots && !rangeError && <NoSlotsBox staff={staff} showAllDoctors={Boolean(state.doctorId)} onAllDoctors={actions.allDoctors} />}
+                {/* With no slot in the whole range, moving between weeks shows nothing, so only the message stays */}
+                {(!noSlots || rangeError) && weekPicker}
+                {noSlots && !rangeError && (
+                    <NoSlotsBox
+                        staff={staff}
+                        showAllDoctors={Boolean(state.doctorId)}
+                        onAllDoctors={actions.allDoctors}
+                        doctorName={context.doctors.find((doctor) => doctor.doctorId === state.doctorId)?.doctorName}
+                    />
+                )}
                 {(!noSlots || rangeError) && !servicesError && (
                     <BookingDayStrip
                         weekStart={state.weekStart}
@@ -246,9 +256,6 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
                             </div>
                         ) : (
                             <BookingSummaryBar
-                                date={state.day}
-                                slotStart={state.slot}
-                                serviceCount={state.items.length}
                                 locked={locked}
                                 submitting={state.submitting}
                                 describedBy="booking-submit-error"

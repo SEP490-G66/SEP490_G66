@@ -51,10 +51,17 @@ namespace OZE.Application.Interfaces
         Task<List<long>> MarkPastPendingAsNoShowAsync(DateOnly today, CancellationToken cancellationToken = default);
         // True when an approved or running treatment plan of the patient has a session scheduled for today or later
         Task<bool> HasUpcomingTreatmentSessionAsync(int patientId);
+        // A session of a treatment plan with its plan and the plan's other sessions (read only)
+        Task<TreatmentPlanStage?> GetTreatmentStageAsync(long stageId);
+        // True when an appointment that is not cancelled or no-show is booked for this session
+        Task<bool> IsTreatmentStageBookedAsync(long stageId, long? excludeAppointmentId = null);
         // True when the patient has come to the clinic at least once: an appointment of the patient is COMPLETED
         Task<bool> HasCompletedVisitAsync(int patientId);
         Task<PagedResult<Appointment>> GetAppointmentsAsync(AppointmentQueryParameters parameters, CancellationToken cancellationToken = default);
         Task UpdateAsync(Appointment appointment);
+
+        // Swaps the service lines of a tracked appointment; saved with the next UpdateAsync
+        void ReplaceServiceItems(Appointment appointment, IEnumerable<AppointmentServiceItem> items);
 
         // The appointment is already tracked. The examination insert and the status change are one save.
         // What an examination holds when the doctor completes it

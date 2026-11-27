@@ -17,6 +17,7 @@ namespace OZE.Persistence.Configurations
 
             builder.Property(x => x.DocumentName).HasMaxLength(200).IsRequired();
             builder.Property(x => x.Note).HasMaxLength(500);
+            builder.Property(x => x.Category).HasMaxLength(30);
             builder.Property(x => x.Status).HasMaxLength(20).HasDefaultValue("Pending");
             builder.Property(x => x.CreatedAt).HasDefaultValueSql("SYSDATETIMEOFFSET()");
 

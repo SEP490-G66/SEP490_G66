@@ -3,14 +3,18 @@ import { call } from "./receptionService";
 import { examinationIdOf } from "./examinationService";
 
 // "Cung cấp tài liệu" (ProvidedDocumentsController): documents the patient uploads from elsewhere, without a request.
-// A document: { id (guid), documentName, performedOn, providerAddress, createdAt, files: [{ id, fileName, fileUrl, createdAt }] }.
+// They belong to the patient's record (not to one visit): every doctor reads them at every visit, and the first doctor
+// who opens them marks them seen. A document: { id (guid), documentName, category, note, performedOn, providerAddress,
+// seenAt, seenByDoctorName, canDelete, createdAt, files: [{ id, fileName, fileUrl, createdAt }] }.
 // Files open through openDocumentFile (documentRequestService). Every call returns the ApiResponse shape.
 
 const MESSAGES = [
     [/Please enter document name/i, "Nhập tên tài liệu."],
     [/Document name must be at most/i, "Tên tài liệu tối đa 200 ký tự."],
-    [/Please enter provider address/i, "Nhập địa chỉ cung cấp."],
-    [/Provider address must be at most/i, "Địa chỉ cung cấp tối đa 300 ký tự."],
+    [/choose the document type/i, "Chọn loại tài liệu."],
+    [/Provider address must be at most/i, "Nơi thực hiện tối đa 300 ký tự."],
+    [/Note must be at most/i, "Ghi chú tối đa 500 ký tự."],
+    [/already seen this document/i, "Bác sĩ đã xem tài liệu này nên không xoá được."],
     [/Performed date cannot be in the future/i, "Ngày thực hiện không được sau hôm nay."],
     [/choose at least one file/i, "Vui lòng chọn ít nhất một tệp."],
     [/at most 5 files/i, "Mỗi tài liệu tối đa 5 tệp."],
@@ -35,15 +39,18 @@ const listOf = (response) => (response.success ? { ...response, data: response.d
 
 export const getMyProvidedDocuments = async () => listOf(translate(await call(() => api.get("/api/provided-documents/my", PATIENT_CALL))));
 
-// performedOn: "yyyy-mm-dd" or "". files: File[] (already checked by the upload dialog; the backend checks again).
-export const uploadProvidedDocument = async ({ documentName, performedOn, providerAddress, files }) => {
+// category: a PROVIDED_DOCUMENT_CATEGORIES value. performedOn: "yyyy-mm-dd" or "". providerAddress, note: optional.
+// files: File[] (already checked by the upload dialog; the backend checks again).
+export const uploadProvidedDocument = async ({ documentName, category, performedOn, providerAddress, note, files }) => {
     const form = new FormData();
     form.append("documentName", documentName.trim());
-    form.append("providerAddress", providerAddress.trim());
+    form.append("category", category);
+    if (providerAddress?.trim()) form.append("providerAddress", providerAddress.trim());
+    if (note?.trim()) form.append("note", note.trim());
     if (performedOn) form.append("performedOn", performedOn);
     files.forEach((file) => form.append("files", file));
     const response = translate(await call(() => api.post("/api/provided-documents", form, { ...PATIENT_CALL, headers: { "Content-Type": "multipart/form-data" } })));
-    return response.success ? { ...response, message: `Đã tải lên "${response.data.documentName}".` } : response;
+    return response.success ? { ...response, message: `Đã gửi "${response.data.documentName}" cho bác sĩ.` } : response;
 };
 
 export const deleteProvidedDocument = async (id) => {

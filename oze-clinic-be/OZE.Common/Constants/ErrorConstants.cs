@@ -290,8 +290,30 @@ namespace OZE.Common.Constants
             public const string StageAlreadyCompleted = "This treatment stage is already completed.";
             public const string FollowUpAppointmentOrPlanRequired = "Either a previous appointment ID or a treatment plan ID is required.";
         }
+        public static class AppointmentChangeRequestMessage
+        {
+            public const string PatientNotFound = "Patient profile not found.";
+            public const string TargetRequired = "Please choose the visit to change.";
+            public const string VisitNotFound = "Visit not found.";
+            public const string BookedByPatient = "You booked this appointment yourself, change or cancel it directly.";
+            public const string VisitNotOpen = "This visit can no longer be changed.";
+            public const string TypeInvalid = "Please choose reschedule or cancel.";
+            public const string ReasonRequired = "Please give a reason.";
+            public const string ReasonInvalid = "Reason must be at most 200 characters.";
+            public const string NoteInvalid = "Note must be at most 500 characters.";
+            public const string PreferredTimesInvalid = "You can give at most 3 preferred times, 50 characters each.";
+            public const string AlreadyRequested = "You already sent a request for this visit, the front desk will call you.";
+            public const string RequestNotFound = "Request not found.";
+            public const string NotPending = "This request has already been handled.";
+            public const string OutcomeInvalid = "Please choose what was done: rescheduled, cancelled or kept.";
+            public const string Created = "Request sent. The front desk will call you.";
+            public const string Withdrawn = "Request withdrawn.";
+            public const string Resolved = "Request handled.";
+        }
+
         public static class AppointmentMessage
         {
+            public const string ArrangedByClinic = "This visit was arranged by the clinic. Please send a change request instead.";
             public const string RecordChangedMeanwhile = "This record was changed by someone else. Please reload and try again";
             public const string ServiceNotFound = "Service not found";
             public const string ServiceInactive = "This service is not available for booking";
@@ -314,6 +336,10 @@ namespace OZE.Common.Constants
             public const string WalkInPatientHasConfirmedToday = "The patient has a confirmed appointment today. Check in that appointment instead";
             public const string PatientHasUnfinishedAppointment = "You already have an appointment that is not finished. Please finish or cancel it before booking a new one";
             public const string PatientHasScheduledTreatmentSession = "You already have a treatment session scheduled in your treatment plan. Please contact the clinic to change it instead of booking a new appointment";
+            public const string TreatmentStageNeedsPatient = "Choose the patient record before booking a treatment plan session";
+            public const string TreatmentStageNotFound = "This treatment plan session was not found for the patient";
+            public const string TreatmentStageNotOpen = "This treatment plan session is already done or cancelled, or its plan is not being carried out";
+            public const string TreatmentStageAlreadyBooked = "This treatment plan session already has an appointment";
             public const string PhoneNotVerified = "Please verify your phone number before booking an appointment";
             public const string ConfigMissing = "System configuration {0} is missing";
             public const string AppointmentNotFound = "Appointment not found in system";
@@ -528,7 +554,11 @@ namespace OZE.Common.Constants
         {
             public const string DocumentNameRequired = "Please enter document name.";
             public const string DocumentNameInvalid = "Document name must be at most 200 characters.";
-            public const string ProviderAddressRequired = "Please enter provider address.";
+            public const string CategoryInvalid = "Please choose the document type.";
+            public const string PerformedOnRequired = "Please choose the date it was done.";
+            public const string ProviderAddressRequired = "Please enter where it was done.";
+            public const string NoteInvalid = "Note must be at most 500 characters.";
+            public const string CannotDeleteSeen = "A doctor has already seen this document, it can no longer be deleted.";
             public const string ProviderAddressInvalid = "Provider address must be at most 300 characters.";
             public const string PerformedOnInFuture = "Performed date cannot be in the future.";
             public const string UploadFilesRequired = "Please choose at least one file.";

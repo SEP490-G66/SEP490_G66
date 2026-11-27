@@ -1,3 +1,4 @@
+using OZE.Application.Helpers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -125,7 +126,7 @@ namespace OZE.UnitTest.Services.Appointments
         [Fact]
         public async Task StartExaminationAsync_ShouldReject_WhenTheAppointmentIsNotToday()
         {
-            ArrangeAppointment(AppointmentConstants.CheckedInStatus, date: DateOnly.FromDateTime(DateTime.Today).AddDays(1));
+            ArrangeAppointment(AppointmentConstants.CheckedInStatus, date: DateOnly.FromDateTime(ClinicClock.Today).AddDays(1));
 
             var act = () => _service.StartExaminationAsync(100, DoctorUserId);
 
@@ -141,7 +142,7 @@ namespace OZE.UnitTest.Services.Appointments
         {
             ArrangeAppointment(AppointmentConstants.CheckedInStatus);
             _appointmentRepositoryMock
-                .Setup(r => r.HasAppointmentInServiceAsync(DoctorId, DateOnly.FromDateTime(DateTime.Today)))
+                .Setup(r => r.HasAppointmentInServiceAsync(DoctorId, DateOnly.FromDateTime(ClinicClock.Today)))
                 .ReturnsAsync(true);
 
             var act = () => _service.StartExaminationAsync(100, DoctorUserId);

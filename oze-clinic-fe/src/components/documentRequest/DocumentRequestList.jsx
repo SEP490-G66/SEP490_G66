@@ -2,6 +2,7 @@ import { FileText } from "lucide-react";
 import { toast } from "react-toastify";
 import { openDocumentFile } from "@/services/documentRequestService";
 import { DOCUMENT_REQUEST_STATUS, DOCUMENT_REQUEST_STATUS_LABELS } from "@/utils/constants/documentRequest";
+import { doctorTitle, providedCategoryOf } from "@/utils/constants/providedDocument";
 import { formatDateTime, getClinicDateTimeParts } from "@/utils/format";
 
 const open = async (file) => {
@@ -28,14 +29,16 @@ const DocumentRequestList = ({ requests, onCancel, onUpload, busyIds, showVisit 
                             <p className="font-semibold break-words text-ink">{request.documentName}</p>
                             <p className="num text-caption text-muted">
                                 {[
+                                    providedCategoryOf(request.category)?.label,
                                     showVisit && request.examinationDate && `Lượt khám ${getClinicDateTimeParts(request.examinationDate).date}`,
                                     formatDateTime(request.createdAt),
-                                    request.doctorName && `BS. ${request.doctorName}`,
+                                    request.doctorName && doctorTitle(request.doctorName),
                                 ]
                                     .filter(Boolean)
                                     .join(" · ")}
                             </p>
                             {request.note && <p className="mt-1 text-caption break-words text-ink">{request.note}</p>}
+                            {request.patientNote && <p className="mt-1 text-caption break-words text-ink">Bệnh nhân ghi chú: {request.patientNote}</p>}
                         </div>
                         <span className={`badge shrink-0 ${status.badge}`}>{status.label}</span>
                         {canCancel && (

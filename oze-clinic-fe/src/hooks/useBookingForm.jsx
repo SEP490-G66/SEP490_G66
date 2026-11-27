@@ -92,7 +92,8 @@ const useBookingForm = ({ api, guest = null, initial = null, embedded = null }) 
     const submit = async () => {
         if (sending.current || state.submitting || (state.day && busy)) return;
         const pending = getPendingSelection(services, state.items, state.pickService, state.pickVariant);
-        const serviceError = pending ? BOOKING_TEXT.SERVICE_PENDING(pending) : state.items.length ? null : BOOKING_TEXT.SERVICE_REQUIRED;
+        // No service picked books the general exam only, which every appointment has
+        const serviceError = pending ? BOOKING_TEXT.SERVICE_PENDING(pending) : null;
         const slotError = state.slot ? null : BOOKING_TEXT.SLOT_REQUIRED;
         const guestField = guest ? guest.validate() : null;
         if (serviceError || slotError || guestField) {

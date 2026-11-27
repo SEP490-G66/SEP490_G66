@@ -365,8 +365,9 @@
   /* ---------- Public site ---------- */
   .utility-bar { @apply flex h-utility-bar items-center bg-primary text-caption text-on-primary; }
   .public-nav { @apply sticky top-0 z-30 flex h-public-nav items-center border-b border-border bg-canvas text-label text-ink; }
-  .public-nav-link { @apply text-label text-body transition-[color,box-shadow] duration-200 hover:text-primary; }
-  .public-nav-link-active, .public-nav-link[aria-current="page"] { @apply text-primary shadow-[inset_0_-2px_0_var(--color-primary)]; }
+  /* Each tab is a soft pill: tinted on hover, tinted and blue where the visitor is */
+  .public-nav-link { @apply rounded-full px-3 py-2 text-label font-medium text-ink transition-colors duration-200 hover:bg-primary-soft hover:text-primary; }
+  .public-nav-link-active, .public-nav-link[aria-current="page"] { @apply bg-primary-soft text-primary; }
   .hero-image { @apply rounded-2xl bg-surface-tint object-cover; }
   .footer-public { @apply bg-surface-navy px-4 py-16 text-body-sm text-on-navy-soft; }
   .footer-public a { @apply text-on-navy hover:underline; }

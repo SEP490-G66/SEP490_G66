@@ -53,6 +53,9 @@ namespace OZE.UnitTest.Services.DocumentRequests
             return examination;
         }
 
+        // What the patient fills in when sending files (all required)
+        protected static SubmitDocumentRequestDetails Details() => new() { Note = "Bác sĩ xem giúp", PerformedOn = new DateOnly(2025, 5, 2), ProviderAddress = "BV Bạch Mai" };
+
         protected DocumentRequest SetupRequest(string status = DocumentRequestConstants.Pending, string ownerUserId = PatientUserId)
         {
             var request = new DocumentRequest
