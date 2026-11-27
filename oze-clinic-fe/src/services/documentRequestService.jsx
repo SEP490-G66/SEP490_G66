@@ -11,6 +11,9 @@ const MESSAGES = [
     [/Please enter document name/i, "Nhập tên tài liệu cần bổ sung."],
     [/Document name must be at most/i, "Tên tài liệu tối đa 200 ký tự."],
     [/Note must be at most/i, "Ghi chú tối đa 500 ký tự."],
+    [/choose the document type/i, "Chọn loại tài liệu."],
+    [/Performed date cannot be in the future/i, "Ngày thực hiện không được sau hôm nay."],
+    [/Provider address must be at most/i, "Nơi thực hiện tối đa 300 ký tự."],
     [/Cannot request documents because the examination is/i, "Lượt khám không còn ở trạng thái đang khám."],
     [/permission to request documents|permission to view document requests/i, "Bạn không phụ trách lượt khám này."],
     [/permission to cancel this document request/i, "Bạn không phải bác sĩ đã tạo yêu cầu này."],
@@ -53,12 +56,15 @@ export const getDocumentRequests = async (queueId) => {
     return response.success ? { ...response, data: { examinationId, requests: response.data } } : response;
 };
 
-// request: { documentName, note }. data: the new request (Pending); the patient is notified.
-export const createDocumentRequest = async (queueId, { documentName, note }) => {
+// request: { documentName, category, note }. category: a PROVIDED_DOCUMENT_CATEGORIES value. data: the new request
+// (Pending), tied to this visit; the patient is notified.
+export const createDocumentRequest = async (queueId, { documentName, category, note }) => {
     const examinationId = examinationIdOf(queueId);
     if (!examinationId) return failure(NOT_STARTED);
     const response = translate(
-        await call(() => api.post(`/api/examinations/${examinationId}/document-requests`, { documentName: documentName.trim(), note: note?.trim() || null })),
+        await call(() =>
+            api.post(`/api/examinations/${examinationId}/document-requests`, { documentName: documentName.trim(), category: category || null, note: note?.trim() || null }),
+        ),
     );
     return response.success ? { ...response, message: `Đã gửi yêu cầu "${response.data.documentName}" tới bệnh nhân.` } : response;
 };
@@ -73,10 +79,14 @@ export const cancelDocumentRequest = async (id) => {
 export const getMyDocumentRequests = async (examinationId) =>
     listOf(translate(await call(() => api.get("/api/document-requests/my", { ...PATIENT_CALL, params: { examinationId } }))));
 
-// files: File[] (already checked by the upload dialog; the backend checks again). data: the request, now Submitted.
-export const submitDocumentFiles = async (id, files) => {
+// files: File[] (already checked by the upload dialog; the backend checks again). details (optional):
+// { note, performedOn ("yyyy-mm-dd"), providerAddress } filled in by the patient. data: the request, now Submitted.
+export const submitDocumentFiles = async (id, files, details = {}) => {
     const form = new FormData();
     files.forEach((file) => form.append("files", file));
+    if (details.note?.trim()) form.append("details.note", details.note.trim());
+    if (details.performedOn) form.append("details.performedOn", details.performedOn);
+    if (details.providerAddress?.trim()) form.append("details.providerAddress", details.providerAddress.trim());
     const response = translate(
         await call(() => api.post(`/api/document-requests/${id}/files`, form, { ...PATIENT_CALL, headers: { "Content-Type": "multipart/form-data" } })),
     );

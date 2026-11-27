@@ -21,6 +21,9 @@ export const PROVIDED_DOCUMENT_CATEGORIES = [
 
 export const providedCategoryOf = (value) => PROVIDED_DOCUMENT_CATEGORIES.find((category) => category.value === value) ?? null;
 
+// "Trần Minh Khoa" -> "BS. Trần Minh Khoa"; a name already starting with "BS" is kept as it is
+export const doctorTitle = (name) => (!name ? "Bác sĩ" : /^BS\b/i.test(name.trim()) ? name.trim() : `BS. ${name.trim()}`);
+
 // Status of a provided document: has a doctor opened it yet?
 export const PROVIDED_DOCUMENT_STATUS = {
     SEEN: { label: "Bác sĩ đã xem", badge: "badge-success" },

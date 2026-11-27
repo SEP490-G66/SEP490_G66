@@ -61,12 +61,12 @@ namespace OZE.UnitTest.Controllers
         {
             List<UploadedImagingFile>? received = null;
             _service
-                .Setup(s => s.SubmitAsync(UserId, 77, It.IsAny<List<UploadedImagingFile>>(), It.IsAny<CancellationToken>()))
-                .Callback<string, long, List<UploadedImagingFile>, CancellationToken>((_, _, files, _) => received = files)
+                .Setup(s => s.SubmitAsync(UserId, 77, It.IsAny<List<UploadedImagingFile>>(), It.IsAny<SubmitDocumentRequestDetails?>(), It.IsAny<CancellationToken>()))
+                .Callback<string, long, List<UploadedImagingFile>, SubmitDocumentRequestDetails?, CancellationToken>((_, _, files, _, _) => received = files)
                 .ReturnsAsync(new DocumentRequestResponse { Id = 77, Status = DocumentRequestConstants.Submitted });
             var files = new List<IFormFile> { FormFile("ket-qua.pdf", "application/pdf", "PDF"), FormFile("phim.png", "image/png", "PNG!") };
 
-            var result = await ControllerFor(RoleConstants.PatientRole).SubmitAsync(77, files, CancellationToken.None);
+            var result = await ControllerFor(RoleConstants.PatientRole).SubmitAsync(77, files, null, CancellationToken.None);
 
             result.Result.Should().BeOfType<OkObjectResult>();
             received.Should().NotBeNull();

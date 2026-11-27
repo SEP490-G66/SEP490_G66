@@ -1,23 +1,27 @@
 import { useId, useState } from "react";
+import DocumentCategoryPicker from "@/components/documentRequest/DocumentCategoryPicker";
 import Modal from "@/components/ui/Modal";
 import { DOCUMENT_NAME_MAX, DOCUMENT_NOTE_MAX } from "@/utils/constants/documentRequest";
 
-// "Yêu cầu bổ sung tài liệu": the doctor types the document the patient must bring (free text) and a note.
-// subtitle: "Nguyễn Văn A · sinh 1998". onSubmit receives { documentName, note }.
+// "Yêu cầu bổ sung tài liệu": the doctor types the document the patient must bring (free text), picks its type and
+// adds a note. The request belongs to this visit. subtitle: "Nguyễn Văn A · sinh 1998".
+// onSubmit receives { documentName, category, note }.
 const DocumentRequestDialog = ({ subtitle, busy = false, onSubmit, onClose }) => {
     const nameId = useId();
     const noteId = useId();
     const nameErrorId = useId();
-    const [form, setForm] = useState({ documentName: "", note: "" });
+    const categoryId = useId();
+    const [form, setForm] = useState({ documentName: "", category: "", note: "" });
     const [errors, setErrors] = useState({});
 
     const handleSubmit = (event) => {
         event.preventDefault();
         const name = form.documentName.trim();
         const nameError = !name ? "Nhập tên tài liệu cần bổ sung." : name.length > DOCUMENT_NAME_MAX ? `Tên tài liệu tối đa ${DOCUMENT_NAME_MAX} ký tự.` : null;
-        setErrors({ documentName: nameError });
-        if (nameError) return;
-        onSubmit({ documentName: name, note: form.note.trim() });
+        const categoryError = form.category ? null : "Chọn loại tài liệu.";
+        setErrors({ documentName: nameError, category: categoryError });
+        if (nameError || categoryError) return;
+        onSubmit({ documentName: name, category: form.category, note: form.note.trim() });
     };
 
     return (
@@ -37,7 +41,7 @@ const DocumentRequestDialog = ({ subtitle, busy = false, onSubmit, onClose }) =>
                         aria-describedby={errors.documentName ? nameErrorId : undefined}
                         onChange={(event) => {
                             setForm((current) => ({ ...current, documentName: event.target.value }));
-                            if (errors.documentName) setErrors({});
+                            if (errors.documentName) setErrors((current) => ({ ...current, documentName: null }));
                         }}
                     />
                     {errors.documentName && (
@@ -46,6 +50,15 @@ const DocumentRequestDialog = ({ subtitle, busy = false, onSubmit, onClose }) =>
                         </p>
                     )}
                 </div>
+                <DocumentCategoryPicker
+                    id={categoryId}
+                    value={form.category}
+                    error={errors.category}
+                    onChange={(category) => {
+                        setForm((current) => ({ ...current, category }));
+                        setErrors((current) => ({ ...current, category: null }));
+                    }}
+                />
                 <div className="field">
                     <label htmlFor={noteId} className="label">
                         Ghi chú cho bệnh nhân
