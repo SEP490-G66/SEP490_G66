@@ -100,12 +100,20 @@ export const BookingLoadingCard = ({ card = "card-app" }) => (
     </section>
 );
 
-const DoctorSelect = ({ doctors, value, onChange }) => (
+// locked: a treatment plan session is booked with the doctor chosen for it in the plan only
+const DoctorSelect = ({ doctors, value, onChange, locked = false }) => (
     <>
         <label htmlFor={BOOKING_IDS.DOCTOR} className={GROUP_LABEL}>
             {BOOKING_TEXT.DOCTOR}
         </label>
-        <select id={BOOKING_IDS.DOCTOR} className="input" value={value ?? ""} onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}>
+        <select
+            id={BOOKING_IDS.DOCTOR}
+            className="input"
+            value={value ?? ""}
+            disabled={locked}
+            aria-describedby={locked ? `${BOOKING_IDS.DOCTOR}-locked` : undefined}
+            onChange={(event) => onChange(event.target.value ? Number(event.target.value) : null)}
+        >
             <option value="">{BOOKING_TEXT.ANY_DOCTOR}</option>
             {doctors.map((doctor) => (
                 <option key={doctor.doctorId} value={doctor.doctorId}>
@@ -113,11 +121,17 @@ const DoctorSelect = ({ doctors, value, onChange }) => (
                 </option>
             ))}
         </select>
+        {locked && (
+            <p id={`${BOOKING_IDS.DOCTOR}-locked`} className="help-text">
+                {BOOKING_TEXT.DOCTOR_LOCKED}
+            </p>
+        )}
     </>
 );
 
-// staff: the receptionist's dialog – no hotline lines, a Cancel button beside submit
-const BookingSchedule = ({ form, staff = false, onCancel }) => {
+// staff: the receptionist's dialog – no hotline lines, a Cancel button beside submit.
+// doctorLocked: the doctor cannot be changed (a treatment plan session, booked with its chosen doctor)
+const BookingSchedule = ({ form, staff = false, doctorLocked = false, onCancel }) => {
     const { state, actions, services, earliest, unfinished, blocked, bounds, rangeBusy, slotsBusy, busy, slotsKey } = form;
     const { context } = state;
     // The services cannot go in one appointment: a message under the picker, no days or slots to choose
@@ -157,7 +171,7 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
                 </div>
             );
         }
-        const doctorSelect = <DoctorSelect doctors={context.doctors} value={state.doctorId} onChange={actions.changeDoctor} />;
+        const doctorSelect = <DoctorSelect doctors={context.doctors} value={state.doctorId} onChange={actions.changeDoctor} locked={doctorLocked} />;
         const locked = state.submitting || busy;
         return (
             <>
@@ -185,7 +199,7 @@ const BookingSchedule = ({ form, staff = false, onCancel }) => {
                 {noSlots && !rangeError && (
                     <NoSlotsBox
                         staff={staff}
-                        showAllDoctors={Boolean(state.doctorId)}
+                        showAllDoctors={Boolean(state.doctorId) && !doctorLocked}
                         onAllDoctors={actions.allDoctors}
                         doctorName={context.doctors.find((doctor) => doctor.doctorId === state.doctorId)?.doctorName}
                     />

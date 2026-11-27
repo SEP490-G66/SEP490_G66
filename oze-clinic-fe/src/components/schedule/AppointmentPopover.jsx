@@ -47,7 +47,7 @@ const AppointmentPopover = ({ appointment: a, anchor, state, roomName, actions, 
 
     const fields = [
         [TEXT.FIELDS.time, `${hhmm(a.timeSlotStart)} – ${hhmm(a.timeSlotEnd)}`],
-        [TEXT.FIELDS.service, serviceNames(a).join(", ") || "—"],
+        [TEXT.FIELDS.service, [serviceNames(a).join(", ") || "—", a.planSession && TEXT.SESSION_OF(a.planSession.stageNumber, a.planSession.totalStages)].filter(Boolean).join(" · ")],
         [TEXT.FIELDS.room, roomName || "—"],
         [TEXT.FIELDS.doctor, a.doctorName || "—"],
         [TEXT.FIELDS.phone, phoneText(a.patientPhoneNumber) || "—"],

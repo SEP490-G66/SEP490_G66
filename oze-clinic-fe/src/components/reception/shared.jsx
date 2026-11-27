@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import Modal from "@/components/ui/Modal";
-import { PRIORITY, clinicToday, findPatientsByKeyword, getAppointments, getAvailableSlots, getDoctorOptions, getPatient, rescheduleAppointment } from "@/services/receptionService";
+import { PRIORITY, appointmentErrorText, clinicToday, findPatientsByKeyword, getAppointments, getAvailableSlots, getDoctorOptions, getPatient, rescheduleAppointment } from "@/services/receptionService";
 import { PRIORITY_LABEL, STATUS_LABEL, dmy, hhmm, slotText, useSubmit } from "./receptionUtils";
 import { cx } from "@/utils/cx";
 import { PATIENT_RECORD_TEXT, RESCHEDULE_TEXT, WALK_IN_TEXT } from "@/utils/messages";
@@ -69,6 +69,8 @@ export const RescheduleDialog = ({ appointment: a, onClose, onDone }) => {
     const [tried, setTried] = useState(false);
     const [busy, setBusy] = useState(false);
     const anyDoctor = doctor === "any";
+    // A treatment plan session stays with the doctor chosen for it in the plan
+    const doctorLocked = Boolean(a.planSession && a.doctorId);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -121,7 +123,7 @@ export const RescheduleDialog = ({ appointment: a, onClose, onDone }) => {
         const result = await rescheduleAppointment(a.id, { date, slotStart, doctorId: anyDoctor ? null : Number(doctor), reason: reason.trim() });
         setBusy(false);
         if (!result.success) {
-            toast.error(result.message || T.SUBMIT);
+            toast.error(appointmentErrorText(result, result.message || T.SUBMIT));
             setStep("edit");
             return;
         }
@@ -182,6 +184,8 @@ export const RescheduleDialog = ({ appointment: a, onClose, onDone }) => {
                             id={`${ids}-doctor`}
                             className="input"
                             value={doctor}
+                            disabled={doctorLocked}
+                            aria-describedby={doctorLocked ? `${ids}-doctor-locked` : undefined}
                             onChange={(e) => {
                                 setDoctor(e.target.value);
                                 resetSlot();
@@ -194,6 +198,11 @@ export const RescheduleDialog = ({ appointment: a, onClose, onDone }) => {
                                 </option>
                             ))}
                         </select>
+                        {doctorLocked && (
+                            <p id={`${ids}-doctor-locked`} className="help-text">
+                                {T.DOCTOR_LOCKED}
+                            </p>
+                        )}
                     </div>
                 </div>
                 <fieldset className="field" aria-describedby={`${ids}-slot-help`}>

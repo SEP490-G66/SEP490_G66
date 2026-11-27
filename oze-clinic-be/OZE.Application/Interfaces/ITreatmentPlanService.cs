@@ -22,6 +22,12 @@ namespace OZE.Application.Interfaces
             CancellationToken cancellationToken = default);
 
         /// <summary>Lấy danh sách các kế hoạch điều trị của một bệnh nhân.</summary>
+        // "Buổi chờ xếp giờ": sessions the front desk still has to give a time
+        Task<List<PendingPlanSessionResponse>> GetPendingSessionsAsync(CancellationToken cancellationToken = default);
+
+        // Doctors a session of this service can be given to, the ones who work in its kind of room first
+        Task<List<PlanDoctorOptionResponse>> GetDoctorOptionsAsync(int? serviceId, CancellationToken cancellationToken = default);
+
         Task<List<TreatmentPlanSummaryResponse>> GetByPatientAsync(int patientId, bool includeClosed, string userId, bool canViewAll,
             CancellationToken cancellationToken = default);
 

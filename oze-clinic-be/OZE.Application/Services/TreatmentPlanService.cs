@@ -92,7 +92,7 @@ namespace OZE.Application.Services
                     StageStatus = TreatmentPlanConstants.StageStatus.Scheduled,
                     CreatedAt = now
                 };
-                ApplyStage(stage, validStage, plan.Stages.Count + 1);
+                ApplyStage(stage, validStage, plan.Stages.Count + 1, plan.CreatedByDoctorId);
                 plan.Stages.Add(stage);
             }
 
@@ -164,7 +164,7 @@ namespace OZE.Application.Services
                     StageStatus = TreatmentPlanConstants.StageStatus.Scheduled,
                     CreatedAt = now
                 };
-                ApplyStage(stage, validStages[i], i + 1);
+                ApplyStage(stage, validStages[i], i + 1, newPlan.CreatedByDoctorId);
                 newPlan.Stages.Add(stage);
             }
 
@@ -226,7 +226,7 @@ namespace OZE.Application.Services
                     plan.Stages.Add(stage);
                 }
 
-                ApplyStage(stage, validStages[i], i + 1);
+                ApplyStage(stage, validStages[i], i + 1, plan.CreatedByDoctorId);
             }
 
             plan.PlanName = request.PlanName.Trim();
@@ -709,6 +709,14 @@ namespace OZE.Application.Services
             var services = (await _serviceRepository.GetByIdsAsync(stageRequests!.Select(s => s.ServiceId!.Value), cancellationToken))
                 .ToDictionary(s => s.Id);
 
+            // A session given to another doctor: that doctor must be an active doctor of the clinic
+            var assignedIds = stageRequests!.Where(s => s.AssignedDoctorId.HasValue).Select(s => s.AssignedDoctorId!.Value).Distinct().ToList();
+            if (assignedIds.Count > 0)
+            {
+                var doctors = await _treatmentPlanRepository.GetActiveDoctorIdsAsync(assignedIds, cancellationToken);
+                ConditionGuard.Ensure(assignedIds.All(doctors.Contains), ErrorConstants.TreatmentPlanMessage.AssignedDoctorInvalid);
+            }
+
             var today = DateOnly.FromDateTime(ClinicClock.Now);
             DateOnly? previousDate = null;
             var validStages = new List<ValidStage>();
@@ -736,8 +744,33 @@ namespace OZE.Application.Services
             return validStages;
         }
 
-        private static void ApplyStage(TreatmentPlanStage stage, ValidStage validStage, int stageNumber)
+        public Task<List<PendingPlanSessionResponse>> GetPendingSessionsAsync(CancellationToken cancellationToken = default) =>
+            _treatmentPlanRepository.GetPendingSessionsAsync(cancellationToken);
+
+        public async Task<List<PlanDoctorOptionResponse>> GetDoctorOptionsAsync(int? serviceId, CancellationToken cancellationToken = default)
         {
+            var roomType = RoomTypeConstants.GeneralTreatment;
+            if (serviceId.HasValue)
+            {
+                var service = (await _serviceRepository.GetByIdsAsync(new[] { serviceId.Value }, cancellationToken)).FirstOrDefault();
+                ConditionGuard.Ensure<NotFoundException>(service != null, ErrorConstants.AppointmentMessage.ServiceNotFound);
+                if (!string.IsNullOrWhiteSpace(service!.RequiredRoomType))
+                {
+                    roomType = service.RequiredRoomType;
+                }
+            }
+
+            // Who worked or will work shifts in that kind of room around now
+            var today = DateOnly.FromDateTime(ClinicClock.Today);
+            return await _treatmentPlanRepository.GetDoctorOptionsAsync(roomType,
+                today.AddDays(-TreatmentPlanConstants.DoctorSuggestionPastDays), today.AddDays(TreatmentPlanConstants.DoctorSuggestionFutureDays),
+                cancellationToken);
+        }
+
+        // defaultDoctorId: the doctor of the plan, who does every session not given to another doctor
+        private static void ApplyStage(TreatmentPlanStage stage, ValidStage validStage, int stageNumber, int defaultDoctorId)
+        {
+            stage.AssignedDoctorId = validStage.Request.AssignedDoctorId ?? defaultDoctorId;
             stage.StageNumber = stageNumber;
             stage.StageName = Clean(validStage.Request.StageName) ?? validStage.Service.ServiceName;
             stage.Description = Clean(validStage.Request.Description);
@@ -799,8 +832,8 @@ namespace OZE.Application.Services
                 CompletedStages = completedStages,
                 CancelledStages = cancelledStages,
                 ProgressPercent = ProgressPercent(completedStages, nonCancelledCount),
-                NextStage = nextStage == null ? null : ToStageResponse(nextStage),
-                Stages = stages.Select(ToStageResponse).ToList()
+                NextStage = nextStage == null ? null : ToStageResponse(nextStage, plan),
+                Stages = stages.Select(s => ToStageResponse(s, plan)).ToList()
             };
         }
 
@@ -812,8 +845,10 @@ namespace OZE.Application.Services
                 : Math.Round((decimal)completedStages / nonCancelledCount * 100m, 2);
         }
 
-        private static TreatmentPlanStageResponse ToStageResponse(TreatmentPlanStage stage)
+        private static TreatmentPlanStageResponse ToStageResponse(TreatmentPlanStage stage, TreatmentPlan plan)
         {
+            // Sessions saved before a doctor could be chosen are done by the planning doctor
+            var assignedToPlanDoctor = stage.AssignedDoctorId == null || stage.AssignedDoctorId == plan.CreatedByDoctorId;
             return new TreatmentPlanStageResponse
             {
                 Id = stage.Id,
@@ -828,6 +863,8 @@ namespace OZE.Application.Services
                 ScheduledDate = stage.ScheduledDate,
                 ActualDate = stage.ActualDate,
                 PerformedByDoctorId = stage.PerformedByDoctorId,
+                AssignedDoctorId = stage.AssignedDoctorId ?? plan.CreatedByDoctorId,
+                AssignedDoctorName = assignedToPlanDoctor ? plan.CreatedByDoctor?.FullName : stage.AssignedDoctor?.FullName,
                 Notes = stage.Notes,
                 CompletedAt = stage.CompletedAt
             };

@@ -272,7 +272,8 @@ const PLAN_RUNNING = ["Approved", "InProgress"];
 const STAGE_OPEN = ["Scheduled", "InProgress"];
 
 // Sessions the receptionist can book a visit for: the next open session of each plan being carried out.
-// [{ stageId, planId, planName, doctorName, number, total, name, serviceId, serviceName, scheduledDate }]
+// [{ stageId, planId, planName, doctorId, doctorName, number, total, name, serviceId, serviceName, scheduledDate }].
+// doctorId: the doctor chosen for the session in the plan (the planning doctor when none was chosen); it is booked with them only.
 export const getBookablePlanSessions = async (patientId, config = {}) => {
     const plans = await getPatientTreatmentPlans(patientId, {}, config);
     if (!plans.success) return plans;
@@ -289,7 +290,8 @@ export const getBookablePlanSessions = async (patientId, config = {}) => {
                 stageId: stage.id,
                 planId: plan.treatmentPlanId,
                 planName: plan.planName ?? "Kế hoạch điều trị",
-                doctorName: plan.createdByDoctorName ?? "",
+                doctorId: stage.assignedDoctorId ?? plan.createdByDoctorId ?? null,
+                doctorName: stage.assignedDoctorName ?? plan.createdByDoctorName ?? "",
                 number: index + 1,
                 total: stages.length,
                 name: stage.stageName ?? "",
@@ -301,6 +303,11 @@ export const getBookablePlanSessions = async (patientId, config = {}) => {
     });
     return { ...plans, data: sessions };
 };
+
+// "Buổi chờ xếp giờ": the next session of every plan being carried out that has no appointment yet.
+// [{ stageId, treatmentPlanId, planName, patientId, patientName, patientCode, patientPhoneNumber, stageNumber, totalStages,
+//    stageName, serviceId, serviceName, requiredRoomType, doctorId, doctorName, scheduledDate }]
+export const getPendingPlanSessions = (config = {}) => call(() => api.get("/api/treatmentplans/pending-sessions", config));
 
 // ----- consultation requests from the public site -----
 export const getConsultations = ({ status, keyword, page = 1, pageSize = 10 } = {}) =>

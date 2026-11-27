@@ -212,6 +212,7 @@ namespace OZE.Application.Services
                     ErrorConstants.AppointmentMessage.TreatmentStageNotFound);
                 ConditionGuard.Ensure(IsOpenSession(stage!), ErrorConstants.AppointmentMessage.TreatmentStageNotOpen);
             }
+            var doctorId = SessionDoctorOrRequested(stage, request.DoctorId);
 
             // No service picked: book the service of the session
             var serviceIds = stage?.ServiceId != null && request.ServiceId.Count == 0 && request.VariantId.Count == 0
@@ -219,7 +220,7 @@ namespace OZE.Application.Services
                 : request.ServiceId;
             var lines = await ResolveBookingLinesAsync(serviceIds, request.VariantId);
             var (appointment, patient, slot) = await CreateBookingAsync(lines, request.Date!.Value, request.SlotStart!.Value,
-                request.DoctorId, request.Note, receptionistUserId, async () =>
+                doctorId, request.Note, receptionistUserId, async () =>
                 {
                     if (known != null)
                     {
@@ -265,6 +266,20 @@ namespace OZE.Application.Services
             var response = ToResponse(appointment, patient, slot, lines);
             response.PlanSession = ToPlanSession(stage);
             return response;
+        }
+
+        // A plan session is booked with the doctor chosen for it in the plan (the planning doctor when none was chosen);
+        // the front desk cannot give it to another doctor. Any other booking keeps the doctor that was asked for.
+        private static int? SessionDoctorOrRequested(TreatmentPlanStage? stage, int? requestedDoctorId)
+        {
+            var sessionDoctorId = stage == null ? null : stage.AssignedDoctorId ?? stage.TreatmentPlan?.CreatedByDoctorId;
+            if (sessionDoctorId == null)
+            {
+                return requestedDoctorId;
+            }
+
+            ConditionGuard.Ensure(requestedDoctorId == null || requestedDoctorId == sessionDoctorId, ErrorConstants.AppointmentMessage.TreatmentStageDoctorMismatch);
+            return sessionDoctorId;
         }
 
         // A session can be booked while its plan is being carried out and the session is not done or cancelled
@@ -896,16 +911,19 @@ namespace OZE.Application.Services
             var slotStart = request.SlotStart!.Value;
             var before = new { appointment.Status, appointment.AppointmentDate, appointment.TimeSlotStart, appointment.TimeSlotEnd, appointment.DoctorId };
 
+            // A plan session stays with the doctor chosen for it
+            var doctorId = SessionDoctorOrRequested(appointment.TreatmentPlanStage, request.DoctorId);
+
             var chosen = await _appointmentRepository.ExecuteSerializableAsync(async () =>
             {
                 // Re-check inside the transaction; never trust the slot sent by the client
-                var candidates = (await FindSlotsAsync(lines, date, request.DoctorId, excludeAppointmentId: appointment.Id))
+                var candidates = (await FindSlotsAsync(lines, date, doctorId, excludeAppointmentId: appointment.Id))
                     .Where(x => x.SlotStart == slotStart)
                     .ToList();
                 ConditionGuard.Ensure(candidates.Count > 0, ErrorConstants.AppointmentMessage.SlotNotAvailable);
 
                 // No doctor sent: keep the current doctor when free, otherwise take the least busy one
-                var slot = request.DoctorId.HasValue
+                var slot = doctorId.HasValue
                     ? candidates[0]
                     : candidates.FirstOrDefault(c => c.DoctorId == appointment.DoctorId)
                         ?? await PickLeastBusyAsync(candidates, date);

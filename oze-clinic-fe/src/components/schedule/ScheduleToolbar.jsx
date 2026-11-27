@@ -4,8 +4,9 @@ import { SCHEDULE_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
 
 // Date bar of the appointment grid: calendar leaf (opens the date picker), the day title, ‹ Hôm nay ›, and the 7 days of the week.
-// strip: { [day]: { text, full } } — what each day chip says under its date
-const ScheduleToolbar = ({ day, today, days, strip, dayCount, onChange }) => {
+// strip: { [day]: { text, full } } — what each day chip says under its date.
+// actions: shown at the end of the top row ("Buổi chờ xếp giờ"); children: shown under the day strip
+const ScheduleToolbar = ({ day, today, days, strip, dayCount, onChange, actions = null, children = null }) => {
     const openPicker = (event) => {
         try {
             event.currentTarget.showPicker?.();
@@ -54,6 +55,7 @@ const ScheduleToolbar = ({ day, today, days, strip, dayCount, onChange }) => {
                         <ChevronRight className="size-4" aria-hidden="true" />
                     </StepButton>
                 </div>
+                {actions && <div className="ml-auto">{actions}</div>}
             </div>
             <div role="tablist" aria-label={TEXT.DAYS_OF_WEEK} className="mt-3.5 grid grid-cols-[repeat(7,64px)] gap-2 overflow-x-auto pb-0.5 sm:grid-cols-7">
                 {days.week.map((key, i) => {
@@ -85,6 +87,7 @@ const ScheduleToolbar = ({ day, today, days, strip, dayCount, onChange }) => {
                     );
                 })}
             </div>
+            {children}
         </section>
     );
 };

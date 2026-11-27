@@ -23,6 +23,7 @@ const success = (data, message = null) => ({ success: true, message, data, error
 const failure = (message) => ({ success: false, message, data: null, errors: null });
 
 const MESSAGES = [
+    [/chosen for a session is not an active doctor/i, "Bác sĩ thực hiện đã chọn cho một buổi không còn hoạt động. Hãy chọn bác sĩ khác."],
     [/Patient is not in the waiting queue|not WAITING|is not waiting/i, "Bệnh nhân không còn trong hàng chờ."],
     [/already has an appointment in service|another .*in service/i, "Đang có bệnh nhân trong phòng. Kết thúc lượt khám trước khi gọi người tiếp theo."],
     [/off duty|not on shift|start your shift/i, "Bạn chưa bắt đầu ca làm. Bấm “Bắt đầu ca” trước khi khám."],
@@ -192,6 +193,23 @@ const loadPlanTypes = async () => {
 
 const typesOf = (serviceId) => state.types.get(serviceId) ?? [];
 
+// Doctors a session of this service can be given to: [{ doctorId, doctorName, specialization, suggested }], the ones who
+// work in the kind of room the service needs first. Asked once per service; a failed answer is asked again next time.
+const doctorOptions = new Map();
+export const getPlanDoctorOptions = (serviceId) => {
+    const key = String(serviceId ?? "");
+    if (!doctorOptions.has(key)) {
+        const request = call(() => api.get("/api/treatmentplans/doctor-options", { params: { serviceId: serviceId || undefined }, skipErrorPage: true })).then(
+            (response) => {
+                if (!response.success) doctorOptions.delete(key);
+                return response.success && Array.isArray(response.data) ? response.data : [];
+            },
+        );
+        doctorOptions.set(key, request);
+    }
+    return doctorOptions.get(key);
+};
+
 const describeSession = (serviceId, session) => {
     const type = typesOf(serviceId).find((option) => option.id === session.typeId);
     return [type && `${TYPE_LINE}${type.name}`, session.note?.trim()].filter(Boolean).join("\n") || null;
@@ -235,6 +253,8 @@ const planFromApi = (plan, item, doctorName) => {
             date: stage.scheduledDate ?? "",
             cost: stage.estimatedCost == null ? null : Number(stage.estimatedCost),
             status: stage.stageStatus === "Completed" ? "done" : "pending",
+            // "" = the planning doctor; a session given to another doctor keeps that doctor's id
+            doctorId: stage.assignedDoctorId && stage.assignedDoctorId !== plan.createdByDoctorId ? String(stage.assignedDoctorId) : "",
         });
     }
     for (const service of services) service.status = serviceStatusOf(service.sessions, stagesOf.get(service.id));
@@ -830,6 +850,8 @@ const writePlan = async (item, plan) => {
         description: describeSession(service.serviceId, session),
         estimatedCost: Number.isFinite(session.cost) ? session.cost : null,
         scheduledDate: session.date || null,
+        // Left out, the backend gives the session to the doctor making the plan
+        assignedDoctorId: session.doctorId ? Number(session.doctorId) : null,
     }));
     const names = plan.services.filter((service) => service.sessions.length).map((service) => service.name);
     const body = { planName: `Kế hoạch điều trị · ${names.join(", ")}`.slice(0, 200), description: null, stages };

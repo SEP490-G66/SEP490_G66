@@ -33,7 +33,132 @@ namespace OZE.Persistence.Repositories
                 .Include(x => x.CreatedByDoctor)
                 .Include(x => x.Stages)
                     .ThenInclude(s => s.Service)
+                .Include(x => x.Stages)
+                    .ThenInclude(s => s.AssignedDoctor)
                 .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        }
+
+        public async Task<List<int>> GetActiveDoctorIdsAsync(IReadOnlyCollection<int> staffIds, CancellationToken cancellationToken = default)
+        {
+            var doctorUserIds = from ur in _context.UserRoles
+                                join r in _context.Roles on ur.RoleId equals r.Id
+                                where r.Name == RoleConstants.DoctorRole
+                                select ur.UserId;
+
+            return await _context.StaffProfiles
+                .AsNoTracking()
+                .Where(x => staffIds.Contains(x.Id) && x.IsActive && doctorUserIds.Contains(x.UserId))
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        public async Task<List<PendingPlanSessionResponse>> GetPendingSessionsAsync(CancellationToken cancellationToken = default)
+        {
+            var plans = await _context.TreatmentPlans
+                .AsNoTracking()
+                .Where(p => p.Status == TreatmentPlanConstants.Approved || p.Status == TreatmentPlanConstants.InProgress)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.PlanName,
+                    p.PatientId,
+                    PatientName = p.Patient.FullName,
+                    p.Patient.PatientCode,
+                    p.Patient.PhoneNumber,
+                    p.CreatedByDoctorId,
+                    CreatedByDoctorName = p.CreatedByDoctor.FullName,
+                    Stages = p.Stages
+                        .Where(s => s.StageStatus != TreatmentPlanConstants.StageStatus.Cancelled)
+                        .OrderBy(s => s.StageNumber)
+                        .Select(s => new
+                        {
+                            s.Id,
+                            s.StageName,
+                            s.StageStatus,
+                            s.ServiceId,
+                            ServiceName = s.Service == null ? null : s.Service.ServiceName,
+                            RoomType = s.Service == null ? null : s.Service.RequiredRoomType,
+                            s.AssignedDoctorId,
+                            AssignedDoctorName = s.AssignedDoctor == null ? null : s.AssignedDoctor.FullName,
+                            s.ScheduledDate
+                        })
+                        .ToList()
+                })
+                .ToListAsync(cancellationToken);
+
+            // Only the next open session of each plan: one visit at a time, the sessions are done in order
+            var next = plans
+                .Select(p => new { Plan = p, Index = p.Stages.FindIndex(s => s.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled
+                    || s.StageStatus == TreatmentPlanConstants.StageStatus.InProgress) })
+                .Where(x => x.Index >= 0)
+                .ToList();
+            var stageIds = next.Select(x => x.Plan.Stages[x.Index].Id).ToList();
+
+            // A session that already has an appointment (not cancelled, not a no-show) is not waiting any more
+            var booked = (await _context.Appointments
+                .AsNoTracking()
+                .Where(a => a.TreatmentPlanStageId != null && stageIds.Contains(a.TreatmentPlanStageId.Value)
+                    && a.Status != AppointmentConstants.CancelledStatus && a.Status != AppointmentConstants.NoShowStatus)
+                .Select(a => a.TreatmentPlanStageId!.Value)
+                .ToListAsync(cancellationToken))
+                .ToHashSet();
+
+            return next
+                .Where(x => !booked.Contains(x.Plan.Stages[x.Index].Id))
+                .Select(x =>
+                {
+                    var plan = x.Plan;
+                    var stage = plan.Stages[x.Index];
+                    var assignedToOther = stage.AssignedDoctorId.HasValue && stage.AssignedDoctorId != plan.CreatedByDoctorId;
+                    return new PendingPlanSessionResponse
+                    {
+                        StageId = stage.Id,
+                        TreatmentPlanId = plan.Id,
+                        PlanName = plan.PlanName,
+                        PatientId = plan.PatientId,
+                        PatientName = plan.PatientName,
+                        PatientCode = plan.PatientCode,
+                        PatientPhoneNumber = plan.PhoneNumber,
+                        StageNumber = x.Index + 1,
+                        TotalStages = plan.Stages.Count,
+                        StageName = stage.StageName,
+                        ServiceId = stage.ServiceId,
+                        ServiceName = stage.ServiceName,
+                        RequiredRoomType = string.IsNullOrWhiteSpace(stage.RoomType) ? RoomTypeConstants.GeneralTreatment : stage.RoomType,
+                        DoctorId = assignedToOther ? stage.AssignedDoctorId!.Value : plan.CreatedByDoctorId,
+                        DoctorName = assignedToOther ? stage.AssignedDoctorName : plan.CreatedByDoctorName,
+                        ScheduledDate = stage.ScheduledDate
+                    };
+                })
+                .OrderBy(x => x.ScheduledDate ?? DateOnly.MaxValue)
+                .ThenBy(x => x.PatientName)
+                .ToList();
+        }
+
+        public async Task<List<PlanDoctorOptionResponse>> GetDoctorOptionsAsync(string roomType, DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+        {
+            var doctorUserIds = from ur in _context.UserRoles
+                                join r in _context.Roles on ur.RoleId equals r.Id
+                                where r.Name == RoleConstants.DoctorRole
+                                select ur.UserId;
+
+            var suggested = _context.StaffSchedules
+                .Where(x => x.ScheduleDate >= from && x.ScheduleDate <= to && x.Room != null && x.Room.RoomType == roomType)
+                .Select(x => x.StaffProfileId);
+
+            return await _context.StaffProfiles
+                .AsNoTracking()
+                .Where(x => x.IsActive && doctorUserIds.Contains(x.UserId))
+                .Select(x => new PlanDoctorOptionResponse
+                {
+                    DoctorId = x.Id,
+                    DoctorName = x.FullName,
+                    Specialization = x.Specialization,
+                    Suggested = suggested.Contains(x.Id)
+                })
+                .OrderByDescending(x => x.Suggested)
+                .ThenBy(x => x.DoctorName)
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<TreatmentPlan?> GetTrackedByIdWithStagesAsync(long id, CancellationToken cancellationToken = default)
@@ -43,6 +168,8 @@ namespace OZE.Persistence.Repositories
                 .Include(x => x.CreatedByDoctor)
                 .Include(x => x.Stages)
                     .ThenInclude(s => s.Service)
+                .Include(x => x.Stages)
+                    .ThenInclude(s => s.AssignedDoctor)
                 .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         }
 

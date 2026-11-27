@@ -35,6 +35,31 @@ namespace OZE.Controllers
         }
 
         /// <summary>
+        /// "Buổi chờ xếp giờ": the next open session of every plan being carried out that has no appointment yet,
+        /// with the doctor who is to do it. Soonest planned date first.
+        /// </summary>
+        [Authorize(Roles = RoleConstants.ReceptionistRole + "," + RoleConstants.ClinicManagerRole)]
+        [HttpGet("pending-sessions")]
+        public async Task<ActionResult<ApiResponse<List<PendingPlanSessionResponse>>>> GetPendingSessionsAsync(CancellationToken cancellationToken)
+        {
+            var sessions = await _treatmentPlanService.GetPendingSessionsAsync(cancellationToken);
+            return Ok(ApiResponse<List<PendingPlanSessionResponse>>.SuccessResult(sessions));
+        }
+
+        /// <summary>
+        /// Doctors a session of the service can be given to; Suggested = works shifts in the room type the service needs.
+        /// </summary>
+        [Authorize(Roles = RoleConstants.DoctorRole)]
+        [HttpGet("doctor-options")]
+        public async Task<ActionResult<ApiResponse<List<PlanDoctorOptionResponse>>>> GetDoctorOptionsAsync(
+            [FromQuery] int? serviceId,
+            CancellationToken cancellationToken)
+        {
+            var doctors = await _treatmentPlanService.GetDoctorOptionsAsync(serviceId, cancellationToken);
+            return Ok(ApiResponse<List<PlanDoctorOptionResponse>>.SuccessResult(doctors));
+        }
+
+        /// <summary>
         /// Returns one treatment plan with its stages, costs and the next stage to perform.
         /// A doctor sees the plans of patients they examine; reception sees every plan.
         /// </summary>

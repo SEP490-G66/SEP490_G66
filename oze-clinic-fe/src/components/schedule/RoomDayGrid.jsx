@@ -60,8 +60,10 @@ const RoomHeader = ({ room, shifts, badge }) => (
 );
 
 // Day × room grid. Columns: rooms that take appointments; rows: slots of the day (lunch as one band).
-// free: { state: "ok", keys } | { state: "notOpen" } | { state: "error" } — free general-room slots from the API
-const RoomDayGrid = ({ rooms, rows, step, day, today, now, duty, appointments, free, flashId, onOpen, onFree }) => {
+// free: { state: "ok", keys } | { state: "notOpen" } | { state: "error" } — free general-room slots from the API.
+// pick: a treatment plan session being given a time ({ doctorId, roomType, keys }): only the cells of its doctor, in its
+// kind of room, where it fits are offered (keys from the API; null = worked out here: a free slot in the future).
+const RoomDayGrid = ({ rooms, rows, step, day, today, now, duty, appointments, free, pick = null, flashId, onOpen, onFree }) => {
     const nowMinutes = toMinutes(now);
     const freeKeys = free.state === "ok" ? free.keys : new Set();
     const dayName = `${TEXT.WEEKDAYS[weekdayIndex(day)]} ${ddmm(day)}`;
@@ -104,7 +106,22 @@ const RoomDayGrid = ({ rooms, rows, step, day, today, now, duty, appointments, f
         const shift = shiftAt(shifts, row.minutes);
         if (!shift) return <td key={room.id} className={cx(CELL, OFF_CELL, nowLine)} />;
         let content = null;
-        if (room.type === ROOM_TYPES.GENERAL && isFreeGeneral(freeKeys, shift.doctorId, row.time)) {
+        if (pick) {
+            const fits =
+                shift.doctorId === pick.doctorId &&
+                room.type === pick.roomType &&
+                (pick.keys ? pick.keys.has(`${shift.doctorId}|${row.time}`) : isFuture(row.minutes) && !doctorBusy(appointments, shift.doctorId, row.minutes, row.minutes + step));
+            content = fits && (
+                <button
+                    type="button"
+                    aria-label={TEXT.PICK_LABEL(room.name, dayName, row.time)}
+                    onClick={() => onFree({ room, shift, time: row.time })}
+                    className="flex h-full min-h-9 w-full items-center justify-center rounded-lg border-[1.5px] border-primary bg-primary-soft text-caption font-semibold text-primary hover:bg-primary hover:text-on-primary focus-visible:bg-primary focus-visible:text-on-primary"
+                >
+                    {row.time}
+                </button>
+            );
+        } else if (room.type === ROOM_TYPES.GENERAL && isFreeGeneral(freeKeys, shift.doctorId, row.time)) {
             content = (
                 <button
                     type="button"
