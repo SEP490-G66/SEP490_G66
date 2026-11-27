@@ -70,6 +70,7 @@ const toService = (service) => ({
     id: service.serviceId,
     name: service.serviceName,
     isMandatory: Boolean(service.isMandatory),
+    roomType: service.requiredRoomType ?? null,
     variants: (service.variants ?? []).map((variant) => ({ id: variant.variantId, name: variant.variantName })),
 });
 
@@ -263,6 +264,8 @@ const RECEPTION_TEXTS = [
     ["session was not found", RECEPTION_BOOKING_TEXT.ERROR_STAGE_NOT_FOUND],
     ["session is already done", RECEPTION_BOOKING_TEXT.ERROR_STAGE_NOT_OPEN],
     ["session already has an appointment", RECEPTION_BOOKING_TEXT.ERROR_STAGE_BOOKED],
+    ["minor surgery is booked only for a treatment plan session", RECEPTION_BOOKING_TEXT.ERROR_SURGERY_NEEDS_PLAN],
+    ["booked with the doctor chosen for it", RECEPTION_BOOKING_TEXT.ERROR_STAGE_DOCTOR],
     [ACTIVE_PLAN, RECEPTION_BOOKING_TEXT.ERROR_ACTIVE_PLAN],
 ];
 

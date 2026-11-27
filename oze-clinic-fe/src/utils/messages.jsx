@@ -830,6 +830,8 @@ export const RECEPTION_BOOKING_TEXT = {
     ERROR_STAGE_NOT_FOUND: "Buổi điều trị không thuộc bệnh nhân này. Tải lại hộp đặt lịch rồi chọn lại.",
     ERROR_STAGE_NOT_OPEN: "Buổi này đã làm xong hoặc đã huỷ, hoặc kế hoạch không còn đang điều trị.",
     ERROR_STAGE_BOOKED: "Buổi này đã có lịch hẹn khác. Đổi giờ lịch đó thay vì đặt mới.",
+    ERROR_SURGERY_NEEDS_PLAN: "Dịch vụ tiểu phẫu chỉ đặt được cho buổi điều trị bác sĩ đã lập trong kế hoạch. Chọn buổi đó, hoặc bỏ dịch vụ tiểu phẫu.",
+    ERROR_STAGE_DOCTOR: "Buổi điều trị chỉ được đặt với bác sĩ thực hiện đã chọn trong kế hoạch.",
 };
 
 export const BOOKING_TEXT = {

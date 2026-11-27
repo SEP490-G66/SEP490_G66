@@ -130,8 +130,9 @@ const DoctorSelect = ({ doctors, value, onChange, locked = false }) => (
 );
 
 // staff: the receptionist's dialog – no hotline lines, a Cancel button beside submit.
-// doctorLocked: the doctor cannot be changed (a treatment plan session, booked with its chosen doctor)
-const BookingSchedule = ({ form, staff = false, doctorLocked = false, onCancel }) => {
+// doctorLocked: the doctor cannot be changed (a treatment plan session, booked with its chosen doctor).
+// serviceFilter: which services can be picked (the receptionist cannot pick minor surgery outside a plan session)
+const BookingSchedule = ({ form, staff = false, doctorLocked = false, serviceFilter = null, onCancel }) => {
     const { state, actions, services, earliest, unfinished, blocked, bounds, rangeBusy, slotsBusy, busy, slotsKey } = form;
     const { context } = state;
     // The services cannot go in one appointment: a message under the picker, no days or slots to choose
@@ -177,7 +178,7 @@ const BookingSchedule = ({ form, staff = false, doctorLocked = false, onCancel }
             <>
                 {/* Always shown: when no slot fits the chosen services, removing one is the way out */}
                 <BookingServicePicker
-                    services={services}
+                    services={serviceFilter ? services.filter(serviceFilter) : services}
                     items={state.items}
                     pickService={state.pickService}
                     pickVariant={state.pickVariant}
