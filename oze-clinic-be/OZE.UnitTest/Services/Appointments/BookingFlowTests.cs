@@ -97,6 +97,30 @@ namespace OZE.UnitTest.Services.Appointments
 
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.TooFarAhead);
         }
+
+        // UTCID06 (N): a 20-minute service still holds a whole 30-minute slot, so every slot ends on the grid
+        [Fact]
+        public async Task GetAvailableSlotsAsync_ShouldHoldWholeSlot_WhenServiceIsShorter()
+        {
+            _generalExamService.EstimatedMinutes = 20;
+
+            var result = await _service.GetAvailableSlotsAsync(Query(Tomorrow));
+
+            result.Select(x => x.SlotStart).Should().Equal(new TimeOnly(8, 0), new TimeOnly(8, 30), new TimeOnly(9, 0), new TimeOnly(9, 30));
+            result.Should().OnlyContain(x => x.SlotEnd == x.SlotStart.AddMinutes(30));
+        }
+
+        // UTCID07 (N): a 45-minute service holds 60 minutes; the last start that fits the 08:00-10:00 shift is 09:00
+        [Fact]
+        public async Task GetAvailableSlotsAsync_ShouldHoldTwoSlots_WhenServiceIsFortyFiveMinutes()
+        {
+            _generalExamService.EstimatedMinutes = 45;
+
+            var result = await _service.GetAvailableSlotsAsync(Query(Tomorrow));
+
+            result.Select(x => x.SlotStart).Should().Equal(new TimeOnly(8, 0), new TimeOnly(8, 30), new TimeOnly(9, 0));
+            result.Should().OnlyContain(x => x.SlotEnd == x.SlotStart.AddMinutes(60));
+        }
     }
 
     // OZ-APPT-03 BookAsGuest
@@ -173,6 +197,21 @@ namespace OZE.UnitTest.Services.Appointments
 
             (await act.Should().ThrowAsync<BadRequestException>()).Which.Message.Should().Be(ErrorConstants.AppointmentMessage.PatientHasScheduledTreatmentSession);
             _appointmentRepoMock.Verify(r => r.AddAsync(It.IsAny<Appointment>()), Times.Never);
+        }
+
+        // UTCID07 (N): the saved booking ends on the slot boundary, while the service line keeps its own 20 minutes
+        [Fact]
+        public async Task BookAsGuestAsync_ShouldSaveRoundedEnd_AndKeepServiceMinutes()
+        {
+            _generalExamService.EstimatedMinutes = 20;
+            Appointment? saved = null;
+            _appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>())).Callback<Appointment>(a => { a.Id = 500; saved = a; }).Returns(Task.CompletedTask);
+
+            await _service.BookAsGuestAsync(Guest());
+
+            saved!.TimeSlotStart.Should().Be(new TimeOnly(8, 0));
+            saved.TimeSlotEnd.Should().Be(new TimeOnly(8, 30));
+            saved.ServiceItems.Should().ContainSingle().Which.DurationMinutes.Should().Be(20);
         }
     }
 
