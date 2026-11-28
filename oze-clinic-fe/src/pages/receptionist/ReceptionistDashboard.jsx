@@ -26,7 +26,7 @@ import { getMyShifts } from "@/services/myScheduleService";
 import { addDays, hhmm, mondayOf } from "@/utils/calendar";
 import { summarize, transactionsOf } from "@/utils/cashShift";
 import { isLate as lateAt, stateOf } from "@/utils/checkIn";
-import { CHECK_IN_TEXT, DASHBOARD_TEXT as TEXT } from "@/utils/messages";
+import { CHECK_IN_TEXT, DASHBOARD_TEXT as TEXT, QUEUE_TEXT } from "@/utils/messages";
 import { NO_DOCTOR_KEY, entryRows, examRooms, examRows, orderRows, otherRooms, waitingCount } from "@/utils/queueBoard";
 import { weekDays } from "@/utils/receptionDashboard";
 import { RECEPTION_PATIENT_CREATE_ROUTE, ROUTES } from "@/utils/routes";
@@ -106,7 +106,7 @@ const ReceptionistDashboard = () => {
     const laterOf = (room) => todays.filter((a) => a.doctorId === room.doctorId && stateOf(a) === "notyet").length;
     const roomBars = rooms
         .filter((r) => r.key !== NO_DOCTOR_KEY)
-        .map((r) => ({ key: r.key, tab: r.tab, name: r.name, staff: r.staff, ended: r.ended, endAt: r.endAt, wait: waitingCount(rows, r.key) }));
+        .map((r) => ({ key: r.key, tab: r.tab, name: r.name ?? QUEUE_TEXT.NO_ROOM, staff: r.staff, ended: r.ended, endAt: r.endAt, wait: waitingCount(rows, r.key) }));
 
     const late = todays.filter((a) => lateAt(a, now)).length;
     const needConfirm = [...todays, ...range.filter((a) => a.appointmentDate > today && a.appointmentDate <= addDays(today, 7))].filter((a) => a.status === "PENDING").length;
