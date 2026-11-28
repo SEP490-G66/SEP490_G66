@@ -45,7 +45,7 @@ namespace OZE.Application.Services
                 Status = RoomConstants.ActiveStatus,
                 Floor = TrimToNull(request.Floor),
                 Description = TrimToNull(request.Description),
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
 
             await _roomRepository.AddAsync(room, cancellationToken);
@@ -81,7 +81,7 @@ namespace OZE.Application.Services
             room.Status = request.Status;
             room.Floor = TrimToNull(request.Floor);
             room.Description = TrimToNull(request.Description);
-            room.UpdatedAt = DateTimeOffset.UtcNow;
+            room.UpdatedAt = ClinicClock.UtcNow;
 
             await _roomRepository.SaveChangesAsync(cancellationToken);
 

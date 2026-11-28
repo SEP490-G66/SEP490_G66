@@ -162,7 +162,7 @@ namespace OZE.Application.Services
             service.ServiceName = request.ServiceName.Trim();
             service.Description = request.Description?.Trim();
             service.RequiredRoomType = normalizedRoomType;
-            service.CreatedAt = DateTimeOffset.UtcNow;
+            service.CreatedAt = ClinicClock.UtcNow;
 
             await _serviceRepository.AddAsync(service, cancellationToken);
             await _serviceRepository.SaveChangesAsync(cancellationToken);
@@ -229,7 +229,7 @@ namespace OZE.Application.Services
                 return ApiResponse<ServiceDto>.FailureResult(ErrorConstants.ServiceMessage.HasOpenAppointments);
             }
             service.IsActive = newIsActive;
-            service.UpdatedAt = DateTimeOffset.UtcNow;
+            service.UpdatedAt = ClinicClock.UtcNow;
 
             await _serviceRepository.UpdateAsync(service, cancellationToken);
             await _serviceRepository.SaveChangesAsync(cancellationToken);
@@ -267,7 +267,7 @@ namespace OZE.Application.Services
             }
 
             service.IsActive = isActive;
-            service.UpdatedAt = DateTimeOffset.UtcNow;
+            service.UpdatedAt = ClinicClock.UtcNow;
 
             await _serviceRepository.UpdateAsync(service, cancellationToken);
             await _serviceRepository.SaveChangesAsync(cancellationToken);
@@ -370,7 +370,7 @@ namespace OZE.Application.Services
                 EstimatedMinutes = request.EstimatedMinutes,
                 DisplayOrder = request.DisplayOrder,
                 IsActive = request.IsActive ?? true,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
 
             await _serviceRepository.AddVariantAsync(variant, cancellationToken);
@@ -420,7 +420,7 @@ namespace OZE.Application.Services
             variant.EstimatedMinutes = request.EstimatedMinutes;
             variant.DisplayOrder = request.DisplayOrder;
             variant.IsActive = newIsActive;
-            variant.UpdatedAt = DateTimeOffset.UtcNow;
+            variant.UpdatedAt = ClinicClock.UtcNow;
 
             await _serviceRepository.SaveChangesAsync(cancellationToken);
 
@@ -454,7 +454,7 @@ namespace OZE.Application.Services
             }
 
             variant.IsActive = isActive;
-            variant.UpdatedAt = DateTimeOffset.UtcNow;
+            variant.UpdatedAt = ClinicClock.UtcNow;
             await _serviceRepository.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Variant {VariantId} of service {ServiceId} status toggled to {IsActive}", variantId, serviceId, isActive);

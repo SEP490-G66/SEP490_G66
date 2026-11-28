@@ -47,7 +47,7 @@ namespace OZE.Application.Services
             var email = request.Email.Trim();
             await EnsureUniqueAsync(email, PhoneNumberHelper.GetLookupVariants(phoneNumber), licenseNumber, null, 0);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var staff = new StaffProfile
             {
                 FullName = request.FullName.Trim(),
@@ -131,7 +131,7 @@ namespace OZE.Application.Services
             staff.PhoneNumber = phoneNumber;
             staff.Specialization = specialization;
             staff.LicenseNumber = licenseNumber;
-            staff.UpdatedAt = DateTimeOffset.UtcNow;
+            staff.UpdatedAt = ClinicClock.UtcNow;
 
             var result = await _registrationRepository.ExecuteInTransactionAsync(
                 () => SaveStaffAsync(user, currentRole, request.Role),
@@ -151,7 +151,7 @@ namespace OZE.Application.Services
 
             // BR-088: the account is locked instead of deleted, so the staff member cannot log in.
             staff.IsActive = false;
-            staff.UpdatedAt = DateTimeOffset.UtcNow;
+            staff.UpdatedAt = ClinicClock.UtcNow;
             user.LockoutEnabled = true;
             user.LockoutEnd = DateTimeOffset.MaxValue;
             // The access tokens already handed out end now too
@@ -185,7 +185,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(!staff.IsActive, ErrorConstants.StaffMessage.AlreadyActive);
 
             staff.IsActive = true;
-            staff.UpdatedAt = DateTimeOffset.UtcNow;
+            staff.UpdatedAt = ClinicClock.UtcNow;
             user.LockoutEnd = null;
             user.AccessFailedCount = 0;
 

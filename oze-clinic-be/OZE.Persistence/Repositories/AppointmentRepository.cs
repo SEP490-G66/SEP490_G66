@@ -376,7 +376,7 @@ namespace OZE.Persistence.Repositories
                 return ids;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             await _context.Appointments
                 .Where(x => ids.Contains(x.Id) && x.Status == AppointmentConstants.PendingStatus)
                 .ExecuteUpdateAsync(s => s

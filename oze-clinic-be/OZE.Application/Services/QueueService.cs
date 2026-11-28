@@ -37,7 +37,7 @@ namespace OZE.Application.Services
             string? notes = null,
             CancellationToken cancellationToken = default)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
 
             var entry = new QueueEntry
             {
@@ -72,7 +72,7 @@ namespace OZE.Application.Services
                 return null;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             entry.Status = newStatus;
 
             if (newStatus == QueueConstants.Called)
@@ -149,7 +149,7 @@ namespace OZE.Application.Services
                 && !atImaging.Contains(x.AppointmentId)
                 && (!offDuty || x.Appointment?.Examination != null)))
             {
-                var calledAt = DateTimeOffset.UtcNow;
+                var calledAt = ClinicClock.UtcNow;
                 // Someone else may have called this patient a moment ago, then the next one in line is ours
                 if (!await _queueRepository.TryMarkCalledAsync(next.Id, roomId, calledAt, cancellationToken))
                 {
@@ -196,7 +196,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(DateOnly.FromDateTime(ClinicClock.ToClinicTime(entry!.CreatedAt)) == DateOnly.FromDateTime(ClinicClock.Today), ErrorConstants.QueueMessage.NotInTodayQueue);
             ConditionGuard.Ensure(entry.Status == QueueConstants.Waiting, ErrorConstants.QueueMessage.OnlyWaitingCanBeCalled);
 
-            var calledAt = DateTimeOffset.UtcNow;
+            var calledAt = ClinicClock.UtcNow;
             // Checked again in the update itself: someone else may have called this number a moment ago
             ConditionGuard.Ensure(await _queueRepository.TryMarkCalledAsync(entry.Id, roomId, calledAt, cancellationToken),
                 ErrorConstants.QueueMessage.OnlyWaitingCanBeCalled);

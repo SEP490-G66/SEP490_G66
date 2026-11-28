@@ -30,4 +30,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="OZE.Common.Helpers" />
+  </ItemGroup>
+
 </Project>

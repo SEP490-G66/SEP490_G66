@@ -46,7 +46,7 @@ namespace OZE.Application.Services
                     IpAddress = http?.Connection.RemoteIpAddress?.ToString(),
                     UserAgent = string.IsNullOrEmpty(userAgent) ? null : userAgent[..Math.Min(userAgent.Length, MaxUserAgentLength)],
                     AdditionalData = additionalData,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = ClinicClock.UtcNow
                 });
             }
             catch (Exception ex)

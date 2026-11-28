@@ -36,6 +36,7 @@ import { QUEUE_TEXT as TEXT } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
 import { fitsRoomTypes } from "@/utils/constants/room";
 import { cx } from "@/utils/cx";
+import { serverNow } from "@/services/clinicTimeService";
 
 const REFRESH_MS = 20_000;
 const PRIORITY_OPTIONS = [["", TEXT.ALL], ...Object.entries(PRIORITY_LABEL).reverse()];
@@ -51,7 +52,7 @@ const loadQueue = async () => {
         waiting: list(waiting),
         today: list(today),
         entries: list(entries),
-        at: waiting.success && today.success && entries.success ? new Date().toISOString() : null,
+        at: waiting.success && today.success && entries.success ? serverNow().toISOString() : null,
     };
 };
 

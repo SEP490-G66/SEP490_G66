@@ -4,6 +4,7 @@ import { RECEPTION_DESK, ROOM_STATUSES, ROOM_TYPES } from "../utils/constants/ro
 import { AFTERNOON_STARTS_AT, LEAVE_REQUEST_STATUSES, SHIFT_SLOTS, SHIFT_SLOT_OPTIONS, SHIFT_STATUSES } from "../utils/constants/shift";
 import api from "./api";
 import { call } from "./receptionService";
+import { serverNow } from "@/services/clinicTimeService";
 
 // Shift schedule of the manager (api/work-shifts). The backend stores single shifts (person, day, start/end, room);
 // the page shows them as a week grid: one card per room and slot (morning / afternoon). The reception desk is the
@@ -126,7 +127,7 @@ const slotOf = (value) => SHIFT_SLOT_OPTIONS.find((slot) => slot.value === value
 const slotOfTime = (time) => (hhmm(time) < AFTERNOON_STARTS_AT ? SHIFT_SLOTS.MORNING : SHIFT_SLOTS.AFTERNOON);
 
 const nowMinutes = () => {
-    const now = new Date();
+    const now = serverNow();
     return now.getHours() * 60 + now.getMinutes();
 };
 
@@ -137,7 +138,7 @@ const toMinutes = (time) => {
 
 // A shift has not started while its day is ahead, or it is today and its start time is ahead.
 const isFuture = (date, start) => {
-    const today = toDateOnly(new Date());
+    const today = toDateOnly(serverNow());
     if (date !== today) return date > today;
     return nowMinutes() < toMinutes(start);
 };
@@ -272,7 +273,7 @@ const weekLabel = (from, to) => `${pad(from.getDate())}/${pad(from.getMonth() + 
 // weekOffset in the result: 0 = this week, 1 = next week, -1 = last week ...
 // editable: the week has not started, so shifts can be assigned and changed.
 export const getWeekShifts = async ({ weekStart }) => {
-    const today = toDateOnly(new Date());
+    const today = toDateOnly(serverNow());
     const from = startOfWeek(parseDay(weekStart));
     const to = addDays(from, 6);
     const fromKey = toDateOnly(from);
@@ -297,7 +298,7 @@ export const getWeekShifts = async ({ weekStart }) => {
         message: null,
         errors: null,
         data: {
-            weekOffset: Math.round((from - startOfWeek(new Date())) / WEEK_MS),
+            weekOffset: Math.round((from - startOfWeek(serverNow())) / WEEK_MS),
             from: fromKey,
             to: toKey,
             label: weekLabel(from, to),

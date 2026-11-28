@@ -25,6 +25,7 @@ import {
     validateFullName,
     validatePhone,
 } from "@/utils/validation";
+import { serverNow } from "@/services/clinicTimeService";
 
 const PHONE_UNCHANGED = "Số điện thoại mới trùng với số hiện tại.";
 
@@ -33,7 +34,7 @@ const RELATIONSHIPS = ["Bố", "Mẹ", "Vợ", "Chồng", "Con", "Anh/chị/em",
 const EMPTY_CONTACT_PERSON = { fullname: "", relationship: "", phone: "" };
 
 // Local date as YYYY-MM-DD, the format of <input type="date">.
-const today = () => new Date().toLocaleDateString("en-CA");
+const today = () => serverNow().toLocaleDateString("en-CA");
 
 // "1990-01-01" -> "01/01/1990"
 const formatDate = (value) => (value ? value.split("-").reverse().join("/") : "");

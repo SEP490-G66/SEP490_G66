@@ -71,7 +71,7 @@ namespace OZE.Application.Services
                     EnsureNotOverpay(payableInvoice, amount);
                 }
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 var payment = new Payment
                 {
                     InvoiceId = payableInvoice.Id,
@@ -149,7 +149,7 @@ namespace OZE.Application.Services
 
                 EnsureNotOverpay(invoice, payment.Amount);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 payment.PaymentStatus = PaymentConstants.Confirmed;
                 payment.PaidAt = now;
                 payment.ConfirmedByUserId = string.IsNullOrWhiteSpace(confirmedByUserId) ? null : confirmedByUserId;
@@ -204,7 +204,7 @@ namespace OZE.Application.Services
                 ClearInstallmentPeriodLink(invoice, payment);
 
                 InvoiceMoneyHelper.Recalculate(invoice);
-                invoice.UpdatedAt = DateTimeOffset.UtcNow;
+                invoice.UpdatedAt = ClinicClock.UtcNow;
                 _invoiceRepository.Update(invoice);
                 await _paymentRepository.SaveChangesAsync(cancellationToken);
 
@@ -298,7 +298,7 @@ namespace OZE.Application.Services
             {
                 period.PaymentId = null;
                 period.PaidAt = null;
-                period.Status = period.DueDate < DateOnly.FromDateTime(DateTime.UtcNow)
+                period.Status = period.DueDate < ClinicClock.TodayDate
                     ? InstallmentConstants.PeriodOverdue
                     : InstallmentConstants.PeriodPending;
             }

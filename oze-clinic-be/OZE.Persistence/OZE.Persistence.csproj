@@ -24,4 +24,8 @@
     <ProjectReference Include="..\OZE.Common\OZE.Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="OZE.Common.Helpers" />
+  </ItemGroup>
+
 </Project>

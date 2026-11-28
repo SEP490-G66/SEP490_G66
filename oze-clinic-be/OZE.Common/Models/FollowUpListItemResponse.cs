@@ -1,3 +1,4 @@
+using OZE.Common.Helpers;
 using System;
 using OZE.Common.Constants;
 
@@ -46,7 +47,7 @@ namespace OZE.Common.Models
             get
             {
                 if (HasActiveAppointment || !FollowUpDate.HasValue) return false;
-                var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(ClinicTimeConstants.UtcOffsetHours));
+                var today = ClinicClock.TodayDate;
                 return FollowUpDate.Value < today;
             }
         }
@@ -69,7 +70,7 @@ namespace OZE.Common.Models
                 }
                 if (FollowUpDate.HasValue)
                 {
-                    var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(ClinicTimeConstants.UtcOffsetHours));
+                    var today = ClinicClock.TodayDate;
                     if (FollowUpDate.Value < today) return "Overdue";
                     if (FollowUpDate.Value == today) return "DueToday";
                     return "PendingBooking";

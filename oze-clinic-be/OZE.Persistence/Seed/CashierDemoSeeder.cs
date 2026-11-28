@@ -135,7 +135,7 @@ namespace OZE.Persistence.Seed
             }
 
             var offset = TimeSpan.FromHours(ClinicTimeConstants.UtcOffsetHours);
-            var today = DateOnly.FromDateTime(DateTime.UtcNow.Add(offset));
+            var today = ClinicClock.TodayDate;
             DateTimeOffset At(int day, string time) => new(today.AddDays(day).ToDateTime(TimeOnly.ParseExact(time, "HH:mm")), offset);
 
             Appointment NewAppointment(Patient patient, int day, string time, string status)

@@ -1,10 +1,11 @@
 import { formatDate, parseDateOnly } from "@/utils/format";
 import { GENDER_LABELS } from "@/utils/messages";
+import { serverNow } from "@/services/clinicTimeService";
 
 const ageOf = (birthDate) => {
     const born = parseDateOnly(birthDate);
     if (!born) return null;
-    const today = new Date();
+    const today = serverNow();
     const hadBirthday = today.getMonth() > born.getMonth() || (today.getMonth() === born.getMonth() && today.getDate() >= born.getDate());
     return today.getFullYear() - born.getFullYear() - (hadBirthday ? 0 : 1);
 };

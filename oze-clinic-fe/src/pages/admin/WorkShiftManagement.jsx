@@ -13,6 +13,7 @@ import useAsync from "@/hooks/useAsync";
 import { SHIFT_ROLE_OPTIONS, copyPreviousWeek, getWeekShifts, roomTypeRole } from "@/services/shiftService";
 import { getWeekStart, toDateOnly } from "@/utils/format";
 import { SHIFT_STATUSES, SHIFT_STATUS_OPTIONS } from "@/utils/constants/shift";
+import { serverNow } from "@/services/clinicTimeService";
 
 const WEEK_NAMES = { 0: "Tuần này", 1: "Tuần sau" };
 
@@ -86,7 +87,7 @@ const WorkShiftManagement = () => {
         setReloadKey((current) => current + 1);
     };
 
-    const today = toDateOnly(new Date());
+    const today = toDateOnly(serverNow());
     const pendingWork = week?.editable ? pendingWorkText(week) : null;
 
     return (

@@ -106,7 +106,7 @@ namespace OZE.Application.Services
             shift.IsPresent = true;
             shift.AbsenceReason = null;
             shift.ActualStartTime = TimeOnly.FromDateTime(ClinicClock.Now);
-            shift.UpdatedAt = DateTimeOffset.UtcNow;
+            shift.UpdatedAt = ClinicClock.UtcNow;
             _workShiftRepository.Update(shift);
             await _workShiftRepository.SaveChangesAsync();
 
@@ -163,7 +163,7 @@ namespace OZE.Application.Services
 
             // Last, so a failure in between leaves the shift open and ending it again finishes the job
             shift.ActualEndTime = nowTime;
-            shift.UpdatedAt = DateTimeOffset.UtcNow;
+            shift.UpdatedAt = ClinicClock.UtcNow;
             _workShiftRepository.Update(shift);
             await _workShiftRepository.SaveChangesAsync();
 
@@ -237,7 +237,7 @@ namespace OZE.Application.Services
                 }
 
                 appointment.Status = item.Status;
-                appointment.UpdatedAt = DateTimeOffset.UtcNow;
+                appointment.UpdatedAt = ClinicClock.UtcNow;
                 await _appointmentRepository.UpdateAsync(appointment);
 
                 // A patient who was waiting goes back in the queue (with a new number, at the back of the same priority)
@@ -256,7 +256,7 @@ namespace OZE.Application.Services
 
             // Last, so a failure in between leaves the shift ended and reopening it again finishes the job
             shift.ActualEndTime = null;
-            shift.UpdatedAt = DateTimeOffset.UtcNow;
+            shift.UpdatedAt = ClinicClock.UtcNow;
             _workShiftRepository.Update(shift);
             await _workShiftRepository.SaveChangesAsync();
 
@@ -322,7 +322,7 @@ namespace OZE.Application.Services
         {
             var oldStatus = appointment.Status;
             appointment.Status = AppointmentConstants.NoShowStatus;
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
             await _appointmentRepository.UpdateAsync(appointment);
 
             // A patient who was waiting leaves the queue board

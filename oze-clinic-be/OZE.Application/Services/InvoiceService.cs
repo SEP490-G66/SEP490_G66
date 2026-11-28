@@ -104,7 +104,7 @@ namespace OZE.Application.Services
                 PaidAmount = 0m,
                 PaymentStatus = InvoiceConstants.Unpaid,
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = ClinicClock.UtcNow,
                 CreatedByUserId = string.IsNullOrWhiteSpace(createdByUserId) ? null : createdByUserId,
                 Items = items
             };
@@ -232,7 +232,7 @@ namespace OZE.Application.Services
                 invoice.FinalAmount = MoneyHelper.Round(invoice.TotalAmount - discount);
             }
 
-            invoice.UpdatedAt = DateTimeOffset.UtcNow;
+            invoice.UpdatedAt = ClinicClock.UtcNow;
             _invoiceRepository.Update(invoice);
             await _invoiceRepository.SaveChangesAsync(cancellationToken);
 
@@ -267,8 +267,8 @@ namespace OZE.Application.Services
             }
 
             invoice.PaymentStatus = InvoiceConstants.Cancelled;
-            invoice.CancelledAt = DateTimeOffset.UtcNow;
-            invoice.UpdatedAt = DateTimeOffset.UtcNow;
+            invoice.CancelledAt = ClinicClock.UtcNow;
+            invoice.UpdatedAt = ClinicClock.UtcNow;
 
             _invoiceRepository.Update(invoice);
             await _invoiceRepository.SaveChangesAsync(cancellationToken);
@@ -419,7 +419,7 @@ namespace OZE.Application.Services
         {
             for (var attempt = 0; attempt < 10; attempt++)
             {
-                var number = $"{InvoiceConstants.NumberPrefix}-{DateTime.UtcNow:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
+                var number = $"{InvoiceConstants.NumberPrefix}-{ClinicClock.UtcDateTime:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
                 if (!await _invoiceRepository.ExistsByNumberAsync(number, cancellationToken))
                 {
                     return number;

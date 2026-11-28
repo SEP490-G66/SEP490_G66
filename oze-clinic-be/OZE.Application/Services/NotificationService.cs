@@ -56,7 +56,7 @@ namespace OZE.Application.Services
             if (!notification!.IsRead)
             {
                 notification.IsRead = true;
-                notification.ReadAt = DateTimeOffset.UtcNow;
+                notification.ReadAt = ClinicClock.UtcNow;
                 await _repository.SaveChangesAsync(cancellationToken);
             }
 
@@ -65,7 +65,7 @@ namespace OZE.Application.Services
 
         public async Task<UnreadCountResponse> MarkAllReadAsync(string userId, CancellationToken cancellationToken = default)
         {
-            await _repository.MarkAllReadAsync(userId, DateTimeOffset.UtcNow, cancellationToken);
+            await _repository.MarkAllReadAsync(userId, ClinicClock.UtcNow, cancellationToken);
             return new UnreadCountResponse { UnreadCount = 0 };
         }
 
@@ -74,7 +74,7 @@ namespace OZE.Application.Services
             var notifications = new List<Notification>();
             try
             {
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 notifications = userIds
                     .Where(id => !string.IsNullOrWhiteSpace(id))
                     .Distinct()

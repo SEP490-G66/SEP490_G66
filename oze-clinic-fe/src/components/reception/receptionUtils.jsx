@@ -3,6 +3,7 @@ import { toast } from "react-toastify";
 import Pagination from "@/components/ui/Pagination";
 import { PRIORITY, getDoctorsOnDuty } from "@/services/receptionService";
 import { roomTypesByDoctor } from "@/utils/constants/room";
+import { serverNow, serverNowMs } from "@/services/clinicTimeService";
 
 // Formatting, status labels and hooks shared by the receptionist pages.
 
@@ -72,10 +73,10 @@ export const weekdayDate = (date) =>
 
 // Clinic time now as "HH:mm", comparable with shift and slot times
 export const clinicClock = () =>
-    new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+    new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Ho_Chi_Minh" }).format(serverNow());
 
 // Whole minutes since a moment (0 when missing or in the future)
-export const minutesSince = (moment, now = Date.now()) => (moment ? Math.max(0, Math.floor((now - new Date(moment).getTime()) / 60_000)) : 0);
+export const minutesSince = (moment, now = serverNowMs()) => (moment ? Math.max(0, Math.floor((now - new Date(moment).getTime()) / 60_000)) : 0);
 
 // "0912 345 678" → "…5678" with the patient code, to tell apart two people with the same name
 export const phoneTail = (phone) => (phone ? `…${phone.replace(/\D/g, "").slice(-4)}` : "");

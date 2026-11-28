@@ -77,7 +77,7 @@ namespace OZE.Application.Services
                 ShiftEnd = shiftEnd,
                 Assignment = request.Assignment?.Trim(),
                 Notes = request.Note?.Trim(),
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
 
             await _workShipRepository.AddAsync(schedule);
@@ -115,7 +115,7 @@ namespace OZE.Application.Services
                 ShiftEnd = item.Preview.ShiftEnd,
                 Assignment = request.Assignment?.Trim(),
                 Notes = request.Note?.Trim(),
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             }).ToList();
 
             await _workShipRepository.AddRangeAsync(schedules);
@@ -513,7 +513,7 @@ namespace OZE.Application.Services
             shift.ShiftEnd = shiftEnd;
             shift.Assignment = request.Assignment?.Trim();
             shift.Notes = request.Note?.Trim();
-            shift.UpdatedAt = DateTimeOffset.UtcNow;
+            shift.UpdatedAt = ClinicClock.UtcNow;
 
             _workShipRepository.Update(shift);
             await _workShipRepository.SaveChangesAsync();

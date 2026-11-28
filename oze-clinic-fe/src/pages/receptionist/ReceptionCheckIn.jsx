@@ -36,6 +36,7 @@ import {
 } from "@/utils/checkIn";
 import { CHECK_IN_TEXT as TEXT } from "@/utils/messages";
 import { cx } from "@/utils/cx";
+import { serverNow } from "@/services/clinicTimeService";
 
 const CRUMBS = [{ label: TEXT.CRUMB }, { label: TEXT.TITLE }];
 const READ = { skipErrorPage: true };
@@ -74,7 +75,7 @@ const ReceptionCheckIn = () => {
         let active = true;
         Promise.all([getTodayAppointments(READ), getWaitingList(READ)]).then(([today, queue]) => {
             if (!active) return;
-            setResult((prev) => (today.success ? { ok: true, items: today.data?.items ?? [], at: new Date().toISOString() } : { ok: false, items: prev?.items ?? [], at: prev?.at ?? null }));
+            setResult((prev) => (today.success ? { ok: true, items: today.data?.items ?? [], at: serverNow().toISOString() } : { ok: false, items: prev?.items ?? [], at: prev?.at ?? null }));
             setWaiting(queue.success && Array.isArray(queue.data) ? queue.data : null);
         });
         return () => {

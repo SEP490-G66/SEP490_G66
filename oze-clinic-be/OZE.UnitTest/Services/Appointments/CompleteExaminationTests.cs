@@ -154,7 +154,7 @@ namespace OZE.UnitTest.Services.Appointments
             await _service.CompleteExaminationAsync(300, DoctorUserId);
 
             examination.FollowUpIsRecall.Should().BeTrue();
-            examination.FollowUpDate.Should().Be(DateOnly.FromDateTime(OZE.Application.Helpers.ClinicClock.Today).AddMonths(6));
+            examination.FollowUpDate.Should().Be(DateOnly.FromDateTime(ClinicClock.Today).AddMonths(6));
             examination.FollowUpNotes.Should().Contain("6 tháng").And.Contain("Lay cao rang");
         }
 

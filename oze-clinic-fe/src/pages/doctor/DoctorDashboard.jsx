@@ -13,6 +13,7 @@ import { DOCTOR_TASK_TYPES, callNextPatient, getDoctorDashboard } from "@/servic
 import { formatDate, formatWeekday, toDateOnly } from "@/utils/format";
 import { GENERIC_ERROR_MESSAGE } from "@/utils/messages";
 import { ROUTES } from "@/utils/routes";
+import { serverNow } from "@/services/clinicTimeService";
 
 const QUEUE_TITLE_ID = "doctor-dashboard-queue";
 const TASKS_TITLE_ID = "doctor-dashboard-tasks";
@@ -141,7 +142,7 @@ const DoctorDashboard = () => {
     const next = queue.find((patient) => !patient.atImaging);
     const shift = data?.shift;
 
-    const todayDate = toDateOnly(new Date());
+    const todayDate = toDateOnly(serverNow());
     const subtitle = `${formatWeekday(todayDate)}, ${formatDate(todayDate)}`;
 
     const handleCallNext = async () => {

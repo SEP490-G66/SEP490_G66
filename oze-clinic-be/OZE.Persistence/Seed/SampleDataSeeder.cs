@@ -394,7 +394,7 @@ namespace OZE.Persistence.Seed
 
             private async Task AddStaffAsync()
             {
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 foreach (var row in StaffRows)
                 {
                     var phone = ToE164(row.Phone);
@@ -454,7 +454,7 @@ namespace OZE.Persistence.Seed
 
             private async Task AddCatalogAsync()
             {
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
 
                 var existingRooms = await _db.Rooms.ToListAsync();
                 foreach (var row in RoomRows)
@@ -544,7 +544,7 @@ namespace OZE.Persistence.Seed
             private void AddShifts()
             {
                 var unassigned = Unassigned.Select(u => (WeekDate(u.Week, u.Weekday), u.Morning, u.Room)).ToHashSet();
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
 
                 for (var date = _monday.AddDays(-70); date <= _monday.AddDays(20); date = date.AddDays(1))
                 {
@@ -660,7 +660,7 @@ namespace OZE.Persistence.Seed
 
             private async Task AddPatientsAsync()
             {
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 foreach (var row in PatientRows)
                 {
                     var patient = new Patient
@@ -991,7 +991,7 @@ namespace OZE.Persistence.Seed
             private Booked Book(Visit visit, string status)
             {
                 var date = Today.AddDays(visit.Day);
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 var items = visit.Book.Select(code => BookedItem(code, now)).ToList();
                 var roomType = items.Select(i => i.Service.RequiredRoomType).FirstOrDefault(t => t != null) ?? RoomTypeConstants.GeneralTreatment;
                 var wanted = visit.WalkIn ? T(visit.CheckIn!).AddMinutes(10) : T(visit.Time);

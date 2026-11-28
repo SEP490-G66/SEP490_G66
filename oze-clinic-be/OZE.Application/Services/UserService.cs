@@ -105,7 +105,7 @@ namespace OZE.Application.Services
 
             // BR-055: the date of birth cannot be in the future. The clinic works in Vietnam time (UTC+7).
             if (request.DateOfBirth is DateOnly dateOfBirth
-                && dateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)))
+                && dateOfBirth > ClinicClock.TodayDate)
             {
                 return ApiResponse<UpdateProfileResponse>.FailureResult(ErrorConstants.AuthMessage.DateOfBirthInvalid);
             }
@@ -317,7 +317,7 @@ namespace OZE.Application.Services
             patient.Gender = update.Gender;
             patient.Email = update.Email;
             patient.Address = update.Address;
-            patient.UpdatedAt = DateTimeOffset.UtcNow;
+            patient.UpdatedAt = ClinicClock.UtcNow;
 
             if (phoneChanged)
             {

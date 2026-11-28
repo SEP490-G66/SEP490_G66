@@ -30,6 +30,7 @@ import {
     slotOf,
 } from "@/utils/followUp";
 import { cx } from "@/utils/cx";
+import { serverNowMs } from "@/services/clinicTimeService";
 
 const READ = { skipErrorPage: true };
 const SEARCH_DELAY_MS = 300;
@@ -62,7 +63,7 @@ const ReceptionFollowUps = () => {
     const [doctors, setDoctors] = useState([]);
     const [dialog, setDialog] = useState(null);
     const [reminding, setReminding] = useState(null);
-    const [now, setNow] = useState(() => Date.now());
+    const [now, setNow] = useState(() => serverNowMs());
     const { schedule, cancel } = useDebounced(SEARCH_DELAY_MS);
 
     usePageTitle(TEXT.DOC_TITLE);
@@ -104,7 +105,7 @@ const ReceptionFollowUps = () => {
     }, [q, from, to, state, page, requestKey]);
 
     useEffect(() => {
-        const tick = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
+        const tick = setInterval(() => setNow(serverNowMs()), CLOCK_TICK_MS);
         return () => clearInterval(tick);
     }, []);
 

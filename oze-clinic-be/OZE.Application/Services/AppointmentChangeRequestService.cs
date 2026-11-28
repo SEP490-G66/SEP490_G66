@@ -85,7 +85,7 @@ namespace OZE.Application.Services
                 PreferredTimes = preferred.Count > 0 ? string.Join('\n', preferred) : null,
                 Note = note.Length > 0 ? note : null,
                 Status = AppointmentChangeRequestConstants.Status.Pending,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             _repository.Add(changeRequest);
             await _repository.SaveChangesAsync(cancellationToken);
@@ -120,7 +120,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(request!.Status == AppointmentChangeRequestConstants.Status.Pending, ErrorConstants.AppointmentChangeRequestMessage.NotPending);
 
             request.Status = AppointmentChangeRequestConstants.Status.Withdrawn;
-            request.HandledAt = DateTimeOffset.UtcNow;
+            request.HandledAt = ClinicClock.UtcNow;
             await _repository.SaveChangesAsync(cancellationToken);
             return ToResponse(request);
         }
@@ -143,7 +143,7 @@ namespace OZE.Application.Services
 
             changeRequest.Status = outcome;
             changeRequest.HandledByUserId = staffUserId;
-            changeRequest.HandledAt = DateTimeOffset.UtcNow;
+            changeRequest.HandledAt = ClinicClock.UtcNow;
             changeRequest.HandlerNote = note.Length > 0 ? note : null;
             await _repository.SaveChangesAsync(cancellationToken);
 

@@ -62,7 +62,7 @@ namespace OZE.Application.Services
                 clinicalIndication.Length <= ImagingRequestConstants.ClinicalIndicationMaxLength,
                 ErrorConstants.ImagingRequestMessage.ClinicalIndicationInvalid);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var imagingRequest = new ImagingRequest
             {
                 ExaminationId = examination.Id,
@@ -189,7 +189,7 @@ namespace OZE.Application.Services
 
             found.RequestStatus = ImagingRequestConstants.Cancelled;
             found.CancelReason = cancelReason;
-            found.UpdatedAt = DateTimeOffset.UtcNow;
+            found.UpdatedAt = ClinicClock.UtcNow;
 
             await _imagingRequestRepository.SaveChangesAsync(cancellationToken);
 
@@ -281,7 +281,7 @@ namespace OZE.Application.Services
         // Marks the request done and, when the patient is waiting for the doctor, puts the patient back at the front of the examination queue
         private async Task<Examination?> CompleteAndReturnPatientAsync(ImagingRequest request, CancellationToken cancellationToken)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             request.RequestStatus = ImagingRequestConstants.Completed;
             request.UpdatedAt = now;
             await _imagingRequestRepository.SaveChangesAsync(cancellationToken);

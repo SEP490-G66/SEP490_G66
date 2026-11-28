@@ -30,4 +30,8 @@
     <ProjectReference Include="..\OZE.Persistence\OZE.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Using Include="OZE.Common.Helpers" />
+  </ItemGroup>
+
 </Project>

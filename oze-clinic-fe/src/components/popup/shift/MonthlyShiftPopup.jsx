@@ -8,6 +8,7 @@ import { cx } from "@/utils/cx";
 import { SHIFT_SLOTS, SHIFT_SLOT_OPTIONS } from "@/utils/constants/shift";
 import { formatDayMonth, toDateOnly } from "@/utils/format";
 import { requiredMessage } from "@/utils/validation";
+import { serverNow } from "@/services/clinicTimeService";
 
 const STAFF_ID = "monthly-shift-staff";
 const MONTH_ID = "monthly-shift-month";
@@ -25,14 +26,14 @@ const emptyPattern = () => WEEKDAYS_SHORT.map(() => ({ [SHIFT_SLOTS.MORNING]: ""
 
 const monthRange = (month) => {
     const [year, monthNumber] = month.split("-").map(Number);
-    const now = new Date();
+    const now = serverNow();
     const tomorrow = toDateOnly(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
     const first = `${month}-01`;
     return { from: first > tomorrow ? first : tomorrow, to: toDateOnly(new Date(year, monthNumber, 0)) };
 };
 
 const monthOptions = () => {
-    const now = new Date();
+    const now = serverNow();
     return Array.from({ length: MONTH_COUNT }, (_, index) => {
         const month = new Date(now.getFullYear(), now.getMonth() + index, 1);
         return { value: `${month.getFullYear()}-${pad(month.getMonth() + 1)}`, label: `${pad(month.getMonth() + 1)}/${month.getFullYear()}` };
@@ -101,7 +102,7 @@ const MonthlyShiftPopup = ({ onClose, onSaved }) => {
     const estimateCount = estimateResult?.created ?? 0;
 
     const monthLabel = months.find((option) => option.value === month)?.label;
-    const today = toDateOnly(new Date());
+    const today = toDateOnly(serverNow());
 
     const selectedCount = useMemo(() => previewItems.filter((item) => item.valid && selectedKeys.has(item.key)).length, [previewItems, selectedKeys]);
     const invalidCount = useMemo(() => previewItems.filter((item) => !item.valid).length, [previewItems]);

@@ -1,4 +1,5 @@
 import { FOLLOW_UP_TEXT as TEXT } from "./messages";
+import { serverNowMs } from "@/services/clinicTimeService";
 
 export const FOLLOW_UP_PAGE_SIZE = 10;
 
@@ -56,7 +57,7 @@ export const dueDateOf = (item, state) => (usesAppointment(item, state) ? item.f
 
 export const slotOf = (item, state) => (usesAppointment(item, state) ? item.followUpTimeSlotStart : null);
 
-export const remindUnlockAt = (item, now = Date.now()) => {
+export const remindUnlockAt = (item, now = serverNowMs()) => {
     if (!item.lastRemindedAt) return null;
     const until = new Date(item.lastRemindedAt).getTime() + REMIND_LOCK_MS;
     return until > now ? new Date(until).toISOString() : null;

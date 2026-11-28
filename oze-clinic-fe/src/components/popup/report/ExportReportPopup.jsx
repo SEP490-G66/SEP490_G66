@@ -8,6 +8,7 @@ import { toDateOnly } from "@/utils/format";
 import { GENERIC_ERROR_MESSAGE } from "@/utils/messages";
 import { downloadReportExcel } from "@/utils/reportExport";
 import { invalidMessage, requiredMessage } from "@/utils/validation";
+import { serverNow } from "@/services/clinicTimeService";
 
 const TYPE_OPTIONS = [
     { value: REPORT_PERIODS.DAY, label: "Ngày" },
@@ -38,7 +39,7 @@ const recentMonths = (today) =>
 // "Xuất báo cáo doanh thu" popup: pick a day, month or year, then download that report as an Excel file.
 // initialPeriod: the period shown on the page (a week falls back to a day).
 const ExportReportPopup = ({ initialPeriod, onClose }) => {
-    const [now] = useState(() => new Date());
+    const [now] = useState(() => serverNow());
     const today = toDateOnly(now);
     const months = recentMonths(now);
     const years = Array.from({ length: YEAR_COUNT }, (_, index) => now.getFullYear() - index);

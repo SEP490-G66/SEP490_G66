@@ -18,6 +18,7 @@ import {
 import { cx } from "@/utils/cx";
 import { CLINIC_HOTLINE, GUEST_HEADER_TEXT as TEXT, MESSAGES, USER_ROLES } from "@/utils/messages";
 import { ROUTES, getSearchRoute, getServiceDetailRoute } from "@/utils/routes";
+import { serverNowMs } from "@/services/clinicTimeService";
 
 const HOVER_CLOSE_DELAY_MS = 150;
 const FOCUSABLE_SELECTOR = "a[href], button:not([disabled]), input:not([disabled])";
@@ -456,7 +457,7 @@ const Notifications = ({ open, onOpenChange }) => {
     useLiveNotifications({
         onNotification: (notification) => {
             setUnreadOverride((current) => (current ?? (countResult?.success ? countResult.data.unreadCount : 0)) + 1);
-            setList((current) => (current && page === 1 ? { ...current, items: [notification, ...current.items], now: Date.now() } : current));
+            setList((current) => (current && page === 1 ? { ...current, items: [notification, ...current.items], now: serverNowMs() } : current));
             toast.info(
                 <div>
                     <p className="font-semibold">{notification.title}</p>
@@ -486,7 +487,7 @@ const Notifications = ({ open, onOpenChange }) => {
         setLoading(false);
         if (!result.success) return;
         setPage(result.data.page);
-        setList({ items: result.data.items, totalPages: result.data.totalPages, now: Date.now() });
+        setList({ items: result.data.items, totalPages: result.data.totalPages, now: serverNowMs() });
         setUnreadOverride(result.data.unreadCount);
     };
 

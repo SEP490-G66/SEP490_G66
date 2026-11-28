@@ -79,7 +79,7 @@ namespace OZE.Application.Services
 
             // BR-055: the date of birth cannot be in the future. The clinic works in Vietnam time (UTC+7).
             var dateOfBirth = request.DateOfBirth!.Value;
-            if (dateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)))
+            if (dateOfBirth > ClinicClock.TodayDate)
             {
                 return ApiResponse<RegisterPendingResponse>.FailureResult(ErrorConstants.AuthMessage.DateOfBirthInvalid);
             }
@@ -254,7 +254,7 @@ namespace OZE.Application.Services
             user ??= new ApplicationUser
             {
                 Id = Guid.NewGuid().ToString(),
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
 
             user.UserName = phoneNumber;
@@ -324,7 +324,7 @@ namespace OZE.Application.Services
                 Gender = pending.Gender,
                 PhoneNumber = pending.PhoneNumber,
                 Email = pending.Email,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
         }
 
@@ -341,7 +341,7 @@ namespace OZE.Application.Services
             {
                 patient.Email = pending.Email;
             }
-            patient.UpdatedAt = DateTimeOffset.UtcNow;
+            patient.UpdatedAt = ClinicClock.UtcNow;
         }
 
         // Returns the account of the OTP session while it is still waiting for verification.
@@ -576,7 +576,7 @@ namespace OZE.Application.Services
                 PhoneNumberConfirmed = false,
                 LockoutEnabled = true,
                 LockoutEnd = null,
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = ClinicClock.UtcNow,
                 SecurityStamp = Guid.NewGuid().ToString()
             };
             user.PasswordHash = _userManager.PasswordHasher.HashPassword(user, Guid.NewGuid().ToString("N"));
@@ -615,7 +615,7 @@ namespace OZE.Application.Services
                 FullName = fullName,
                 Email = email,
                 PhoneNumber = null,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
 
             var updateResult = await _userManager.UpdateAsync(user);

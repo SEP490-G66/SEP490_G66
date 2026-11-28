@@ -4,6 +4,7 @@ import api from "./api";
 import { pendingLeaveRequests } from "./leaveRequestService";
 import { call } from "./receptionService";
 import { pendingRefundRequests } from "./refundRequestService";
+import { serverNow } from "@/services/clinicTimeService";
 
 // Manager report ("Báo cáo" dashboard) built from the backend:
 // - api/invoice-reports/overview: collected revenue, new invoices, revenue by payment method of a date range
@@ -111,7 +112,7 @@ const comparisonLabels = (period, range, previousRange) => {
 // Offset (for getReport) of the day / month / year that contains dateOnly ("2026-10-18").
 export const getReportOffset = (period, dateOnly) => {
     const [year, month, day] = dateOnly.split("-").map(Number);
-    const today = startOfDay(new Date());
+    const today = startOfDay(serverNow());
     if (period === REPORT_PERIODS.YEAR) return year - today.getFullYear();
     if (period === REPORT_PERIODS.MONTH) return (year - today.getFullYear()) * 12 + month - 1 - today.getMonth();
     return Math.round((new Date(year, month - 1, day) - today) / DAY_MS);
@@ -244,7 +245,7 @@ const buildBars = async (period, range, previousRange, today) => {
 // Report of one period. offset: 0 = the current period, -1 = the one before, ...
 // Changes compare with the same number of days at the start of the previous period, so a week in progress is fair.
 export const getReport = async ({ period = REPORT_PERIODS.WEEK, offset = 0 } = {}) => {
-    const now = new Date();
+    const now = serverNow();
     const today = startOfDay(now);
     const range = getRange(period, offset, today);
     const elapsedTo = minDate(range.to, today);

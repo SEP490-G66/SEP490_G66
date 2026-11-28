@@ -62,7 +62,7 @@ namespace OZE.Application.Services
 
             var oldValue = config.ConfigValue;
             config.ConfigValue = newValue;
-            config.UpdatedAt = DateTimeOffset.UtcNow;
+            config.UpdatedAt = ClinicClock.UtcNow;
             config.UpdatedByUserId = userId;
             await _repository.SaveChangesAsync(cancellationToken);
 
