@@ -1,6 +1,7 @@
 import axios from "axios";
 import api from "./api";
 import { APPOINTMENT_ERROR_TEXT, BILLING_TEXT } from "@/utils/messages";
+import { serverNowMs } from "@/services/clinicTimeService";
 
 // Receptionist workspace calls to oze-clinic-be. Every call returns the ApiResponse body
 // ({ success, message, data, errors }); a business error from the server comes back as success: false.
@@ -8,7 +9,7 @@ import { APPOINTMENT_ERROR_TEXT, BILLING_TEXT } from "@/utils/messages";
 // Clinic date (Asia/Ho_Chi_Minh) as "yyyy-mm-dd", the same day the backend uses for ClinicClock.Today
 export const clinicToday = (offsetDays = 0) => {
     const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" })
-        .format(new Date(Date.now() + offsetDays * 86_400_000));
+        .format(new Date(serverNowMs() + offsetDays * 86_400_000));
     return parts;
 };
 

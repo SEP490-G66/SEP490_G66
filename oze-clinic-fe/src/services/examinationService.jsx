@@ -8,6 +8,7 @@ import { ROOM_TYPES } from "../utils/constants/room";
 import { AFTERNOON_STARTS_AT } from "../utils/constants/shift";
 import { imagingTypeLabel } from "../utils/imagingRequest";
 import { QUEUE_STATUS } from "../utils/messages";
+import { serverNow } from "@/services/clinicTimeService";
 
 // Doctor's examination room ("Khám bệnh"). Every call returns the ApiResponse shape ({ success, message, data, errors }).
 // Real API: the room queue (DoctorRoomController), call / skip (QueuesController), start / complete (AppointmentsController),
@@ -282,7 +283,7 @@ const loadPlan = async (examinationId) => {
 // ---- Workspace (queue panel) ----
 
 const shiftOf = (shifts) => {
-    const now = formatClock(new Date());
+    const now = formatClock(serverNow());
     const shift =
         shifts.find((s) => s.actualStartTime && !s.actualEndTime) ??
         shifts.find((s) => now < String(s.shiftEnd ?? "").slice(0, 5)) ??

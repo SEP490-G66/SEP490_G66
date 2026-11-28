@@ -77,7 +77,7 @@ namespace OZE.Application.Services
                 Content = content,
                 OriginalContent = original,
                 CreatedByDoctorId = doctor.Id,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             await _examinationRepository.AddAddendumAsync(addendum, cancellationToken);
             await _examinationRepository.SaveChangesAsync(cancellationToken);
@@ -121,7 +121,7 @@ namespace OZE.Application.Services
             {
                 examination.Symptoms = SerializeSymptoms(request.Symptoms);
             }
-            examination.UpdatedAt = DateTimeOffset.UtcNow;
+            examination.UpdatedAt = ClinicClock.UtcNow;
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
             return await BuildWorkResponseAsync(examination, cancellationToken);
@@ -147,7 +147,7 @@ namespace OZE.Application.Services
                 // Copied now, so a later change of the catalog does not alter this appointment
                 DurationMinutes = (variant?.EstimatedMinutes ?? service.EstimatedMinutes) ?? slotMinutes,
                 PriceAtBooking = variant?.ReferencePrice ?? service.ReferencePrice,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             });
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
@@ -247,7 +247,7 @@ namespace OZE.Application.Services
                     Surface = surface,
                     Severity = severity,
                     Notes = notes,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = ClinicClock.UtcNow
                 });
             }
 
@@ -286,7 +286,7 @@ namespace OZE.Application.Services
             EnsureDraft(prescription);
 
             prescription.Notes = notes;
-            prescription.UpdatedAt = DateTimeOffset.UtcNow;
+            prescription.UpdatedAt = ClinicClock.UtcNow;
             await _examinationRepository.SaveChangesAsync(cancellationToken);
             return ToPrescriptionResponse(examination);
         }
@@ -301,7 +301,7 @@ namespace OZE.Application.Services
 
             item.SortOrder = prescription.Items.Count == 0 ? 1 : prescription.Items.Max(x => x.SortOrder) + 1;
             prescription.Items.Add(item);
-            prescription.UpdatedAt = DateTimeOffset.UtcNow;
+            prescription.UpdatedAt = ClinicClock.UtcNow;
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
             return ToPrescriptionResponse(examination);
@@ -324,7 +324,7 @@ namespace OZE.Application.Services
             existing.Duration = changed.Duration;
             existing.Quantity = changed.Quantity;
             existing.Instructions = changed.Instructions;
-            prescription.UpdatedAt = DateTimeOffset.UtcNow;
+            prescription.UpdatedAt = ClinicClock.UtcNow;
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
             return ToPrescriptionResponse(examination);
@@ -342,7 +342,7 @@ namespace OZE.Application.Services
 
             _examinationRepository.RemovePrescriptionItem(existing!);
             prescription.Items.Remove(existing!);
-            prescription.UpdatedAt = DateTimeOffset.UtcNow;
+            prescription.UpdatedAt = ClinicClock.UtcNow;
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
             return ToPrescriptionResponse(examination);
@@ -377,7 +377,7 @@ namespace OZE.Application.Services
             if (prescription!.Status != PrescriptionConstants.Finalized)
             {
                 prescription.Status = PrescriptionConstants.Finalized;
-                prescription.UpdatedAt = DateTimeOffset.UtcNow;
+                prescription.UpdatedAt = ClinicClock.UtcNow;
                 await _examinationRepository.SaveChangesAsync(cancellationToken);
             }
             return ToPrescriptionResponse(examination);
@@ -392,7 +392,7 @@ namespace OZE.Application.Services
             if (prescription != null && prescription.Status != PrescriptionConstants.Draft)
             {
                 prescription.Status = PrescriptionConstants.Draft;
-                prescription.UpdatedAt = DateTimeOffset.UtcNow;
+                prescription.UpdatedAt = ClinicClock.UtcNow;
                 await _examinationRepository.SaveChangesAsync(cancellationToken);
             }
             return ToPrescriptionResponse(examination);
@@ -412,7 +412,7 @@ namespace OZE.Application.Services
                 Description = description,
                 Teeth = JoinTeeth(request.Teeth),
                 DiagnosedByDoctorId = doctor.Id,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             // The first diagnosis is the primary one without being asked
             var makePrimary = request.IsPrimary || examination.Diagnoses.Count == 0;
@@ -473,7 +473,7 @@ namespace OZE.Application.Services
             var (_, examination) = await LoadAsync(doctorUserId, examinationId, cancellationToken);
             // Allow setting follow-up during InProgress or once Completed; only locked records cannot be changed
             ConditionGuard.Ensure(examination.ExaminationStatus != ExaminationConstants.Locked, ErrorConstants.ExaminationMessage.AlreadyLocked);
-            examination.UpdatedAt = DateTimeOffset.UtcNow;
+            examination.UpdatedAt = ClinicClock.UtcNow;
 
             if (request.FollowUpDate.HasValue)
             {
@@ -575,7 +575,7 @@ namespace OZE.Application.Services
             var followUpDate = examination!.FollowUpDate ?? examination.FollowUpAppointment?.AppointmentDate;
             ConditionGuard.Ensure(followUpDate.HasValue, ErrorConstants.ExaminationMessage.FollowUpNotSet);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             if (!force && examination.FollowUpRemindedAt.HasValue && now - examination.FollowUpRemindedAt.Value < TimeSpan.FromHours(4))
             {
                 throw new BadRequestException("Follow-up reminder has already been sent recently. Please wait before reminding again.");
@@ -625,7 +625,7 @@ namespace OZE.Application.Services
                 return response;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var successfulExams = new List<(Examination Exam, DateOnly FollowUpDate)>();
             var reminderTexts = new Dictionary<long, string>();
             var syncLock = new object();
@@ -823,7 +823,7 @@ namespace OZE.Application.Services
                 PatientId = examination.PatientId,
                 PrescribedByDoctorId = doctor.Id,
                 Status = PrescriptionConstants.Draft,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             examination.Prescriptions.Add(prescription);
             return prescription;
@@ -965,7 +965,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(examination.ExaminationStatus == ExaminationConstants.InProgress, ErrorConstants.ExaminationMessage.AlreadyLocked);
             // Every change also saves the examination row, so its row version is checked: a change racing with
             // "complete" (or another change) fails with 409 instead of landing on a locked examination
-            examination.UpdatedAt = DateTimeOffset.UtcNow;
+            examination.UpdatedAt = ClinicClock.UtcNow;
         }
 
         private async Task<int> GetSlotMinutesAsync()
@@ -1064,7 +1064,7 @@ namespace OZE.Application.Services
             {
                 ExaminationId = examination.Id,
                 PatientId = examination.PatientId,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             ApplyToothFinding(finding, request);
             examination.ToothFindings.Add(finding);
@@ -1080,7 +1080,7 @@ namespace OZE.Application.Services
             var finding = examination.ToothFindings.FirstOrDefault(x => x.Id == findingId);
             ConditionGuard.Ensure<NotFoundException>(finding != null, ErrorConstants.ExaminationMessage.ToothFindingNotFound);
             ApplyToothFinding(finding!, request);
-            finding!.UpdatedAt = DateTimeOffset.UtcNow;
+            finding!.UpdatedAt = ClinicClock.UtcNow;
 
             await _examinationRepository.SaveChangesAsync(cancellationToken);
             return ToToothFindingResponses(examination.ToothFindings);

@@ -5,6 +5,7 @@ import { call } from "./receptionService";
 import { formatClock, getClinicToday } from "../utils/format";
 import { imagingTypeLabel } from "../utils/imagingRequest";
 import { GENDER_LABELS, QUEUE_STATUS } from "../utils/messages";
+import { serverNow, serverNowMs } from "@/services/clinicTimeService";
 
 // Doctor's "Tổng quan". Every call returns the ApiResponse shape ({ success, message, data, errors }).
 // Real API: the room of the shift (GET api/doctor-room), today's shifts (GET api/schedules/my),
@@ -17,7 +18,7 @@ export const DOCTOR_TASK_TYPES = {
 const success = (data, message = null) => ({ success: true, message, data, errors: null });
 const failure = (message) => ({ success: false, message, data: null, errors: null });
 
-const minutesSince = (value) => (value ? Math.max(0, Math.round((Date.now() - Date.parse(value)) / 60_000)) : 0);
+const minutesSince = (value) => (value ? Math.max(0, Math.round((serverNowMs() - Date.parse(value)) / 60_000)) : 0);
 
 const ageOf = (birthDate) => {
     if (!birthDate) return null;
@@ -28,7 +29,7 @@ const ageOf = (birthDate) => {
 
 // The shift running now, else the first one of today still to come, else the last one
 const shiftOfToday = (shifts) => {
-    const now = formatClock(new Date());
+    const now = formatClock(serverNow());
     const shift =
         shifts.find((item) => item.actualStartTime && !item.actualEndTime) ??
         shifts.find((item) => now < String(item.shiftEnd ?? "").slice(0, 5)) ??

@@ -59,7 +59,7 @@ namespace OZE.Application.Services
                     paymentId = payment!.Id;
                 }
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 var refundRequest = new RefundAdjustmentRequest
                 {
                     InvoiceId = invoice!.Id,
@@ -142,7 +142,7 @@ namespace OZE.Application.Services
                 ConditionGuard.Ensure(workDone < netPaid, ErrorConstants.RefundMessage.WorkDoneExceedsPaid);
 
                 refundRequest.WorkDoneAmount = workDone;
-                refundRequest.UpdatedAt = DateTimeOffset.UtcNow;
+                refundRequest.UpdatedAt = ClinicClock.UtcNow;
                 invoice.UpdatedAt = refundRequest.UpdatedAt;
                 _invoiceRepository.Update(invoice);
                 await _refundRepository.SaveChangesAsync(cancellationToken);
@@ -186,7 +186,7 @@ namespace OZE.Application.Services
 
                 var refundAmount = MoneyHelper.Round(netPaid - workDone);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 refundRequest.Amount = refundAmount;
                 // BE-B3: approved, the receptionist pays it out later (payout)
                 refundRequest.Status = PaymentConstants.RefundRequestStatus.Approved;
@@ -250,7 +250,7 @@ namespace OZE.Application.Services
                     refundRequest!.Status == PaymentConstants.RefundRequestStatus.Pending,
                     ErrorConstants.RefundMessage.RequestNotPending);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 refundRequest.Status = PaymentConstants.RefundRequestStatus.Rejected;
                 refundRequest.RejectionReason = rejectionReason;
                 refundRequest.ApprovedByUserId = string.IsNullOrWhiteSpace(rejectedByUserId) ? null : rejectedByUserId;
@@ -303,7 +303,7 @@ namespace OZE.Application.Services
                     refundRequest!.Status == PaymentConstants.RefundRequestStatus.Approved,
                     ErrorConstants.RefundMessage.RequestNotApproved);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 refundRequest.Status = PaymentConstants.RefundRequestStatus.Processed;
                 refundRequest.ProcessedAt = now;
                 // So the cash paid out is counted in this receptionist's cash session

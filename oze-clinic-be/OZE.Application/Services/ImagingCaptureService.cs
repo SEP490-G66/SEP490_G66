@@ -85,7 +85,7 @@ namespace OZE.Application.Services
             }, cancellationToken);
             EnsureSimulatorAnswered(started);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var capture = new ImagingCapture
             {
                 ImagingRequestId = imagingRequestId,
@@ -147,7 +147,7 @@ namespace OZE.Application.Services
                 ImagingRequestConstants.QueueStatuses.Contains(imagingRequest!.RequestStatus),
                 string.Format(ErrorConstants.ImagingCaptureMessage.RequestNotOpen, imagingRequest.RequestStatus));
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var results = new List<ImagingResult>();
             foreach (var file in files)
             {
@@ -329,7 +329,7 @@ namespace OZE.Application.Services
             List<SimulatorImage>? images,
             CancellationToken cancellationToken)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
 
             if (status == ImagingCaptureConstants.Completed)
             {
@@ -359,7 +359,7 @@ namespace OZE.Application.Services
                 var stored = await GetCaptureResultsAsync(capture, cancellationToken);
                 var storedPaths = stored.Select(r => r.FilePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 var results = new List<ImagingResult>();
                 foreach (var image in images.OrderBy(i => i.SequenceNumber))
                 {

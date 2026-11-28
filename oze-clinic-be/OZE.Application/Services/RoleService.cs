@@ -41,7 +41,7 @@ namespace OZE.Application.Services
             {
                 Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
                 IsActive = true,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
 
             var result = await _roleManager.CreateAsync(role);
@@ -57,7 +57,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure<NotFoundException>(role != null, ErrorConstants.RoleMessage.RoleNotFound);
 
             role!.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
-            role.UpdatedAt = DateTimeOffset.UtcNow;
+            role.UpdatedAt = ClinicClock.UtcNow;
 
             var result = await _roleManager.UpdateAsync(role);
             ConditionGuard.Ensure(result.Succeeded,

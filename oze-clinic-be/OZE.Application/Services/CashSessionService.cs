@@ -51,7 +51,7 @@ namespace OZE.Application.Services
                     ClinicClock.ToClinicTime(other.OpenedAt).ToString("HH:mm dd/MM/yyyy")));
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var session = new CashSession
             {
                 OpenedByUserId = userId,
@@ -93,7 +93,7 @@ namespace OZE.Application.Services
                 Category = category,
                 Description = description,
                 CreatedByUserId = userId,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             session.Expenses.Add(expense);
             session.UpdatedAt = expense.CreatedAt;
@@ -113,7 +113,7 @@ namespace OZE.Application.Services
 
             session.Expenses.Remove(expense!);
             _cashSessionRepository.RemoveExpense(expense!);
-            session.UpdatedAt = DateTimeOffset.UtcNow;
+            session.UpdatedAt = ClinicClock.UtcNow;
             await _cashSessionRepository.SaveChangesAsync(cancellationToken);
 
             await _auditLogService.LogAsync(AuditConstants.CashExpenseRemoved, AuditConstants.CashSessionEntity, session.Id.ToString(),
@@ -150,7 +150,7 @@ namespace OZE.Application.Services
                     ErrorConstants.CashSessionMessage.HandoverInvalid);
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var numbers = await ComputeAsync(session, now, cancellationToken);
             // A payment, expense or refund came in while the drawer was being counted: count again on the new figures
             var figuresChanged = (request.ExpectedCash.HasValue && MoneyHelper.Round(request.ExpectedCash.Value) != numbers.ExpectedCash)
@@ -379,7 +379,7 @@ namespace OZE.Application.Services
         private async Task<CashSessionResponse> ToResponseAsync(CashSession session, CancellationToken cancellationToken)
         {
             var isClosed = session.Status == CashSessionConstants.Closed;
-            var numbers = await ComputeAsync(session, session.ClosedAt ?? DateTimeOffset.UtcNow.AddSeconds(1), cancellationToken);
+            var numbers = await ComputeAsync(session, session.ClosedAt ?? ClinicClock.UtcNow.AddSeconds(1), cancellationToken);
             var names = await _cashSessionRepository.GetStaffNamesAsync(
                 new[] { session.OpenedByUserId, session.HandoverToUserId ?? string.Empty }, cancellationToken);
 

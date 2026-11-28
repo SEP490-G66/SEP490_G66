@@ -74,7 +74,7 @@ namespace OZE.Application.Services
             }
 
             var groupId = Guid.NewGuid();
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var documents = new List<PatientDocument>();
             foreach (var file in files)
             {
@@ -174,7 +174,7 @@ namespace OZE.Application.Services
             var unseen = documents.Where(d => d.SeenAt == null).ToList();
             if (unseen.Count > 0)
             {
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 foreach (var document in unseen)
                 {
                     document.SeenAt = now;

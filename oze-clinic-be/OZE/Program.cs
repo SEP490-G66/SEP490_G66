@@ -229,6 +229,38 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+// Fake clinic time for testing (Clinic:FakeNow, Development only). Set before seeding so "today" data matches it,
+// and read again when appsettings.Development.json / appsettings.Local.json changes, so the time can be moved without a restart
+var clockLogger = app.Services.GetRequiredService<ILogger<Program>>();
+void ApplyClinicClock()
+{
+    var fakeNow = app.Configuration[ClinicClock.FakeNowKey];
+    if (!app.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(fakeNow))
+    {
+        clockLogger.LogWarning("{Key} is ignored outside Development; the clinic runs on the real clock.", ClinicClock.FakeNowKey);
+        ClinicClock.Configure(null);
+        return;
+    }
+
+    try
+    {
+        var fake = ClinicClock.Configure(fakeNow, app.Configuration[ClinicClock.FakeNowModeKey]);
+        if (fake != null)
+        {
+            clockLogger.LogWarning("Clinic clock is FAKE: {Now:yyyy-MM-dd HH:mm:ss} clinic time ({Mode}).", ClinicClock.Now,
+                app.Configuration[ClinicClock.FakeNowModeKey] ?? "Frozen");
+        }
+    }
+    catch (FormatException ex)
+    {
+        clockLogger.LogError(ex, "Clinic clock setting is invalid; the real clock is used.");
+        ClinicClock.Configure(null);
+    }
+}
+
+ApplyClinicClock();
+Microsoft.Extensions.Primitives.ChangeToken.OnChange(app.Configuration.GetReloadToken, ApplyClinicClock);
+
 // 6. Global Exception Middleware
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<OZE.ProjectBase.Middlewares.SlowRequestLoggingMiddleware>();

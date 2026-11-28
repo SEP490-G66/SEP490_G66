@@ -49,7 +49,7 @@ namespace OZE.Application.Services
             var email = string.IsNullOrWhiteSpace(request.Email) ? null : request.Email.Trim();
             ConditionGuard.ThrowIf(email != null && !new EmailAddressAttribute().IsValid(email), ErrorConstants.AuthMessage.EmailInvalid);
 
-            var recent = await _repository.HasRecentNewAsync(phone, DateTimeOffset.UtcNow.AddMinutes(-RepeatMinutes), cancellationToken);
+            var recent = await _repository.HasRecentNewAsync(phone, ClinicClock.UtcNow.AddMinutes(-RepeatMinutes), cancellationToken);
             ConditionGuard.ThrowIf(recent, ErrorConstants.ConsultationMessage.AlreadySent);
 
             var entity = new ConsultationRequest
@@ -59,7 +59,7 @@ namespace OZE.Application.Services
                 Email = email,
                 Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
                 Status = New,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             await _repository.AddAsync(entity, cancellationToken);
             await _repository.SaveChangesAsync(cancellationToken);
@@ -97,7 +97,7 @@ namespace OZE.Application.Services
             entity.Status = status!;
             entity.HandleNote = string.IsNullOrWhiteSpace(request.Note) ? entity.HandleNote : request.Note.Trim();
             entity.HandledByUserId = userId;
-            entity.HandledAt = DateTimeOffset.UtcNow;
+            entity.HandledAt = ClinicClock.UtcNow;
             await _repository.SaveChangesAsync(cancellationToken);
 
             await _auditLogService.LogAsync(AuditConstants.ConsultationHandled, AuditConstants.ConsultationEntity, entity.Id.ToString(),

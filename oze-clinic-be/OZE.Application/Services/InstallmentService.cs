@@ -82,7 +82,7 @@ namespace OZE.Application.Services
             {
                 InvoiceId = invoice.Id,
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = ClinicClock.UtcNow,
                 CreatedByUserId = string.IsNullOrWhiteSpace(createdByUserId) ? null : createdByUserId,
                 Periods = periods
             };

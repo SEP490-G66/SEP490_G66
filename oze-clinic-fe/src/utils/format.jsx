@@ -1,3 +1,5 @@
+import { serverNow } from "@/services/clinicTimeService";
+
 const WEEKDAYS = ["Chủ nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" });
@@ -30,7 +32,7 @@ const getClinicParts = (value) => {
 export const toDateOnly = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
 // Monday of the week containing date, as "YYYY-MM-DD".
-export const getWeekStart = (date = new Date()) =>
+export const getWeekStart = (date = serverNow()) =>
     toDateOnly(new Date(date.getFullYear(), date.getMonth(), date.getDate() - ((date.getDay() + 6) % 7)));
 
 export const DAY_MS = 86_400_000;
@@ -99,7 +101,7 @@ export const toClinicDateTime = (dateOnly, time) => {
 };
 
 export const getClinicToday = () => {
-    const parts = getClinicParts(new Date());
+    const parts = getClinicParts(serverNow());
     return `${parts.year}-${parts.month}-${parts.day}`;
 };
 
@@ -120,7 +122,7 @@ export const formatClock = (value) => {
 };
 
 // Greeting by time of day: "Chào buổi sáng" before 12h, "Chào buổi chiều" before 18h, then "Chào buổi tối".
-export const getGreeting = (date = new Date()) => {
+export const getGreeting = (date = serverNow()) => {
     const hour = date.getHours();
     if (hour < 12) return "Chào buổi sáng";
     if (hour < 18) return "Chào buổi chiều";

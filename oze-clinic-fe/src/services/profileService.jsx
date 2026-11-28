@@ -3,6 +3,7 @@ import { getMockCurrentUser, updateMockUser } from "../utils/data/mockData";
 import { BACKEND_ROLE_NAMES, PROFILE_MESSAGES, VALIDATION_MESSAGES } from "../utils/messages";
 import { invalidMessage } from "../utils/validation";
 import { getSessionRole, updateSessionUserName } from "./sessionStore";
+import { serverNow } from "@/services/clinicTimeService";
 
 const PROFILE_REQUEST_CONFIG = { skipErrorPage: true };
 
@@ -159,7 +160,7 @@ export const resendProfileOtp = async ({ sessionId }) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const today = () => new Date().toLocaleDateString("en-CA");
+const today = () => serverNow().toLocaleDateString("en-CA");
 
 const mockFailure = (message) => ({ success: false, message, data: null, errors: null });
 

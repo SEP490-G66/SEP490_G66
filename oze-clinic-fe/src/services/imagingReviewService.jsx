@@ -3,6 +3,7 @@ import { call } from "./receptionService";
 import { loadPictures } from "./imagingPictures";
 import { formatClock, getClinicDateTimeParts, getClinicToday } from "@/utils/format";
 import { imagingTypeLabel } from "@/utils/imagingRequest";
+import { serverNow } from "@/services/clinicTimeService";
 
 // "Duyệt kết quả chụp": imaging requests the signed-in doctor ordered (ImagingReviewsController).
 // Every call returns the ApiResponse shape ({ success, message, data, errors }).
@@ -33,7 +34,7 @@ const shortTime = (value) => {
 const ageOf = (birthDate) => {
     if (!birthDate) return null;
     const born = new Date(birthDate);
-    const now = new Date();
+    const now = serverNow();
     let age = now.getFullYear() - born.getFullYear();
     if (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())) age -= 1;
     return age;

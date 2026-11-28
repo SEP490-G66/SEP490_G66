@@ -130,7 +130,7 @@ namespace OZE.Application.Services
             patient.EmergencyContactName = request.EmergencyContactName?.Trim();
             patient.EmergencyContactPhone = request.EmergencyContactPhone?.Trim();
             patient.Notes = request.Notes?.Trim();
-            patient.CreatedAt = DateTimeOffset.UtcNow;
+            patient.CreatedAt = ClinicClock.UtcNow;
 
             await _patientRepository.AddAsync(patient, cancellationToken);
             await _patientRepository.SaveChangesAsync(cancellationToken);
@@ -214,7 +214,7 @@ namespace OZE.Application.Services
             patient.EmergencyContactName = request.EmergencyContactName?.Trim();
             patient.EmergencyContactPhone = request.EmergencyContactPhone?.Trim();
             patient.Notes = request.Notes?.Trim();
-            patient.UpdatedAt = DateTimeOffset.UtcNow;
+            patient.UpdatedAt = ClinicClock.UtcNow;
 
             await _patientRepository.UpdateAsync(patient, cancellationToken);
             await _patientRepository.SaveChangesAsync(cancellationToken);
@@ -241,7 +241,7 @@ namespace OZE.Application.Services
                 return ApiResponse<bool>.FailureResult(ErrorConstants.PatientMessage.HasOpenAppointments);
             }
 
-            patient.DeletedAt = DateTimeOffset.UtcNow;
+            patient.DeletedAt = ClinicClock.UtcNow;
             await _patientRepository.UpdateAsync(patient, cancellationToken);
             await _patientRepository.SaveChangesAsync(cancellationToken);
 
@@ -290,7 +290,7 @@ namespace OZE.Application.Services
             profile.Severity = normalizedSeverity;
             profile.Status = normalizedStatus!;
             profile.CreatedByUserId = createdByUserId;
-            profile.CreatedAt = DateTimeOffset.UtcNow;
+            profile.CreatedAt = ClinicClock.UtcNow;
 
             await _patientRepository.AddMedicalProfileAsync(profile, cancellationToken);
             await _patientRepository.SaveChangesAsync(cancellationToken);

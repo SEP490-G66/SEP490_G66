@@ -127,7 +127,7 @@ namespace OZE.Application.Services
                             FullName = request.FullName.Trim(),
                             PhoneNumber = phone,
                             Email = email,
-                            CreatedAt = DateTimeOffset.UtcNow
+                            CreatedAt = ClinicClock.UtcNow
                         };
                         await _appointmentRepository.AddPatientAsync(patient);
                     }
@@ -239,7 +239,7 @@ namespace OZE.Application.Services
                             Gender = gender,
                             DateOfBirth = request.DateOfBirth,
                             Address = address,
-                            CreatedAt = DateTimeOffset.UtcNow
+                            CreatedAt = ClinicClock.UtcNow
                         };
                         await _appointmentRepository.AddPatientAsync(patient);
                     }
@@ -401,7 +401,7 @@ namespace OZE.Application.Services
                     Notes = string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
                     ParentAppointmentId = parentAppointmentId,
                     TreatmentPlanStageId = treatmentPlanStageId,
-                    CreatedAt = DateTimeOffset.UtcNow,
+                    CreatedAt = ClinicClock.UtcNow,
                     CreatedByUserId = createdByUserId,
                     // Saved together with the appointment in the same transaction
                     ServiceItems = lines.Select(l => new AppointmentServiceItem
@@ -410,7 +410,7 @@ namespace OZE.Application.Services
                         VariantId = l.Variant?.Id,
                         DurationMinutes = l.GetMinutes(slotMinutes),
                         PriceAtBooking = l.Price,
-                        CreatedAt = DateTimeOffset.UtcNow
+                        CreatedAt = ClinicClock.UtcNow
                     }).ToList()
                 };
                 await _appointmentRepository.AddAsync(appointment);
@@ -833,15 +833,15 @@ namespace OZE.Application.Services
             var oldStatus = appointment!.Status;
             appointment.Status = AppointmentConstants.CancelledStatus;
             appointment.CancellationReason = request!.Reason.Trim();
-            appointment.CancelledAt = DateTimeOffset.UtcNow;
+            appointment.CancelledAt = ClinicClock.UtcNow;
             appointment.CancelledByUserId = userId;
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
 
             // If this appointment was a follow-up appointment, release the active link on the original examination
             if (appointment.ParentAppointment?.Examination != null && appointment.ParentAppointment.Examination.FollowUpAppointmentId == appointment.Id)
             {
                 appointment.ParentAppointment.Examination.FollowUpAppointmentId = null;
-                appointment.ParentAppointment.Examination.UpdatedAt = DateTimeOffset.UtcNow;
+                appointment.ParentAppointment.Examination.UpdatedAt = ClinicClock.UtcNow;
             }
 
             await _appointmentRepository.UpdateAsync(appointment);
@@ -944,18 +944,18 @@ namespace OZE.Application.Services
                         VariantId = l.Variant?.Id,
                         DurationMinutes = l.GetMinutes(slotMinutes),
                         PriceAtBooking = l.Price,
-                        CreatedAt = DateTimeOffset.UtcNow
+                        CreatedAt = ClinicClock.UtcNow
                     }));
                 }
                 // A patient's change still needs the receptionist's call; staff changed it after talking to the patient
                 appointment.Status = isPatient ? AppointmentConstants.PendingStatus : AppointmentConstants.ConfirmedStatus;
-                appointment.UpdatedAt = DateTimeOffset.UtcNow;
+                appointment.UpdatedAt = ClinicClock.UtcNow;
 
                 // Keep parent examination's follow-up date in sync with the rescheduled appointment date
                 if (appointment.ParentAppointment?.Examination != null && appointment.ParentAppointment.Examination.FollowUpAppointmentId == appointment.Id)
                 {
                     appointment.ParentAppointment.Examination.FollowUpDate = date;
-                    appointment.ParentAppointment.Examination.UpdatedAt = DateTimeOffset.UtcNow;
+                    appointment.ParentAppointment.Examination.UpdatedAt = ClinicClock.UtcNow;
                 }
 
                 await _appointmentRepository.UpdateAsync(appointment);
@@ -1028,7 +1028,7 @@ namespace OZE.Application.Services
 
             var oldStatus = appointment.Status;
             appointment.Status = AppointmentConstants.ConfirmedStatus;
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
 
             await _appointmentRepository.UpdateAsync(appointment);
             await _auditLogService.LogAsync(AuditConstants.AppointmentConfirmed, AuditConstants.AppointmentEntity, appointment.Id.ToString(),
@@ -1080,8 +1080,8 @@ namespace OZE.Application.Services
             appointment.Status = AppointmentConstants.CheckedInStatus;
             appointment.Priority = priority;
             appointment.PriorityReason = PriorityReasonOf(priority, request?.Reason);
-            appointment.CheckInAt = DateTimeOffset.UtcNow;
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.CheckInAt = ClinicClock.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
 
             await _appointmentRepository.UpdateAsync(appointment);
 
@@ -1246,7 +1246,7 @@ namespace OZE.Application.Services
 
             var oldDoctorId = appointment.DoctorId;
             appointment.DoctorId = newDoctorId;
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
             await _appointmentRepository.UpdateAsync(appointment);
 
             // The same queue entry goes to the new doctor: the number, missed calls and priority stay, so the doctor calls the
@@ -1318,7 +1318,7 @@ namespace OZE.Application.Services
             var queueNote = string.Join(" · ", new[] { $"Chuyển từ {fromRoom ?? "phòng khám"}", appointment.Doctor?.FullName, note }
                 .Where(x => !string.IsNullOrWhiteSpace(x)));
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var oldDoctorId = appointment.DoctorId;
             appointment.DoctorId = surgeonId;
             // Waiting again, now to be called by the surgery doctor (who resumes the same examination)
@@ -1362,7 +1362,7 @@ namespace OZE.Application.Services
 
             var oldStatus = appointment.Status;
             appointment.Status = AppointmentConstants.NoShowStatus;
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
             await _appointmentRepository.UpdateAsync(appointment);
 
             if (_queueService != null)
@@ -1447,14 +1447,14 @@ namespace OZE.Application.Services
                         Gender = gender,
                         EmergencyContactName = string.IsNullOrWhiteSpace(request.EmergencyContactName) ? null : request.EmergencyContactName.Trim(),
                         EmergencyContactPhone = emergencyPhone,
-                        CreatedAt = DateTimeOffset.UtcNow,
+                        CreatedAt = ClinicClock.UtcNow,
                         MedicalProfiles = history.Select(h => new PatientMedicalProfile
                         {
                             RecordType = h.RecordType,
                             Title = h.Title,
                             Status = PatientConstants.MedicalProfile.AllowedStatuses[0],
                             CreatedByUserId = createdByUserId,
-                            CreatedAt = DateTimeOffset.UtcNow
+                            CreatedAt = ClinicClock.UtcNow
                         }).ToList()
                     };
                     await _appointmentRepository.AddPatientAsync(patient);
@@ -1475,14 +1475,14 @@ namespace OZE.Application.Services
                     {
                         pending.Status = AppointmentConstants.CancelledStatus;
                         pending.CancellationReason = WalkInCancelReason;
-                        pending.CancelledAt = DateTimeOffset.UtcNow;
+                        pending.CancelledAt = ClinicClock.UtcNow;
                         pending.CancelledByUserId = createdByUserId;
-                        pending.UpdatedAt = DateTimeOffset.UtcNow;
+                        pending.UpdatedAt = ClinicClock.UtcNow;
                         replacedPending.Add(pending.Id);
                     }
                 }
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 var appointment = new Appointment
                 {
                     Patient = patient,
@@ -1658,7 +1658,7 @@ namespace OZE.Application.Services
             appointment.Priority = priority;
             // Back to normal clears the reason
             appointment.PriorityReason = PriorityReasonOf(priority, request.Reason);
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
 
             await _appointmentRepository.UpdateAsync(appointment);
 
@@ -1700,7 +1700,7 @@ namespace OZE.Application.Services
             var isExamining = await _appointmentRepository.HasAppointmentInServiceAsync(doctorId!.Value, appointment.AppointmentDate);
             ConditionGuard.ThrowIf(isExamining, ErrorConstants.AppointmentMessage.DoctorAlreadyExamining);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var oldStatus = appointment.Status;
             appointment.Status = AppointmentConstants.InServiceStatus;
             appointment.UpdatedAt = now;
@@ -1772,7 +1772,7 @@ namespace OZE.Application.Services
             ConditionGuard.ThrowIf(draftPrescriptions > 0, ErrorConstants.ExaminationMessage.PrescriptionNotFinalized);
             await _appointmentRepository.RemoveEmptyDraftPrescriptionsAsync(examination.Id, cancellationToken);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var oldStatus = appointment.Status;
             examination.ExaminationStatus = "Locked";
             examination.LockedAt = now;
@@ -2053,7 +2053,7 @@ namespace OZE.Application.Services
 
             // Q9: a follow-up booked by the receptionist is confirmed directly; one set by the doctor waits for the receptionist
             appointment.Status = byDoctor ? AppointmentConstants.PendingStatus : AppointmentConstants.ConfirmedStatus;
-            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+            appointment.UpdatedAt = ClinicClock.UtcNow;
 
             originalAppointment.Examination.FollowUpAppointmentId = appointment.Id;
             originalAppointment.Examination.FollowUpDate = appointment.AppointmentDate;
@@ -2061,7 +2061,7 @@ namespace OZE.Application.Services
             {
                 originalAppointment.Examination.FollowUpNotes = request.Notes.Trim();
             }
-            originalAppointment.Examination.UpdatedAt = DateTimeOffset.UtcNow;
+            originalAppointment.Examination.UpdatedAt = ClinicClock.UtcNow;
 
             // The confirmation SMS/email goes out only for a confirmed booking; a pending one is confirmed later by the receptionist
             if (!byDoctor)

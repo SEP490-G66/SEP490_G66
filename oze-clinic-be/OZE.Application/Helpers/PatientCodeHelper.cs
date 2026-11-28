@@ -6,6 +6,6 @@ namespace OZE.Application.Helpers
     {
         // Format: BN-yyMMdd-XXXXXX (fits Patients.PatientCode NVARCHAR(20)).
         public static string Generate() =>
-            $"BN-{DateTime.UtcNow:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
+            $"BN-{ClinicClock.UtcDateTime:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
     }
 }

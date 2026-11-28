@@ -44,7 +44,7 @@ namespace OZE.Application.Services
             var waiting = request.Results.Where(x => x.ReviewStatus == MedicalRecordConstants.PendingImageStatus).ToList();
             ConditionGuard.Ensure(waiting.Count > 0, ErrorConstants.ImagingCaptureMessage.NothingToReview);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             foreach (var result in waiting)
             {
                 result.ReviewStatus = MedicalRecordConstants.ReviewedImageStatus;
@@ -79,7 +79,7 @@ namespace OZE.Application.Services
                 ClinicalIndication = request.ClinicalIndication
             }, cancellationToken);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             foreach (var result in request.Results.Where(x => x.ReviewStatus == MedicalRecordConstants.PendingImageStatus))
             {
                 result.ReviewStatus = MedicalRecordConstants.RejectedImageStatus;

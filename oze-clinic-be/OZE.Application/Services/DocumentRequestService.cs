@@ -72,7 +72,7 @@ namespace OZE.Application.Services
                 Note = note,
                 Category = category,
                 Status = DocumentRequestConstants.Pending,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             await _repository.AddAsync(documentRequest, cancellationToken);
 
@@ -143,7 +143,7 @@ namespace OZE.Application.Services
                 string.Format(ErrorConstants.DocumentRequestMessage.RequestNotPending, request.Status));
 
             request.Status = DocumentRequestConstants.Cancelled;
-            request.UpdatedAt = DateTimeOffset.UtcNow;
+            request.UpdatedAt = ClinicClock.UtcNow;
             await _repository.SaveChangesAsync(cancellationToken);
 
             await NotifyAsync(n => n.NotifyPatientAsync(request.PatientId,
@@ -199,7 +199,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(address.Length <= ProvidedDocumentConstants.ProviderAddressMaxLength, ErrorConstants.ProvidedDocumentMessage.ProviderAddressInvalid);
             ConditionGuard.Ensure(patientNote.Length <= ProvidedDocumentConstants.NoteMaxLength, ErrorConstants.ProvidedDocumentMessage.NoteInvalid);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var documents = new List<PatientDocument>();
             foreach (var file in files)
             {

@@ -27,7 +27,7 @@ namespace OZE.Persistence.Seed
             {
                 if (!await roleManager.RoleExistsAsync(role))
                 {
-                    await roleManager.CreateAsync(new ApplicationRole(role) { CreatedAt = DateTimeOffset.UtcNow });
+                    await roleManager.CreateAsync(new ApplicationRole(role) { CreatedAt = ClinicClock.UtcNow });
                     logger.LogInformation("Role '{Role}' created successfully.", role);
                 }
             }

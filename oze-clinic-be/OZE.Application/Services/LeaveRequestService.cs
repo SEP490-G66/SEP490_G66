@@ -63,7 +63,7 @@ namespace OZE.Application.Services
                 Slot = slot,
                 Reason = reason,
                 Status = LeaveRequestConstants.Pending,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             await _leaveRequestRepository.AddAsync(leave, cancellationToken);
             await _leaveRequestRepository.SaveChangesAsync(cancellationToken);
@@ -102,7 +102,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(leave.Status == LeaveRequestConstants.Pending, ErrorConstants.LeaveRequestMessage.NotPending);
 
             leave.Status = LeaveRequestConstants.Cancelled;
-            leave.UpdatedAt = DateTimeOffset.UtcNow;
+            leave.UpdatedAt = ClinicClock.UtcNow;
             await _leaveRequestRepository.SaveChangesAsync(cancellationToken);
 
             await _auditLogService.LogAsync(AuditConstants.LeaveCancelled, EntityType, leave.Id.ToString(),
@@ -147,7 +147,7 @@ namespace OZE.Application.Services
                     await _leaveRequestRepository.GetOpenAppointmentsOnDateAsync(leave.StaffProfileId, leave.LeaveDate, cancellationToken),
                     shifts);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 if (!string.IsNullOrWhiteSpace(request.SubstituteStaffUserId))
                 {
                     var substitute = await ValidateSubstituteAsync(leave, request.SubstituteStaffUserId.Trim(), shifts, cancellationToken);
@@ -218,7 +218,7 @@ namespace OZE.Application.Services
             var leave = await LoadAsync(id, cancellationToken);
             ConditionGuard.Ensure(leave.Status == LeaveRequestConstants.Pending, ErrorConstants.LeaveRequestMessage.NotPending);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             leave.Status = LeaveRequestConstants.Rejected;
             leave.RejectionReason = reason;
             leave.ReviewedByUserId = managerUserId;

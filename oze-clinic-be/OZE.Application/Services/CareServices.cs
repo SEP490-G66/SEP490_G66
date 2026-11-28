@@ -47,7 +47,7 @@ namespace OZE.Application.Services
                 Note = string.IsNullOrWhiteSpace(request.Note) ? null : request.Note.Trim(),
                 CallBackDate = outcome == CareConstants.OutcomeCallBack ? request.CallBackDate : null,
                 CreatedByUserId = userId,
-                CreatedAt = DateTimeOffset.UtcNow
+                CreatedAt = ClinicClock.UtcNow
             };
             exam.FollowUpContacts.Add(contact);
             // Declined stops the reminders; any other outcome keeps (or reopens) the follow-up
@@ -142,7 +142,7 @@ namespace OZE.Application.Services
             var stats = await _careRepository.GetReminderStatsAsync(new[] { invoiceId }, cancellationToken);
             if (!request.Force && stats.TryGetValue(invoiceId, out var last))
             {
-                ConditionGuard.ThrowIf(last.Last > DateTimeOffset.UtcNow.AddHours(-CareConstants.PaymentReminderCooldownHours), ErrorConstants.CareMessage.RemindedRecently);
+                ConditionGuard.ThrowIf(last.Last > ClinicClock.UtcNow.AddHours(-CareConstants.PaymentReminderCooldownHours), ErrorConstants.CareMessage.RemindedRecently);
             }
 
             var period = NextOpenPeriod(invoice, today);
@@ -193,7 +193,7 @@ namespace OZE.Application.Services
             var today = DateOnly.FromDateTime(ClinicClock.Today);
             var periods = await _careRepository.GetPeriodsToRemindAsync(targetDate, today, cancellationToken);
             var lastByPeriod = await _careRepository.GetLastReminderByPeriodAsync(periods.Select(x => x.Id), cancellationToken);
-            var overdueCutoff = DateTimeOffset.UtcNow.AddDays(-CareConstants.OverdueReminderEveryDays);
+            var overdueCutoff = ClinicClock.UtcNow.AddDays(-CareConstants.OverdueReminderEveryDays);
 
             var due = periods
                 .Where(p => p.DueDate == targetDate
@@ -281,7 +281,7 @@ namespace OZE.Application.Services
                 Message = message.Length <= 1000 ? message : message[..1000],
                 IsAutomatic = isAutomatic,
                 SentByUserId = isAutomatic ? null : userId,
-                SentAt = DateTimeOffset.UtcNow
+                SentAt = ClinicClock.UtcNow
             };
             await _careRepository.AddReminderAsync(reminder, cancellationToken);
             return reminder;
@@ -448,7 +448,7 @@ namespace OZE.Application.Services
                 RefundTotal = current.RefundTotal,
                 Notes = notes,
                 ConfirmedByUserId = userId,
-                ConfirmedAt = DateTimeOffset.UtcNow
+                ConfirmedAt = ClinicClock.UtcNow
             };
             await _careRepository.AddReconciliationAsync(reconciliation, cancellationToken);
             await _careRepository.SaveChangesAsync(cancellationToken);

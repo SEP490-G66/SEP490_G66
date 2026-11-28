@@ -153,7 +153,7 @@ namespace OZE.Application.Services
                 var option = request.Option?.Trim().ToUpperInvariant() ?? string.Empty;
                 ConditionGuard.Ensure(CashierConstants.Option.All.Contains(option), ErrorConstants.CashierMessage.OptionInvalid);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 plan.PaymentOption = option;
                 plan.DepositRate = option == CashierConstants.Option.Deposit
                     ? await GetDepositRatePercentAsync(cancellationToken)
@@ -194,7 +194,7 @@ namespace OZE.Application.Services
                 var error = CashierCalculator.ReceiptError(account, lines);
                 ConditionGuard.ThrowIf(error != null, error ?? string.Empty);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 var isCash = method == PaymentConstants.Cash;
                 var code = await NewReceiptCodeAsync(cancellationToken);
                 var reference = isCash ? null : NullIfEmpty(request.TransactionReference?.Trim());
@@ -267,7 +267,7 @@ namespace OZE.Application.Services
                 // Installment payments of the old flow also mark their period; they are confirmed on the invoice screen
                 ConditionGuard.ThrowIf(payments.Any(p => p.Purpose == PaymentConstants.PurposeInstallment), ErrorConstants.CashierMessage.KindInvalid);
 
-                var now = DateTimeOffset.UtcNow;
+                var now = ClinicClock.UtcNow;
                 foreach (var payment in payments)
                 {
                     if (confirm)
@@ -328,7 +328,7 @@ namespace OZE.Application.Services
                     var invoice = await _cashierRepository.GetTrackedPlanInvoiceAsync(plan.Id, cancellationToken);
                     if (invoice != null)
                     {
-                        SyncPlanInvoice(invoice, plan, DateTimeOffset.UtcNow);
+                        SyncPlanInvoice(invoice, plan, ClinicClock.UtcNow);
                     }
                 }
 
@@ -527,7 +527,7 @@ namespace OZE.Application.Services
         {
             for (var attempt = 0; attempt < 10; attempt++)
             {
-                var number = $"{InvoiceConstants.NumberPrefix}-{DateTime.UtcNow:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
+                var number = $"{InvoiceConstants.NumberPrefix}-{ClinicClock.UtcDateTime:yyMMdd}-{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
                 if (!await _cashierRepository.InvoiceNumberExistsAsync(number, cancellationToken))
                 {
                     return number;

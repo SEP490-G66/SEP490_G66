@@ -6,13 +6,14 @@ import Modal from "@/components/ui/Modal";
 import { deleteCertificate, saveCertificate } from "@/services/profileService";
 import { cx } from "@/utils/cx";
 import { isRequiredEmpty, requiredMessage } from "@/utils/validation";
+import { serverNow } from "@/services/clinicTimeService";
 
 const TEXT_MAX = 200;
 const EMPTY_CERTIFICATE = { name: "", issuer: "", number: "", issuedAt: "", expiresAt: "" };
 const ICON_BUTTON_CLASS = "btn btn-icon size-8 hover:bg-surface-tint";
 
 // Local date as YYYY-MM-DD, the format of <input type="date">.
-const today = () => new Date().toLocaleDateString("en-CA");
+const today = () => serverNow().toLocaleDateString("en-CA");
 
 // "2020-06-15" -> "15/06/2020"
 const formatDate = (value) => (value ? value.split("-").reverse().join("/") : "");

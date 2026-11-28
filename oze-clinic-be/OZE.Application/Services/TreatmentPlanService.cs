@@ -73,7 +73,7 @@ namespace OZE.Application.Services
 
             var validStages = await ValidateStagesAsync(request.Stages, cancellationToken);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var plan = new TreatmentPlan
             {
                 ExaminationId = examination.Id,
@@ -138,7 +138,7 @@ namespace OZE.Application.Services
 
             var validStages = await ValidateStagesAsync(request.Stages, cancellationToken);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
 
             // Mark old plan as Superseded
             oldPlan.Status = TreatmentPlanConstants.Superseded;
@@ -206,7 +206,7 @@ namespace OZE.Application.Services
                 plan.Stages.Remove(removedStage);
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             for (var i = 0; i < validStages.Count; i++)
             {
                 var stageId = request.Stages[i].Id;
@@ -276,7 +276,7 @@ namespace OZE.Application.Services
             ConditionGuard.Ensure(plan.Stages.Count > 0, ErrorConstants.TreatmentPlanMessage.StagesRequired);
 
             plan.Status = TreatmentPlanConstants.Proposed;
-            plan.UpdatedAt = DateTimeOffset.UtcNow;
+            plan.UpdatedAt = ClinicClock.UtcNow;
 
             await _treatmentPlanRepository.SaveChangesAsync(cancellationToken);
             return ToProgressResponse(plan);
@@ -297,7 +297,7 @@ namespace OZE.Application.Services
         {
             ConditionGuard.Ensure(plan.Status == TreatmentPlanConstants.Proposed, ErrorConstants.TreatmentPlanMessage.OnlyProposedCanBeApproved);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             plan.Status = TreatmentPlanConstants.Approved;
             plan.ApprovedAt = now;
             plan.UpdatedAt = now;
@@ -331,7 +331,7 @@ namespace OZE.Application.Services
             var stageInProgress = plan.Stages.Any(s => s.StageStatus == TreatmentPlanConstants.StageStatus.InProgress);
             ConditionGuard.ThrowIf(stageInProgress, ErrorConstants.TreatmentPlanMessage.StageStillInProgress);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             var cancelledStages = plan.Stages.Where(s => s.StageStatus == TreatmentPlanConstants.StageStatus.Scheduled).ToList();
             foreach (var stage in cancelledStages)
             {
@@ -479,7 +479,7 @@ namespace OZE.Application.Services
                 && s.StageStatus != TreatmentPlanConstants.StageStatus.Cancelled);
             ConditionGuard.ThrowIf(earlierStageOpen, ErrorConstants.TreatmentPlanMessage.EarlierStageNotCompleted);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             stage.StageStatus = TreatmentPlanConstants.StageStatus.InProgress;
             stage.UpdatedAt = now;
 
@@ -530,7 +530,7 @@ namespace OZE.Application.Services
                     ErrorConstants.TreatmentPlanMessage.NotesRequiredWhenCostDiffers);
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
 
             if (request.NextStageScheduledDate.HasValue)
             {
@@ -608,7 +608,7 @@ namespace OZE.Application.Services
                 costDiffers && string.IsNullOrWhiteSpace(notes),
                 ErrorConstants.TreatmentPlanMessage.NotesRequiredWhenCostDiffers);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             stage.Notes = notes;
             stage.ActualCost = actualCost;
             stage.StageStatus = TreatmentPlanConstants.StageStatus.Completed;
@@ -667,7 +667,7 @@ namespace OZE.Application.Services
                 costDiffers && string.IsNullOrWhiteSpace(notes),
                 ErrorConstants.TreatmentPlanMessage.NotesRequiredWhenCostDiffers);
 
-            var now = DateTimeOffset.UtcNow;
+            var now = ClinicClock.UtcNow;
             stage.Notes = notes;
             stage.ActualCost = actualCost;
             stage.StageStatus = TreatmentPlanConstants.StageStatus.Completed;

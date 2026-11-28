@@ -27,6 +27,7 @@ import {
     isInClinic,
 } from "@/utils/patientQueue";
 import { ROUTES, getMedicalRecordDetailRoute } from "@/utils/routes";
+import { serverNow } from "@/services/clinicTimeService";
 
 const APPOINTMENT_ID_PATTERN = /^[1-9]\d{0,17}$/;
 const NOT_FOUND_TOAST_ID = "appointment-not-found";
@@ -326,7 +327,7 @@ const AppointmentDetail = () => {
     const focusRequestRef = useRef(null);
     const redirectedRef = useRef(false);
     const asyncState = useAsync(
-        () => (validId ? getMyAppointmentDetail(appointmentId).then((value) => ({ ...value, receivedAt: new Date() })) : Promise.resolve(null)),
+        () => (validId ? getMyAppointmentDetail(appointmentId).then((value) => ({ ...value, receivedAt: serverNow() })) : Promise.resolve(null)),
         [appointmentId, validId, retryCount],
     );
     const [live, setLive] = useState(null);
@@ -361,7 +362,7 @@ const AppointmentDetail = () => {
                 refreshingRef.current = false;
             });
         if (result?.success === true && isPlainObject(result.data) && isPlainObject(result.data.appointment)) {
-            setLive({ base, detail: result.data, receivedAt: new Date(), error: false });
+            setLive({ base, detail: result.data, receivedAt: serverNow(), error: false });
             if (manual) toast.success(TEXT.REFRESH_SUCCESS);
             return;
         }
@@ -450,7 +451,7 @@ const AppointmentDetail = () => {
     const showChanged = (data) => {
         restoreFocusRef.current = true;
         setModal(null);
-        setLive({ base: asyncState.value, detail: data, receivedAt: new Date(), error: false });
+        setLive({ base: asyncState.value, detail: data, receivedAt: serverNow(), error: false });
     };
 
     const leaveNotFound = () => {
